@@ -327,14 +327,13 @@ fn step_matches_across_the_row_table() {
     for (label, table) in [("rows", &doc.rows), ("nonFinite", &doc.non_finite)] {
         for (i, row) in table.iter().enumerate() {
             assert_eq!(row.len(), 6, "{label}[{i}] has {} columns", row.len());
-            let state = MispricingState {
-                s: bits(&row[0]),
-                s_prev: bits(&row[1]),
+            let state = {
+                let mut mispricing_state = MispricingState::default();
+                mispricing_state.s = bits(&row[0]);
+                mispricing_state.s_prev = bits(&row[1]);
+                mispricing_state
             };
-            let inputs = MispricingInputs {
-                innovation: bits(&row[2]),
-                shock: bits(&row[3]),
-            };
+            let inputs = MispricingInputs::new(bits(&row[2]), bits(&row[3]));
             let got = step_mispricing(&state, &inputs);
 
             for (field, g, want_hex) in [("s", got.s, &row[4]), ("sPrev", got.s_prev, &row[5])] {
@@ -712,9 +711,11 @@ fn check_trajectory(file: &str) {
     assert_eq!(doc.shocks.len(), meta.steps, "{file}: shock count");
     assert_eq!(doc.output_s.len(), meta.steps, "{file}: output count");
 
-    let mut state = MispricingState {
-        s: meta.initial_state.s.f(),
-        s_prev: meta.initial_state.s_prev.f(),
+    let mut state = {
+        let mut mispricing_state = MispricingState::default();
+        mispricing_state.s = meta.initial_state.s.f();
+        mispricing_state.s_prev = meta.initial_state.s_prev.f();
+        mispricing_state
     };
     for (label, g, w) in [
         ("initialState.s", state.s, &meta.initial_state.s),
@@ -740,10 +741,7 @@ fn check_trajectory(file: &str) {
     for i in 0..meta.steps {
         state = step_mispricing(
             &state,
-            &MispricingInputs {
-                innovation: doc.innovations.at(i),
-                shock: doc.shocks.at(i),
-            },
+            &MispricingInputs::new(doc.innovations.at(i), doc.shocks.at(i)),
         );
 
         // sPrev is not recorded per step because it is s[i-1] by

@@ -158,7 +158,7 @@ def test_the_registry_docstring_counts_the_registry():
     from tradefloor import interventions
 
     words = {"ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13,
-             "fourteen": 14, "fifteen": 15}
+             "fourteen": 14, "fifteen": 15, "sixteen": 16}
     source = pathlib.Path(interventions.__file__).read_text(encoding="utf-8")
     claims = re.findall(r"of the (\w+) targets|list of (\w+) names", source)
     found = [w for pair in claims for w in pair if w]
@@ -205,6 +205,12 @@ def test_every_registered_target_reads_and_writes_the_engine():
             after = tuple(v * 0.5 for v in before)
         else:
             after = (before * 0.5) if before else 0.01
+        # The spread is held within the meeting formula's 0.8 to 6 per cent.
+        # pt-v21, the default from 0.10.0, opens seed 1 at a spread of 0.99
+        # per cent, where half is under the floor, so it is written up by
+        # half instead (pt-v20 opened at 1.83 per cent).
+        if name == "macro.corporate_spread" and after < 0.008:
+            after = before * 1.5
         target.write(engine, after)
         assert target.read(engine) == pytest.approx(after), name
 

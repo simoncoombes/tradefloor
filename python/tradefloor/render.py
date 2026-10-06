@@ -1,33 +1,33 @@
 """Turn an allowlisted observation payload into the text an agent reads.
 
-This module exists to ask one question: how much of what an agent decides
-is the market, and how much is how the market was described to it.
-Four adapters already turn `integrations.common.serialize_observation` (or
+It is for measuring how much of what an agent decides comes from the
+market and how much from how the market was described to it. Four
+adapters already turn `integrations.common.serialize_observation` (or
 FinRobot's own copy of it, `integrations.finrobot.observe`) into text, each
-its own way -- FinRobot writes prose, LangGraph and PydanticAI dump sorted
-JSON, OpenAI Agents sends the same JSON as a second message. A `Renderer`
-is the seam that lets one payload be shown four ways, or the four adapters
-be handed one renderer, and the decisions compared.
+its own way. FinRobot writes prose, LangGraph and PydanticAI dump sorted
+JSON, and OpenAI Agents sends the same JSON as a second message. A
+`Renderer` lets one payload be shown four ways, or the four adapters be
+handed one renderer, so the decisions can be compared.
 
 ## What a renderer never sees
 
-A :class:`Renderer` takes the payload and nothing else. Not the
-`Observation`, not the engine. `serialize_observation` already drew the
-line between what an agent may see and what only the simulator knows;
-handing a renderer anything beyond the payload it was given would let a
-formatting choice reopen that boundary, and the allowlist test would not
-see it happen, because it inspects the payload the serializer built, not
-what a renderer read afterwards.
+A :class:`Renderer` takes the payload and nothing else, neither the
+`Observation` nor the engine. `serialize_observation` already drew the
+line between what an agent may see and what only the simulator knows.
+Handing a renderer anything beyond the payload would let a formatting
+choice reopen that boundary, and the allowlist test would not see it
+happen, because it inspects the payload the serializer built and not what
+a renderer read afterwards.
 
 ## What stays outside a renderer
 
-A mandate, a brief, an "Objective" section: whatever an adapter tells its
-framework about the TASK rather than about the MARKET. Two adapters
-concatenate that text onto the rendered payload (FinRobot, LangGraph) and
-two send it as a separate message (PydanticAI, OpenAI Agents), and a
-renderer that took a position on which would be deciding something that is
-each adapter's own choice, not this module's. A :class:`Renderer` renders
-`payload`; the instructions stay where each adapter already keeps them.
+Anything an adapter tells its framework about the TASK rather than the
+MARKET (a mandate, a brief, an "Objective" section) is not rendered. Two
+adapters concatenate that text onto the rendered payload (FinRobot,
+LangGraph) and two send it as a separate message (PydanticAI, OpenAI
+Agents). That choice belongs to each adapter, so a renderer takes no
+position on it. A :class:`Renderer` renders `payload`, and the
+instructions stay where each adapter already keeps them.
 
 ## Two renderers, and why there are two
 
@@ -35,10 +35,10 @@ each adapter's own choice, not this module's. A :class:`Renderer` renders
 today: `payload`, `json.dumps`-ed with sorted keys. :class:`TextRenderer`
 is what FinRobot sends today, generalised over four axes of the
 observation (`detail`, `units`, `order` and `language`), so the same knobs
-that vary FinRobot's prompt can be turned on any adapter's. Neither is
-privileged by the :class:`Renderer` protocol; an adapter's default is
-whichever reproduces what it already sends, and `invariance` takes any object
-with `render` and `key`.
+that vary FinRobot's prompt can be turned on any adapter's. The
+:class:`Renderer` protocol favours neither. An adapter's default is
+whichever reproduces what it already sends, and `invariance` takes any
+object with `render` and `key`.
 """
 
 from __future__ import annotations
@@ -60,19 +60,19 @@ LANGUAGE = ("en", "fr")
 class Renderer(Protocol):
     """What every adapter's `renderer=` argument, and `invariance`, accept.
 
-    Two methods, and nothing else is assumed. `render` turns one
-    allowlisted payload into the text an agent reads; `key` names the exact
+    A renderer needs two methods and nothing else. `render` turns one
+    allowlisted payload into the text an agent reads. `key` names the exact
     configuration that produced it, stable across calls, so a transcript
     and an `Invariance` table can say which renderer is which without
     printing every argument beside it.
 
     `@runtime_checkable` makes `isinstance` check method PRESENCE, not
-    signature. It is what :func:`check_renderer` uses -- every adapter's
-    constructor and :func:`~tradefloor.counterfactual.invariance` call it
-    on a `renderer` argument before storing it, which is what turns
-    passing the wrong kind of object into a clear refusal at construction
-    rather than an `AttributeError` three calls deep inside an adapter,
-    the first time something asks for `.key()`.
+    signature. :func:`check_renderer` uses it, and every adapter's
+    constructor and :func:`~tradefloor.counterfactual.invariance` call
+    that on a `renderer` argument before storing it. Passing the wrong kind
+    of object is then refused at construction, instead of raising an
+    `AttributeError` three calls deep inside an adapter the first time
+    something asks for `.key()`.
     """
 
     def render(self, payload: dict[str, Any]) -> str:
@@ -85,11 +85,10 @@ class Renderer(Protocol):
 def check_renderer(renderer: Any, *, where: str) -> None:
     """Refuse anything that is not a :class:`Renderer`, by name.
 
-    `isinstance(renderer, Renderer)` alone would do the same check but
-    say only that the check failed; this names the argument and the type
-    that was actually given, since a wrong-shaped `renderer=` is a
-    construction-time mistake and the message a caller meets should say
-    what to fix, not that something failed three frames away.
+    `isinstance(renderer, Renderer)` alone does the same check but says
+    only that it failed. This names the argument and the type that was
+    given. A wrong-shaped `renderer=` is a construction-time mistake, and
+    the message a caller meets should say what to fix.
     """
     if not isinstance(renderer, Renderer):
         raise ValidationError(
@@ -98,32 +97,31 @@ def check_renderer(renderer: Any, *, where: str) -> None:
 
 
 class JSONRenderer:
-    """`payload`, as canonical JSON. `key()` is `"json"`.
+    """Renders `payload` as canonical JSON, and `key()` returns `"json"`.
 
-    Sorted keys and a two-space indent: what LangGraph's and PydanticAI's
-    current prompts already send, and what OpenAI Agents' current second
-    message already sends in substance -- see below. A replay key is a
-    digest of this text, and an unordered dump would give the same market
-    two keys depending on how a dict happened to be built.
+    It uses sorted keys and a two-space indent, which is what LangGraph's
+    and PydanticAI's current prompts send and, in substance, what OpenAI
+    Agents' second message sends (see below). A replay key is a digest of
+    this text, and an unordered dump would give the same market two keys
+    depending on how a dict happened to be built.
 
-    No `default=` hook, unlike OpenAI Agents' own prior construction
-    (`json.dumps(payload, ..., default=float)`), and this is a real
-    narrowing, not a no-op tidy-up. `serialize_observation` and `observe`
-    emit only JSON-native values for every field THEY compute, but
-    `fundamentals` is caller-supplied and passed through unconverted, by
-    design -- see `serialize_observation`'s own docstring -- so a caller
-    who puts a `decimal.Decimal` or a `numpy.float64` in a fundamentals
-    value is not doing anything the allowlist forbids. LangGraph's
-    `render` and PydanticAI's `render` already raised on that case, with
-    no `default=` of their own; only OpenAI Agents silently coerced it to
-    a plain float. This class picks the reading two adapters out of three
-    already had: raise, with json's own `TypeError`, naming the type it
-    could not encode, rather than convert a value silently -- the same
-    choice PydanticAI's own `_jsonable` states explicitly, because a
-    value rendered as something other than what it was would change a
-    replay key without changing anything a reader could see. OpenAI
-    Agents loses the silent conversion on this specific input; nothing
-    else the default renderer sends changes.
+    There is no `default=` hook, unlike OpenAI Agents' own prior
+    construction (`json.dumps(payload, ..., default=float)`), and that
+    changes behaviour. `serialize_observation` and `observe` emit only
+    JSON-native values for every field THEY compute, but `fundamentals` is
+    caller-supplied and passed through unconverted, by design (see
+    `serialize_observation`'s own docstring), so a caller who puts a
+    `decimal.Decimal` or a `numpy.float64` in a fundamentals value is not
+    doing anything the allowlist forbids. LangGraph's `render` and
+    PydanticAI's `render` already raised on that case, with no `default=`
+    of their own. Only OpenAI Agents silently coerced it to a plain float.
+    This class does what two adapters out of three already did. It raises
+    json's own `TypeError`, naming the type it could not encode, instead of
+    converting the value silently. PydanticAI's own `_jsonable` states the
+    same choice, because a value rendered as something other than what it
+    was would change a replay key without changing anything a reader could
+    see. OpenAI Agents loses the silent conversion on this specific input,
+    and nothing else the default renderer sends changes.
     """
 
     def render(self, payload: dict[str, Any]) -> str:
@@ -176,6 +174,7 @@ _LABELS: dict[str, dict[str, str]] = {
         "avg_daily_volume": "  avg daily volume",
         "position": "  your position",
         "max_order_shares": "  max order this step",
+        "dividend": "  dividend paid today",
         "cash": "cash",
         "net_worth": "net worth",
         "leverage": "leverage",
@@ -222,6 +221,7 @@ _LABELS: dict[str, dict[str, str]] = {
         "avg_daily_volume": "  volume quotidien moyen",
         "position": "  votre position",
         "max_order_shares": "  ordre maximal ce pas",
+        "dividend": "  dividende verse ce jour",
         "cash": "liquidites",
         "net_worth": "valeur nette",
         "leverage": "levier",
@@ -333,96 +333,93 @@ def _sector_rows(assets: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 class TextRenderer:
-    """The payload as prose: macro, then assets, then the portfolio.
+    """Renders the payload as prose: macro, then assets, then the portfolio.
 
     The all-default construction, `TextRenderer()`, reproduces
     `integrations.finrobot.render` character for character on every
-    payload that carries no `detail` -- which is every payload
+    payload that carries no `detail`, which is every payload
     `integrations.finrobot.observe` has ever built for an existing caller,
-    since `detail` is `None` there too by default. That is what lets
-    FinRobot's adapter, and any other adapter, fall back to this class
-    without moving a single committed fixture's key.
+    since `detail` is `None` there too by default. So FinRobot's adapter,
+    and any other adapter, can fall back to this class without moving any
+    committed fixture's key.
 
     ``detail`` -- ``None`` renders a full block per asset, in ``order``.
     A sequence switches to the large-universe form: a sector summary
     (`_sector_rows`, computed from `payload["assets"]`), one compact row
-    per symbol, and a full block for `detail` -- exactly the given
-    symbols, dropping any this market does not list, unless
-    ``union_held`` says otherwise.
+    per symbol, and a full block for exactly the symbols in `detail`,
+    dropping any this market does not list, unless ``union_held`` says
+    otherwise.
 
     ``union_held`` -- ``False`` by default. ``True`` additionally details
     the union of `detail` and whichever symbols the payload's own
-    `position` fields say are currently held -- a position the agent
+    `position` fields say are currently held. A position the agent
     cannot see the book for is a different question, so a held name is
     detailed whether or not it is in the standing panel. Both readings
-    were live in this codebase's history and disagreed: FinRobot's own
+    existed in this codebase's history and disagreed. FinRobot's own
     `observe(detail=X)` and `render(payload)`, called directly, rendered
-    `X` exactly, with no union, for as long as either has existed; the
-    union was a property of `FinRobotAdapter` alone, applied to the
+    `X` exactly, with no union, for as long as either has existed, while
+    the union was a property of `FinRobotAdapter` alone, applied to the
     *argument* it passed as `detail`, in a method this class replaces.
-    The default here keeps the bytes those direct callers -- and every
-    existing test of `observe`/`render` -- have always gotten.
+    The default here keeps the bytes those direct callers (and every
+    existing test of `observe`/`render`) have always gotten.
     `FinRobotAdapter`'s own default renderer passes `union_held=True`,
-    which is what restores the adapter's own historical guarantee
-    without asking `observe`, `render`, or any other direct caller to
-    change what they publish. Both the union and the sector summary come
-    from the payload alone, so the caller of :meth:`render` decides
-    nothing by choosing when to call it: an adapter's *standing panel* is
-    `detail`; *what is held* is already in
-    `payload["assets"][i]["position"]`.
+    which restores the adapter's own historical guarantee without asking
+    `observe`, `render`, or any other direct caller to change what they
+    publish. Both the union and the sector summary come from the payload
+    alone, so the caller of :meth:`render` decides nothing by choosing
+    when to call it. An adapter's *standing panel* is `detail`, and *what
+    is held* is already in `payload["assets"][i]["position"]`.
 
     ``units`` -- ``"usd"`` (the default) prints each asset's dollar price.
-    ``"bps"`` prints `return_1d` -- `_window_return` over `steps_per_day`
-    steps, which is the last trading day's worth of steps and, at the
-    library's default cadence, one step short of a full day, a
-    documented and load-bearing imprecision `_window_return` already
-    carries -- in basis points instead, on the price line and in the
-    price column of the compact table. This is the SAME number
-    `"return, 1 day"` already states as a percentage a few lines below;
-    `units="bps"` does not add information, it restates one figure in a
-    second unit, deliberately, so a caller comparing an agent's reaction
-    to the two units is comparing the same fact read two ways rather than
-    two different facts. Every other figure (the bid, the ask, the
-    average volume, the order cap, the portfolio's own dollar figures)
-    stays in the unit it already carries; there is no basis-point form of
-    a share count. Where `return_1d` is `None` -- day zero, before the
-    adapter has shown the agent a full day -- the bps line reads
-    `"not available"`, exactly as the dollar line would for a price the
-    payload never carried.
+    ``"bps"`` prints `return_1d` in basis points instead, on the price
+    line and in the price column of the compact table. `return_1d` is
+    `_window_return` over `steps_per_day` steps, which is the last trading
+    day's worth of steps and, at the library's default cadence, one step
+    short of a full day, a documented imprecision `_window_return` already
+    carries and FinRobot's replay keys depend on. It is the SAME number
+    `"return, 1 day"` already states as a percentage a few lines below.
+    `units="bps"` adds no information. It restates one figure in a second
+    unit, so a caller comparing an agent's reaction to the two units is
+    comparing the same fact read two ways. Every other figure (the bid,
+    the ask, the average volume, the order cap, the portfolio's own dollar
+    figures) stays in the unit it already carries, since there is no
+    basis-point form of a share count. Where `return_1d` is `None` (day
+    zero, before the adapter has shown the agent a full day), the bps line
+    reads `"not available"`, exactly as the dollar line would for a price
+    the payload never carried.
 
-    A limit worth stating plainly rather than leaving a reader to find
-    it: in the large-universe form, the compact table's price column is
-    the only place a symbol without a detail block states a price at
-    all, and under `units="bps"` that column carries `return_1d`, not a
-    level. For a symbol outside `detail` (and outside the union under
-    `union_held`), no dollar price survives anywhere in the text -- the
-    detail block, which carries the bid and the ask, is the only place
-    one does. So "all decision differences are presentation" is not
-    quite true for `units="bps"` combined with a panel: an agent that
-    needs a dollar level to size an undetailed name's order has
-    genuinely lost information that `units="usd"` does not lose, which
-    is a property of the axis and not a defect in one renderer.
+    In the large-universe form, the compact table's price column is the
+    only place a symbol without a detail block states a price at all, and
+    under `units="bps"` that column carries `return_1d`, not a level. For
+    a symbol outside `detail` (and outside the union under `union_held`),
+    no dollar price appears anywhere in the text, because the detail
+    block, which carries the bid and the ask, is the only place one does.
+    So "all decision differences are presentation" is not quite true for
+    `units="bps"` combined with a panel. An agent that needs a dollar
+    level to size an undetailed name's order has lost information that
+    `units="usd"` keeps. That comes with the axis and is not a defect in
+    one renderer.
 
     ``order`` -- ``"roster"`` (the default) renders assets in the order
-    `payload["assets"]` lists them, which is a no-op: it is what every
-    payload has always been rendered in. ``"alphabetical"`` sorts by
-    symbol. ``"by_position"`` sorts by the position's absolute size,
-    largest first, symbol breaking a tie. It reorders every asset listing
-    -- the full blocks, the compact table and the closing holdings line --
-    and never the sector summary, which is grouped by sector rather than
-    listed by symbol.
+    `payload["assets"]` lists them, which changes nothing, since every
+    payload has always been rendered in that order. ``"alphabetical"``
+    sorts by symbol. ``"by_position"`` sorts by the position's absolute
+    size, largest first, symbol breaking a tie. It reorders every asset
+    listing (the full blocks, the compact table and the closing holdings
+    line) and never the sector summary, which is grouped by sector rather
+    than listed by symbol.
 
     ``language`` -- ``"en"`` (the default) or ``"fr"``. It translates the
-    section headings and the fixed labels this module writes -- "Macro",
-    "price", "cash" and their kind -- and nothing else: a ticker, a sector
-    name, a macro field name and a mandate are the payload's or the
-    adapter's, not this renderer's, and travel unchanged. Number
-    formatting (the decimal point, the thousands comma) does not change
-    with ``language`` either, for the same reason: it is not a label.
+    section headings and the fixed labels this module writes ("Macro",
+    "price", "cash" and their kind) and nothing else. A ticker, a sector
+    name, a macro field name and a mandate belong to the payload or the
+    adapter and travel unchanged. Number formatting (the decimal point,
+    the thousands comma) does not change with ``language`` either,
+    because it is not a label.
 
     Raises :class:`~tradefloor._core.ValidationError` at construction on
     an argument outside :data:`UNITS`, :data:`ORDER` or :data:`LANGUAGE`,
-    rather than at the first :meth:`render` -- the same choice
+    rather than at the first :meth:`render`, the same choice
     :class:`~tradefloor.counterfactual.World` makes for `on_refusal`.
     """
 
@@ -461,7 +458,7 @@ class TextRenderer:
         sorted symbols (`"+held"` appended under `union_held`) otherwise.
         `union_held` never appears when `detail is None`, since it
         changes nothing there. Every argument that changes :meth:`render`'s
-        output changes this string, and nothing else does: two
+        output changes this string, and nothing else does. Two
         `TextRenderer` instances built from the same arguments, in any
         order for `detail`, produce the same key.
         """
@@ -596,6 +593,10 @@ class TextRenderer:
             f"{L['max_order_shares']:<23}"
             f"{_qty(asset['max_order_shares'])} {L['shares']}",
         ]
+        # Only on a model that pays dividends, whose payload carries the
+        # key, and only on a name that went ex today.
+        if asset.get("dividend"):
+            out.append(f"{L['dividend']:<23}{_money(asset['dividend'])}")
         for key, value in sorted(asset["fundamentals"].items()):
             out.append(f"  {key:<20} {_num(value)}")
         return out

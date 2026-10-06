@@ -183,13 +183,14 @@ def test_a_traded_run_matches_its_baseline():
 
     Every other digest here covers the engine. This one covers what an
     agent benchmark reports: the reference agents and a scripted
-    limit-order agent through `evaluate` on pt-v20, with each agent's
+    limit-order agent through `evaluate` on the default preset by name
+    (`known_answer_traded.PRESET`, pt-v21 since 0.10.0), with each agent's
     order log, fills and scorecard hashed (`known_answer_traded.py` says
     what each covers). It must agree on every platform the determinism
     workflow builds.
 
     The failure names the agent and the part that moved. A deliberate
-    change to pt-v20, a reference agent or the scoring is re-based with
+    change to that preset, a reference agent or the scoring is re-based with
     `python tests/known_answer_traded.py --write`, with a sentence in the
     baseline's note. A digest that moved on one platform only is never
     re-based.
@@ -218,7 +219,7 @@ def test_a_traded_run_matches_its_baseline():
     moved = [f"{name} {part}" for name in k.AGENTS for part in k.PARTS
              if measured[name][part] != baseline["agents"][name][part]]
     assert not moved, (
-        f"the traded run moved: {', '.join(moved)}. If pt-v20, a reference "
+        f"the traded run moved: {', '.join(moved)}. If {k.PRESET}, a reference "
         "agent or the scoring changed on purpose, bump TRADED_KAT_VERSION, "
         "re-base with `python tests/known_answer_traded.py --write` and say "
         "what moved in the note. If only this platform disagrees, that is the failure the "
@@ -235,7 +236,7 @@ def test_the_traded_run_hashes_every_scorecard_field():
     between platforms."""
     k = known_answer_traded
     placed = (set(k.SCORECARD_FIELDS) | set(k.SCORECARD_COUNTED)
-              | set(k.SCORECARD_DERIVED))
+              | set(k.SCORECARD_NONZERO) | set(k.SCORECARD_DERIVED))
     assert placed == set(tradefloor.Scorecard.__slots__), (
         "Scorecard's fields and the ones known_answer_traded.py hashes "
         f"differ: {sorted(placed ^ set(tradefloor.Scorecard.__slots__))}. "

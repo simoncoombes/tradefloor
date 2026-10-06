@@ -1165,17 +1165,17 @@ def test_the_shipped_record_reports_its_mechanism_certificate_beside_the_bar_tha
     line = envelope.mechanism_bar_line(verdict)
     assert "mechanism bar" in line and "PASS" in line
 
-    # The reading the release carries, REPORTED: 10 of 10 at 252 and 9 of 10
-    # held out since the fifth composition of 2026-09-23, the held-out miss
-    # being `corr_asymmetry_lagged` at 20 of 30 against a cut of 21. pt-v20
-    # reads the same counts and the same miss, also at 20 of 30. The
-    # fourth composition read 9 and 9 with `corr_asymmetry` the miss on both;
-    # the test below reads the two records against each other.
+    # The reading the release carries, REPORTED: on pt-v21 (box ptv21c1),
+    # 10 of 10 at 252 and 9 of 10 held out, the held-out miss being
+    # `corr_asymmetry`. pt-v20 and pt-v19's fifth composition read the same
+    # counts with `corr_asymmetry_lagged` the held-out miss, at 20 of 30
+    # against a cut of 21. pt-v19's fourth composition read 9 and 9 with
+    # `corr_asymmetry` the miss on both; the test below reads those two
+    # records against each other.
     assert rec["mechanism_252"]["counts"]["mechanism_shown"] == 10
     assert rec["mechanism_252"]["not_shown"] == []
     assert rec["mechanism_heldout_seeds"]["counts"]["mechanism_shown"] == 9
-    assert rec["mechanism_heldout_seeds"]["not_shown"] == [
-        "corr_asymmetry_lagged"]
+    assert rec["mechanism_heldout_seeds"]["not_shown"] == ["corr_asymmetry"]
     assert rec["mechanism_252"]["reversed"] == []
     assert rec["mechanism_heldout_seeds"]["reversed"] == []
 
@@ -1313,7 +1313,7 @@ def test_the_record_tool_writes_a_regression_and_carries_it_rather_than_refusing
     lost = json.loads(json.dumps(on_disk["mechanism_252"]))
     lost["shown"] = [r for r in lost["shown"] if r != "leverage_effect"]
     lost["not_shown"] = sorted(lost["not_shown"] + ["leverage_effect"])
-    panel = {"pretium_version": "test", "method": "test",
+    panel = {"tradefloor_version": "test", "method": "test",
              "presets": {"pt-v18": {
                  "mechanism_252": lost,
                  "mechanism_heldout_seeds": on_disk["mechanism_heldout_seeds"]}}}

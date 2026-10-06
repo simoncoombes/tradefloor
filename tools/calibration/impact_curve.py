@@ -1,7 +1,8 @@
 """Measure the cost of size in the agent-facing book, against the square-root law.
 
     python tools/calibration/impact_curve.py [--seeds 3] [--names 40]
-        [--days 60] [--coefficient 0.75] [--exponent 0.5] [--out FILE]
+        [--days 60] [--coefficient 0.75] [--exponent 0.5] [--base pt-v19]
+        [--set name=value[,name=value...] ...] [--out FILE]
 
 What it measures, on `Universe.random(names, seed=111 + k)` for each seed k,
 after `days` untraded sessions (so each name's realised daily volatility can
@@ -33,8 +34,16 @@ The literature it is compared with, stated as the script prints it:
   it, [0.33, 0.67].
 - Almgren, Thum, Hauptmann and Li (Risk 18(7), 2005), US equity program
   trades: temporary cost `0.142 sigma (X / (V T))^0.6` and permanent
-  impact `0.314 sigma X / V`, of which the trader pays half. Evaluated
-  here at one step of six a day, T = 1/6.
+  impact `0.314 sigma X / V (Theta / V)^(1/4)`, of which the trader pays
+  half. `Theta` is shares outstanding; the turnover factor `(Theta/V)^(1/4)`
+  is part of their fit (restated in Kocinski, Quantitative Methods in
+  Economics). Evaluated here at one step of six a day, T = 1/6, and, as
+  this tool has always printed it, WITHOUT the factor, which understates
+  the permanent term 3.0 times at the sim roster's median Theta/V of 81
+  and 3.87 times at the real forty's 223 (EDGAR shares outstanding over
+  daily volume, 2019 and 2023). With it, the cost at 10% of daily volume is
+  0.152 to 0.165 sigma rather than 0.120; pass `turnover` to
+  `almgren_cost` for that reading.
 - Frazzini, Israel and Moskowitz ("Trading Costs", 2018, AQR's own
   executions 1998-2016) find impact concave in size and well below earlier
   academic estimates for patient institutional execution; no coefficient
@@ -65,6 +74,10 @@ def f64(buf: bytes) -> list[float]:
 
 BASE = "pt-v19"
 
+#: Further `ModelParams` overrides from `--set`, applied to every model the
+#: script builds, so a switch's effect on the curve can be read.
+EXTRA: dict[str, float] = {}
+
 
 def model(coefficient: float, exponent: float, shared: bool = False,
           half_life: float = 27.0, base: str | None = None,
@@ -80,7 +93,7 @@ def model(coefficient: float, exponent: float, shared: bool = False,
             over["book_refill_half_life"] = half_life
     if gamma:
         over["fill_impact_coefficient"] = gamma
-    return tf.ModelParams.from_preset(base, **over)
+    return tf.ModelParams.from_preset(base, **{**over, **EXTRA})
 
 
 def warm(seed: int, universe, params, days: int, vix: float | None = None):
@@ -177,12 +190,15 @@ def refill(seed: int, universe, coefficient: float, exponent: float,
             "permanent": {k: statistics.median(v) for k, v in perm.items() if v}}
 
 
-def almgren_cost(f: float, steps_per_day: int = 6) -> float:
+def almgren_cost(f: float, steps_per_day: int = 6, turnover: float = 1.0) -> float:
     """Almgren et al. (2005) cost in units of sigma for X/V = f executed
     over one step: temporary 0.142 (X/(V T))^0.6 plus half the permanent
-    0.314 X/V."""
+    0.314 X/V (Theta/V)^(1/4). `turnover` is Theta/V; the default 1.0 drops
+    the factor, as this tool's printed figures always have (see the module
+    note: 81 for the sim roster and 223 for the real forty are the
+    measured medians)."""
     t = 1.0 / steps_per_day
-    return 0.142 * (f / t) ** 0.6 + 0.5 * 0.314 * f
+    return 0.142 * (f / t) ** 0.6 + 0.5 * 0.314 * f * turnover ** 0.25
 
 
 def fit(rows: list[dict], key: str) -> tuple[float, float]:
@@ -211,13 +227,21 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--out", default=None)
     ap.add_argument("--base", default="pt-v19",
                     help="the preset whose market the book is measured in")
+    ap.add_argument("--set", action="append", default=[],
+                    help="further ModelParams overrides, name=value or a comma-"
+                         "separated list of them; repeatable")
     args = ap.parse_args(argv)
     global BASE
     BASE = args.base
+    for item in args.set:
+        for kv in item.split(","):
+            if kv.strip():
+                k, v = kv.split("=", 1)
+                EXTRA[k.strip()] = float(v)
 
     result: dict = {"coefficient": args.coefficient, "exponent": args.exponent,
                     "seeds": args.seeds, "names": args.names, "days": args.days,
-                    "base": args.base}
+                    "base": args.base, "set": dict(EXTRA)}
     for label, coef in (("off", 0.0), ("on", args.coefficient)):
         rows = []
         for k in range(args.seeds):

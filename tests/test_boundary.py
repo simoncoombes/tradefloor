@@ -679,6 +679,16 @@ def test_the_derived_macro_field_is_the_one_the_target_writes(name):
         assert field is None
         return
     assert field in engine.macro_fields
+    if name == "macro.corporate_spread":
+        # The one derived target: it writes the corporate yield's level, as
+        # the 10-year plus the spread.
+        assert field == "corporate_bond_yield"
+        value = target.read(engine) + 0.005
+        target.write(engine, value)
+        fields = true_macro_fields(engine)
+        assert fields[field] - fields["treasury_yield_10y"] == pytest.approx(value)
+        assert target.read(engine) == pytest.approx(value)
+        return
     value = "contraction" if name == "macro.cycle" else (
         target.read(engine) + 0.005 if name != "macro.fear_greed" else 60.0)
     target.write(engine, value)
@@ -747,6 +757,11 @@ def test_the_map_runs_against_the_recorded_finrobot_agent_without_a_provider():
     shown = {name for name in targets
              if macro_field_of(tf.TARGETS[name]) in OBSERVABLE_MACRO}
     shown.add("market.liquidity")
+    # On pt-v21, the default from 0.10.0, the open prints each name through
+    # its fair value (the night split, `overnight_market_share`), so an
+    # earnings write before the open reaches the first price the agent is
+    # shown. On pt-v20 the open was the last close and the write did not.
+    shown.add("market.earnings")
 
     atlas = map_boundaries(world, targets=targets,
                            scenarios=[None, "rate_shock"],

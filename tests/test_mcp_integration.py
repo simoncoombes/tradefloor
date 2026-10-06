@@ -73,7 +73,19 @@ CALLS = {
                   "arguments": {"strategies": {"m": MOMENTUM}, "days": 1,
                                 "universe_size": 8}},
     "check_job": {},
+    # Session ids are random, so OPENED and FORKED stand for the ids
+    # open_session and session_fork return, and `_drive` fills them in.
+    "open_session": {"universe_size": 8},
+    "session_step": {"session_id": "OPENED", "steps": 2,
+                     "orders": {"AAA": 100}},
+    "session_fork": {"session_id": "OPENED"},
+    "session_rewind": {"session_id": "OPENED", "step": 0},
+    "session_state": {"session_id": "FORKED", "tickers": ["AAA"]},
+    "close_session": {"session_id": "FORKED"},
 }
+
+#: The placeholders in CALLS, and the call whose result names each id.
+_IDS = {"OPENED": "open_session", "FORKED": "session_fork"}
 
 
 def _structured(result):
@@ -106,6 +118,9 @@ async def _drive():
             listed = await session.list_tools()
             results = {}
             for name, args in CALLS.items():
+                args = {k: (results[_IDS[v]][1]["session_id"]
+                            if isinstance(v, str) and v in _IDS else v)
+                        for k, v in args.items()}
                 res = await session.call_tool(name, args)
                 results[name] = (res, _structured(res))
             return init, listed.tools, results
@@ -260,6 +275,28 @@ def test_a_job_started_over_the_wire_is_visible_over_the_wire(live):
     assert any(j["job_id"] == started["job_id"] for j in listed["jobs"]), (
         "the job listing did not see the job just started"
     )
+
+
+def test_a_session_lives_between_calls_over_the_wire(live):
+    """The session tools are several calls that must agree about one
+    market held in the server process: the fork carries the step and the
+    position the first session reached, and the rewind takes the first
+    back to its open."""
+    _init, _tools, results = live
+    _res, opened = results["open_session"]
+    _res, stepped = results["session_step"]
+    _res, forked = results["session_fork"]
+    _res, rewound = results["session_rewind"]
+    _res, state = results["session_state"]
+    assert opened["session_id"].startswith("session-")
+    assert stepped["agents"]["me"]["positions"]["AAA"]["quantity"] == 100.0
+    assert forked["forked_from"] == opened["session_id"]
+    assert forked["session_id"] != opened["session_id"]
+    assert rewound["clock"]["step"] == 0
+    assert rewound["agents"]["me"]["positions"] == {}
+    assert state["clock"]["step"] == 2
+    assert state["agents"]["me"]["positions"]["AAA"]["quantity"] == 100.0
+    assert set(state["market"]["detail"]) == {"AAA"}
 
 
 def test_a_bad_argument_comes_back_as_a_result_not_a_crash():

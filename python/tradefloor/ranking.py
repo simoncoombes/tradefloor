@@ -1,14 +1,15 @@
-"""Ranking agents across many markets, because one market ranks them wrongly.
+"""Rank agents across many markets instead of one.
 
-`evaluate` scores every agent against one seed. That is the right primitive,
-it is what makes a comparison exact, since all agents see the identical market
-but it is the wrong unit of judgement, and the difference is not small.
+`evaluate` scores every agent against one seed. That makes the comparison
+exact, since all agents see the identical market, but one seed is too small a
+unit to judge agents on.
 
 Measured on this build under pt-v19, with the reference agents over
 ``Universe.random(30, seed=11)``, ten days, sim seeds 0 through 11. Every
 capture figure in this docstring is from pt-v19, the last preset where the
-Oracle is a ceiling. The default, pt-v20, reports no capture and ranks each
-agent on its P&L over buy-and-hold's instead (see "On pt-v20" below).
+Oracle is a ceiling. pt-v20 and pt-v21, the default, report no capture and
+rank each agent on its P&L over buy-and-hold's instead (see "On pt-v20"
+below).
 
     pooled capture over 12 seeds        per-seed range      wins
         buy_and_hold     +0.095       [-0.776, +0.836]      9/12
@@ -17,101 +18,99 @@ agent on its P&L over buy-and-hold's instead (see "On pt-v20" below).
         momentum         -0.950       [-1.336, -0.477]      0/12
 
 Until 0.8.5 this table was led by mean reversion at +0.947, winning 11 of
-12. That lead was the harness: an agent's fills were held on every tick of
-the step, so an agent that trades a lot was marked to many times its own
+12. That lead came from the harness. An agent's fills were held on every tick
+of the step, so an agent that trades a lot was marked to many times its own
 impact. With the fills applied once, nothing that sees only prices keeps
 much of what the Oracle earns over ten days, and the winner is the agent
 that trades least.
 
 **A single seed names the pooled leader nine times in twelve here, and still
-misreports the verdict.** The case for many seeds is not that one seed picks
-the wrong winner, since it usually does not. It is that one seed cannot say
-what the winner is WORTH: buy-and-hold's own capture runs from -0.776 to
+misreports the verdict.** One seed usually picks the right winner but cannot
+say what the winner is worth. Buy-and-hold's own capture runs from -0.776 to
 +0.836 depending only on which market it drew, from losing three quarters of
 what the Oracle made to keeping most of it, and that range is printed next
-to the verdict for exactly that reason.
+to the verdict for that reason.
 
 So a leaderboard from one call to `evaluate` is a measurement of the seed at
 least as much as of the agents, and anything built on it (a benchmark, a
 regression gate, an agent that tunes itself against this harness) inherits
 that.
 
-## And the aggregate can overstate too, so `separation` exists
+## The aggregate can overstate too, and `separation` tests it
 
-That gap does NOT establish that buy-and-hold is the better agent. Paired
+That gap does not establish that buy-and-hold is the better agent. Paired
 across the same twelve markets, buy-and-hold beats mean reversion on nine and
-loses on three: `p = 0.15`, no separation worth the name. It wins more often
-than it loses; twelve paired trials cannot call the ordering real, and no
+loses on three, `p = 0.15`, which does not separate them. It wins more often
+than it loses, but twelve paired trials cannot call the ordering real, and no
 aggregate of returns can tell those apart.
 
 Mean reversion against random reads 10 to 2, `p = 0.039`, and momentum
 against random 0 to 12, `p = 0.0005`, a clean sweep in random's favour. That
-is what a real difference looks like here, and the contrast is the point:
-orderings that appear on the same table, one of them meaningless.
+is what a real difference looks like here, on the same table as the
+buy-and-hold ordering that means nothing.
 
-A p-value also carries its seed window with it: the identical
+A p-value also depends on its seed window. The identical
 buy-and-hold-versus-mean-reversion test over seeds 12 to 23 reads 4 to 8,
 `p = 0.39`, the other way round, and there mean reversion leads the pooled
 table by a hair (-0.093 against -0.098). Twelve paired seeds is a small
 experiment, and even a clean sweep only reaches p = 0.0005, so one window's p
-is a single draw of a noisy statistic, and the honest quote names the seeds.
+is a single draw of a noisy statistic. Quote it with the seeds.
 
-Note that 10 to 2 is not `decisive`. That flag is reserved for a clean
-sweep, the one verdict that needs no distributional assumption at all. A
-small `p` and a clean sweep are different claims and the result reports both.
+10 to 2 is not `decisive`. That flag is reserved for a clean sweep, the one
+verdict that needs no distributional assumption. A small `p` and a clean
+sweep are different claims, and the result reports both.
 
-Quote a capture with its separation, or the ranking is just a prettier
-version of the single-seed verdict.
+Quote a capture with its separation. Without it the ranking says little more
+than the single-seed verdict.
 
-## The aggregate pools; it does not average ratios
+## The aggregate pools P&L across seeds
 
 A capture ratio divides by what the reference earned in that market, which on
 a short horizon can be almost nothing. Measured at three days on the same
-universe, sim seeds 0-9: the Oracle's per-seed P&L spans $11.5k to $28.1k,
+universe, sim seeds 0-9, the Oracle's per-seed P&L spans $11.5k to $28.1k,
 and against the thinnest denominator, 1.1% of the $1M book, momentum's ratio
-is **-2.54** and buy-and-hold's +1.00. Values like those drag a median of ten
-far enough to reorder the table: ranked by median of ratios, mean reversion
+is -2.54 and buy-and-hold's +1.00. Values like those drag a median of ten
+far enough to reorder the table. Ranked by median of ratios, mean reversion
 (+0.189) goes above buy-and-hold (+0.054), which the pooled figure reverses
 (-0.035 against +0.042). Until 0.8.5, which stopped counting an agent's
 fills on every tick of a step, the same grid read $15.5k to $34.1k and a
 mean-reversion ratio of +1.50 on its best seed.
 
-So the headline sums the numerators and the denominators instead. Each market
-is weighted by the opportunity that actually existed in it, a seed with
-nothing to earn contributes nothing to either sum, and the number answers a
-question a reader has: of all the alpha the reference captured across these
-markets, how much did this agent capture? The per-seed ratios are still
-reported, because each is a true fact about its own seed and the spread is
-the warning.
+So the headline sums the numerators and the denominators. Each market is
+weighted by the opportunity that existed in it, and a seed with nothing to
+earn contributes nothing to either sum. The number says how much of all the
+alpha the reference captured across these markets this agent captured. The
+per-seed ratios are still reported, because each is a true fact about its
+own seed and their spread shows how far one seed can mislead.
 
-## What it reports, and why not a p-value on returns
+## What it reports, and why it uses a sign test
 
 `rank` returns the pooled capture across seeds, the per-seed range, and a
 win count.
 :meth:`Ranking.separation` answers "is A really better than B" with a sign
 test: the number of seeds where A beat B, out of the paired seeds where both
-were measurable. Paired, because both agents traded the *same* market on each
-seed, which removes the market from the comparison entirely and is the whole
-reason per-seed pairing is worth the runtime.
+were measurable. The test is paired because both agents traded the same
+market on each seed, which removes the market from the comparison and is why
+per-seed pairing is worth the runtime.
 
-A sign test rather than a t-test on returns, because capture ratios across
-seeds are neither normal nor independent of the market's dispersion, and a
-p-value computed as though they were would be a precise-looking number built
-on an assumption this library can measure to be false. Counting wins assumes
-almost nothing.
+It is a sign test rather than a t-test on returns, because capture ratios
+across seeds are neither normal nor independent of the market's dispersion,
+and a t-test's p-value would rest on an assumption this library can measure
+to be false. Counting wins assumes almost nothing.
 
-It needs more seeds than people expect. Six wins out of six paired seeds is
-p = 0.031, and five out of five is p = 0.062, so below six seeds nothing can
-separate at 0.05. At eight seeds 8 of 8 is p = 0.0078, but 7 of 8 is
-p = 0.070 and 6 of 8 is p = 0.29. At twelve, 10 of 12 is p = 0.039. Pick the
-seed count before the run, from the smallest split you would want to call
+A sign test needs more seeds than people expect. Six wins out of six paired
+seeds is p = 0.031, and five out of five is p = 0.062, so below six seeds
+nothing can separate at 0.05. At eight seeds 8 of 8 is p = 0.0078, but 7 of 8
+is p = 0.070 and 6 of 8 is p = 0.29. At twelve, 10 of 12 is p = 0.039. Pick
+the seed count before the run, from the smallest split you would want to call
 real.
 
 ## On pt-v20 there is no capture, and the table reads against buy-and-hold
 
-A capture divides by the Oracle's P&L, and on pt-v20 that is not a ceiling:
-market moves mostly stick, the Oracle made money in 10 of 14 test markets,
+A capture divides by the Oracle's P&L, and on pt-v20 that is not a ceiling.
+Market moves mostly stick, the Oracle made money in 10 of 14 test markets,
 and its P&L follows the market's month (``baselines.ORACLE_NOT_A_CEILING``).
+The same holds on pt-v21, the default from 0.10.0.
 There `rank` reports no capture at all. :attr:`Ranking.capture_withheld`
 gives the reason, no seed is listed as unmeasurable, and the table sorts on
 each agent's mean P&L over buy-and-hold's in the same market, with the count
@@ -129,9 +128,8 @@ the report says which label it read. Pass ``benchmark=`` to name another.
 
 `Momentum` keeps a rolling window; `RandomTrader` advances a generator. Handing
 the same instances to twelve seeds would carry seed 0's history into seed 1 and
-score something that is not the agent. That failure is silent, because the
-numbers look fine, so `rank` refuses a mapping of built agents rather than
-accepting one and measuring the wrong thing.
+score something that is not the agent. The numbers would look fine, so
+`rank` refuses a mapping of built agents.
 
 A factory that hands back the same objects every time has the same problem,
 so `rank` keeps the agents from the first call and refuses the run if a later
@@ -256,7 +254,7 @@ class AgentRecord:
 
     ``captures`` and ``pnls`` are parallel to the ranking's ``seeds``, so a
     result can always be traced back to the market that produced it. A capture
-    is ``None`` where it could not be measured -- see :class:`Ranking`.
+    is ``None`` where it could not be measured (see :class:`Ranking`).
 
     ``errors``, ``rejected`` and ``max_leverage`` are parallel to ``seeds``
     too, read off each seed's scorecard: how many times the agent's own code
@@ -352,25 +350,23 @@ class AgentRecord:
 
     @property
     def pooled_capture(self) -> float | None:
-        """The number to quote: total P&L over the reference's total P&L.
+        """Total P&L over the reference's total P&L, the number to quote.
 
-        Pooled rather than averaged, and the difference is not cosmetic. A
-        per-seed ratio divides by whatever the reference happened to earn in
-        that market, which on a short horizon can be almost nothing --
-        measured at three days on the grid in this module's docstring, a
-        seed where the reference earned 1.1% of capital produced capture
-        ratios of **-2.54** and +1.00, and seeds like it drag a median of
-        ten far enough to reorder the table.
+        It is pooled rather than averaged. A per-seed ratio divides by
+        whatever the reference happened to earn in that market, which on a
+        short horizon can be almost nothing. Measured at three days on the
+        grid in this module's docstring, a seed where the reference earned
+        1.1% of capital produced capture ratios of -2.54 and +1.00, and
+        seeds like it drag a median of ten far enough to reorder the table.
 
         Pooling weights each market by the opportunity that existed in it. A
         seed where nothing was there to earn contributes nearly nothing to the
-        numerator AND nearly nothing to the denominator, so it cannot dominate.
-        It also answers the question a reader actually has: across all these
-        markets, what fraction of what the reference captured did this agent
-        capture?
+        numerator and nearly nothing to the denominator, so it cannot
+        dominate. The result is the fraction of what the reference captured
+        across all these markets that this agent captured.
 
-        Seeds where the reference lost money are excluded from both sums --
-        see :attr:`Ranking.unmeasurable` -- because a negative denominator
+        Seeds where the reference lost money are excluded from both sums
+        (see :attr:`Ranking.unmeasurable`), because a negative denominator
         flips the sign of everything above it.
 
         None on a preset where the Oracle is not a ceiling
@@ -390,10 +386,10 @@ class AgentRecord:
     def median_capture(self) -> float | None:
         """The middle per-seed ratio. Prefer :attr:`pooled_capture`.
 
-        Kept because a per-seed ratio is a true fact about its own seed and
-        the distribution is worth seeing. But a median OF ratios inherits
-        every explosion in the tail -- see :attr:`pooled_capture` -- so it is
-        no longer what the table sorts on.
+        It is kept because a per-seed ratio is a true fact about its own
+        seed and the distribution is worth seeing. But a median of ratios
+        inherits every extreme value in the tail (see :attr:`pooled_capture`),
+        so the table no longer sorts on it.
         """
         values = self.measured
         return statistics.median(values) if values else None
@@ -605,17 +601,17 @@ class Ranking:
                 + sorted(missing, key=lambda r: r.name))
 
     def separation(self, a: str, b: str) -> dict[str, Any]:
-        """Is ``a`` really better than ``b``? A paired sign test.
+        """A paired sign test of whether ``a`` is better than ``b``.
 
         Both agents traded the same market on each seed, so comparing them
         seed by seed removes the market from the question. Returns the win
         counts and a ``decisive`` flag, which is true only when one agent won
-        on every paired seed -- the strongest claim a sign test can make and
-        the only one that needs no distributional assumption at all.
+        on every paired seed. That is the strongest claim a sign test can
+        make, and the only one that needs no distributional assumption.
 
         ``p_value`` is the two-sided probability of a split at least this
-        lopsided if the two were coin-flip equal. Exact rather than
-        approximate, being a binomial tail on a handful of trials.
+        lopsided if the two were coin-flip equal. It is exact, a binomial
+        tail on a handful of trials.
         """
         for name in (a, b):
             if name not in self.records:

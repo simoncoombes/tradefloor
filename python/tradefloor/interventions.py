@@ -1,39 +1,39 @@
-"""What a scenario is made of: named targets, three operations, one clock.
+"""The parts of a scenario: named targets, three operations and one clock.
 
-A scenario in this library is not a feature flag. There is no `start_war()`,
-no `elect_president()`, no `recession=True`. A scenario is a **named,
-inspectable collection of explicit interventions**, and the narrative that
-motivated it is a description, not a mechanism.
+A scenario is a **named, inspectable collection of explicit
+interventions**. There is no `start_war()`, no `elect_president()` and no
+`recession=True`, and the narrative that motivated a scenario describes it
+and does nothing in the run.
 
-Everything here turns on that distinction. `OilCrisis` hides its assumptions
-inside a class name; a scenario that says
+A class such as `OilCrisis` would hide its assumptions inside its name. A
+scenario that says
 
     shocks:       commodity.oil  x1.40  at 50
     transmission: macro.inflation +1.5pp at 55
 
 states them. The second is falsifiable and the first is not, and this library
-cannot predict how a real oil shock transmits to real inflation. What it can
-do is let you say what you are assuming and then measure how an agent behaves
-under that assumption.
+cannot predict how a real oil shock transmits to real inflation. It lets you
+say what you are assuming and then measure how an agent behaves under that
+assumption.
 
 ## The registry, and why it is short
 
 An intervention names a TARGET, and the targets are an explicit registry, not
 a path into the object graph. `target: simulator.internal.foo.bar` is
-refused, and so is every economic variable this model does not have. A
-registry that accepted `sector.energy.earnings` because the phrase sounds
-plausible would be lying: nothing in the engine carries per-sector earnings,
-and a scenario that appeared to run would be measuring nothing.
+refused, and so is every economic variable this model does not have.
+Nothing in the engine carries per-sector earnings, so a registry that
+accepted `sector.energy.earnings` because the phrase sounds plausible would
+let a scenario appear to run while measuring nothing.
 
 So every entry here is a field some part of the engine actually reads, and
-each one records WHAT reads it and HOW FAST it arrives. That second column is
-not decoration. On pt-v19 four things reach a price the day they move: the
-corporate bond yield, VIX, the cycle phase, and quoted depth through the
-book. From pt-v18 onward growth and inflation also reach fair value,
-because earnings grow with nominal output (`earnings_nominal_growth`), but
-through a level they compound: on pt-v19, 300bp less growth held for a
-hundred sessions lowers nominal output by about 1.2%. The QE boost reaches nothing from pt-v16 onward,
-where `qe_pe_gain` is 0.0. Everything else in the economy reaches the market
+each one records WHAT reads it and HOW FAST it arrives. On pt-v19 four
+things reach a price the day they move: the corporate bond yield, VIX, the
+cycle phase, and quoted depth through the book. From pt-v18 onward growth
+and inflation also reach fair value, because earnings grow with nominal
+output (`earnings_nominal_growth`), but through a level they compound. On
+pt-v19, 300bp less growth held for a hundred sessions lowers nominal output
+by about 1.2%. The QE boost reaches nothing from pt-v16 onward, where
+`qe_pe_gain` is 0.0. Everything else in the economy reaches the market
 through the macro chain: a monthly inflation update, then the central bank's
 next MEETING, then the curve. Through pt-v16 the first meeting is 45 days
 out. From pt-v18 the economy opens part-way through the meeting cycle, and on
@@ -52,7 +52,7 @@ Until 2026-09-24 they were pt-v14's, the default when the notes were written.
 
 ## Three operations and one clock
 
-`set`, `add`, `multiply`. Nothing else, and deliberately no expressions: a
+The operations are `set`, `add` and `multiply`, with no expressions. A
 configuration language grows until it needs a debugger, and the interesting
 part of an experiment is never the arithmetic.
 
@@ -66,7 +66,7 @@ checkpoint. See :meth:`tradefloor.Scenario.apply`.
 `multiply` is not expressible as a path computed in advance, because the value
 it multiplies is whatever the endogenous chain has arrived at by day `at`.
 So an intervention READS the field, applies its operation, and writes the
-result back -- which is also why the audit trail can report `previous: 82.14,
+result back. That is also why the audit trail can report `previous: 82.14,
 new: 115.00` rather than restating the recipe.
 
 That read and that write have to be in the same units, or a `multiply` by 1.4
@@ -148,10 +148,10 @@ class ScenarioValidationError(ValidationError):
     """A scenario that cannot be run, reported where it was written.
 
     A subclass of :class:`tradefloor.ValidationError`, so code that already
-    catches the library's construction errors catches these too. It exists as
-    its own type because a scenario is usually written by hand in a file, and
-    "which file, which line, which of the four legal operations" is a
-    different conversation from a bad argument to a constructor.
+    catches the library's construction errors catches these too. It is its
+    own type because a scenario is usually written by hand in a file, and
+    its errors have to say which file, which line and which of the four
+    legal operations, which a bad argument to a constructor does not.
     """
 
 
@@ -228,11 +228,11 @@ class Target:
     def outside_domain(self, value: Any) -> str | None:
         """Why this COMPUTED value cannot be written, or None.
 
-        The other half of `check`, and the half that matters for a relative
-        operation. `check` sees the multiplier; it cannot see what the
-        multiplier will produce, because that depends on where the endogenous
-        chain has arrived. So the result is checked too, on the day it is
-        written -- which is the only place the answer exists.
+        This is the other half of `check`, and the half that matters for a
+        relative operation. `check` sees the multiplier but not what the
+        multiplier will produce, because that depends on where the
+        endogenous chain has arrived. So the result is checked too, on the
+        day it is written, which is the only time the answer is known.
 
         Without this, `add -500` on macro.vix wrote a VIX of -485 and the
         market traded a session against it: `(vix/15)^2` squares away the
@@ -261,8 +261,13 @@ class Target:
 #: Under `gdp_publication_lag` `macro_fields["gdp_growth"]` is the last
 #: quarter released, and under `cycle_publication_lag` `macro_fields["cycle"]`
 #: is the phase as published; the engine's own state carries the true ones.
+#: Under `vix_stress_premium` `macro_fields["vix"]` is the published quote,
+#: which carries a stress premium over the VIX state that `pin_macro` writes;
+#: a `multiply` that read the quote would pin the state at the quote's level.
+#: With the dial at 0.0, which every preset carries, the two are one number.
 TRUE_MACRO_FIELDS: dict[str, str] = {"gdp_growth": "gdp_growth",
-                                     "cycle": "cycle_phase"}
+                                     "cycle": "cycle_phase",
+                                     "vix": "vix"}
 
 
 def true_macro_value(engine: Engine, field: str) -> Any:
@@ -271,9 +276,10 @@ def true_macro_value(engine: Engine, field: str) -> Any:
     The value `pin_macro` writes. For the keys in :data:`TRUE_MACRO_FIELDS`
     it is read from ``state_snapshot()["economy"]``, since `macro_fields`
     reports the published one; for every other key the two are the same
-    field and it is read from `macro_fields`. With both publication lags at
-    0.0 the two reads agree to the bit: the growth is the core's percent
-    over 100 either way, and the phase is the same name.
+    field and it is read from `macro_fields`. With both publication lags and
+    `vix_stress_premium` at 0.0 the two reads agree to the bit: the growth is
+    the core's percent over 100 either way, the phase is the same name, and
+    the VIX is the state's own number.
     """
     if field not in TRUE_MACRO_FIELDS:
         return engine.macro_fields[field]
@@ -300,10 +306,10 @@ def _macro(field: str) -> tuple[Callable[[Engine], Any], Callable[[Engine, Any],
     returns the core's percent denomination; a `multiply` that read one and
     wrote the other would be out by a hundred and would still produce a
     plausible market. `Engine.macro_fields` is the read side of `pin_macro`,
-    field for field and unit for unit, with two exceptions: `gdp_growth` and
-    `cycle` read the true values from the snapshot, because under
-    `gdp_publication_lag` and `cycle_publication_lag` `macro_fields` reports
-    the published ones.
+    field for field and unit for unit, with three exceptions: `gdp_growth`,
+    `cycle` and `vix` read the true values from the snapshot, because under
+    `gdp_publication_lag`, `cycle_publication_lag` and `vix_stress_premium`
+    `macro_fields` reports the published ones.
     """
     def read(engine: Engine) -> Any:
         if field in TRUE_MACRO_FIELDS:
@@ -572,7 +578,7 @@ def _make_macro_target(name: str, field: str, *, units: str, note: str,
 #: 39 comparisons behind these numbers came back with a market draw delta of
 #: zero, so the difference is the intervention and nothing else.
 #:
-#: Read them before believing a scenario. Four of the fifteen targets are
+#: Read them before believing a scenario. Four of the sixteen targets are
 #: honest mechanisms with effects too small to see over a hundred days, and
 #: one of them is measurably worth exactly nothing. Knowing which is which is
 #: the difference between an experiment and a number.
@@ -598,6 +604,43 @@ _register(_make_macro_target(
     ),
     check=_rate_check(), format=_pp, domain=_domain_rate,
 ))
+
+def _spread_read(engine: Engine) -> float:
+    fields = engine.macro_fields
+    return fields["corporate_bond_yield"] - fields["treasury_yield_10y"]
+
+
+def _spread_write(engine: Engine, value: float) -> None:
+    engine.pin_macro(corporate_spread=value)
+
+
+def _domain_spread(value: float) -> str | None:
+    if value == value and 0.0 <= value <= 0.2:
+        return None
+    return f"a corporate spread of {value}"
+
+
+_register(Target(
+    "macro.corporate_spread",
+    units="fraction",
+    note=(
+        "The corporate yield's spread over the 10-year: the level is the "
+        "10-year plus the spread, and the engine holds the spread within "
+        "the meeting formula's 0.8 to 6 per cent. A pinned spread holds "
+        "through the close, the central bank's meeting included, and the "
+        "10-year moves the level, so the curve's daily noise and a policy "
+        "move's transmission reach the discount rate, which a hold on "
+        "macro.corporate_yield freezes. Released, the chain "
+        "resumes from where it stands and the next meeting re-anchors it, "
+        "so end a window with a ramp back. Measured, +200bp on pt-v19, "
+        "the ruler of the notes here: +0.00% as an impulse, -3.79% as a "
+        "permanent (macro.corporate_yield's is -4.02%). On pt-v20: -0.00% "
+        "and -7.60% (macro.corporate_yield's -6.13%)."
+    ),
+    read=_spread_read, write=_spread_write,
+    check=_rate_check(0.0, 0.2), format=_pp, domain=_domain_spread,
+))
+
 
 _register(_make_macro_target(
     "macro.policy_rate", "federal_funds_rate",
@@ -711,7 +754,7 @@ _register(_make_macro_target(
     units="fraction",
     note=(
         "The 2-year treasury yield. The UST2Y rate index reads it and nothing in "
-        "the equity market does. On pt-v20, the default from 0.8.5, the 2-year "
+        "the equity market does. On pt-v20, the default from 0.8.5 to 0.9.1, the 2-year "
         "is its own process, closing 5% of its gap to 0.85 x the policy rate + "
         "0.15 x the 10-year each session, so a write decays over weeks; on "
         "every preset through pt-v19 the chain recomputes it as that formula at "
@@ -965,12 +1008,11 @@ UNSUPPORTED: dict[str, str] = {
 def suggest(name: str) -> str:
     """The tail of an unknown-target message: what to write instead.
 
-    Three cases, and they are worth telling apart. A near-miss on a real
-    target is a typo and gets the spelling. A name in :data:`UNSUPPORTED` is
-    not a typo at all -- the reader has a mechanism in mind that this model
-    does not have -- and gets the reason and the nearest real lever. Anything
-    else gets the whole registry, because a list of fifteen names is shorter
-    than a conversation.
+    There are three cases. A near-miss on a real target is a typo and gets
+    the spelling. A name in :data:`UNSUPPORTED` is not a typo (the reader
+    has a mechanism in mind that this model does not have) and gets the
+    reason and the nearest real lever. Anything else gets the whole
+    registry, because a list of sixteen names is short enough to print.
     """
     if name in UNSUPPORTED:
         return f"\n\n{name} is not a mechanism in this model: {UNSUPPORTED[name]}."
@@ -1086,8 +1128,8 @@ class Intervention:
         """The final day this intervention writes, or None for a permanent.
 
         Used to tell a scenario that never fires inside a horizon from one
-        that does, which is the difference between an honest zero and a
-        meaningless one.
+        that does, so a zero from a scenario that fired is not confused with
+        a zero from one that never did.
         """
         if self.shape == "permanent":
             return None
@@ -1107,12 +1149,11 @@ class Intervention:
     # -- serialisation -----------------------------------------------------
 
     def as_dict(self) -> dict[str, Any]:
-        """The canonical resolved form. This is what gets fingerprinted.
+        """The canonical resolved form, which is what gets fingerprinted.
 
-        Every field appears, including the defaults, because a fingerprint
-        over a document whose keys come and go is a fingerprint over the
-        author's typing habits. ``duration`` is null rather than absent for
-        the same reason.
+        Every field appears, including the defaults, because otherwise the
+        fingerprint would change with whether the author wrote a default
+        out. ``duration`` is null rather than absent for the same reason.
         """
         return {
             "target": self.target,
@@ -1297,19 +1338,19 @@ def _resolve_shape(shape: str | None, duration: Any, target: str) -> str:
 class Firing:
     """One write the scenario made, on the day it made it, with real values.
 
-    The point of recording this rather than the recipe: a `multiply` says
-    x1.40, and what a reader needs to know afterwards is that oil went from
-    82.14 to 115.00 -- which depends on where the endogenous chain had got to.
+    A `multiply` says x1.40, but what a reader needs afterwards is that oil
+    went from 82.14 to 115.00, which depends on where the endogenous chain
+    had got to. So this records the values the write produced.
 
     ``operation`` is the intervention's own operation, with one addition:
     ``"release"`` is the write that puts a level back when the last window on
-    a target the engine never restores closes. It is in the trail rather than
-    silent, because a reader comparing two runs needs to see the depth come
-    back as much as they need to see it go.
+    a target the engine never restores closes. It is recorded in the trail,
+    because a reader comparing two runs needs to see the depth come back as
+    much as they need to see it go.
 
     A column target (there is one, `market.liquidity`) reports the column
-    TOTAL before and after, because forty per-instrument pairs in a log is not
-    an audit trail anybody reads. The per-name values are in the engine.
+    TOTAL before and after, because nobody reads forty per-instrument pairs
+    in a log. The per-name values are in the engine.
     """
 
     __slots__ = ("day", "scenario", "role", "target", "operation", "value",
@@ -1377,7 +1418,7 @@ def summarise(value: Any) -> Any:
 
 
 def canonical_json(payload: Any) -> str:
-    """One byte sequence per document, so a fingerprint is a fingerprint."""
+    """One byte sequence per document, so equal documents fingerprint equal."""
     return json.dumps(payload, sort_keys=True, separators=(",", ":"),
                       ensure_ascii=False)
 

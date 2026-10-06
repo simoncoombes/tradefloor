@@ -1,3 +1,191 @@
+## 0.10.0
+
+pt-v21 is the default model. It is pt-v20 with 104 dials moved. pt-v20
+and every older preset keep their values and replay exactly. Every default trajectory moves, and the
+known-answer digests are re-based (`KAT_VERSION` 29).
+
+Populated mode is new: `tf.Population` puts background traders in the
+book beside your strategy. Isolated mode stays the default and is
+unchanged.
+
+The MCP server runs any shipped preset, keeps markets open between calls
+as sessions, and runs a population on request.
+
+The Rust crate follows semver from 0.10.0 and gains a full snapshot and
+restore, a kept opening for host-driven markets, its state widths as
+constants, and a check on the shock flow a host adds.
+
+This is a minor release with breaking changes. Python loses the ten
+engine internals deprecated in 0.9.0 and the `pretium_version` keys. Rust
+structs and enums a host builds or matches are `#[non_exhaustive]`.
+Building a pt-v21 engine takes about 1.5 seconds for 20 names, because the
+market lives two years of prehistory first. Each break is listed under
+"Breaking changes" below.
+
+<!-- release-note-ends -->
+
+### pt-v21
+
+The new default adds, on top of pt-v20:
+
+- The business cycle feels the stock market: a fall below the index's
+  slow average adds to the hazard of a downturn, and the opening economy
+  is drawn with that hazard's average.
+- The Fed's rules for stress and growth, a "Fed put" that cuts into a
+  falling market and holds rises while the index stays down, and a
+  Treasury curve that prices the expected policy path.
+- Credit spreads that follow the cycle, the VIX and a leverage term.
+- Dividends and buybacks paid out of accrued earnings, with the
+  ex-dividend drop at the open.
+- A market variance that follows the cycle, with a leverage effect, a
+  slower GARCH component and a VIX that carries a stress premium.
+- Two years of market prehistory before day 0, so a run opens with the
+  volatility and valuation a market would have, not a calm start.
+- Each name's own variance clusters (an idiosyncratic GARCH), and market
+  jumps are rarer, larger and skewed down.
+- Overnight gaps: part of each day's market and company move happens
+  between the close and the open.
+- An earnings calendar with surprises, the earnings-day move, its
+  follow-through and the drift before the report.
+- Traded impact that remembers recent volume and decays on its own
+  clock, so slicing a programme saves some of its cost, not all of it.
+- Unemployment on Okun's law, and oil that reverts to its inventory
+  level and passes through to inflation.
+- Order-flow impact divides by a name's depth once and is linear in a
+  tick's participation (see "Injected order flow" below).
+
+Each dial's own documentation says what it does at the value pt-v21 sets.
+`ModelParams.from_preset("pt-v20")` is unchanged and still runs.
+
+pt-v21 meets all 40 long-run criteria, read on 270 histories of 21 years.
+The certification, its scripts and its outputs are in `validation/pt-v21/`,
+and `tf.preset_record("pt-v21")` carries the verdict. On the one-year table
+it reads 18 of 19. The row out is a gap: the share of days the index
+falls 3% or more is 0.60% on the 30 certification seeds, under the floor
+of 0.64%, and 0.98% over 360 seeds. Volatility clustering reads 0.095 at
+lag 1 against a real 0.107 and fades faster than real after the first few
+days. The VIX is more persistent from day to day than the real one (0.956
+against 0.930). docs/REALISM.md lists what pt-v21 gets right and wrong.
+
+### Injected order flow
+
+On pt-v21, the impact of order flow a caller injects grows with the
+programme's size measured in the day's volume and is scaled by the day's
+gross volume. A session-long programme moves its name 1.3 bp at 1% of the
+day's volume and 127 bp at the whole day's, linear in size: Y of 0.06 to
+0.63, against the 0.5 to 1 published for real markets. docs/MODEL.md
+gives the table.
+
+### Populated mode
+
+`population=` on `tf.evaluate`, `tf.World` and `tf.Engine` runs a
+fingerprinted set of background traders in the same book:
+`Population.standard()` (a trend follower, a mean reverter, a liquidity
+provider and a flow detector) or `Population.crowded()`, which adds crowds
+trading the ranked rules' own signals and five competing flow detectors.
+Results are reproducible, but strategies no longer face identical
+markets, so `tf.rank` stays isolated. Scorecards, manifests, checkpoints
+and replays carry the population and its fingerprint; isolated results
+are byte-identical to before.
+
+What it was measured to do on pt-v21, with the crowded population
+(`tf.population.MEASURED`):
+
+- An edge decays as other traders trade its signal. Over 30 seeds the
+  one-day reversal's frictionless return falls from 5.7% to 1.8% over 60
+  sessions, and each extra copy of a rule in the same market lowers every
+  copy's return.
+- When the momentum crowd hits its loss limit and sells out, holders of
+  the five-day momentum signal lose 0.06 of a daily standard deviation
+  that day, and the loss comes back over the following week.
+- A predictable programme pays about 2.4% more than it does in isolated
+  mode. Real markets show far more: van Kervel and Menkveld (2019) report
+  169%. Impact here is mostly transient, so there is less to trade ahead
+  of. Treat front-running costs from populated mode as a floor.
+- A run takes about 1.5 times as long as an isolated one.
+
+### MCP server
+
+- The run tools take `preset`, any shipped preset's name. A result on a
+  preset other than the default names it with its fingerprint and says
+  the run is outside the certified envelope.
+- Six session tools keep one market open between calls: `open_session`,
+  `session_step` (steps or days, placing orders in the harness's `act()`
+  grammar), `session_state`, `session_fork`, `session_rewind` and
+  `close_session`. Session and job ids are unguessable.
+- `evaluate_strategies`, `run_stress_scenario`, `open_session` and
+  `start_job` take `population`, "standard" or "crowded"; `rank_strategies`
+  refuses it, because its paired test needs one market draw.
+
+### Agent payload version 2
+
+On a model that pays dividends or runs the earnings calendar, each asset
+in the observation payload also carries `dividend` and
+`next_earnings_in_sessions`. pt-v21 does both, so its payload is version
+2. Recordings made on version 1 still replay. docs/SUPPORT.md lists the
+keys.
+
+### For Rust embedders
+
+- `Engine::snapshot` and `Engine::restore` save and restore the whole
+  engine, the same fields under the same `state_schema` as the Python
+  `state_snapshot` and `restore_state`, with one binary form (#240).
+- `Engine::with_params_keeping_opening` keeps a host's starting economy
+  instead of running the preset's macro burn-in over it, and
+  `opening_settled` says which one ran (#241).
+- Every width a host sizes a state buffer by is a constant at the crate
+  root (#241).
+- `prior_closes`, `last_closes` and `restore_closes` give close-to-close
+  changes, since `previous_close` is the open; `crisis_vix_threshold` and
+  `vix_above_crisis_threshold` expose the crisis VIX level (#243).
+- `tradefloor::flow` states the shock flow each preset was fitted at and
+  checks a host's own: `CalibratedFlow`, `ExternalFlow` and `assess()`. In
+  Python, `tf.envelope.CALIBRATED_FLOW` and `check(external_flow=...)`.
+  REALISM.md gives the table and a measured host flow (#238, #239).
+- `Engine::innovation_day`, in Python `Engine.garch_innovation()`, gives
+  each name's GARCH innovation for the day, night included, since
+  attribution books the night under `overnight` alone.
+- The crate follows semver from 0.10.0, and the release refuses a patch
+  release that breaks its API (#242).
+
+### Breaking changes
+
+Python:
+
+- The ten engine internals deprecated in 0.9.0 (`MispricingState`,
+  `apply_mispricing`, `characteristic_root_moduli`, `check_rate`,
+  `crisis_epicentre_solve`, `crowd_adjusted_root_moduli`,
+  `impulse_response`, `sector_daily_sigma`, `stationary_sigma`,
+  `step_mispricing_daily`) are gone from the top level. Import them from
+  `tradefloor._core`; reading one through the package raises an
+  AttributeError that says so.
+- MCP results no longer carry `pretium_version`, the package's name
+  before 0.5.0. `tradefloor_version` holds the same value (#237).
+- A `RunManifest` names its writer `written_by.tradefloor_version`
+  instead of `pretium_version`. Manifests from 0.9.1 and earlier still
+  load, verify and reproduce; the key is in no fingerprint (#237).
+- A checkpoint written by 0.9.x does not resume on 0.10.0. The resume
+  refuses it and names both versions, because its engine check runs under
+  pt-v21. Resume it with the release that wrote it.
+- The default is pt-v21, so every run on the default moves. Name
+  `pt-v20` to keep a 0.9 result.
+- Constructing a pt-v21 engine takes about 1.5 seconds for 20 names,
+  against about a millisecond on pt-v20: the market plays 504 sessions of
+  prehistory before day 0. Each session after that costs the same.
+- The observation payload is version 2 on pt-v21 (above).
+
+Rust:
+
+- 77 public structs with public fields and 15 public enums are
+  `#[non_exhaustive]`. Fields stay public. A host builds the structs
+  through the new constructors (`TickRequest::new`, `GameTime::new`,
+  `InstrumentInit::new` and the rest) or `Default`, and matches the enums
+  with a wildcard arm. rust/README.md's "Upgrading to 0.10.0" has the
+  list (#242).
+- `ModelParams` gains the pt-v21 dials, each inert at its default.
+- A snapshot of a pt-v21 engine carries the keys its dials switch on,
+  among them `innovation_day`; a snapshot of an older preset is unchanged.
+
 ## 0.9.1
 
 A patch release for the MCP server. No coefficient, default or trajectory

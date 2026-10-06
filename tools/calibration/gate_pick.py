@@ -390,26 +390,36 @@ def driven_basket(m, seed: int, roster_path, freeze=()) -> dict:
 
 
 def one(job):
-    base, overrides, kind, seed = job
+    """One (base, overrides, kind, seed) measurement.
+
+    An optional fifth element shortens every panel kind's horizon to that
+    many sessions. It exists for smoke tests of the tools that call this,
+    which need a run of seconds, and is never part of a graded gate: a
+    shortened panel is a different measurement, and the result cache keys
+    it apart (`gate_batch.protocol_for`).
+    """
+    base, overrides, kind, seed = job[:4]
+    days = job[4] if len(job) > 4 else None
     m = model(base, overrides)
     if kind == "p252":
-        f = facts.measure(seed=seed, universe=_universe(), days=252, model=m)
+        f = facts.measure(seed=seed, universe=_universe(), days=days or 252, model=m)
     elif kind == "p504":
-        f = facts.measure(seed=seed, universe=_universe(), days=504, model=m)
+        f = facts.measure(seed=seed, universe=_universe(), days=days or 504, model=m)
     elif kind in ("vix5", "vix45", "vix65"):
         # The two ENDS as well as the middle: the crisis volatility lever is
         # vol(VIX 65) / vol(VIX 5), the headline number for any
         # crisis preset. A gate that reported only the middle sent every
         # candidate to a separate laptop run to find its lever (§93).
         held = {"vix5": 5.0, "vix45": 45.0, "vix65": 65.0}[kind]
-        f = facts.measure(seed=seed, universe=_universe(), days=252,
+        f = facts.measure(seed=seed, universe=_universe(), days=days or 252,
                           model=m, scenario=Scenario().hold(vix=held))
     elif kind == "driven":
         return kind, driven_window(m, seed)
     elif kind == "ho_seeds":
-        f = facts.measure(seed=seed, universe=_universe(), days=252, model=m)
+        f = facts.measure(seed=seed, universe=_universe(), days=days or 252, model=m)
     elif kind == "ho_universe":
-        f = facts.measure(seed=seed, universe=pt.Universe.random(60, seed=909), days=252, model=m)
+        f = facts.measure(seed=seed, universe=pt.Universe.random(60, seed=909),
+                          days=days or 252, model=m)
     else:
         raise ValueError(kind)
     return kind, panel_row(f)

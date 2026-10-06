@@ -34,6 +34,14 @@
 //! which is how the engine moves them, the close-to-close return is exactly
 //! `y_prev / 252 - D * dy + 0.5 * C * dy^2`.
 //!
+//! Under `rate_close_remark` the close's curve reaches the levels AT that
+//! close ([`RateBook::remark_now`](crate::rates::RateBook::remark_now)), beside the equities' re-mark, and the
+//! next open adds the night's carry alone, so the close-to-close return is
+//! `y_prev / 252` then `- D * dy + 0.5 * C * dy^2` on the SAME close's move,
+//! to the product of the two terms (under 0.01 bp). Under
+//! `rate_intraday_live` the session's print reads a live mark ([`LiveCurve`](crate::rates::LiveCurve))
+//! that is never committed to the level, so the identity still holds.
+//!
 //! The quadratic has its minimum at `dy = D / C` and would price a larger
 //! rise as a gain, so a single move above that is priced at `D / C`: 10.1
 //! percentage points for the 10-year, 7.0 for the corporate index and 41
@@ -170,6 +178,7 @@ pub const INVENTORY_HALF_LIFE_TICKS: f64 = 15.0;
 
 /// Which yield an instrument reads.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum CurvePoint {
     Treasury2Y,
     Treasury10Y,
@@ -190,6 +199,7 @@ impl CurvePoint {
 
 /// One instrument's fixed terms.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct RateSpec {
     pub ticker: &'static str,
     /// What it is, in words, for anyone reading a roster.
@@ -286,6 +296,7 @@ pub fn credit_spread(economy: &EconomyState) -> f64 {
 /// quadratic turns. `carry_yield` is the overnight yield on the step that
 /// accrues carry and zero on every other.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct Repricing {
     pub carry: f64,
     pub duration: f64,
@@ -315,6 +326,7 @@ impl Repricing {
 
 /// One instrument's state.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct RateInstrument {
     pub spec: RateSpec,
     /// The index level: what the instrument is worth at the yield it is
@@ -343,6 +355,15 @@ pub struct RateInstrument {
     /// defines it. Per-tick output, not state.
     pub tick_shock: f64,
     pub tick_absorbed: f64,
+    /// The log move written to the price since its last print and not yet
+    /// booked onto a tape row (`rate_close_remark`: the close's re-mark, a
+    /// pin's and the open's). The next tick moves it into `tick_repriced`.
+    /// Recording, not state: zero on every engine without the switch, NaN
+    /// after a restore with it (the snapshot does not carry it).
+    pub repriced_pending: f64,
+    /// The last tick's `repriced`, the equities' column's meaning: the log
+    /// move from the last print to the price this tick started from.
+    pub tick_repriced: f64,
 }
 
 impl RateInstrument {
@@ -365,6 +386,8 @@ impl RateInstrument {
             day_convexity: 0.0,
             tick_shock: 0.0,
             tick_absorbed: 0.0,
+            repriced_pending: 0.0,
+            tick_repriced: 0.0,
         }
     }
 
@@ -391,25 +414,46 @@ impl RateInstrument {
     /// up to a half spread. The level itself when the maker is flat, which is
     /// every tick of a run nobody trades in.
     pub fn quoted_mid(&self, vix: f64) -> f64 {
+        self.quoted_mid_at(self.level, vix)
+    }
+
+    /// [`Self::quoted_mid`] around `level`, the index level or a live mark
+    /// of it ([`LiveCurve`]).
+    pub fn quoted_mid_at(&self, level: f64, vix: f64) -> f64 {
         if self.maker_inventory == 0.0 {
-            return self.level;
+            return level;
         }
         let load = mathx::clamp(self.maker_inventory / self.inventory_limit(), -1.0, 1.0);
-        let half_spread = self.level * (self.half_spread_bps(vix) / 10_000.0);
-        self.level - load * half_spread
+        let half_spread = level * (self.half_spread_bps(vix) / 10_000.0);
+        level - load * half_spread
+    }
+
+    /// The index level repriced, without carry, by `dy` (a fraction) from
+    /// the yield it is marked at, committing nothing: a live mark's level.
+    /// The level itself at `dy` 0.0.
+    pub fn level_at(&self, dy: f64) -> f64 {
+        if dy == 0.0 {
+            return self.level;
+        }
+        Repricing::new(self.spec.duration, self.spec.convexity, dy, 0.0).apply(self.level)
     }
 
     /// The executable book, now: the equity maker's ladder around the index
     /// level, with this instrument's spread and depth.
     pub fn book(&self, vix: f64) -> OrderBook {
+        self.book_at(self.level, vix)
+    }
+
+    /// [`Self::book`] around `level`, the index level or a live mark of it.
+    pub fn book_at(&self, level: f64, vix: f64) -> OrderBook {
         let mut book = OrderBook::new(self.spec.ticker.to_string(), Some(self.price));
-        if !(self.level > 0.0) {
+        if !(level > 0.0) {
             return book;
         }
         let base_size = self.base_size();
         let (bids, asks) = quote_ladder(&LadderParams {
             quote: QuoteParams {
-                fair_value: self.level,
+                fair_value: level,
                 half_spread_bps: self.half_spread_bps(vix),
                 base_size,
                 inventory: MakerInventory {
@@ -450,11 +494,37 @@ fn inventory_decay() -> f64 {
     *DECAY.get_or_init(|| mathx::pow(0.5, 1.0 / INVENTORY_HALF_LIFE_TICKS))
 }
 
+/// The live mark's move over the published curve (`rate_intraday_live`), in
+/// per cent as the economy holds yields: what the session so far adds to
+/// tonight's expected 2-year, 10-year and corporate yields. The 2-year and
+/// 10-year indices read their own point's move; the corporate index reads
+/// the corporate yield's, since its yield is the 10-year plus a spread that
+/// is the corporate yield less the 10-year.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[non_exhaustive]
+pub struct LiveCurve {
+    pub d2y: f64,
+    pub d10y: f64,
+    pub dcorp: f64,
+}
+
+impl LiveCurve {
+    /// The move, as a fraction, at the yield `point` reads.
+    pub fn dy(&self, point: CurvePoint) -> f64 {
+        crate::units::percent_to_fraction(match point {
+            CurvePoint::Treasury2Y => self.d2y,
+            CurvePoint::Treasury10Y => self.d10y,
+            CurvePoint::InvestmentGrade => self.dcorp,
+        })
+    }
+}
+
 /// Every rate instrument an engine holds, and the curve state they share.
 ///
 /// Empty on every engine built without rate instruments, and an empty book
 /// is never touched: no hook below runs, no column grows, nothing is hashed.
 #[derive(Debug, Clone, Default, PartialEq)]
+#[non_exhaustive]
 pub struct RateBook {
     pub instruments: Vec<RateInstrument>,
     /// The corporate index's credit spread over the 10-year, as a fraction,
@@ -562,6 +632,20 @@ impl RateBook {
     /// reprice if a yield moved, put any flow for an instrument through its
     /// book, print, then let the maker lay off a minute's worth of inventory.
     pub fn tick(&mut self, time: GameTime, economy: &EconomyState, flows: &[(String, OrderVolume)]) {
+        self.tick_live(time, economy, None, flows);
+    }
+
+    /// [`Self::tick`], with the book and the print around a live mark when
+    /// `live` is given (`rate_intraday_live`): each level repriced by its
+    /// point's move ([`RateInstrument::level_at`]), which is not committed.
+    /// `None` is [`Self::tick`] exactly.
+    pub fn tick_live(
+        &mut self,
+        time: GameTime,
+        economy: &EconomyState,
+        live: Option<LiveCurve>,
+        flows: &[(String, OrderVolume)],
+    ) {
         let status = get_market_status(time);
         if status == MarketStatus::Closed {
             return;
@@ -571,8 +655,17 @@ impl RateBook {
         let decay = inventory_decay();
         let vix = economy.vix;
         for inst in &mut self.instruments {
+            // Whatever was written to the price since the last print is this
+            // row's `repriced`; zero on every engine without the close's
+            // re-mark, which never writes it.
+            inst.tick_repriced = inst.repriced_pending;
+            inst.repriced_pending = 0.0;
+            let mark = match live {
+                Some(curve) => inst.level_at(curve.dy(inst.spec.point)),
+                None => inst.level,
+            };
             let last_print = inst.price;
-            let mut print = inst.quoted_mid(vix);
+            let mut print = inst.quoted_mid_at(mark, vix);
             let mut traded = 0.0;
             let flow = flows
                 .iter()
@@ -580,14 +673,14 @@ impl RateBook {
                 .map(|(_, v)| *v)
                 .unwrap_or_default();
             if flow.buy > 0.0 || flow.sell > 0.0 {
-                let mut book = inst.book(vix);
+                let mut book = inst.book_at(mark, vix);
                 let mut delta = 0.0;
                 for (side, quantity) in [(Side::Buy, flow.buy), (Side::Sell, flow.sell)] {
                     let result = book.submit(
                         side,
                         quantity,
                         "flow",
-                        SubmitOptions { limit_price: None, post_remainder: false, order_id: None, skip_own: false },
+                        SubmitOptions { limit_price: None, post_remainder: false, order_id: None, skip_own: false, house_ids: false },
                     );
                     for fill in &result.fills {
                         traded += fill.quantity;
@@ -601,7 +694,7 @@ impl RateBook {
                     }
                 }
             }
-            let (shock, absorbed) = decompose(last_print, inst.level, print);
+            let (shock, absorbed) = decompose(last_print, mark, print);
             inst.tick_shock = shock;
             inst.tick_absorbed = absorbed;
             inst.price = print;
@@ -614,8 +707,49 @@ impl RateBook {
         }
     }
 
+    /// Re-mark every level to the curve `economy` holds now, without carry,
+    /// and print there: the close's re-mark after its macro step and a pin's
+    /// (`rate_close_remark`). The night's carry still accrues at the next
+    /// open, at the yield marked here. The print's move from the last one is
+    /// booked for the next tape row's `repriced`. No draw.
+    pub fn remark_now(&mut self, economy: &EconomyState) {
+        self.sync(economy, false);
+        let vix = economy.vix;
+        for inst in &mut self.instruments {
+            let last = inst.price;
+            let print = inst.quoted_mid(vix);
+            inst.price = print;
+            inst.high = mathx::max(inst.high, print);
+            inst.low = mathx::min(inst.low, print);
+            if last > 0.0 && print > 0.0 {
+                inst.repriced_pending += mathx::log(print / last);
+            }
+        }
+    }
+
+    /// Book what the open wrote to each price, `log(open print / before)`
+    /// with `before` each instrument's price before [`Self::open`], for the
+    /// next tape row's `repriced` (`rate_close_remark`).
+    pub fn book_open_repricing(&mut self, before: &[f64]) {
+        for (inst, &last) in self.instruments.iter_mut().zip(before.iter()) {
+            if last > 0.0 && inst.price > 0.0 {
+                inst.repriced_pending += mathx::log(inst.price / last);
+            }
+        }
+    }
+
+    /// Forget what was written to each price since its last print, as not
+    /// known (NaN): for a restore under `rate_close_remark`, whose snapshot
+    /// does not carry it.
+    pub fn forget_repriced(&mut self, value: f64) {
+        for inst in &mut self.instruments {
+            inst.repriced_pending = value;
+        }
+    }
+
     /// The close. Nothing reprices here: the economy steps after this and its
-    /// yields reach the levels at the next open.
+    /// yields reach the levels at the next open, or at this close's re-mark
+    /// under `rate_close_remark` ([`Self::remark_now`]).
     pub fn close(&mut self) {
         self.closed_since_open = true;
     }
@@ -795,5 +929,77 @@ mod tests {
             }
             assert!((spread_at(i, 60.0) - 0.02).abs() < 1e-9, "{i} at 60");
         }
+    }
+
+    /// `rate_close_remark`: the close's curve reaches each level at the
+    /// close, the next open adds the night's carry alone, and the tape's
+    /// `repriced` books both moves.
+    #[test]
+    fn the_close_remark_prices_the_same_close_and_the_open_adds_only_carry() {
+        let e0 = economy();
+        let mut b = book();
+        b.open(&e0);
+        b.tick(at(9, 30), &e0, &[]);
+        let before: Vec<(f64, f64, f64)> =
+            b.instruments.iter().map(|i| (i.level, i.marked_yield, i.price)).collect();
+        b.close();
+        let mut e1 = e0.clone();
+        e1.treasury_yield_2y += 0.07;
+        e1.treasury_yield_10y -= 0.12;
+        e1.corporate_bond_yield += 0.09;
+        b.remark_now(&e1);
+        let spread = credit_spread(&e1);
+        for (inst, (level, y, last)) in b.instruments.iter().zip(before.iter()) {
+            let y1 = curve_yield(inst.spec.point, &e1, spread);
+            let expected = Repricing::new(inst.spec.duration, inst.spec.convexity, y1 - y, 0.0)
+                .apply(*level);
+            assert_eq!(inst.level, expected, "{}", inst.spec.ticker);
+            assert_eq!(inst.marked_yield, y1);
+            assert_eq!(inst.price, inst.level, "untraded, the print is the level");
+            assert_eq!(inst.repriced_pending, mathx::log(inst.price / last));
+        }
+        let closes: Vec<f64> = b.instruments.iter().map(|i| i.price).collect();
+        let marks: Vec<(f64, f64)> = b.instruments.iter().map(|i| (i.level, i.marked_yield)).collect();
+        b.open(&e1);
+        b.book_open_repricing(&closes);
+        for (inst, (level, y)) in b.instruments.iter().zip(marks.iter()) {
+            assert_eq!(inst.level, Repricing::new(inst.spec.duration, inst.spec.convexity, 0.0, *y)
+                .apply(*level), "{}: the open is the carry alone", inst.spec.ticker);
+            assert_eq!(inst.day_duration, 0.0);
+        }
+        // The first print books the re-mark and the open together.
+        let pending: Vec<f64> = b.instruments.iter().map(|i| i.repriced_pending).collect();
+        b.tick(at(9, 30), &e1, &[]);
+        for (inst, (p, (_, _, last))) in b.instruments.iter().zip(pending.iter().zip(before.iter())) {
+            assert_eq!(inst.tick_repriced, *p);
+            assert_eq!(inst.repriced_pending, 0.0);
+            assert!((inst.tick_repriced - mathx::log(inst.price / last)).abs() < 1e-15);
+        }
+    }
+
+    /// `rate_intraday_live`: the print is around the live mark, and nothing
+    /// is committed, so the close's one-step repricing is unchanged.
+    #[test]
+    fn a_live_mark_prints_around_the_moved_level_and_commits_nothing() {
+        let e = economy();
+        let mut plain = book();
+        plain.open(&e);
+        let mut live = plain.clone();
+        // `None` is the shipped tick exactly.
+        let mut none = plain.clone();
+        plain.tick(at(10, 0), &e, &[]);
+        none.tick_live(at(10, 0), &e, None, &[]);
+        assert_eq!(plain, none);
+        let curve = LiveCurve { d2y: 0.03, d10y: -0.05, dcorp: 0.11 };
+        live.tick_live(at(10, 0), &e, Some(curve), &[]);
+        for (a, b) in live.instruments.iter().zip(plain.instruments.iter()) {
+            assert_eq!(a.level, b.level, "the level is not committed");
+            assert_eq!(a.marked_yield, b.marked_yield);
+            let dy = curve.dy(a.spec.point);
+            assert_eq!(a.price, b.level_at(dy));
+            assert_ne!(a.price, b.price);
+        }
+        // The corporate index reads the corporate yield's move.
+        assert_eq!(curve.dy(CurvePoint::InvestmentGrade), 0.0011);
     }
 }

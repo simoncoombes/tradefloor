@@ -91,9 +91,15 @@
 //!   to 0.53 and 0.77, the middle of each band.
 //! - At one step of six a day, Almgren, Thum, Hauptmann and Li (Risk, 2005)
 //!   predict a cost of `0.120 sigma` at 10% of daily volume and `0.249
-//!   sigma` at 30%; this book charges `0.142` and `0.249`. Below 3% the
-//!   maker's spread sets the cost and the book is dearer than their
-//!   estimate, which is for patient program trading.
+//!   sigma` at 30% if their permanent term is read without its turnover
+//!   factor; this book charges `0.142` and `0.249`. Below 3% the maker's
+//!   spread sets the cost and the book is dearer than their estimate, which
+//!   is for patient program trading. Their fitted law is `sigma [(gamma/2)
+//!   (X/V) (Theta/V)^(1/4) + eta (X/(VT))^(3/5)]`, `Theta` the shares
+//!   outstanding: the factor `(Theta/V)^(1/4)` is part of the fit. At the
+//!   sim roster's median `Theta/V` of 81 (factor 3.0) or the real forty's
+//!   223 (3.87; EDGAR shares over daily volume, 2019 and 2023) the two
+//!   figures are `0.152` to `0.165` at 10% and `0.343` to `0.384` at 30%.
 //! - Cost follows volatility: with the fear gauge held at 35 rather than 15
 //!   realised volatility rises by a factor of 1.61 and the cost of 10% and
 //!   30% of daily volume by 1.71 and 1.72 (spreads widen too).
@@ -149,17 +155,86 @@
 //! The settlement book inside a tick is the maker's ladder, quoted fresh,
 //! plus any resting agent orders. It never sees consumed depth, because the
 //! maker has re-quoted by then and the flow's four slices never reach past
-//! the ladder into the latent depth. So an agent's temporary impact never
-//! reaches the tape as a lifted print for the market to re-centre on: only
-//! its permanent impact does, through `s` (`fill_impact_coefficient`, or
-//! the imbalance law), and through the maker's inventory. That is the line
-//! between temporary and permanent impact this model draws.
+//! the ladder into the latent depth. So, with the metaorder memory off, an
+//! agent's temporary impact never reaches the tape as a lifted print for
+//! the market to re-centre on: only its permanent impact does, through `s`
+//! (`fill_impact_coefficient`, or the imbalance law), and through the
+//! maker's inventory. That is the line between temporary and permanent
+//! impact this model draws without the memory, and it makes the tape's
+//! impact linear in size and permanent within the day: on pt-v20 a
+//! half-day order's peak displacement is `0.42 f^1.04` sigma and 99% of it
+//! is still there at the close (`tools/calibration/metaorder_curve.py`).
+//!
+//! # The metaorder memory (`impact_memory_coefficient`)
+//!
+//! Off zero, each name keeps a signed memory of agents' net taker flow
+//! against the house (the maker and the latent depth), in fractions of its
+//! daily volume. A fill between two agents is left out: it consumed no
+//! liquidity the house must refill, and the pair's cash nets to zero, so
+//! counting the taker's side would let one agent rest an ask and another
+//! lift it to walk the tape at no cost. Fills passed in from outside the
+//! engine (`queue_external_fills`) are left out too; they have no price
+//! the book set. The memory has a fast part `Mf` decaying at
+//! `impact_memory_half_life` and a slow part `Ms` at
+//! `impact_memory_slow_half_life`, combined as `M = (1 - w) Mf + w Ms`,
+//! decaying on open ticks only, so it holds overnight. The name's `s`
+//! carries `D(M) = sign(M) Y_M sigma h(|M|)`, `h(m) = m^delta` above the
+//! crossover `m*` and `m m*^(delta - 1)` below it, booked through the
+//! order-flow slot on each tick so that the part of `s` it owns is `D`
+//! despite `s`'s own reversion ([`BookState::memory`]'s third column). The
+//! print follows `s`, so the displacement is on the tape; the closing
+//! cross prints it, and it carries overnight in `s`. The memory aggregates
+//! every agent, so splitting an order across agent names does not escape
+//! it. The linear `gamma` stays as the long-lived permanent part.
+//!
+//! Two switches, both 0 on every preset, handle agents' RESTING orders
+//! against the memory (sim/r17-wash). `impact_memory_refill`: a resting
+//! order filled against the memory's lean (by the market's flow, or crossed
+//! during the session) takes its size off the memory, never past zero, as
+//! new depth on the side the lean consumed; without it a group that buys as
+//! a taker and sells back through asks at the touch leaves the memory
+//! displaced for free. `book_cross_at_limit`: a resting order the book
+//! leaves crossed during the session trades at its own limit, not at the
+//! maker's better price. See `Engine::refill_memory`.
+//!
+//! What a tick's flow may add to the displacement is capped by what it
+//! paid: `|D(after) - D(before)| <= (1 + delta) * paid / |net shares|`,
+//! `paid` the flow's `sum shares * |log(price / reference)|`. A sell back
+//! along the memory's path recovers `1 / (1 + delta)` of the displacement
+//! on average, so without the cap a block that walked a deep maker ladder
+//! for little more than the spread would leave a displacement worth more
+//! than it cost, and selling it back would pay (measured: `+2` to `+6` bp
+//! on a 3% block sold back in six slices, pt-v20, `Y_M` 0.5 to 0.6). With
+//! it, the round trip's recovery is at most its cost before spreads and
+//! decay. On the latent curve the cap does not bind, since the walk's
+//! average is `Y_B / (1 + delta)` of its marginal and `Y_M <= Y_B`.
+//!
+//! The latent depth on the side the memory leans continues from the
+//! memory's point on its own curve, `x_M = (|D| / (Y_B sigma))^(1/delta)`:
+//! its `Q`-th share is priced at `touch (1 + Y_B sigma ((x_M + Q/V)^delta
+//! - x_M^delta))`, and the front removed for consumption is what `taken`
+//! holds beyond `x_M V`. At `M` = 0 this is the rule above, exactly.
+//!
+//! This is the volume-recovery book of Alfonsi, Fruth and Schied
+//! (Quantitative Finance 10(2), 2010) with a book linear in distance, the
+//! same family as the latent refill. Against the lean, the house's side is
+//! bounded by the memory's own path (`MemoryBound`): a sell into a
+//! buy-displaced price fetches at most `P exp(D(M - q) - B)`, so unwinding
+//! walks the displacement back down rather than cashing it at the spread.
+//! On the lean's side the latent depth continues the curve at `Y_B >= Y_M`;
+//! only the maker's ladder, a few tenths of a percent of daily volume at
+//! the spread, is cheaper than the curve there, as it is on a fresh book.
+//! With `M` = 0 nothing is bounded, so a single block on a fresh book costs
+//! what it did without the memory (C9 is unchanged). Alfonsi, Fruth and
+//! Schied show their book admits no price manipulation for a single
+//! exponential (`w` = 0); this book is not exactly theirs, and the
+//! round-trip tests in `tests/test_impact_memory.py` are the check.
 
 use crate::market::TickCompany;
 use crate::market_maker::MARKET_MAKER_ID;
 use crate::mathx;
 use crate::microstructure::{build_live_book, LiveBookOptions, BOOK_LEVELS};
-use crate::order_book::{OrderBook, Side};
+use crate::order_book::{BookOrder, OrderBook, Side};
 use crate::params::ModelParams;
 
 /// The owner id of every latent-depth level.
@@ -200,8 +275,24 @@ pub const TAKEN_DEPTH_ASK: usize = 3;
 pub const TAKEN_MAKER_INVENTORY: usize = 4;
 pub const TAKEN_WIDTH: usize = 5;
 
+/// Indices into [`BookState::memory`], per company slot: the fast and slow
+/// memories of agents' net flow against the house, in fractions of daily
+/// volume; the displacement already booked into `s`, in log units; what
+/// the taker flow waiting for the next tick paid the house, `sum shares *
+/// |log(price / reference)|`, which caps how far that flow may move the
+/// displacement; and that flow itself, signed shares (bought less sold)
+/// that the house took the other side of. A fill between two agents is in
+/// neither of the last two: it moved no house liquidity.
+pub const MEMORY_FAST: usize = 0;
+pub const MEMORY_SLOW: usize = 1;
+pub const MEMORY_BOOKED: usize = 2;
+pub const MEMORY_PAID: usize = 3;
+pub const MEMORY_FLOW: usize = 4;
+pub const MEMORY_WIDTH: usize = 5;
+
 /// How an order that did not fill in full waits.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum RestMode {
     /// In the book, in the queue at its price (`book_resting` on).
     Queue,
@@ -230,6 +321,7 @@ impl RestMode {
 /// An agent's order that is waiting: resting in the queue, or waiting for the
 /// traded range.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct AgentOrder {
     pub id: String,
     pub agent: String,
@@ -246,8 +338,36 @@ pub struct AgentOrder {
     pub mode: RestMode,
 }
 
+impl AgentOrder {
+    /// A waiting order with nothing filled: `remaining` is `quantity` and
+    /// `sequence` is 0. Set `remaining` and `sequence` on the value to
+    /// restore one that has part filled or that queued behind others.
+    pub fn new(
+        id: impl Into<String>,
+        agent: impl Into<String>,
+        ticker: impl Into<String>,
+        side: Side,
+        limit: f64,
+        quantity: f64,
+        mode: RestMode,
+    ) -> Self {
+        AgentOrder {
+            id: id.into(),
+            agent: agent.into(),
+            ticker: ticker.into(),
+            side,
+            limit,
+            quantity,
+            remaining: quantity,
+            sequence: 0,
+            mode,
+        }
+    }
+}
+
 /// Which side of a trade an agent was on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Liquidity {
     /// The agent's order crossed and took liquidity.
     Taker,
@@ -278,6 +398,7 @@ impl Liquidity {
 
 /// One fill of one agent's order, at one price.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct AgentFill {
     pub agent: String,
     pub order_id: String,
@@ -303,6 +424,7 @@ pub struct AgentFill {
 
 /// One agent's permanent impact on one name, applied on one tick.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct AgentImpact {
     pub agent: String,
     pub ticker: String,
@@ -313,6 +435,12 @@ pub struct AgentImpact {
     /// additive; the tick's flow impact shared pro rata by signed shares
     /// under the imbalance law, where it is neither.
     pub permanent: f64,
+    /// The metaorder memory's part: the tick's flow-driven change to the
+    /// displacement, `D(M after the flow) - D(M decayed)`, shared pro rata
+    /// by each agent's signed net shares. `None` while
+    /// `impact_memory_coefficient` is 0.0, and then absent from the Python
+    /// row, the snapshot and the state hash.
+    pub transient: Option<f64>,
     pub day: i64,
     pub tick: u32,
 }
@@ -324,6 +452,7 @@ pub struct AgentImpact {
 /// snapshot, so every run that never uses this hashes as it did before it
 /// existed.
 #[derive(Debug, Clone, Default, PartialEq)]
+#[non_exhaustive]
 pub struct BookState {
     /// Per company slot, in roster order: see the `TAKEN_*` indices.
     pub taken: Vec<[f64; TAKEN_WIDTH]>,
@@ -340,6 +469,11 @@ pub struct BookState {
     pub sequence: u64,
     /// The next fill's number.
     pub fill_sequence: u64,
+    /// Per company slot, the metaorder memory: see the `MEMORY_*` indices.
+    /// Empty unless `impact_memory_coefficient` is set and agents' flow has
+    /// reached the market, and then carried by the snapshot and the state
+    /// hash; empty, it is in neither.
+    pub memory: Vec<[f64; MEMORY_WIDTH]>,
 }
 
 impl BookState {
@@ -352,12 +486,44 @@ impl BookState {
             && self.fills.is_empty()
             && self.impacts.is_empty()
             && self.taken.iter().all(|row| row.iter().all(|v| *v == 0.0))
+            && self.memory.iter().all(|row| row.iter().all(|v| *v == 0.0))
     }
 
     /// Bring `taken` to the roster's length, adding zero rows.
     pub fn fit(&mut self, companies: usize) {
         if self.taken.len() < companies {
             self.taken.resize(companies, [0.0; TAKEN_WIDTH]);
+        }
+    }
+
+    /// Record an agent's taker fill against the house (the maker or the
+    /// latent depth, never another agent) for the metaorder memory: its
+    /// signed shares on the name's [`MEMORY_FLOW`], and what it paid
+    /// against its reference, `quantity * |log(price / reference)|`, on
+    /// [`MEMORY_PAID`] for the cap. Called only with the memory on.
+    pub fn add_house_flow(
+        &mut self,
+        companies: usize,
+        index: usize,
+        side: Side,
+        quantity: f64,
+        price: f64,
+        reference: f64,
+    ) {
+        if !(quantity > 0.0) {
+            return;
+        }
+        if self.memory.len() < companies {
+            self.memory.resize(companies, [0.0; MEMORY_WIDTH]);
+        }
+        if let Some(row) = self.memory.get_mut(index) {
+            row[MEMORY_FLOW] += match side {
+                Side::Buy => quantity,
+                Side::Sell => -quantity,
+            };
+            if price > 0.0 && reference > 0.0 {
+                row[MEMORY_PAID] += quantity * mathx::log(price / reference).abs();
+            }
         }
     }
 
@@ -437,6 +603,20 @@ fn cents_away(price: f64, side: Side) -> f64 {
 /// first version of this function). Beside it, a walk meets whichever pool
 /// is cheaper at each price, so the book is never dearer than the law, and
 /// past the ladder's few percent of daily volume it IS the law.
+///
+/// `from` is where on its own curve the pool starts, in fractions of daily
+/// volume: 0.0 is the law above; off zero, on the side the metaorder memory
+/// leans, the `Q`-th share is priced at `touch * (1 + Y sigma ((from +
+/// Q/V)^delta - from^delta))`, the curve continued from the memory's point.
+///
+/// With `book_depth_nesting` `k` off zero, the pool counts `k` times the
+/// ladder's shares at a price as good as a level's or better as already on
+/// its curve: the cumulative size placed through that level is `Q - k L`
+/// (never less than what is already placed), `Q` the law's cumulative size
+/// at the level's price and `L` the ladder's. At `k` = 1 the depth within
+/// any distance of the touch is the larger of the ladder's and the law's.
+/// The ladder is read from `book` as it stands, so this is called before
+/// anything else is added to that side. At 0.0 nothing here is read.
 pub fn append_latent_depth(
     book: &mut OrderBook,
     side: Side,
@@ -444,6 +624,7 @@ pub fn append_latent_depth(
     sigma: f64,
     volume: f64,
     params: &ModelParams,
+    from: f64,
 ) {
     let y = params.book_depth_coefficient;
     let (delta, reach) = depth_shape(params);
@@ -465,6 +646,17 @@ pub fn append_latent_depth(
     }
     bounds.reverse();
 
+    // The ladder on this side, best first, for the nesting.
+    let nest = params.book_depth_nesting;
+    let ladder: Vec<(f64, f64)> = if nest > 0.0 {
+        let orders = match side {
+            Side::Buy => &book.bids,
+            Side::Sell => &book.asks,
+        };
+        orders.iter().map(|o| (o.price, o.remaining)).collect()
+    } else {
+        Vec::new()
+    };
     // Integer shares: a level is the difference of two floored cumulative
     // sizes, so the floors never accumulate. Levels on the same cent merge
     // into one order, carried until the price moves on.
@@ -472,7 +664,12 @@ pub fn append_latent_depth(
     let mut pending: Option<(f64, f64)> = None;
     let mut levels: Vec<(f64, f64)> = Vec::new();
     for bound in bounds {
-        let distance = y * sigma * mathx::pow(bound / volume, delta);
+        // A branch, so the pool without a memory is priced as it always was.
+        let distance = if from > 0.0 {
+            y * sigma * (mathx::pow(from + bound / volume, delta) - mathx::pow(from, delta))
+        } else {
+            y * sigma * mathx::pow(bound / volume, delta)
+        };
         let raw = match side {
             Side::Sell => touch * (1.0 + distance),
             Side::Buy => touch * (1.0 - distance),
@@ -481,6 +678,20 @@ pub fn append_latent_depth(
         if !(price > 0.0) {
             break;
         }
+        // A branch, so the pool beside the ladder is placed as it always was.
+        let bound = if nest > 0.0 {
+            let ahead: f64 = ladder
+                .iter()
+                .filter(|(p, _)| match side {
+                    Side::Sell => *p <= price,
+                    Side::Buy => *p >= price,
+                })
+                .map(|(_, q)| *q)
+                .sum();
+            mathx::max(placed, bound - nest * ahead)
+        } else {
+            bound
+        };
         let shares = bound.floor() - placed;
         if !(shares >= 1.0) {
             continue;
@@ -499,7 +710,7 @@ pub fn append_latent_depth(
         levels.push(level);
     }
     for (price, shares) in levels {
-        book.post_limit(side, price, shares, DEPTH_OWNER, None);
+        book.rest_limit(side, price, shares, DEPTH_OWNER);
     }
 }
 
@@ -509,6 +720,181 @@ pub fn depth_shape(params: &ModelParams) -> (f64, f64) {
     let delta = if params.book_depth_exponent == 0.0 { 0.5 } else { params.book_depth_exponent };
     let reach = if params.book_depth_reach == 0.0 { 1.0 } else { params.book_depth_reach };
     (delta, reach)
+}
+
+/// The metaorder memory's combined position `M = (1 - w) Mf + w Ms`, in
+/// fractions of daily volume.
+pub fn memory_position(params: &ModelParams, row: &[f64; MEMORY_WIDTH]) -> f64 {
+    let w = params.impact_memory_slow_weight;
+    if w == 0.0 {
+        row[MEMORY_FAST]
+    } else {
+        (1.0 - w) * row[MEMORY_FAST] + w * row[MEMORY_SLOW]
+    }
+}
+
+/// The memory's displacement of `s` for a position `m` (fractions of daily
+/// volume) at daily sigma `sigma`: `sign(m) Y_M sigma h(|m|)`, with `h(x) =
+/// x^delta` at or above the crossover `m*` and `x m*^(delta - 1)` below it.
+pub fn memory_displacement(params: &ModelParams, m: f64, sigma: f64) -> f64 {
+    let y = params.impact_memory_coefficient;
+    if !(y > 0.0) || m == 0.0 || !(sigma > 0.0) {
+        return 0.0;
+    }
+    let (delta, _) = depth_shape(params);
+    let a = m.abs();
+    let star = params.impact_memory_crossover;
+    let h = if star > 0.0 && a < star {
+        a * mathx::pow(star, delta - 1.0)
+    } else {
+        mathx::pow(a, delta)
+    };
+    let d = y * sigma * h;
+    if m > 0.0 { d } else { -d }
+}
+
+/// The per-open-tick decay of a memory at half-life `h` ticks: `2^(-1/h)`,
+/// or 1.0 (none) at 0.0.
+pub fn memory_decay(h: f64) -> f64 {
+    if h > 0.0 { mathx::pow(0.5, 1.0 / h) } else { 1.0 }
+}
+
+/// The memory's point on the latent book's own curve, in fractions of
+/// daily volume, for a booked displacement `booked`: `(|D| / (Y_B
+/// sigma))^(1/delta)`. Zero without the memory or the depth.
+pub fn memory_point(params: &ModelParams, booked: f64, sigma: f64) -> f64 {
+    let yb = params.book_depth_coefficient;
+    if booked == 0.0 || !(yb > 0.0) || !(sigma > 0.0) || !(params.impact_memory_coefficient > 0.0) {
+        return 0.0;
+    }
+    let (delta, _) = depth_shape(params);
+    mathx::pow(booked.abs() / (yb * sigma), 1.0 / delta)
+}
+
+/// The inverse of [`memory_displacement`]: the position whose displacement
+/// is `d`.
+pub fn memory_inverse(params: &ModelParams, d: f64, sigma: f64) -> f64 {
+    let y = params.impact_memory_coefficient;
+    if !(y > 0.0) || d == 0.0 || !(sigma > 0.0) {
+        return 0.0;
+    }
+    let (delta, _) = depth_shape(params);
+    let a = d.abs() / (y * sigma);
+    let star = params.impact_memory_crossover;
+    let m = if star > 0.0 && a < mathx::pow(star, delta) {
+        a / mathx::pow(star, delta - 1.0)
+    } else {
+        mathx::pow(a, 1.0 / delta)
+    };
+    if d > 0.0 { m } else { -m }
+}
+
+/// The metaorder memory's bound on the house's side of the book: no share
+/// an agent takes from the maker or the latent depth is priced better than
+/// the memory's own price once that share is in it.
+///
+/// A buy's `Q`-th share costs at least `P exp(D(M + Q/V) - B)` and a sell's
+/// fetches at most `P exp(D(M - Q/V) - B)`, where `P` is the last print,
+/// `B` the displacement already booked into it and `M` the memory with the
+/// flow still waiting for the next tick. It acts only on the side AGAINST
+/// the memory's lean (the bids while agents have net bought, the asks while
+/// they have net sold), and not at all while `M` is zero: on the lean's own
+/// side the latent depth continues the memory's curve, and a fresh book is
+/// the book it was, so a single block costs what it always did. At the
+/// memory's own position the bound is the print; past it, the maker's
+/// ladder is pulled down (or lifted) to the curve. This is
+/// what closes the round trip the tape's displacement would otherwise open:
+/// the maker re-quotes around the displaced print with its full depth, so a
+/// sell against the lean would fetch the displaced price for the price of a
+/// spread, and alternating buys and sells of a percent of daily volume
+/// would earn the displacement. Bounded, both legs pay the memory's path,
+/// as they do in the book of Alfonsi, Fruth and Schied (2010).
+struct MemoryBound<'a> {
+    params: &'a ModelParams,
+    sigma: f64,
+    volume: f64,
+    reference: f64,
+    position: f64,
+    booked: f64,
+}
+
+impl MemoryBound<'_> {
+    /// The bound on the `q`-th share (cumulative shares) on one side: the
+    /// book's `Sell` side is what a buy meets.
+    fn price(&self, side: Side, q: f64) -> f64 {
+        let m = match side {
+            Side::Sell => self.position + q / self.volume,
+            Side::Buy => self.position - q / self.volume,
+        };
+        let d = memory_displacement(self.params, m, self.sigma);
+        self.reference * mathx::exp(d - self.booked)
+    }
+
+    /// Cumulative shares up to which a level at `price` is inside the bound.
+    fn reach(&self, side: Side, price: f64) -> f64 {
+        let x = mathx::log(price / self.reference) + self.booked;
+        let m = memory_inverse(self.params, x, self.sigma);
+        match side {
+            Side::Sell => (m - self.position) * self.volume,
+            Side::Buy => (self.position - m) * self.volume,
+        }
+    }
+
+    /// One side's house orders, best first, with every share past the
+    /// bound re-priced onto it. A level is kept at its price up to where
+    /// the bound crosses it; the rest is cut on a grid of cumulative size
+    /// (each piece a quarter longer than what came before it, and at least
+    /// a ten-thousandth of daily volume), each piece priced at its LAST
+    /// share and rounded away from the touch, as the latent levels are. The
+    /// result is sorted as the book requires.
+    fn apply(&self, orders: Vec<BookOrder>, side: Side, company_id: &str) -> Vec<BookOrder> {
+        let worse = |a: f64, b: f64| match side {
+            Side::Sell => mathx::max(a, b),
+            Side::Buy => mathx::min(a, b),
+        };
+        let step = self.volume * DEPTH_GRID_FLOOR;
+        let mut out: Vec<BookOrder> = Vec::with_capacity(orders.len());
+        let mut placed = 0.0;
+        let mut last: Option<f64> = None;
+        // One buffer for every order's pieces, emptied at each.
+        let mut pieces: Vec<(f64, f64)> = Vec::new();
+        for o in orders {
+            let mut left = o.remaining;
+            let within = mathx::max(0.0, mathx::min(left, self.reach(side, o.price) - placed));
+            pieces.clear();
+            if within > 0.0 {
+                pieces.push((o.price, within));
+                left -= within;
+                placed += within;
+            }
+            while left > 1e-9 {
+                let span = mathx::max(step, 0.25 * placed);
+                let take = mathx::min(left, span);
+                placed += take;
+                left -= take;
+                let bound = cents_away(self.price(side, placed), side);
+                pieces.push((worse(o.price, bound), take));
+            }
+            for (k, &(price, shares)) in pieces.iter().enumerate() {
+                let price = match last {
+                    Some(prev) => worse(price, prev),
+                    None => price,
+                };
+                last = Some(price);
+                out.push(if k == 0 {
+                    BookOrder {
+                        price,
+                        quantity: shares,
+                        remaining: shares,
+                        ..o.clone()
+                    }
+                } else {
+                    o.piece(k as u32, price, shares, company_id)
+                });
+            }
+        }
+        out
+    }
 }
 
 /// Remove the first `quantity` shares owned by `owner` from one side of the
@@ -537,6 +923,7 @@ pub fn remove_front(book: &mut OrderBook, side: Side, owner: &str, quantity: f64
 }
 
 /// What building the agent-facing book needs.
+#[non_exhaustive]
 pub struct AgentBookInputs<'a> {
     pub company: &'a TickCompany,
     pub vix: f64,
@@ -545,10 +932,36 @@ pub struct AgentBookInputs<'a> {
     pub market_sigma_daily: f64,
     /// This company's row of [`BookState::taken`], or zeros.
     pub taken: [f64; TAKEN_WIDTH],
+    /// This name's row of [`BookState::memory`], or zeros. Its
+    /// [`MEMORY_FLOW`] is the flow against the house the next tick adds.
+    pub memory: [f64; MEMORY_WIDTH],
     /// Waiting orders; only this name's [`RestMode::Queue`] orders are used.
     pub orders: &'a [AgentOrder],
     /// Leave this agent's own orders out: the book an agent's order meets.
     pub exclude_agent: Option<&'a str>,
+}
+
+impl<'a> AgentBookInputs<'a> {
+    /// The book for `company` with nothing taken from it, no metaorder
+    /// memory, no waiting orders and no agent left out. Set `taken`,
+    /// `memory`, `orders` or `exclude_agent` on the value to add them.
+    pub fn new(
+        company: &'a TickCompany,
+        vix: f64,
+        params: &'a ModelParams,
+        market_sigma_daily: f64,
+    ) -> Self {
+        AgentBookInputs {
+            company,
+            vix,
+            params,
+            market_sigma_daily,
+            taken: [0.0; TAKEN_WIDTH],
+            memory: [0.0; MEMORY_WIDTH],
+            orders: &[],
+            exclude_agent: None,
+        }
+    }
 }
 
 /// The maker's ladder, quoted the way the tick quotes it for this name.
@@ -581,25 +994,72 @@ pub fn agent_book(inputs: &AgentBookInputs<'_>) -> OrderBook {
     let params = inputs.params;
     let mut book = maker_ladder(company, inputs.vix, params);
 
+    // The metaorder memory's point on the latent curve, and the side it
+    // leans: the ask when agents have net bought (the book's `Sell` side).
+    let mut lean: Option<(Side, f64, f64)> = None;
     if params.book_depth_coefficient > 0.0 {
         let sigma = daily_sigma(company, inputs.market_sigma_daily);
         let volume = daily_volume(company);
+        let booked = inputs.memory[MEMORY_BOOKED];
+        let x_m = memory_point(params, booked, sigma);
+        if x_m > 0.0 {
+            let side = if booked > 0.0 { Side::Sell } else { Side::Buy };
+            lean = Some((side, x_m, volume));
+        }
         for side in [Side::Buy, Side::Sell] {
             let touch = match side {
                 Side::Buy => book.best_bid(),
                 Side::Sell => book.best_ask(),
             };
+            let from = match lean {
+                Some((s, x, _)) if s == side => x,
+                _ => 0.0,
+            };
             if let Some(touch) = touch {
-                append_latent_depth(&mut book, side, touch, sigma, volume, params);
+                append_latent_depth(&mut book, side, touch, sigma, volume, params, from);
             }
         }
     }
 
     let t = inputs.taken;
+    // On the side the memory leans, the memory already holds the front of
+    // what was taken: only what `taken` holds beyond `x_M V` is removed.
+    let depth_front = |side: Side, taken: f64| match lean {
+        Some((s, x, v)) if s == side => mathx::max(0.0, taken - x * v),
+        _ => taken,
+    };
     remove_front(&mut book, Side::Buy, MARKET_MAKER_ID, t[TAKEN_MAKER_BID]);
     remove_front(&mut book, Side::Sell, MARKET_MAKER_ID, t[TAKEN_MAKER_ASK]);
-    remove_front(&mut book, Side::Buy, DEPTH_OWNER, t[TAKEN_DEPTH_BID]);
-    remove_front(&mut book, Side::Sell, DEPTH_OWNER, t[TAKEN_DEPTH_ASK]);
+    remove_front(&mut book, Side::Buy, DEPTH_OWNER, depth_front(Side::Buy, t[TAKEN_DEPTH_BID]));
+    remove_front(&mut book, Side::Sell, DEPTH_OWNER, depth_front(Side::Sell, t[TAKEN_DEPTH_ASK]));
+
+    // No house share is better than the memory's price after it.
+    if params.impact_memory_coefficient > 0.0 {
+        let sigma = daily_sigma(company, inputs.market_sigma_daily);
+        let volume = daily_volume(company);
+        let reference = company.stock.price;
+        if volume > 0.0 && sigma > 0.0 && reference > 0.0 {
+            let m = memory_position(params, &inputs.memory) + inputs.memory[MEMORY_FLOW] / volume;
+            let bound = MemoryBound {
+                params,
+                sigma,
+                volume,
+                reference,
+                position: m,
+                booked: inputs.memory[MEMORY_BOOKED],
+            };
+            // Only against the lean: a sell into a buy-displaced price, or
+            // a buy into a sell-displaced one. On the lean's own side the
+            // latent depth already continues the memory's curve, and with
+            // no memory there is no bound, so an order on a fresh book
+            // meets the book it always did.
+            if m > 0.0 {
+                book.bids = bound.apply(std::mem::take(&mut book.bids), Side::Buy, &book.company_id);
+            } else if m < 0.0 {
+                book.asks = bound.apply(std::mem::take(&mut book.asks), Side::Sell, &book.company_id);
+            }
+        }
+    }
 
     for o in inputs.orders {
         if o.mode != RestMode::Queue || o.ticker != company.ticker {
@@ -684,6 +1144,8 @@ mod tests {
                 short_interest: 0.0,
                 float: 1e8,
                 fair_value_offset: None,
+                buyback_log_shares: None,
+                dividend: None,
             },
             sector_volatility: Some(1.0),
             sector_avg_pe: None,
@@ -708,9 +1170,131 @@ mod tests {
             params: p,
             market_sigma_daily: 0.01,
             taken: [0.0; TAKEN_WIDTH],
+            memory: [0.0; MEMORY_WIDTH],
             orders,
             exclude_agent: None,
         }
+    }
+
+    fn memory_params(y_m: f64) -> ModelParams {
+        let mut p = tail_params(0.75);
+        p.book_shared = 1.0;
+        p.impact_memory_coefficient = y_m;
+        p.impact_memory_half_life = 90.0;
+        p.impact_memory_crossover = 0.001;
+        p
+    }
+
+    /// The displacement is the square root above the crossover, linear
+    /// below it and continuous at it, odd in the position, and inverted by
+    /// `memory_inverse`; off, it is zero.
+    #[test]
+    fn the_memory_displacement_is_a_square_root_with_a_linear_foot() {
+        let p = memory_params(0.6);
+        let sigma = 0.02;
+        let d = |m: f64| memory_displacement(&p, m, sigma);
+        assert!((d(0.1) - 0.6 * sigma * 0.1f64.sqrt()).abs() < 1e-15);
+        assert!((d(-0.1) + d(0.1)).abs() < 1e-15);
+        assert!((d(0.0005) - 0.6 * sigma * 0.0005 / 0.001f64.sqrt()).abs() < 1e-15);
+        assert!((d(0.001 - 1e-12) - d(0.001)).abs() < 1e-12);
+        for m in [-0.3, -0.01, -0.0002, 0.0002, 0.004, 0.2] {
+            assert!((memory_inverse(&p, d(m), sigma) - m).abs() < 1e-12, "{m}");
+        }
+        let off = memory_params(0.0);
+        assert_eq!(memory_displacement(&off, 0.1, sigma), 0.0);
+        assert_eq!(memory_point(&off, 0.01, sigma), 0.0);
+        assert_eq!(memory_decay(0.0), 1.0);
+        assert!((memory_decay(90.0).powf(90.0) - 0.5).abs() < 1e-12);
+    }
+
+    /// With an empty memory the book is the book without it: the bound acts
+    /// only against a lean, so a block on a fresh book (row C9) is priced
+    /// as it always was.
+    #[test]
+    fn an_empty_memory_leaves_the_book_as_it_was() {
+        let c = company(50.0, 2e5, 0.0004);
+        let on = memory_params(0.6);
+        let mut off = on.clone();
+        off.impact_memory_coefficient = 0.0;
+        off.impact_memory_half_life = 0.0;
+        let a = agent_book(&inputs(&c, &on, &[]));
+        let b = agent_book(&inputs(&c, &off, &[]));
+        assert_eq!(a.asks, b.asks);
+        assert_eq!(a.bids, b.bids);
+    }
+
+    /// `book_depth_nesting`: at 1.0 the depth within any price of the touch
+    /// is the larger of the ladder's and the law's (to a share and the
+    /// grid's rounding), never their sum and never less than the law; the
+    /// ladder itself is untouched; at 0.0 the book is the book beside it.
+    #[test]
+    fn nesting_makes_the_depth_the_larger_of_ladder_and_law() {
+        let c = company(50.0, 2e5, 0.0004);
+        let beside = tail_params(0.75);
+        let mut nested = beside.clone();
+        nested.book_depth_nesting = 1.0;
+        let a = agent_book(&inputs(&c, &beside, &[]));
+        let b = agent_book(&inputs(&c, &nested, &[]));
+        let ladder = maker_ladder(&c, 15.0, &beside);
+        let within = |orders: &[BookOrder], owner: Option<&str>, price: f64| -> f64 {
+            orders.iter().filter(|o| o.price <= price && owner.is_none_or(|w| o.owner_id == w))
+                .map(|o| o.remaining).sum()
+        };
+        // The ladder is the same in both.
+        let maker = |bk: &OrderBook| -> Vec<(f64, f64)> {
+            bk.asks.iter().filter(|o| o.owner_id == MARKET_MAKER_ID).map(|o| (o.price, o.remaining)).collect()
+        };
+        assert_eq!(maker(&a), maker(&b));
+        let mut thinner = false;
+        for o in &a.asks {
+            let p = o.price;
+            let lad = within(&ladder.asks, None, p);
+            let law_beside = within(&a.asks, Some(DEPTH_OWNER), p);
+            let total_nested = within(&b.asks, None, p);
+            // Never less than either pool alone, never more than the larger
+            // plus the one level the law's grid may carry past it.
+            assert!(total_nested + 1.0 >= lad.max(law_beside) - 1.0, "{p}");
+            assert!(total_nested <= lad.max(law_beside) + law_beside * 0.25 + 2.0, "{p}");
+            if total_nested + 1.0 < within(&a.asks, None, p) {
+                thinner = true;
+            }
+        }
+        assert!(thinner, "nesting must remove the double-counted front somewhere");
+        // Off, identical to the book without the dial.
+        let mut zero = beside.clone();
+        zero.book_depth_nesting = 0.0;
+        assert_eq!(agent_book(&inputs(&c, &zero, &[])).asks, a.asks);
+    }
+
+    /// Leaning long (agents have net bought), the asks continue the latent
+    /// curve from the memory's point and the bids are bounded by the
+    /// memory's own path, so a sell back fetches no more than the path.
+    #[test]
+    fn a_long_lean_bounds_the_bids_and_continues_the_asks() {
+        let c = company(50.0, 2e5, 0.0004);
+        let p = memory_params(0.6);
+        let sigma = daily_sigma(&c, 0.01);
+        let m = 0.05;
+        let booked = memory_displacement(&p, m, sigma);
+        let mut inp = inputs(&c, &p, &[]);
+        inp.memory = [m, 0.0, booked, 0.0, 0.0];
+        let book = agent_book(&inp);
+        let mut plain = p.clone();
+        plain.impact_memory_coefficient = 0.0;
+        plain.impact_memory_half_life = 0.0;
+        let fresh = agent_book(&inputs(&c, &plain, &[]));
+        // Asks: the latent depth continues the curve from the memory's
+        // point, where it is flatter, so a buy of a tenth of a day's volume
+        // reaches less far past the touch than on a fresh curve (the touch
+        // already carries `booked`).
+        let worst = |b: &OrderBook| b.sweep_cost(Side::Buy, 0.1 * 2e5).unwrap().worst_price;
+        assert!(worst(&book) < worst(&fresh), "{} {}", worst(&book), worst(&fresh));
+        // Bids: selling the whole memory back fetches at most the path.
+        let q = m * 2e5;
+        let got = book.sweep_cost(Side::Sell, q).unwrap().average_price;
+        let path = 50.0 * (-(booked - 0.6 * sigma * (2.0 / 3.0) * m.sqrt())).exp();
+        assert!(got <= path + 0.02, "{got} above the path's {path}");
+        assert!(got < fresh.sweep_cost(Side::Sell, q).unwrap().average_price + 1e-9);
     }
 
     /// Off, the agent book is the maker's ten levels and nothing else.

@@ -1,19 +1,20 @@
 """Replay a recorded run.
 
-A seed reproduces a market only when nothing else varies. It does vary: the
-market an agent trades in depends on the agent's own orders, so one seed with
-different order flow is a different market, correctly. Reproducing a run
+A seed reproduces a market only when nothing else varies, and order flow
+does vary. The market an agent trades in depends on the agent's own orders,
+so one seed with different order flow is a different market, as it should
+be. Reproducing a run
 therefore means reproducing every INPUT, and that sequence is what
 ``Engine.order_log`` holds.
 
-Three things this makes possible that a seed alone cannot:
+A log allows three things a seed alone does not:
 
 - **Replaying someone else's result without their code.** The log is data, so
   a published run can be re-executed by anyone with the package.
 - **Bisecting a divergence.** Replay the first N entries of two logs and find
   the step where they part.
-- **Archiving an experiment.** A script may not run next year; a list of dicts
-  will.
+- **Archiving an experiment.** A script may not run next year, but a list of
+  dicts will.
 """
 
 from __future__ import annotations
@@ -77,14 +78,14 @@ def replay(
     until: int | None = None,
     ledger: Any = None,
     max_ticks_per_day: int = MAX_TICKS_PER_DAY,
+    population: Any = None,
 ) -> Engine:
     """Re-execute a recorded log and return the resulting engine.
 
-    ``seed`` and ``universe`` are NOT in the log and must be supplied. That is
-    deliberate: they are the identity of the experiment, and burying them in a
-    list of operations would make it easy to replay a log against the wrong
-    starting conditions without noticing. Passing them explicitly forces the
-    question.
+    ``seed`` and ``universe`` are NOT in the log and must be supplied. They
+    are the identity of the experiment, and burying them in a list of
+    operations would make it easy to replay a log against the wrong starting
+    conditions without noticing.
 
     ``until`` stops after that many entries, which makes bisecting a
     divergence practical: replay both logs to step N and compare.
@@ -96,7 +97,7 @@ def replay(
     ``model`` is the coefficient set the run was recorded under, either a
     preset name or a :class:`ModelParams`, and defaults to the shipped preset.
     Like ``seed`` and ``universe`` it is identity, not history, so it is
-    not in the log; replaying a custom-model run under the default would
+    not in the log. Replaying a custom-model run under the default would
     produce a plausible market that is not the recorded one, so
     :class:`tradefloor.RunManifest` carries the full coefficient dictionary
     and passes it back through here.
@@ -107,9 +108,13 @@ def replay(
 
     ``max_ticks_per_day`` bounds the ticks between two closes, checked over
     the whole log before anything runs; see :data:`MAX_TICKS_PER_DAY`.
+
+    ``population`` is the :class:`tradefloor.Population` the run was
+    recorded with, if any. Like ``model`` it is identity, not history: its
+    orders are not in the log, because the engine makes them again.
     """
     engine = Engine(seed=seed, universe=universe, macro_state=macro,
-                    model=model)
+                    model=model, population=population)
     entries = list(log)[: until if until is not None else len(log)]
     apply_log(engine, entries, ledger=ledger,
               max_ticks_per_day=max_ticks_per_day)
@@ -125,11 +130,11 @@ def apply_log(
 ) -> Engine:
     """Execute recorded entries against an engine that already exists.
 
-    :func:`replay` builds the engine and calls this; a caller that has one
-    already -- a verifier replaying a single day onto a restored state -- calls
-    it directly. Splitting the two is what stops a sampled verification
-    reimplementing the operation table, where a missed entry would replay a
-    day the log does not describe and report the difference as tampering.
+    :func:`replay` builds the engine and calls this. A caller that has one
+    already, such as a verifier replaying a single day onto a restored state,
+    calls it directly. With the two split, a sampled verification does not
+    reimplement the operation table, where a missed entry would replay a day
+    the log does not describe and report the difference as tampering.
 
     Appends to the engine's own order log, as every operation here does, so
     an engine that started from a snapshot ends holding the entries it was

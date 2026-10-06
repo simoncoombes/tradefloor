@@ -1,37 +1,35 @@
 """Adapters that let somebody else's agent framework trade a Tradefloor market.
 
 One module per framework, and each one is a shim. All of them split the work
-the same way, so this subpackage is a place and not a file:
+the same way:
 
     the framework      interprets, reasons, decides
     Tradefloor         market, macro, execution, accounting, checkpoints,
                        forks, interventions, comparison
 
-A framework adapter MUST NOT touch engine state, and it is worth being
-precise about what enforces that. Every decision is validated before
-anything is executed, and the adapter receives the
-:class:`~tradefloor.harness.Observation` exactly as any ordinary agent does:
-the boundary is EQUAL to an agent's, not tighter. Since 0.8.5 that boundary
-is a read-only :class:`~tradefloor.sandbox.MarketView` rather than the live
-engine, and the harness compares the engine's state hash around every
-``act``, so a write is refused or flagged whoever made it. Under
+A framework adapter MUST NOT touch engine state. Every decision is
+validated before anything is executed, and the adapter receives the
+:class:`~tradefloor.harness.Observation` exactly as any ordinary agent does,
+so its boundary is the same as an agent's and no tighter. Since 0.8.5 that
+boundary is a read-only :class:`~tradefloor.sandbox.MarketView` instead of
+the live engine, and the harness compares the engine's state hash around
+every ``act``, so a write is refused or flagged whoever made it. Under
 ``trusted_agents=True`` the Observation carries the live engine again, and
 then the allowlist serializer and the mutation checks in
 ``tests/test_integrations.py`` are what catch a cooperating author's
 accident. Neither is a security boundary against code in the same process
 that walks the interpreter to the engine on purpose (see
-:mod:`tradefloor.sandbox`), and no docstring should tell an author
-otherwise -- an author who believes the harness holds a property does not
-defend it themselves.
+:mod:`tradefloor.sandbox`). An author who believed the harness enforced
+that would not guard against it themselves.
 
-``common.py`` is the shared half of every adapter -- the observation
+``common.py`` is the shared half of every adapter: the observation
 allowlist, the decision model and its two-stage validation, transcripts and
-replay, adapter metadata, and the :class:`~.common.FrameworkAdapter` base --
-derived from the FinRobot integration, which came first and settled those
-questions. ``callable.py`` is the reference adapter over a plain Python
-function, and the template a new framework adapter starts from. ``common``
-depends on nothing outside the library, so importing it never needs any
-framework installed.
+replay, adapter metadata, and the :class:`~.common.FrameworkAdapter` base.
+It was derived from the FinRobot integration, which came first and settled
+those questions. ``callable.py`` is the reference adapter over a plain
+Python function, and the template a new framework adapter starts from.
+``common`` depends on nothing outside the library, so importing it never
+needs any framework installed.
 
 ## Why these are not in the top-level namespace
 
@@ -39,8 +37,7 @@ Every other module under ``tradefloor/`` is first-party engine surface, and
 importing the package imports all of them. An adapter depends on a third
 party whose release cadence, Python support and dependency tree belong to
 somebody else, and it must never break ``import tradefloor`` for a user who
-has never heard of that project. So the rules here are narrow and worth
-stating.
+has never heard of that project. So the rules here are narrow:
 
 - ``tradefloor/__init__.py`` does not import this subpackage, and this
   subpackage's ``__init__`` does not import its own modules. Reaching an

@@ -1,0 +1,2 @@
+pt-v20       all-days bar1 +2.27bp | hike n=855 bar1 +2.2 -> excess -0.1 (bound 5.0) | cut n=643 bar1 +0.5 -> excess -1.7 (bound 5.0) | night hike -68.1 cut +157.7 -> R7a pass
+pt-v21       all-days bar1 +2.29bp | hike n=1216 bar1 +1.4 -> excess -0.9 (bound 5.0) | cut n=1352 bar1 +1.9 -> excess -0.3 (bound 5.0) | night hike -24.6 cut +54.0 -> R7a pass

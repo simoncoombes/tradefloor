@@ -1,7 +1,8 @@
 """The top-level API surface, held to its classification.
 
 ``tradefloor._api`` puts every name reachable as ``tradefloor.X`` in one tier:
-stable, advanced, deprecated or internal. ``tests/api_surface.txt`` is the
+stable, advanced, deprecated or internal (``_api.REMOVED`` lists the
+names 0.10.0 took off the top level). ``tests/api_surface.txt`` is the
 sorted list of those names with their tiers. These tests fail when a name
 appears at the top level, or disappears from it, without both being updated,
 so every change to the public surface shows up in review as a change to
@@ -121,8 +122,8 @@ def test_every_all_entry_resolves_without_a_warning():
 
 
 def test_all_holds_the_api_and_what_is_on_its_way_out():
-    """Stable and advanced names, plus the deprecated ones until they leave,
-    so a star import keeps binding every name it bound in 0.8. `yaml_subset`
+    """Stable and advanced names, plus any deprecated ones until they leave,
+    so a star import keeps binding every name it bound before. `yaml_subset`
     is internal but was in `__all__` in 0.8, so it stays for the same
     reason."""
     wrong = sorted(n for n in tf.__all__
@@ -132,52 +133,53 @@ def test_all_holds_the_api_and_what_is_on_its_way_out():
     assert set(_api.DEPRECATED) <= set(tf.__all__)
 
 
-def test_star_import_binds_every_deprecated_name_without_a_warning():
-    """A star import bound these in 0.8, and code that then calls one
-    unqualified must not meet a NameError in the release that only starts
-    warning. It must not warn ten times either, for names it may not use."""
+# ---------------------------------------------------------------------------
+# The names 0.10.0 removed
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("name", sorted(_api.REMOVED))
+def test_a_removed_name_says_where_it_lives_now(name):
+    home = _api.REMOVED[name]
+    with pytest.raises(AttributeError) as caught:
+        getattr(tf, name)
+    message = str(caught.value)
+    assert f"tradefloor.{name} " in message
+    assert home in message and "0.10.0" in message
+    assert getattr(importlib.import_module(home), name) is not None
+    assert not hasattr(tf, name)
+
+
+@pytest.mark.parametrize("name", sorted(_api.REMOVED))
+def test_from_import_of_a_removed_name_fails(name):
+    """Python words this ImportError itself, so the pointer to the module is
+    in the AttributeError a read through the package raises, not here."""
+    with pytest.raises(ImportError, match=f"cannot import name '{name}'"):
+        exec(f"from tradefloor import {name}\n", {})
+
+
+def test_a_star_import_binds_no_removed_name():
     namespace: dict = {}
     with warnings.catch_warnings():
         warnings.simplefilter("error")
         exec("from tradefloor import *", namespace)
-    for name, home in _api.DEPRECATED.items():
-        assert namespace[name] is getattr(importlib.import_module(home), name)
+    assert sorted(set(_api.REMOVED) & set(namespace)) == []
 
 
-def test_a_star_import_does_not_silence_a_later_read():
-    namespace: dict = {}
-    exec("from tradefloor import *", namespace)
-    with pytest.warns(DeprecationWarning):
-        tf.check_rate
+def test_no_name_is_both_removed_and_classified():
+    assert sorted(set(_api.REMOVED) & set(_api.TIERS)) == []
+    assert set(_api.REMOVED.values()) == {"tradefloor._core"}
 
 
-# ---------------------------------------------------------------------------
-# Deprecated names
-# ---------------------------------------------------------------------------
-
-@pytest.mark.parametrize("name", sorted(_api.DEPRECATED))
-def test_a_deprecated_name_still_resolves_and_warns_at_the_caller(name):
-    home = _api.DEPRECATED[name]
+def test_the_deprecation_path_still_warns_at_the_caller(monkeypatch):
+    """Nothing is deprecated now; the next deprecation uses this path."""
+    monkeypatch.setitem(tf._DEPRECATED, "check_rate", "tradefloor._core")
+    monkeypatch.setitem(_api.DEPRECATED, "check_rate", "tradefloor._core")
+    monkeypatch.setattr(_api, "REMOVAL", "9.9.9")
     with pytest.warns(DeprecationWarning) as caught:
-        value = getattr(tf, name)
-    assert value is getattr(importlib.import_module(home), name)
-    assert len(caught) == 1
-    message = str(caught[0].message)
-    assert f"tradefloor.{name} " in message
-    assert home in message and _api.REMOVAL in message
+        value = tf.check_rate
+    assert value is tf._core.check_rate
+    assert "9.9.9" in str(caught[0].message)
     assert caught[0].filename == __file__
-
-
-@pytest.mark.parametrize("name", sorted(_api.DEPRECATED))
-def test_from_import_of_a_deprecated_name_warns_once_at_the_import(name):
-    source = f"from tradefloor import {name}\n"
-    namespace: dict = {}
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        exec(compile(source, "caller.py", "exec"), namespace)
-    assert namespace[name] is getattr(tf._core, name)
-    assert [(w.category, w.filename, w.lineno) for w in caught] == [
-        (DeprecationWarning, "caller.py", 1)]
 
 
 def test_an_unknown_name_is_still_an_attribute_error():
@@ -186,12 +188,11 @@ def test_an_unknown_name_is_still_an_attribute_error():
     assert not hasattr(tf, "no_such_name")
 
 
-def test_deprecated_names_are_engine_internals_the_stub_declares():
-    """A deprecated name's home is where the stub says it is."""
+def test_removed_names_are_engine_internals_the_stub_declares():
+    """A removed name's home is where the stub says it is."""
     declared = {node.name for node in ast.parse(STUB.read_text("utf-8")).body
                 if isinstance(node, (ast.FunctionDef, ast.ClassDef))}
-    assert set(_api.DEPRECATED.values()) == {"tradefloor._core"}
-    assert sorted(set(_api.DEPRECATED) - declared) == []
+    assert sorted(set(_api.REMOVED) - declared) == []
 
 
 def test_every_compiled_top_level_name_is_declared_in_the_stub():
@@ -242,8 +243,8 @@ def _files():
                 yield path
 
 
-def test_nothing_in_the_repository_reads_a_deprecated_name_from_the_top_level():
-    names = "|".join(sorted(_api.DEPRECATED))
+def test_nothing_in_the_repository_reads_a_removed_name_from_the_top_level():
+    names = "|".join(sorted({**_api.DEPRECATED, **_api.REMOVED}))
     offenders = []
     for path in _files():
         text = _source(path)
@@ -257,12 +258,12 @@ def test_nothing_in_the_repository_reads_a_deprecated_name_from_the_top_level():
             body = re.sub(r"#.*", "", match.group(1) or match.group(2))
             imported = {part.strip().split(" as ")[0].strip()
                         for part in body.replace("\\", " ").split(",")}
-            if imported & set(_api.DEPRECATED):
+            if imported & (set(_api.DEPRECATED) | set(_api.REMOVED)):
                 offenders.append(str(path.relative_to(ROOT)))
                 break
     assert offenders == [], (
-        f"{offenders} read a deprecated name from the top level; import it "
-        "from the module tradefloor._api.DEPRECATED names instead")
+        f"{offenders} read a removed or deprecated name from the top level; "
+        "import it from the module tradefloor._api names instead")
 
 
 def test_importing_the_package_and_its_modules_raises_no_deprecation():

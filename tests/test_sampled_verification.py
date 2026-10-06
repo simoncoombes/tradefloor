@@ -1110,6 +1110,11 @@ def _widths(snapshot):
     """Each per-slot array in a snapshot, by the instruments it holds."""
     out = {name: _slots(snapshot[name], per)
            for name, per in _PER_SLOT.items()}
+    # Without dividends a snapshot's attribution rows leave the dividend's
+    # slot, the last, out.
+    if "dividend" not in snapshot:
+        out["attribution"] = _slots(snapshot["attribution"],
+                                    len(tf.Engine.FACTORS) - 1)
     for name, buffer in snapshot["columns"].items():
         out[f"columns.{name}"] = _slots(buffer, 1)
     return out

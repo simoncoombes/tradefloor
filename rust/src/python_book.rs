@@ -56,9 +56,9 @@ fn check_size(name: &str, value: f64) -> PyResult<()> {
 #[pyclass(name = "Fill", module = "tradefloor._core", frozen, get_all)]
 #[derive(Debug, Clone)]
 pub struct PyFill {
-    /// Always the RESTING order's price, never the incoming one. That is what
-    /// makes size costly: a large taker walks the book paying each maker's
-    /// price in turn.
+    /// Always the RESTING order's price, never the incoming one's. A large
+    /// taker walks the book and pays each maker's price in turn, which is
+    /// what makes size costly.
     pub price: f64,
     pub quantity: f64,
     pub maker_order_id: String,
@@ -86,9 +86,8 @@ pub struct PyMatchResult {
     pub unfilled: f64,
     /// Volume-weighted average across the fills, or None if nothing filled.
     ///
-    /// This is the number showing that slippage is emergent: compare it to the
-    /// mid price before submission and the gap is levels consumed, not a
-    /// coefficient applied.
+    /// The gap between this and the mid price before submission is the cost
+    /// of the levels the order consumed. No slippage coefficient is applied.
     pub average_price: Option<f64>,
     /// Id of the resting remainder, when one was posted.
     pub resting_order_id: Option<String>,
@@ -148,18 +147,17 @@ impl PySweepCost {
 ///
 /// # Why this exists rather than a slippage coefficient
 ///
-/// Real exchanges do not compute a fill price from a formula; they match two
-/// orders. A large order here pays worse prices because it CONSUMED the levels
-/// above it, not because a coefficient said large orders cost more. Market
-/// impact is therefore emergent, and the displayed depth is the executable
-/// depth -- the ladder you can read is the ladder you trade against.
+/// A real exchange makes a fill price by matching two orders, and so does
+/// this book. A large order pays worse prices because it CONSUMED the levels
+/// above it. There is no coefficient for size, so market impact is emergent,
+/// and the depth you can read is the depth you trade against.
 ///
 /// # Validation differs from the core, on purpose
 ///
 /// The underlying implementation returns an empty result for a non-positive or
-/// NaN size, reproducing the reference exactly. This binding raises instead. A
-/// silently ignored order is the worst failure available: the caller believes
-/// they traded, the book disagrees, and nothing reports the disagreement.
+/// NaN size, reproducing the reference exactly. This binding raises instead,
+/// because a silently ignored order leaves the caller believing they traded
+/// while the book disagrees, and nothing reports it.
 #[pyclass(name = "OrderBook", module = "tradefloor._core")]
 pub struct PyOrderBook {
     inner: crate::order_book::OrderBook,
@@ -200,17 +198,18 @@ impl PyOrderBook {
         let s = parse_side(side)?;
         check_size("price", price)?;
         check_size("quantity", quantity)?;
+        let company = self.inner.company_id.clone();
         self.inner
             .post_limit(s, price, quantity, owner, order_id)
-            .map(|o| o.id)
+            .map(|o| o.id_in(&company))
             .ok_or_else(|| OrderError::new_err("the book rejected the limit order"))
     }
 
     /// Submit an order against the book.
     ///
-    /// `limit_price=None` is a market order. Market orders never rest: an
-    /// unfilled remainder is simply unfilled, which is why `post_remainder` is
-    /// ignored for them.
+    /// `limit_price=None` is a market order. Market orders never rest. An
+    /// unfilled remainder stays unfilled, so `post_remainder` is ignored for
+    /// them.
     #[pyo3(signature = (
         side, quantity, *, taker = "taker",
         limit_price = None, post_remainder = false, order_id = None
@@ -238,6 +237,7 @@ impl PyOrderBook {
                 post_remainder,
                 order_id,
                 skip_own: false,
+                house_ids: true,
             },
         );
         Ok(PyMatchResult {
@@ -248,14 +248,14 @@ impl PyOrderBook {
                     price: f.price,
                     quantity: f.quantity,
                     maker_order_id: f.maker_order_id,
-                    maker_id: f.maker_id,
-                    taker_id: f.taker_id,
+                    maker_id: f.maker_id.into_owned(),
+                    taker_id: f.taker_id.into_owned(),
                     taker_side: side_name(f.taker_side).to_string(),
                 })
                 .collect(),
             unfilled: r.unfilled,
             average_price: r.average_price,
-            resting_order_id: r.resting.map(|o| o.id),
+            resting_order_id: r.resting.map(|o| o.id_in(&self.inner.company_id)),
         })
     }
 
@@ -263,17 +263,17 @@ impl PyOrderBook {
     ///
     /// # Callers MUST append in worsening price order
     ///
-    /// This is a bulk-construction fast path for building a ladder that is
-    /// already sorted. It does NOT sort, so appending out of order leaves the
-    /// book silently mis-ordered and every later match wrong. Use
+    /// It is a fast path for building a ladder that is already sorted. It
+    /// does NOT sort, so appending out of order leaves the book silently
+    /// mis-ordered and every later match wrong. Use
     /// [`OrderBook::post_limit`] for anything whose position is not already
-    /// known — it sorts, and costs nothing until a ladder is thousands deep.
+    /// known. That sorts, and the sort costs nothing until a ladder is
+    /// thousands deep.
     ///
-    /// It also differs from `post_limit` at the depth cap, which is easy to
-    /// miss and is not merely an optimisation detail: at `MAX_DEPTH_PER_SIDE`
-    /// this REFUSES and consumes no sequence number, whereas `post_limit`
-    /// accepts and truncates the far end. Substituting one for the other
-    /// therefore desynchronises order ids once a side is full.
+    /// It also differs from `post_limit` at the depth cap. At
+    /// `MAX_DEPTH_PER_SIDE` this REFUSES and consumes no sequence number,
+    /// while `post_limit` accepts and truncates the far end. Substituting one
+    /// for the other desynchronises order ids once a side is full.
     ///
     /// Returns the new order's id, or None when the side is already full.
     #[pyo3(signature = (side, price, quantity, *, owner))]
@@ -290,7 +290,7 @@ impl PyOrderBook {
         Ok(self
             .inner
             .append_maker_level(s, price, quantity, owner)
-            .map(|o| o.id))
+            .map(|o| o.id_in(&self.inner.company_id)))
     }
 
     /// What sweeping `quantity` would cost, without executing it.

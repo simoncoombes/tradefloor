@@ -59,6 +59,8 @@ def run(*, counterfactual, days=DAYS, ticks=TICKS, seed=RUN_SEED):
 def test_the_table_has_a_row_per_instrument_per_tick():
     table = pa.table(run(counterfactual=False, days=1, ticks=30).prints())
     assert table.num_rows == 30 * NAMES
+    # The default, pt-v21 from 0.10.0, pays dividends, so its tape carries
+    # `distribution` last; pt-v20's, which this listed until then, does not.
     assert table.column_names == [
         "day",
         "tick",
@@ -69,6 +71,7 @@ def test_the_table_has_a_row_per_instrument_per_tick():
         "absorbed",
         "clamp",
         "repriced",
+        "distribution",
     ]
 
 
@@ -82,7 +85,10 @@ def test_the_counterfactual_columns_arrive_only_when_asked_for():
     on = pa.table(run(counterfactual=True, days=1, ticks=30).prints())
     assert "unbounded_print" not in off.column_names
     assert "liquidity_share" not in off.column_names
-    assert on.column_names[-2:] == ["unbounded_print", "liquidity_share"]
+    # Before the default's `distribution` (pt-v21 from 0.10.0; this read
+    # `[-2:]` on pt-v20).
+    assert on.column_names[-3:] == ["unbounded_print", "liquidity_share",
+                                    "distribution"]
 
 
 def test_the_schema_carries_one_caveat_computed_from_the_state():
@@ -361,7 +367,10 @@ def test_the_repricing_term_is_what_the_close_wrote_to_the_price():
     engine holds after `close_market` over the day's last print is the
     next day's first `repriced`, name by name."""
     universe = tradefloor.Universe.random(NAMES, seed=ROSTER_SEED)
-    engine = tradefloor.Engine(seed=RUN_SEED, universe=universe)
+    # pt-v20 by name, the default until 0.10.0. On pt-v21 the open's night
+    # (`overnight_market_share`) prints too, and the first `repriced` books
+    # the close's write and the opening print's move together.
+    engine = tradefloor.Engine(seed=RUN_SEED, universe=universe, model="pt-v20")
     engine.open_market()
     engine.run_session(9, 30, 3, 60)
     last = pa.table(engine.prints()).to_pydict()["print"][-NAMES:]

@@ -141,19 +141,22 @@ fn matches_the_reference_bit_for_bit() {
             .copied()
             .unwrap_or_else(|| panic!("unknown sector {}", case.inputs.sector));
 
-        let company = CompanyValuationInputs {
-            sector_avg_pe: Some(anchor),
-            eps: opt(&case.inputs.eps),
-            book_value_per_share: opt(&case.inputs.book_value_per_share),
-            revenue_growth: opt(&case.inputs.revenue_growth),
+        let company = {
+            let mut company_valuation_inputs = CompanyValuationInputs::default();
+            company_valuation_inputs.sector_avg_pe = Some(anchor);
+            company_valuation_inputs.eps = opt(&case.inputs.eps);
+            company_valuation_inputs.book_value_per_share = opt(&case.inputs.book_value_per_share);
+            company_valuation_inputs.revenue_growth = opt(&case.inputs.revenue_growth);
+            company_valuation_inputs
         };
-        let economy = EconomyValuationInputs {
-            corporate_bond_yield: opt(&case.inputs.corporate_bond_yield),
-            federal_funds_rate: f(&case.inputs.federal_funds_rate),
-            qe_pe_boost: opt(&case.inputs.qe_pe_boost),
+        let economy = {
+            let mut economy_valuation_inputs = EconomyValuationInputs::new(f(&case.inputs.federal_funds_rate));
+            economy_valuation_inputs.corporate_bond_yield = opt(&case.inputs.corporate_bond_yield);
+            economy_valuation_inputs.qe_pe_boost = opt(&case.inputs.qe_pe_boost);
             // None is the reference's own default, and it makes the QE stock
             // term zero, so these goldens hold unchanged.
-            qe_assets_ratio: None,
+            economy_valuation_inputs.qe_assets_ratio = None;
+            economy_valuation_inputs
         };
 
         let fv = compute_fair_value(&company, &economy);

@@ -1081,7 +1081,69 @@ def _nothing_dormant():
                    # and a restore that lost it would move the next release.
                    unemployment_adjustment_half_life=84.0,
                    # A switch.
-                   fear_greed_published_inputs=1.0)
+                   fear_greed_published_inputs=1.0,
+                   # The market's cycle nowcast is 0.0 or in (0.2, 1]; 0.4 is
+                   # the value proposed for pt-v20 (r13 phase re-anchor).
+                   cycle_nowcast_accuracy=0.4,
+                   # A switch. At 1.0 the drawn schedule replaces the fixed
+                   # lag's history, which `cycle_publication_lag` 5 above keeps
+                   # lively here; tests/test_macro_clock.py carries the
+                   # schedule across a restore.
+                   cycle_publication_lag_draw=0.0,
+                   # A switch as well: the accrued buyback share counts,
+                   # which the snapshot carries only while it is on.
+                   buyback_accrual=1.0,
+                   # The rate indices' close re-mark and live mark are
+                   # switches, and the live mark needs the re-mark (r13 bond
+                   # timing); the stress cut takes the blanket 0.05.
+                   rate_close_remark=1.0,
+                   rate_intraday_live=1.0,
+                   # Two switches read only under a macro pin (r13).
+                   macro_pins_hold=1.0,
+                   pinned_vix_feedback=1.0,
+                   # A switch. It moves only a World cohort's order, which an
+                   # untraded market does not have.
+                   book_arrival_shuffle=1.0,
+                   # A switch as well; the dividend at 0.05 of the sector
+                   # payouts is small but pays, so a restore that lost a
+                   # name's dividend state would move its next amount.
+                   dividend_buyback_substitution=1.0,
+                   # The night split and the earnings calendar (earnings-
+                   # gaps). The split SPLITS the day where the ratio ADDS a
+                   # night, and the two are refused together, so the ratio
+                   # stays at zero here and the split carries the overnight
+                   # stream; the degrees of freedom are integers from 3; the
+                   # calendar reports from the fifth session at a real size,
+                   # holding back half the cycle for each report.
+                   overnight_variance_ratio=0.0,
+                   overnight_idio_df=3.0,
+                   earnings_surprise_sigma=3.0,
+                   earnings_surprise_df=4.0,
+                   earnings_cycle_report_share=0.5,
+                   # The cycle's volatility multiplier at the design's
+                   # centre (bear-dynamics): at a blanket 0.05 the ratio and
+                   # the expansion multiplier put the factor on its variance
+                   # floor in every phase.
+                   market_vol_cycle_ratio=2.25,
+                   market_vol_cycle_expansion=0.75,
+                   market_vol_cycle_half_life=21.0,
+                   market_vol_cycle_relative=1.0,
+                   # Its two pin switches are 0.0 or 1.0 (r15 bearcycle).
+                   market_vol_cycle_pin_neutral=1.0,
+                   market_vol_cycle_pin_phase=1.0,
+                   # The day's market t scale takes degrees of freedom from
+                   # 3 (r17 d1tail); at 5 a restore between the open and
+                   # the close has a live scale to carry.
+                   market_day_tail_df=5.0,
+                   # The wash fix's two book switches are 0.0 or 1.0 (r17
+                   # wash); they are read only by resting orders.
+                   book_cross_at_limit=1.0,
+                   impact_memory_refill=1.0,
+                   # The market's prehistory is a whole number of sessions
+                   # and its valuation carry a switch (r18 valopen); five
+                   # sessions keep the build short and still hand on state.
+                   market_prehistory_sessions=5.0,
+                   market_prehistory_valuation=1.0)
     return tf.ModelParams.from_preset(**dormant)
 
 
@@ -1241,7 +1303,70 @@ REQUIRED_SNAPSHOT_KEYS = ("columns", "rng", "tickers", "tick_components")
 #: and for the same reason: a field that moves nothing WITHOUT a named reason
 #: is a field the guard below is not guarding, and the difference between
 #: those two cases is the whole value of the check.
+#:
+#: Three left this table at 0.10.0, when the default moved to pt-v21, whose
+#: dials put the scenario in reach of them: `fed_drawdown_mcap_prev`,
+#: `night_market_factor` and `market_vol_cycle_log`.
 UNREACHED_SNAPSHOT_FIELDS = {
+    "attribution":
+        "the day's decomposition of the change in `s`. This model splits the "
+        "day (`overnight_market_share`), and under a split the close's GJR "
+        "steps on `innovation_day`, the noise slot's sum with the night ahead "
+        "of it, so the attribution is reporting only and a restore without it "
+        "prices the same. Without a split the close reads its `random_noise` "
+        "slot, and a fork that lost it closes on a different variance "
+        "(Engine::restore_day_state says so).",
+    "idio_jump_pending":
+        "the name's own jump waiting to enter the next close's variance "
+        "update (`idio_vol_jump_bump`). A fresh engine holds zeros, and "
+        "mid-day under `CRISIS` no name's own jump has landed since the "
+        "close, so the parent's vector is zeros too. tests/test_idio_vol.py "
+        "carries a landed jump across a restore; a snapshot without the key "
+        "is refused by name.",
+    "fed_stress_hold_age":
+        "sessions since the last stressed close (`fed_stress_hold`, r15 "
+        "postcut). `CRISIS` publishes a VIX of 45 at every close, so each "
+        "close restarts the clock at zero whatever it held, and at this "
+        "model's blanket 0.05 sessions the hold covers only the stressed "
+        "session itself, where the clock is zero either way. What it takes "
+        "to see it is a VIX that spikes and falls back, then a meeting that "
+        "would raise inside the hold. tests/test_postcut.py::test_the_hold_"
+        "clock_restarts_on_a_stressed_close_and_ages_otherwise and ::test_the_"
+        "hashes_agree_and_a_restore_reproduces_the_run hold it in the state "
+        "hash and across a restore.",
+    "treasury_policy_path":
+        "the market's forecast of the policy path (`treasury_path_pricing`, "
+        "r15 postcut). It moves only with a meeting's rate change and decays "
+        "at `treasury_path_half_life`, here the blanket 0.05 sessions, so it "
+        "is gone within a session. `CRISIS` starts the policy rate at 0.05, "
+        "where a contraction's ladder has no cut left and no reason to hike. "
+        "tests/test_postcut.py::test_the_hashes_agree_and_a_restore_"
+        "reproduces_the_run cuts, carries a non-zero path across a restore "
+        "and asserts the state hash reads it.",
+    "fed_stress_vix_max":
+        "the central bank's stress level, the highest VIX published since "
+        "the last meeting (`fed_stress_cut`). `CRISIS` holds the VIX at 45 "
+        "every session, so each close writes 45 whatever the level was, and "
+        "an engine restored without it (0.0) is back at 45 at its first "
+        "close, before any meeting reads it. What it takes to see it is a "
+        "VIX that spikes and falls back before a meeting. tests/"
+        "test_bond_timing.py::test_a_restore_without_the_stress_level_loses_"
+        "the_cut is that scenario: without the key the meeting holds where "
+        "the parent cut.",
+    "earnings_key":
+        "the earnings calendar's key. It is derived from the seed the engine "
+        "was built with, and this guard restores into an engine built from "
+        "the same seed, so a restore without it derives the same key. "
+        "tests/test_earnings_calendar.py::test_the_key_is_carried_only_while_"
+        "the_calendar_runs restores into an engine built from another seed, "
+        "where a snapshot without it reports on other dates.",
+    "jump_move":
+        "the jump waiting to be traded in, read by the volume scale only off "
+        "`volume_move_jump_share` 1.0 and without a night split. This model "
+        "splits the day (earnings-gaps), and under a split the volume scale "
+        "reads the day's move from the last close, jumps included, so "
+        "nothing reads it; tests/test_forking.py reached it through the "
+        "volume scale before the split was in this model.",
     "draw_counts":
         "the address counters behind tradefloor.noise. A generator restored "
         "without them continues from counts of zero, so a patch written "
@@ -1337,6 +1462,24 @@ UNREACHED_SNAPSHOT_FIELDS = {
         "close, so the target after the close differs from the one the "
         "draws were made at, and the sector state then carries the "
         "difference into the next day.",
+    "vix_stress_memory":
+        "the published VIX's stress memory (`vix_stress_premium`). It moves "
+        "the QUOTE only -- macro_fields['vix'], the macro table, the wasm "
+        "getter -- and nothing inside the engine reads it, so by "
+        "construction no price, draw or tape row can see it, and this guard "
+        "compares those. tests/test_vix_stress_premium.py::test_the_snapshot_"
+        "and_a_restore_carry_the_memory is the test that does see it: it "
+        "restores the memory and compares the published quote and the state "
+        "hash, which carries it.",
+    "opening_carry":
+        "the prehistory's carried mispricing (`market_prehistory_valuation`, "
+        "r18 valopen), which the first open takes in place of its draws. "
+        "This guard forks mid-day, after that open, so the snapshot carries "
+        "an empty buffer, as with opening_z; and before the open an engine "
+        "built from the same seed builds the same carry. tests/test_market_"
+        "prehistory_valuation.py::test_a_pre_open_snapshot_carries_the_"
+        "opening_into_an_engine_of_another_seed restores before the open into "
+        "another seed's engine, where a snapshot without it opens elsewhere.",
     "central_bank":
         "the meeting calendar runs off day_count, which IS restored, so both "
         "engines schedule the same meetings. A difference needs a run that "
@@ -1382,7 +1525,14 @@ def test_the_drift_guard_notices_every_field_the_snapshot_carries():
             damaged[key] = blank[key]
         else:
             damaged.pop(key)
-        restored.restore_state(damaged)
+        # A field carried as one of a group (the idiosyncratic variance
+        # state's three vectors) is refused when dropped alone: the restore
+        # names it, which is the drop noticed.
+        try:
+            restored.restore_state(damaged)
+        except tf.ValidationError as refused:
+            assert key in str(refused), (key, str(refused))
+            continue
         _continue(reference)
         _continue(restored)
         if not _diverged(restored, reference):

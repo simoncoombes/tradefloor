@@ -1,0 +1,10 @@
+tradefloor known-answer test v29
+  package  0.10.0
+  bytes    16920
+  sha256   4ea1d56340a3357db730764c3e24c131c5e0883efa4cd6f7f56c83ea9674033c
+  sim      3a063f0d207bc37b5ade3b23c60f5e358b275507550b7f75f172a8d7cafb075c
+  meta     8804ef0e67ecede070a22d7fb56f6980605e78a9e45c71ca10f15862d270b165
+  bonds    aae52e08c038f68fec696cec15af4ebbda2743edf5dc9b634a3f67f25635c2d1
+  presets  67ddc3a7c2eab9603e84c7c4ff1d24590ae8dfbd0f1eb3a3963e11a0ba0fc2a3
+  highseed cef62229d22349e5fbd41dac6ccaba91555b68a86dd79bde1c0259bd8e3e6a8b
+  traded   64b896ef2b8e806523bc7a2cd71711bf8cf6b24ac8b6cb34bb3dc7b8b3555fba

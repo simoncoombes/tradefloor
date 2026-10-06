@@ -88,9 +88,9 @@ impl PyModelParams {
     /// With no name this returns the ENGINE'S DEFAULT preset, the same one
     /// `Engine(...)` runs and `model_preset()` reports, so the two cannot
     /// disagree. It read `"pt-v1"` through 0.1.4 while engines ran pt-v3,
-    /// which is a live substitution bug wherever a caller uses the no-arg
-    /// form as "the default model": `Checkpoint.of` did exactly that and
-    /// dropped the model of every pt-v1 run, resuming it as pt-v3.
+    /// a substitution bug for any caller that used the no-arg form as "the
+    /// default model". `Checkpoint.of` did, and dropped the model of every
+    /// pt-v1 run, resuming it as pt-v3.
     ///
     /// `ModelParams.from_preset("pt-v1")` still returns pt-v1 and
     /// fingerprints as `"pt-v1"`; any override that changes a bit
@@ -109,20 +109,20 @@ impl PyModelParams {
 
     /// `from_preset`, with the preset's own identity claims NOT checked.
     ///
-    /// The escape hatch, and the reason it is a second constructor rather
-    /// than a keyword: `**overrides` IS the settable surface, so a flag name
-    /// would have to be reserved against every future dial forever.
+    /// It is a second constructor rather than a keyword because
+    /// `**overrides` IS the settable surface, and a flag name would have to
+    /// be reserved against every future dial forever.
     ///
-    /// Probing a derived dial off its identity is a legitimate measurement --
-    /// it is how the record knows the cap and the ceiling are inert on the
-    /// pt-v19 vector -- and refusing it outright loses a tool. What this
-    /// constructor does NOT skip is `invariants`: a universal invariant has
-    /// no hatch, because no reading taken on a vector that breaks one means
+    /// Probing a derived dial off its identity is a legitimate measurement.
+    /// It is how the record knows the cap and the ceiling are inert on the
+    /// pt-v19 vector, and refusing it outright would lose that. This
+    /// constructor still checks `invariants`. A universal invariant has no
+    /// hatch, because no reading taken on a vector that breaks one means
     /// anything.
     ///
     /// The vector it returns is the same frozen type with the same bits. A
-    /// caller that uses it owes the reader the waiver beside the number;
-    /// the arm tooling writes it into the arm record when run with
+    /// caller that uses it should report the waiver beside the number. The
+    /// arm tooling writes it into the arm record when run with
     /// `--allow-identity-break`.
     #[staticmethod]
     #[pyo3(signature = (name = crate::params::DEFAULT_PRESET_NAME, **overrides))]
@@ -140,10 +140,10 @@ impl PyModelParams {
     /// `identity`, `expected`, `actual`, `tolerance` and `claimed_by`, and
     /// an empty list when they all do.
     ///
-    /// Read-only, and it is what a harness writes into an arm record after
-    /// waiving. It takes the preset name because the claims are a property of
-    /// the preset and not of the type: the cap identity holds on pt-v19 and
-    /// on nothing else shipped.
+    /// Read-only. A harness writes its result into an arm record after
+    /// waiving. It takes the preset name because the claims belong to a
+    /// preset. The cap identity, for one, holds on pt-v19 and on nothing
+    /// else shipped.
     ///
     /// `preset` defaults to the engine's default preset, pt-v19, which is
     /// the default `from_preset` uses, and not to the preset the vector was
@@ -251,7 +251,7 @@ impl PyModelParams {
 
     /// The full preset surface as a dict: every settable coefficient, the
     /// derived-bits pair and the carried read-only constants, plus
-    /// `"name"`, which is the fingerprint. This is what a manifest embeds.
+    /// `"name"`, which is the fingerprint. A manifest embeds this.
     pub fn to_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
         let out = PyDict::new_bound(py);
         out.set_item("name", self.inner.fingerprint())?;
@@ -261,17 +261,18 @@ impl PyModelParams {
         Ok(out.into())
     }
 
-    /// The honest name: a shipped preset's name when bit-identical to it,
-    /// `custom-XXXXXXXX` otherwise, being the first 8 hex chars of sha256 over the
-    /// canonical serialisation (names sorted, values as IEEE-754 bit
-    /// patterns). A non-shipped preset can never present as a shipped one.
+    /// The model's name: a shipped preset's name when bit-identical to it,
+    /// `custom-XXXXXXXX` otherwise, where the X's are the first 8 hex chars
+    /// of sha256 over the canonical serialisation (names sorted, values as
+    /// IEEE-754 bit patterns). A non-shipped preset can never present as a
+    /// shipped one.
     #[getter]
     fn fingerprint(&self) -> String {
         self.inner.fingerprint()
     }
 
-    /// The runtime-settable parameter names, sorted. This is what `from_preset`
-    /// accepts as keywords.
+    /// The runtime-settable parameter names, sorted. `from_preset` accepts
+    /// these as keywords.
     #[staticmethod]
     fn settable() -> Vec<String> {
         settable_names().iter().map(|s| s.to_string()).collect()
@@ -284,6 +285,19 @@ impl PyModelParams {
     #[staticmethod]
     fn digest_silent_at_zero() -> Vec<String> {
         crate::params::DIGEST_SILENT_AT_ZERO.iter().map(|s| s.to_string()).collect()
+    }
+
+    /// The dials left out of the model's digest while they hold their
+    /// default, which is not 0.0, as `{name: default}`. Each is read only
+    /// while a switch silent at zero is set, so at its default it is the
+    /// model that existed before it. The preset records follow the same
+    /// rule.
+    #[staticmethod]
+    fn digest_silent_at_default() -> std::collections::BTreeMap<String, f64> {
+        crate::params::DIGEST_SILENT_AT_DEFAULT
+            .iter()
+            .map(|(n, v)| (n.to_string(), *v))
+            .collect()
     }
 
     /// Read any parameter as an attribute: `params.garch_alpha`.

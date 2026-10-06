@@ -1,0 +1,733 @@
+{
+ "what": "The grade job split into stages, each a set of lines of r15-grade-jobs.sh (the job mkparts.sh splits into the five parts), with what each stage costs. A stage is the unit the screen caches, shards and estimates.",
+ "jobs_file": "programme/r13reg/box/r15-grade-jobs.sh",
+ "jobs_ref": "registration/fifteenth",
+ "preamble": "1,134",
+ "closing": "380,384",
+ "timings": "g15_minutes: the stage's wall-clock minutes on one arm, from the stage marks in programme/results/ptv20/box-g15/parts/*/jobs.log (registration/fifteenth f52c9f79): c8g.16xlarge (64 vCPU), exam seeds, SKIP_GATE. The box and r7 marks cover several tools; their split is in the note. cores_per_arm: the cores one arm keeps busy, from the worker counts in the stage lines, capped at 64.",
+ "not_staged": {
+  "impact (158-162)": "impact_curve.py on pt-v20 itself: feeds no row (C9 is read from the mc stage's per-arm shim)",
+  "scenarios (163-175)": "skipped by GRID=1 on every screen and grade",
+  "preset panel (209-215)": "skipped by GRID=1"
+ },
+ "box": {
+  "boot_minutes_build": 1.9,
+  "boot_minutes_wheel": 1.0,
+  "boot_note": "launch to first stage on g15: 13:01:38 to 13:03:28 with SKIP_GATE (dnf, rustup, clone, a 46-52 s release build, two known-answer runs). Without SKIP_GATE the pytest and cargo gate adds about 7 minutes (programme/results/*/run.log: preflight to first stage 8.3-9.2 min on 18 gated runs, 1.0-1.2 min on 10 SKIP_GATE runs). v21v2 (wheel built on the box, SKIP_GATE): launch 14:50:16, screen start 14:51:59, 1.7 min.",
+  "price_per_hour": {
+   "c8g.16xlarge": 0.64,
+   "c8g.24xlarge": 0.9
+  },
+  "price_note": "c8g.16xlarge: the mean of g15's spot prices, $0.5504 in us-east-2c and $0.7328 in us-east-1c (verdict-pt-v20-g15.json box_run). c8g.24xlarge: programme/longrun/README.md (\"about $0.9 an hour\"). us-east-2c was $0.5461 on 2026-10-04 (v21v2).",
+  "cores": {
+   "c8g.16xlarge": 64,
+   "c8g.24xlarge": 96
+  }
+ },
+ "stages": {
+  "box": {
+   "part": "p1a",
+   "lines": [
+    "136,139"
+   ],
+   "seed_vars": {
+    "LONGRUN_SEED_LIST": {
+     "screen": 90,
+     "scalable": true
+    },
+    "CERT_SEEDS": {
+     "screen": 30,
+     "scalable": true
+    },
+    "HELDSEEDS_SEEDS": {
+     "screen": 30,
+     "scalable": true
+    },
+    "HELDU_SEEDS": {
+     "screen": 30,
+     "scalable": true
+    },
+    "CRISISEXT_FIRST": {
+     "screen": 30,
+     "scalable": false
+    }
+   },
+   "g15_minutes": 10.7,
+   "cores_per_arm": 64,
+   "resumes_per_seed": true,
+   "arm_paths": [
+    "longrun/{ARM}",
+    "cert/cells/cell-{ARM}.json",
+    "cert/cells504/cell-{ARM}.json",
+    "heldseeds/cells/cell-{ARM}.json",
+    "heldu/cells/cell-{ARM}.json",
+    "cert/crisisext/ext-{ARM}.json",
+    "cert/crisisext504/ext-{ARM}.json",
+    "heldseeds/crisisext/ext-{ARM}.json",
+    "heldu/crisisext/ext-{ARM}.json"
+   ],
+   "note": "longrun-jobs.sh (90 histories of 21 years plus the 2008 and 2020 replays, 90 workers) then the four certification cells and the crisis extension at 48 workers (r14-box-jobs.sh). longrun.py skips parts already on disk.",
+   "channels": [
+    "market"
+   ],
+   "floor_minutes_n10": 5.54,
+   "outputs": [
+    "longrun-report.json",
+    "cert/cells/cell-{ARM}.json"
+   ]
+  },
+  "edge": {
+   "part": "p1b",
+   "lines": [
+    "140,144"
+   ],
+   "seed_vars": {
+    "EDGE_FIRST_SEED": {
+     "screen": 10,
+     "scalable": false
+    }
+   },
+   "g15_minutes": 0.35,
+   "cores_per_arm": 40,
+   "resumes_per_seed": false,
+   "arm_paths": [],
+   "note": "C3, edge.py, 10 seeds x 300 sessions",
+   "channels": [
+    "market"
+   ],
+   "floor_minutes_n10": 0.31,
+   "outputs": [
+    "edge.json"
+   ]
+  },
+  "c4": {
+   "part": "p1b",
+   "lines": [
+    "145,151"
+   ],
+   "seed_vars": {
+    "C4A_FIRST_SEED": {
+     "screen": 8,
+     "scalable": false
+    }
+   },
+   "g15_minutes": 1.83,
+   "cores_per_arm": 48,
+   "resumes_per_seed": false,
+   "arm_paths": [],
+   "note": "C4a (8 seeds) and C4b (20 fixed suite markets)",
+   "channels": [
+    "market",
+    "order_flow",
+    "agent_book"
+   ],
+   "floor_minutes_n10": 0.6,
+   "rewrite": [
+    [
+     "python \"$L/c4.py\"",
+     "python \"$L/graded_scenarios.py\" \"$L/c4.py\""
+    ]
+   ],
+   "scenarios": "graded: scripts/longrun/graded-scenarios/ (caaa4c6e's packaged files), through graded_scenarios.py",
+   "own_files": [
+    "graded_scenarios.py",
+    "shim/",
+    "graded-scenarios/"
+   ],
+   "outputs": [
+    "c4a.json",
+    "c4b.json"
+   ]
+  },
+  "xsec": {
+   "part": "p1a",
+   "lines": [
+    "152,157"
+   ],
+   "seed_vars": {
+    "XSEC_SEEDS": {
+     "screen": 90,
+     "scalable": true
+    }
+   },
+   "g15_minutes": 2.72,
+   "cores_per_arm": 64,
+   "resumes_per_seed": false,
+   "arm_paths": [],
+   "note": "C5-C8, R1-R3, E1, B9: grade_xsec.py, 90 histories of 2,660 sessions",
+   "channels": [
+    "market"
+   ],
+   "floor_minutes_n10": 1.35,
+   "outputs": [
+    "xsec.json"
+   ]
+  },
+  "driven2020": {
+   "part": "p1b",
+   "lines": [
+    "176,180"
+   ],
+   "seed_vars": {
+    "XSEC_SEEDS": {
+     "screen": 90,
+     "scalable": true
+    }
+   },
+   "g15_minutes": 0.75,
+   "cores_per_arm": 64,
+   "resumes_per_seed": false,
+   "arm_paths": [],
+   "note": "D2, F1, L1",
+   "channels": [
+    "market"
+   ],
+   "floor_minutes_n10": 0.39,
+   "outputs": [
+    "driven2020.json"
+   ]
+  },
+  "c10": {
+   "part": "p1a",
+   "lines": [
+    "181,187"
+   ],
+   "seed_vars": {},
+   "g15_minutes": 0.2,
+   "cores_per_arm": 1,
+   "resumes_per_seed": false,
+   "arm_paths": [],
+   "note": "C10 from the long run on disk: run after the box stage, in the same shard set",
+   "channels": [
+    "market"
+   ],
+   "floor_minutes_n10": 0.05,
+   "outputs": [
+    "c10.json"
+   ]
+  },
+  "driven2022": {
+   "part": "p1b",
+   "lines": [
+    "188,192"
+   ],
+   "seed_vars": {
+    "XSEC_SEEDS": {
+     "screen": 90,
+     "scalable": true
+    }
+   },
+   "g15_minutes": 0.53,
+   "cores_per_arm": 64,
+   "resumes_per_seed": false,
+   "arm_paths": [],
+   "note": "R5, R6",
+   "channels": [
+    "market"
+   ],
+   "floor_minutes_n10": 0.26,
+   "outputs": [
+    "driven2022.json"
+   ]
+  },
+  "r7": {
+   "part": "p1b",
+   "lines": [
+    "193,199"
+   ],
+   "seed_vars": {
+    "R7_SEEDS": {
+     "screen": 90,
+     "scalable": true
+    },
+    "R7EVAL_SEEDS": {
+     "screen": 30,
+     "scalable": true
+    }
+   },
+   "g15_minutes": 9.92,
+   "cores_per_arm": 64,
+   "resumes_per_seed": false,
+   "arm_paths": [],
+   "note": "R7a (r7_event.py, 90 x 21 years) and R7b (r7_eval.py, tf.evaluate agents)",
+   "channels": [
+    "market",
+    "order_flow",
+    "agent_book"
+   ],
+   "floor_minutes_n10": 5.74,
+   "outputs": [
+    "r7-event.json",
+    "r7-eval.json"
+   ]
+  },
+  "recession": {
+   "part": "p1b",
+   "lines": [
+    "200,205"
+   ],
+   "seed_vars": {
+    "REC_SEEDS": {
+     "screen": 30,
+     "scalable": true
+    }
+   },
+   "g15_minutes": 1.47,
+   "cores_per_arm": 30,
+   "resumes_per_seed": false,
+   "arm_paths": [],
+   "note": "S1a, S1b, S2 on the packaged recession",
+   "channels": [
+    "market"
+   ],
+   "floor_minutes_n10": 1.05,
+   "rewrite": [
+    [
+     "python \"$L/recession_rows.py\"",
+     "python \"$L/graded_scenarios.py\" \"$L/recession_rows.py\""
+    ]
+   ],
+   "scenarios": "graded: scripts/longrun/graded-scenarios/ (caaa4c6e's packaged files), through graded_scenarios.py",
+   "own_files": [
+    "graded_scenarios.py",
+    "shim/",
+    "graded-scenarios/"
+   ],
+   "outputs": [
+    "recession.json"
+   ]
+  },
+  "stab": {
+   "part": "p2",
+   "lines": [
+    "219,228",
+    "230,230"
+   ],
+   "seed_vars": {
+    "STAB_FIRST_SEED": {
+     "screen": 12,
+     "scalable": false
+    }
+   },
+   "g15_minutes": 12.15,
+   "cores_per_arm": 12,
+   "resumes_per_seed": false,
+   "arm_paths": [
+    "stab100/{ARM}-*.npz"
+   ],
+   "note": "H1-100y: stab60.py, 12 histories of 100 years; on g15 it ran beside r14gen and was the longer of the two (12.15 min; 12 histories keep about 12 cores busy)",
+   "channels": [
+    "market"
+   ],
+   "floor_minutes_n10": 10.66,
+   "outputs": [
+    "stab100/{ARM}-*.npz"
+   ]
+  },
+  "gen": {
+   "part": "p2",
+   "lines": [
+    "219,219",
+    "229,229"
+   ],
+   "seed_vars": {
+    "GEN_SEEDS": {
+     "screen": 90,
+     "scalable": true
+    }
+   },
+   "g15_minutes": 8.35,
+   "cores_per_arm": 44,
+   "resumes_per_seed": false,
+   "arm_paths": [
+    "r13gen/{ARM}"
+   ],
+   "note": "r14gen.py true-phase histories, 90 x 5,292 sessions at 44 workers (501 s on g15, from r14gen.log)",
+   "channels": [
+    "market"
+   ],
+   "floor_minutes_n10": 2.24,
+   "outputs": [
+    "r13gen/{ARM}/*"
+   ]
+  },
+  "probe": {
+   "part": "p2",
+   "lines": [
+    "219,219",
+    "232,233"
+   ],
+   "seed_vars": {
+    "PROBE_SEEDS": {
+     "screen": 12,
+     "scalable": true
+    }
+   },
+   "g15_minutes": 1.17,
+   "cores_per_arm": 12,
+   "resumes_per_seed": false,
+   "arm_paths": [],
+   "note": "L-rate rows: tf.evaluate bond timers",
+   "channels": [
+    "market",
+    "order_flow",
+    "agent_book"
+   ],
+   "floor_minutes_n10": 0.55,
+   "outputs": [
+    "probe.json"
+   ]
+  },
+  "sf": {
+   "part": "p2",
+   "lines": [
+    "219,219",
+    "234,241"
+   ],
+   "seed_vars": {
+    "SF_REC_SEEDS": {
+     "screen": 30,
+     "scalable": true
+    },
+    "SF_SEEDS": {
+     "screen": 12,
+     "scalable": true
+    }
+   },
+   "g15_minutes": 3.2,
+   "cores_per_arm": 42,
+   "resumes_per_seed": false,
+   "arm_paths": [],
+   "note": "SF rows: scenario front-run desk on seven scenario files",
+   "channels": [
+    "market"
+   ],
+   "floor_minutes_n10": 2.45,
+   "rewrite": [
+    [
+     "python \"$L/desk_sf.py\"",
+     "python \"$L/graded_scenarios.py\" \"$L/desk_sf.py\""
+    ]
+   ],
+   "scenarios": "graded: scripts/longrun/graded-scenarios/ (caaa4c6e's packaged files), through graded_scenarios.py",
+   "own_files": [
+    "graded_scenarios.py",
+    "shim/",
+    "graded-scenarios/"
+   ],
+   "outputs": [
+    "sf.json",
+    "sf-rec.json"
+   ]
+  },
+  "r7pre": {
+   "part": "p2",
+   "lines": [
+    "242,245"
+   ],
+   "seed_vars": {
+    "R7PRE_SEEDS": {
+     "screen": 90,
+     "scalable": true
+    }
+   },
+   "g15_minutes": 4.03,
+   "cores_per_arm": 64,
+   "resumes_per_seed": false,
+   "arm_paths": [],
+   "note": "R7a-pre; the same simulation as r7_event",
+   "channels": [
+    "market"
+   ],
+   "outputs": [
+    "r7pre.json"
+   ]
+  },
+  "mc": {
+   "part": "p2",
+   "lines": [
+    "219,219",
+    "246,287"
+   ],
+   "seed_vars": {
+    "MC_RUN_SEEDS": {
+     "screen": 30,
+     "scalable": true
+    },
+    "MC_TRIP_SEEDS": {
+     "screen": 3,
+     "scalable": false
+    },
+    "MC_MARK_SEED": {
+     "screen": 1,
+     "scalable": false
+    }
+   },
+   "g15_minutes": 5.32,
+   "cores_per_arm": 34,
+   "resumes_per_seed": false,
+   "arm_paths": [
+    "mc/{ARM}_*",
+    "trips/{ARM}_*",
+    "mark/{ARM}_*",
+    "mc-report-{ARM}.json",
+    "mc-report-{ARM}.txt",
+    "c9/{ARM}.json",
+    "c9/{ARM}.txt"
+   ],
+   "note": "Q1-Q9, G-rt, C9 with the arm's own dials",
+   "channels": [
+    "market",
+    "order_flow",
+    "agent_book"
+   ],
+   "floor_minutes_n10": 3.99,
+   "outputs": [
+    "mc-report-{ARM}.json",
+    "c9/{ARM}.json"
+   ]
+  },
+  "aoph": {
+   "part": "p2",
+   "lines": [
+    "219,219",
+    "288,308"
+   ],
+   "seed_vars": {
+    "AO_FIRST_SEED": {
+     "screen": 30,
+     "scalable": false
+    },
+    "PH1_SEEDS": {
+     "screen": 5,
+     "scalable": true
+    },
+    "PH3_SEEDS": {
+     "screen": 30,
+     "scalable": true
+    }
+   },
+   "g15_minutes": 4.33,
+   "cores_per_arm": 64,
+   "resumes_per_seed": false,
+   "arm_paths": [
+    "ao/*_{ARM}_*",
+    "ph/*-{ARM}-*"
+   ],
+   "note": "AO2 (30 seeds), PH1, PH3",
+   "channels": [
+    "market",
+    "order_flow",
+    "agent_book",
+    "arrival"
+   ],
+   "floor_minutes_n10": 2.78,
+   "outputs": [
+    "ao/*_{ARM}_*.json"
+   ],
+   "rewrite": [
+    [
+     "$L/ph_rows.py",
+     "$L/ph_rows_port.py"
+    ]
+   ],
+   "own_files": [
+    "ph_rows_port.py"
+   ]
+  },
+  "d1pool": {
+   "part": "p3",
+   "lines": [
+    "309,312"
+   ],
+   "seed_vars": {
+    "D1POOL_SEEDS": {
+     "screen": 360,
+     "scalable": true
+    }
+   },
+   "g15_minutes": 2.2,
+   "cores_per_arm": 64,
+   "resumes_per_seed": false,
+   "arm_paths": [
+    "d1pool/{ARM}.json"
+   ],
+   "note": "D1 pooled tail and drift, 360 seeds (130 s on g15, from d1pool.log)",
+   "channels": [
+    "market"
+   ],
+   "floor_minutes_n10": 0.61,
+   "outputs": [
+    "d1pool/{ARM}.json"
+   ]
+  },
+  "aopool": {
+   "part": "p3",
+   "lines": [
+    "219,219",
+    "313,328"
+   ],
+   "seed_vars": {
+    "AOPOOL_FIRST": {
+     "screen": 400,
+     "scalable": false
+    }
+   },
+   "g15_minutes": 11.95,
+   "cores_per_arm": 44,
+   "resumes_per_seed": false,
+   "arm_paths": [
+    "ao-pool/coin-{ARM}.*",
+    "ao-pool/*_{ARM}_*",
+    "ao-pool/{ARM}-*"
+   ],
+   "note": "AO1 (the book coin, 400 seeds) and AO3, AO4 (e7_arm.py q2, q3 in 20 blocks of 20): 41 jobs per arm",
+   "channels": [
+    "market",
+    "order_flow",
+    "agent_book",
+    "arrival"
+   ],
+   "outputs": [
+    "ao-pool/coin-{ARM}.json"
+   ]
+  },
+  "longrun_pool": {
+   "part": "p3",
+   "lines": [
+    "330,337"
+   ],
+   "seed_vars": {
+    "LONGRUN_POOL_SEED_LIST": {
+     "screen": 180,
+     "scalable": true
+    }
+   },
+   "g15_minutes": 10.28,
+   "cores_per_arm": 64,
+   "resumes_per_seed": true,
+   "arm_paths": [
+    "longrun-pool/{ARM}"
+   ],
+   "note": "180 more long-run histories for C10c, PH5 and edge-c10_mirror",
+   "channels": [
+    "market"
+   ],
+   "floor_minutes_n10": 2.83,
+   "outputs": [
+    "longrun-pool/{ARM}/*-free.json"
+   ]
+  },
+  "edgeaudit": {
+   "part": "p4",
+   "lines": [
+    "219,219",
+    "338,358"
+   ],
+   "seed_vars": {
+    "EDGEGEN_SEEDS": {
+     "screen": 30,
+     "scalable": true
+    },
+    "EDGEEVAL_SEEDS": {
+     "screen": 20,
+     "scalable": true
+    }
+   },
+   "g15_minutes": 51.65,
+   "cores_per_arm": 30,
+   "resumes_per_seed": false,
+   "arm_paths": [
+    "edge-{ARM}",
+    "edge-{ARM}-*.log"
+   ],
+   "note": "the exploit gate's stock-level histories (2.5 min) and the tf.evaluate agents with their exposure-matched twins (about 49 min)",
+   "channels": [
+    "market",
+    "order_flow",
+    "agent_book"
+   ],
+   "outputs": [
+    "edge-{ARM}/*"
+   ],
+   "floor_minutes_n10": 51.65
+  },
+  "regr": {
+   "part": "p3",
+   "lines": [
+    "219,219",
+    "359,379"
+   ],
+   "seed_vars": {
+    "AUDIT_SEED_SHORT": {
+     "screen": 30,
+     "scalable": false
+    },
+    "AUDIT_SEED_VAR": {
+     "screen": 30,
+     "scalable": false
+    },
+    "AUDIT_SEED_LONG": {
+     "screen": 8,
+     "scalable": false
+    },
+    "AUDIT_SEED_PROBE": {
+     "screen": 8,
+     "scalable": false
+    }
+   },
+   "g15_minutes": 30.4,
+   "cores_per_arm": 30,
+   "resumes_per_seed": false,
+   "arm_paths": [
+    "regr-{ARM}"
+   ],
+   "note": "the regression audit's probes (regr.tgz), many sequential steps per arm",
+   "channels": [
+    "market",
+    "order_flow",
+    "agent_book"
+   ],
+   "outputs": [
+    "regr-{ARM}/*"
+   ],
+   "floor_minutes_n10": 30.4
+  },
+  "ptv21": {
+   "part": "screen",
+   "lines": [],
+   "script": [
+    "echo \"=== ptv21 free histories  $(date -u +%H:%M:%S)\"",
+    "python \"$L/ptv21.py\" measure --arm-file \"$L/arms.txt\" --seeds \"$PTV21_SEEDS\" --years \"${PTV21_YEARS:-21}\" \\",
+    "    --parts free --workers \"$WORKERS\" --out \"$OUT/ptv21\" 2>&1 | tee \"$OUT/ptv21.log\" | tail -n 3"
+   ],
+   "seed_vars": {
+    "PTV21_SEEDS": {
+     "screen": 30,
+     "scalable": true,
+     "default": "201-230"
+    }
+   },
+   "own_files": [
+    "ptv21.py"
+   ],
+   "g15_minutes": 3.0,
+   "cores_per_arm": 30,
+   "floor_minutes_n10": 2.89,
+   "arm_paths": [
+    "ptv21/{ARM}"
+   ],
+   "channels": [
+    "market"
+   ],
+   "note": "ptv21.py measure --parts free: one 21-year free history per seed with every name's first-tick open and close (ON1, G1, G1c, U1-U4, O1-O4, SK1, SK2). Not a grade-job stage. Minutes are an estimate from the desk: one R20M history of 3 years took 27 s, so 21 years about 2.5 to 3 min; 30 seeds on 90 workers are one wave.",
+   "outputs": [
+    "ptv21/{ARM}/free-*.json"
+   ]
+  }
+ },
+ "channels_note": "The channels a stage opens: the union over its tools. Traded tools (tf.evaluate agents, metaorders, round trips, the World's agents) open order_flow and agent_book; tools that read the book's quotes or depth open agent_book; the arrival-order tools open arrival. A row reached through a channel is re-measured only on its stages that open that channel; its other stages are read from the baseline.",
+ "floors": "floor_minutes_n10: the longest of the two arms' minutes for the stage on box v21v2 (2026-10-04, c8g.16xlarge, two arms, 10 seeds per list, one shard at a time). A stage on a few seeds takes one wave of its longest task however few seeds it has, which the core-minute model cannot see; with shards run one at a time a shard takes at least this long. Stages v21v2 did not run (regr, edgeaudit, aopool, stab, r7pre) have no floor. stab and ptv21: box s1a1 (2026-10-04), 10.66 and 2.89 minutes; stab's 12 histories of 100 years do not shrink with the seed count. edgeaudit and regr: g15 (one arm, its own box), 51.65 and 30.40 minutes; neither shrinks below its own wall time.",
+ "graded_scenarios_note": "sf, recession and c4 run their tools through graded_scenarios.py, so the packaged scenarios they load are the ones the pt-v20 grade's engine (caaa4c6e) packaged and the rows were banded on, not the build's own. On ptv21/base the packaged files are dev's, which hold the corporate yield's level and read SF5 at 0.00.",
+ "outputs_note": "outputs: files a finished shard must hold (globs, {ARM} the arm). A shard missing one is failed and never cached: a tool that crashes inside a stage leaves the job's exit status 0 (a pool crash in desk_sf on the desk, 2026-10-04)."
+}

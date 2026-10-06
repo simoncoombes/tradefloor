@@ -36,9 +36,10 @@ def universe(n=6):
     ]
 
 
-def engine(seed=42, n=6, **macro):
+def engine(seed=42, n=6, model=None, **macro):
     return tradefloor.Engine(
-        seed=seed, universe=universe(n), macro_state=tradefloor.Macro(**macro)
+        seed=seed, universe=universe(n), macro_state=tradefloor.Macro(**macro),
+        model=model,
     )
 
 
@@ -394,8 +395,12 @@ def test_order_flow_moves_the_targeted_name_in_the_right_direction():
 def test_order_flow_is_visible_in_the_state_even_when_the_print_rounds_away():
     # The single-tick case the test above avoids. It IS working; the cent grid
     # is simply coarser than one tick of pressure.
+    # On pt-v20 by name, the default until 0.10.0 (this built the default).
+    # pt-v21 takes injected flow at `order_flow_coefficient` 800 and divides
+    # by depth once, so the same tick moves the print 30 cents, 50.06 to
+    # 50.36: the cent grid hides nothing there.
     def one(flow=None):
-        e = engine(seed=42, n=3)
+        e = engine(seed=42, n=3, model="pt-v20")
         e.open_market()
         e.tick(9, 30, 3, order_flow=flow)
         return arr(e.column("mispricing_s")), arr(e.prices())
@@ -511,6 +516,9 @@ def test_attribution_reports_every_component_that_moves_a_price():
         # fair-value level under the permanent share, which the ten report
         # as the whole shock. Zero on every earlier preset.
         "fair_value_shift",
+        # The twelfth: the change in `s` at an ex-date open, zero on every
+        # model without dividends (`dividend_payout_share`).
+        "dividend",
     ]
 
 
@@ -523,7 +531,11 @@ def test_an_unknown_factor_names_the_valid_ones():
 def test_attribution_is_per_day_and_survives_the_close():
     # Reset at open, not at close, so a caller can still read the day's
     # decomposition after closing -- which is when they actually want it.
-    e = engine(n=3)
+    # On pt-v20 by name (this built the default until 0.10.0). On pt-v21
+    # the open itself books the night (`overnight_market_share`,
+    # `overnight_idio_share`) into `overnight` and `random_noise`, so the
+    # day's slots start from the night's move rather than zero.
+    e = engine(n=3, model="pt-v20")
     e.open_market()
     e.run_session(9, 30, 3, 100)
     e.close_market()

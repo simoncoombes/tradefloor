@@ -59,6 +59,7 @@ const BOOK_SCATTER: f64 = 2.4;
 
 /// One generated instrument, in the shape the public API accepts.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct GeneratedInstrument {
     pub ticker: String,
     pub sector: &'static str,
@@ -307,6 +308,7 @@ pub fn random_universe(n: usize, seed: u64) -> Vec<GeneratedInstrument> {
 /// decisions, not glue, and a binding that re-made them would fork the
 /// initial state while looking like it was only copying fields. Both the
 /// Python and WebAssembly surfaces build this and call `to_tick_company`.
+#[non_exhaustive]
 pub struct InstrumentInit {
     pub ticker: String,
     pub sector: String,
@@ -318,6 +320,32 @@ pub struct InstrumentInit {
     pub avg_volume: f64,
     pub beta: f64,
     pub short_interest: f64,
+}
+
+impl InstrumentInit {
+    /// An instrument with the Python `Instrument`'s defaults for the rest:
+    /// average volume 1,000,000, beta 1.0, no short interest and no
+    /// fundamentals. Set the others on the value. `sector` must be a key
+    /// from [`crate::sectors::keys`] by the time `to_tick_company` runs.
+    pub fn new(
+        ticker: impl Into<String>,
+        sector: impl Into<String>,
+        initial_price: f64,
+        shares_outstanding: f64,
+    ) -> Self {
+        InstrumentInit {
+            ticker: ticker.into(),
+            sector: sector.into(),
+            initial_price,
+            shares_outstanding,
+            eps: None,
+            book_value_per_share: None,
+            revenue_growth: None,
+            avg_volume: 1_000_000.0,
+            beta: 1.0,
+            short_interest: 0.0,
+        }
+    }
 }
 
 impl InstrumentInit {
@@ -353,6 +381,8 @@ impl InstrumentInit {
                 mispricing_s_prev_close: None,
                 mispricing_momentum: None,
                 fair_value_offset: None,
+                buyback_log_shares: None,
+                dividend: None,
                 maker_inventory: None,
                 garch_variance: sector.base_daily_variance(),
                 // Seeded at the sector base, like `garch_variance` beside

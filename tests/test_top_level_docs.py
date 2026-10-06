@@ -52,7 +52,7 @@ def test_the_statistics_summary_row_counts_what_the_record_holds():
     text = read("docs/STATISTICS.md")
     summary = next(line for line in text.splitlines()
                    if line.startswith("| [The long-run criteria]"))
-    assert f"{of} registered rows for pt-v20" in summary, summary
+    assert f"{of} registered rows" in summary, summary
     assert f"{passed} of {of} met" in summary, summary
     assert f"fails 16 of the {of}" in summary, summary
     assert "28" not in summary, summary
@@ -63,8 +63,8 @@ def test_the_readme_counts_the_long_run_rows_the_record_holds():
     """The README said 'meets all 17, and the 23 more'."""
     record = long_run()
     text = flat(read("README.md"))
-    assert f"are {record['of']} rows over 21 years for pt-v20" in text
-    assert f"pt-v20 meets all {record['of']}." in text
+    assert f"are {record['of']} rows over 21 years" in text
+    assert f"{tf.preset_record()['preset']} meets all {record['of']}," in text
     assert "meets all 17" not in text
 
 
@@ -89,18 +89,26 @@ def test_c9_says_it_measures_one_immediate_order():
 
 
 def test_the_readme_counts_the_mcp_tools_the_server_registers():
-    """The README said twelve; `mcp.py` registers thirteen."""
+    """The README said twelve; `mcp.py` registers thirteen. It then called
+    all thirteen read-only when `start_job` was not, and the session tools
+    are not either, so the row counts both. Read from the source, so this
+    runs without the `mcp` extra; `test_mcp.py` checks the same row against
+    the registered annotations."""
     source = read("python/tradefloor/mcp.py")
     count = source.count("@server.tool")
-    words = {12: "twelve", 13: "thirteen", 14: "fourteen", 15: "fifteen"}
+    read_only = source.count("annotations=_READ_ONLY,")
+    words = {12: "twelve", 13: "thirteen", 14: "fourteen", 15: "fifteen",
+             16: "sixteen", 17: "seventeen", 18: "eighteen", 19: "nineteen",
+             20: "twenty"}
     text = read("README.md")
-    assert f"| MCP server | {words[count]} read-only tools" in text
+    assert (f"| MCP server | {words[count]} tools for a coding agent, "
+            f"{words[read_only]} of them read-only") in text
 
 
 def test_the_examples_table_says_what_the_factors_sum_to():
     text = read("README.md")
     assert "sum to every move" not in text
-    assert "The eleven factors that sum to the mispricing's move" in text
+    assert "The twelve factors that sum to the mispricing's move" in text
 
 
 # ---------------------------------------------------------------------------
@@ -130,13 +138,22 @@ def test_the_scenario_limit_states_the_envelope_s_bias():
 
 
 @pytest.mark.parametrize("name", [
-    "volatility memory", "opening state", "overnight gaps", "intraday",
+    "volatility memory", "overnight gaps", "intraday",
     "slicing a large order", "agent interaction",
 ])
 def test_every_limit_the_reviewers_measured_has_a_row(name):
     rows = limits_table()
     assert name in rows, f"no {name!r} row in the docs/REALISM.md limits table"
     assert rows[name].endswith("the next preset"), rows[name]
+
+
+def test_the_opening_limit_says_pt_v21_has_none():
+    """pt-v21 opens after 504 sessions of prehistory, so the opening VIX
+    varies with the seed, and the row says so with the range."""
+    row = limits_table()["opening state"]
+    assert row.startswith("on pt-v21 the market lives 504 sessions"), row
+    assert "from 10.3 to 43.2" in row, row
+    assert row.endswith("| no limit on pt-v21"), row
 
 
 def test_the_roster_limit_names_the_preset_it_was_measured_on():
@@ -148,22 +165,23 @@ def test_the_readme_states_the_per_seed_pass_rate():
     """19 of 19 is a verdict on 30-seed medians, not on one seed's year."""
     text = flat(read("README.md"))
     assert "tf.envelope.intervals()" in text
-    assert "all 14 were in range on 5 of the 16" in text
+    assert "all 14 were in range on 8 of the 16" in text
     assert "tf.envelope.intervals()" in flat(read("docs/STATISTICS.md"))
 
 
 def test_the_clustering_shortfall_is_stated_beside_the_certificate():
+    """On pt-v21 clustering is near real at lag 1 and below every real year
+    at lag 5; the pages say both, with the certified figures."""
     certified = tf.envelope.certified()["statistics"]
     lag1 = certified["abs_return_acf1"]["measured"]
     lag5 = certified["abs_return_acf5"]["measured"]
     windows = tf.facts.REAL_MARKETS_WINDOWS["values"]
-    assert lag1 < min(windows["abs_return_acf1"])
     assert lag5 < min(windows["abs_return_acf5"])
     readme = flat(read("README.md"))
-    assert f"`abs_return_acf1` reads {lag1:.3f}" in readme
+    assert f"`abs_return_acf5` reads {lag5:.3f}" in readme
     stats = flat(read("docs/STATISTICS.md"))
     assert f"{lag1:.4f} for `abs_return_acf1`" in stats
-    assert f"{min(windows['abs_return_acf1']):.3f}" in stats
+    assert f"{min(windows['abs_return_acf5']):.3f}" in stats
 
 
 # ---------------------------------------------------------------------------
@@ -188,7 +206,8 @@ def test_support_says_what_each_digest_covers():
     # A traded evaluate run has had a digest since 0.8.5. Before it, this
     # page said none did, and that sentence must not come back.
     assert "has no digest yet" not in text
-    assert "one traded `tf.evaluate` run is pinned on pt-v20" in text
+    # The default preset by name since 0.10.0 (pt-v21); "on pt-v20" before.
+    assert "one traded `tf.evaluate` run is pinned on the default preset" in text
     assert "does not recompute a score" in text
 
 

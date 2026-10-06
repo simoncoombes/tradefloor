@@ -27,6 +27,20 @@ Usage:
     [{"label": "ptv11+sector0.8", "base": "pt-v11",
       "overrides": {"sector_vix_coupling": 0.8}}]
 
+`--cache DIR` keeps every reading once per (build, model, kind, seed)
+(`result_cache.py`), so a block, a candidate or a baseline measured before
+is read rather than run. `--staged A|B` runs a staged screen over the same
+kinds instead of the gate (`staged_screen.py`): stage A measures only the
+kinds a candidate's changed dials reach (`dial_reach.py`) on `--n0` seeds
+and kills a candidate whose row is clearly out (`staged_rule.py`); stage B
+measures every kind, reads the unreachable ones from the candidate's
+`"baseline"` (default its base preset), and grows a kind's seeds only while
+a row it feeds is near a limit. `--staged B --verify` measures everything
+and exits 3 if any cached or baseline reading disagrees:
+
+    python tools/calibration/gate_batch.py --candidates cands.json \
+        --cache gate-cache --staged A --workers 94 --out stage-a.json
+
 Every candidate is gated on the same axes `gate_pick` uses, and the printed
 block per candidate is `gate_pick`'s own `summarise`, so the two tools cannot
 drift into disagreeing about what a gate says. The response instrument is
@@ -125,6 +139,140 @@ def one(job):
     return label, kind, row
 
 
+# -- the result cache and the staged screen (every kind, every seed) --------
+#
+# `--ho-cache` above keeps the two held-out kinds once per model. `--cache`
+# keeps every kind's reading once per (build, model, kind, seed), so a block
+# that shares seeds with an earlier one, a candidate gated twice, and the
+# baseline every candidate is compared with are measured once. `--staged`
+# runs the staged screen of `staged_screen.py` on the same readings.
+
+def protocol_for(kind: str, days: int | None = None) -> str:
+    """The cache's name for one gate kind, with everything that shapes it.
+
+    The universe override (`PT_UNIVERSE_SEED`, `PT_UNIVERSE_N`) changes every
+    panel kind but `ho_universe`, which is pinned to 909/60. A shortened
+    horizon is a different measurement and is keyed apart.
+    """
+    import result_cache  # noqa: PLC0415
+    settings = {}
+    if kind != "ho_universe" and kind != "driven":
+        settings.update(universe_seed=gate_pick._U_SEED, universe_n=gate_pick._U_N)
+    if days and kind != "driven":
+        settings["days"] = int(days)
+    return result_cache.protocol_id(kind, **settings)
+
+
+def measure_kind(payload, kind, seed, settings):
+    """`staged_screen`'s measure function: module level, so it pickles."""
+    base, overrides = payload
+    job = (base, overrides, kind, seed)
+    if settings.get("days"):
+        job += (settings["days"],)
+    return gate_pick.one(job)[1]
+
+
+def kind_seeds(kind: str, train: tuple) -> tuple:
+    if kind in HO_KINDS:
+        return tuple(gate_pick.HELDOUT)
+    if kind == "driven":
+        return tuple(train[:6])
+    return tuple(train)
+
+
+def gate_rows(kinds) -> list:
+    """The rows a gate grades, as `staged_screen.RowSpec`s.
+
+    Every scored statistic of the panel kinds against its `envelope` band
+    at the kind's horizon, crisis co-movement against its real range on the
+    held VIX 45, and the crisis lever against its tolerance. The driven
+    window has no band and is not a row.
+    """
+    import staged_screen as S  # noqa: PLC0415
+    rows = []
+    for kind in kinds:
+        if kind not in gate_pick.PANEL_KINDS or kind.startswith("vix"):
+            continue
+        days = 504 if kind == "p504" else 252
+        for stat in facts.REAL_MARKETS:
+            def est(rd, kind=kind, stat=stat):
+                return gate_pick.graded_panel(rd[kind]).get(stat)
+
+            def band(rd, kind=kind, stat=stat, days=days):
+                sc = envelope.score(gate_pick.graded_panel(rd[kind]), horizon_days=days)
+                b = sc["statistics"].get(stat, {}).get("band") or (None, None)
+                return tuple(b)
+            rows.append(S.RowSpec(f"{kind}:{stat}", (kind,), est, band))
+    if "vix45" in kinds:
+        rows.append(S.RowSpec(
+            "crisis_comovement", ("vix45",),
+            lambda rd: gate_pick.graded_panel(rd["vix45"]).get("cross_sectional_corr"),
+            CRISIS_COMOVEMENT_REAL))
+    if "vix5" in kinds and "vix65" in kinds:
+        def lever(rd):
+            lo = gate_pick.graded_panel(rd["vix5"]).get("annualised_vol_pct")
+            hi = gate_pick.graded_panel(rd["vix65"]).get("annualised_vol_pct")
+            return hi / lo if lo else None
+        rows.append(S.RowSpec(
+            "crisis_lever", ("vix5", "vix65"), lever,
+            (CRISIS_LEVER_REAL * (1 - CRISIS_LEVER_TOLERANCE),
+             CRISIS_LEVER_REAL * (1 + CRISIS_LEVER_TOLERANCE))))
+    return rows
+
+
+def staged(args, cands, train) -> int:
+    """`--staged A|B`: the staged screen over the gate's kinds."""
+    import dial_reach  # noqa: PLC0415
+    import result_cache as RC  # noqa: PLC0415
+    import staged_screen as S  # noqa: PLC0415
+    if not args.cache:
+        sys.exit("--staged needs --cache: stage B reads what stage A measured")
+    kinds = tuple(args.kinds.split(",")) if args.kinds else KINDS
+    build = RC.build_digest()
+    cache = RC.ResultCache(args.cache)
+    protocols = [S.Protocol(k, protocol_for(k, args.days), kind_seeds(k, train),
+                            dial_reach.GATE_PROTOCOLS[k]) for k in kinds]
+    rows = gate_rows(kinds)
+    if args.rows:
+        keep = set(args.rows.split(","))
+        rows = [r for r in rows if r.id in keep]
+        missing = keep - {r.id for r in rows}
+        if missing:
+            sys.exit(f"--rows names rows the kinds do not grade: {sorted(missing)}")
+    used = {p for r in rows for p in r.protocols}
+    protocols = [p for p in protocols if p.name in used]
+    candidates = []
+    for c in cands:
+        m = gate_pick.model(c["base"], c["overrides"])
+        b = c.get("baseline", {"base": c["base"], "overrides": {}})
+        bm = gate_pick.model(b["base"], b.get("overrides", {}))
+        base_build = c.get("baseline_build", args.baseline_build or build)
+        candidates.append(S.Candidate(
+            c["label"], (c["base"], c["overrides"]), build, RC.params_digest(m),
+            m.to_dict(), (base_build, RC.params_digest(bm), bm.to_dict()),
+            tuple(c["targets"]) if c.get("targets") else None))
+    print(f"build {build[:16]}  cache {args.cache}  stage {args.staged}"
+          f"{'  VERIFY' if args.verify else ''}", flush=True)
+    outs = S.run(candidates, protocols, rows, cache=cache, measure=measure_kind,
+                 settings={"days": args.days} if args.days else {},
+                 stage=args.staged, n0=args.n0, N=len(train), block=args.block,
+                 gamma=args.gamma, verify=args.verify, workers=args.workers,
+                 log=lambda m: print(m, flush=True))
+    for o in outs:
+        print(S.report(o), flush=True)
+    if args.out:
+        Path(args.out).write_text(json.dumps([S.outcome_json(o) for o in outs],
+                                             indent=1, default=float), encoding="utf-8")
+        print(f"\nwrote {args.out}", flush=True)
+    bad = sum(len(o.disagreements) for o in outs)
+    if bad:
+        print(f"\nVERIFY: {bad} cached or baseline reading(s) disagree with a fresh "
+              "measurement. A baseline disagreement is a reach-map claim the "
+              "measurement refutes.", flush=True)
+        return 3
+    return 0
+
+
 def load(path: str) -> list[dict]:
     cands = json.loads(Path(path).read_text(encoding="utf-8"))
     if not isinstance(cands, list) or not cands:
@@ -215,6 +363,27 @@ def main() -> int:
              "identically. Keyed by the model fingerprint, so a candidate "
              "whose coefficients move gets measured again rather than "
              "reading somebody else's rows.")
+    ap.add_argument(
+        "--cache", default=None, metavar="DIR",
+        help="the result cache: every kind's reading, once per (build, model, "
+             "kind, seed). Read before measuring and written after, so a block "
+             "or a candidate measured before is not measured again.")
+    ap.add_argument("--staged", choices=("A", "B"), default=None,
+                    help="run a staged screen (staged_screen.py) instead of the gate")
+    ap.add_argument("--verify", action="store_true",
+                    help="with --staged B: measure every reading, cached or not, "
+                         "and report every cached or baseline one that disagrees")
+    ap.add_argument("--n0", type=int, default=10, help="stage A's seeds (staged)")
+    ap.add_argument("--block", type=int, default=10, help="seeds per extension (staged)")
+    ap.add_argument("--gamma", type=float, default=0.05,
+                    help="stated rate: P(stage A kills | stage B passes) <= gamma")
+    ap.add_argument("--kinds", default=None, help="comma list of kinds (staged; default all)")
+    ap.add_argument("--rows", default=None, help="comma list of row ids (staged; default all)")
+    ap.add_argument("--days", type=int, default=None,
+                    help="shorten every panel kind to this many sessions: smoke tests only")
+    ap.add_argument("--baseline-build", default=None,
+                    help="build digest whose entries the baseline is read from "
+                         "(default this build)")
     args = ap.parse_args()
 
     cands = load(args.candidates)
@@ -229,6 +398,15 @@ def main() -> int:
                      "that shares seeds with discovery confirms nothing")
     print(f"seeds {train[0]}-{train[-1]} "
           f"({'calibration' if args.seed_start is None else 'DISJOINT'})", flush=True)
+    if args.staged:
+        return staged(args, cands, train)
+    if args.verify or args.days or args.kinds or args.rows:
+        sys.exit("--verify, --days, --kinds and --rows belong to --staged")
+    rcache = build = None
+    if args.cache:
+        import result_cache as RC  # noqa: PLC0415
+        rcache, build = RC.ResultCache(args.cache), RC.build_digest()
+        print(f"result cache {args.cache}, build {build[:16]}", flush=True)
 
     # Keyed by model fingerprint rather than by label: two labels can name
     # the same coefficients, and a label can be reused for different ones.
@@ -263,17 +441,41 @@ def main() -> int:
                 jobs += [(label, base, ov, kind, s)
                          for s in gate_pick.HELDOUT]
 
-    print(f"\n{len(cands)} candidates, {len(jobs)} tasks, {args.workers} workers",
+    # The result cache: a job whose reading is on file is not run. Rows are
+    # kept in job order per kind, so a cached reading takes its seed's place.
+    if rcache is not None:
+        keyed, todo = [], []
+        for job in jobs:
+            label, base, ov, kind, seed = job
+            key = RC.Key(build, RC.params_digest(gate_pick.model(base, ov)),
+                         protocol_for(kind), seed)
+            hit = rcache.get(key)
+            keyed.append((job, key, hit))
+            if hit is None:
+                todo.append(job)
+        print(f"result cache: {len(jobs) - len(todo)} of {len(jobs)} readings on file",
+              flush=True)
+    else:
+        keyed, todo = [(job, None, None) for job in jobs], jobs
+
+    print(f"\n{len(cands)} candidates, {len(todo)} tasks, {args.workers} workers",
           flush=True)
 
     acc: dict[str, dict[str, list]] = {c["label"]: {} for c in cands}
+    fresh: dict[tuple, dict] = {}
     done = 0
     with ProcessPoolExecutor(args.workers) as ex:
-        for label, kind, row in ex.map(one, jobs):
-            acc[label].setdefault(kind, []).append(row)
+        for job, (label, kind, row) in zip(todo, ex.map(one, todo)):
+            fresh[(label, kind, job[4])] = row
             done += 1
             if done % 250 == 0:
-                print(f"  ... {done}/{len(jobs)}", flush=True)
+                print(f"  ... {done}/{len(todo)}", flush=True)
+    for job, key, hit in keyed:
+        label, _, _, kind, seed = job
+        row = hit if hit is not None else fresh[(label, kind, seed)]
+        if key is not None and hit is None:
+            rcache.put(key, row, meta={"label": label})
+        acc[label].setdefault(kind, []).append(row)
 
     if args.ho_cache:
         measured = {}

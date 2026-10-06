@@ -4,9 +4,9 @@ Several traders in one market affect each other, and no run of that market
 says by how much. The P&L each one ends with is the P&L it ended with in a
 market the others were also trading; the part of it that belongs to the
 others is not a column anywhere. Estimating it needs a market without one of
-them, and a market without one of them is a market nobody ran.
+them, which nobody ran.
 
-Here every one of them is runnable. The cohort forks once per agent, one
+This module runs those markets. The cohort forks once per agent, one
 agent is frozen in each fork, and every arm carries the same engine state,
 the same generator position and the same shared history:
 
@@ -52,11 +52,11 @@ The market-wide one: a's flow moves the cap-weighted index, the fear gauge
 reacts to that same day, VIX sets the shared factor's variance target, and
 the nudge reaches every name's volatility two closes later.
 :meth:`tradefloor.Execution.moved` documents and measures this channel, and
-says plainly that it is not a rounding error. It reaches b through names a
+finds it is not a rounding error. It reaches b through names a
 never touched, so ``matrix[a][b]`` is non-zero even when nothing a traded
 is anything b traded or held, and it grows with the horizon because the
-reaction has to cross two closes. On pt-v20, the default, part of it
-arrives at the first close: the close's macro step reads the session's
+reaction has to cross two closes. On pt-v20 and pt-v21, the default, part
+of it arrives at the first close: the close's macro step reads the session's
 index return (the VIX, the 10-year's flight to quality, the corporate
 yield that follows it) and ``macro_publication_repricing`` re-marks every
 name to that step before b's holdings are marked, so one day is enough
@@ -74,16 +74,20 @@ An agent holding a name it did not trade in the window has an empty traded
 set, so comparing traded against traded calls it disjoint from everyone
 and blames the gauge for a direct effect.
 
-And b's own reaction to the market a made, which is in the number too.
-Separating that one needs a third arm in which b sees a's prices and
-answers as though it did not, and there is no such arm.
+The third route is b's own reaction to the market a made, which is in the
+number too. Separating that one needs a third arm in which b sees a's prices
+and answers as though it did not, and there is no such arm.
 
 None of the three is the order book. On every preset through pt-v19 agents
 in a cohort take no levels from each other, because
 :meth:`Portfolio.execute` reads the ladder and removes nothing. Under a
-model with ``book_shared`` on, as pt-v20, the default, has it, they do: an
-agent later in a step's arrival order meets the book an earlier one left.
-That arrives through fills rather than prices, so it is measured apart, as
+model with ``book_shared`` on, as pt-v20 and pt-v21 (the default) have it,
+they do, and an agent later in a step's arrival order meets the book an
+earlier one left. That order is label order at ``book_arrival_shuffle``
+0.0, so ``levels`` then runs mostly from the earlier label to the later
+one. With the switch on it is a seeded shuffle fresh every step, and the
+matrix measures the agents rather than their names. That arrives through
+fills rather than prices, so it is measured apart, as
 :attr:`Externality.levels`: ``levels[a][b]`` is what b's
 execution cost against each step's opening mid changes by when a stops
 trading, positive when a made b's fills dearer. It is zero, to the cent,
@@ -176,7 +180,7 @@ class Externality:
 
     def effect_on(self, label: str) -> dict[str, float]:
         """Every other agent's effect on ``label``, keyed by the agent
-        removed. The column of the matrix rather than the row."""
+        removed, which is a column of the matrix."""
         if label not in self.labels:
             raise ValidationError(
                 f"no agent is labelled {label!r} here; this result covers "
@@ -186,9 +190,8 @@ class Externality:
     def caveats(self) -> list[str]:
         """What this particular result cannot support, computed from it.
 
-        Each line below fires on a property of the run, so a result never
-        carries a caveat that does not apply to it, which keeps the ones it
-        does carry worth reading. The rule and its reasoning are
+        Each line below fires on a property of the run, so a result carries
+        only the caveats that apply to it. The rule and its reasoning are
         `python/tradefloor/mcp.py`'s.
         """
         held = (f" At this fork {_names(self.held_at_fork)} held a "
@@ -295,7 +298,7 @@ class Externality:
                          "kind": kind, "value": value})
 
     def as_dict(self) -> dict[str, Any]:
-        """Artifact-shaped, like :meth:`Comparison.as_dict`. JSON-serialisable
+        """Artifact-shaped like :meth:`Comparison.as_dict`, JSON-serialisable,
         and carrying nothing an agent was not shown."""
         return {
             "labels": list(self.labels),
@@ -412,7 +415,7 @@ def externalities(world: World, days: int = 1) -> Externality:
     eight-agent cohort runs nine markets.
 
     Returns an :class:`Externality`. Read :meth:`Externality.caveats` beside
-    the numbers: they say what the arms were and what the matrix holds.
+    the numbers. They say what the arms were and what the matrix holds.
     """
     if not isinstance(world, World):
         raise ValidationError(
@@ -579,7 +582,8 @@ def _path(world: World, fork_step: int,
     Each step's row is the cross-section the world showed its agents when
     that step opened (``World._step_opens``). Reconstructing it from the
     trace instead, as the row the previous step's session left, is right
-    within a day and wrong across a close on pt-v20, the default: its close
+    within a day and wrong across a close on pt-v20 and on pt-v21, the
+    default: its close
     re-marks every traded name to the macro state it publishes
     (``macro_publication_repricing``), so the next day's first step opens
     at the re-marked price, not the last print. A fill on a day's first

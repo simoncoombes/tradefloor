@@ -1,0 +1,62 @@
+{
+ "commit": "931ed3d4fe659e4dec765673ee3e280a6b40ab2b",
+ "build": {
+  "so": "/home/ec2-user/src/.venv/lib64/python3.11/site-packages/tradefloor/_core.abi3.so",
+  "so_mtime": "2026-10-05 15:20:36",
+  "rust_commit": "2026-10-05 10:04:21 a4504f6f",
+  "rust_dirty": "",
+  "branch": "HEAD",
+  "python": "3.11.16",
+  "engine_file": "/home/ec2-user/src/.venv/lib64/python3.11/site-packages/tradefloor/__init__.py"
+ },
+ "base": "pt-v20",
+ "seeds": [
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7,
+  8,
+  9,
+  10,
+  11,
+  12,
+  13,
+  14,
+  15,
+  16,
+  17,
+  18,
+  19,
+  20,
+  21,
+  22,
+  23,
+  24,
+  25,
+  26,
+  27,
+  28,
+  29,
+  30
+ ],
+ "lever_seeds": [
+  101,
+  102,
+  103,
+  104,
+  105,
+  106,
+  107,
+  108,
+  109,
+  110
+ ],
+ "protocols": {
+  "held": "Universe.random(40, seed=111), market seed s, 252 days",
+  "vary": "Universe.random(40, seed=s), market seed s, 252 days (facts.LEVEL_PROTOCOL)",
+  "lever": "held roster, 252 days after 252 burn, Scenario().hold(vix=5|65), the --lever-seeds"
+ }
+}

@@ -37,8 +37,12 @@ PACKAGE = pathlib.Path(tf.__file__).resolve().parent
 #: then they are regenerated on 3.11 with ``python
 #: tests/test_python_versions.py`` and the commit says why. A change on 3.12
 #: or later alone is the bug this file exists for.
-ORDERS_SHA256 = "537488a29c52a5d0"
-SCORECARDS_SHA256 = "c0638ba5e48738ca"
+#:
+#: Regenerated on 3.11.16 at 0.10.0, when the run's default market moved
+#: from pt-v20 to pt-v21 (3.13 gives the same): was 537488a29c52a5d0 and
+#: c0638ba5e48738ca on pt-v20.
+ORDERS_SHA256 = "a67005c524a5cb33"
+SCORECARDS_SHA256 = "bcb8bf08c55961bb"
 
 
 # --------------------------------------------------------------------------
@@ -196,3 +200,22 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         pathlib.Path(sys.argv[1]).write_bytes(
             "\n".join(orders + cards).encode("utf-8") + b"\n")
+
+
+def test_the_example_agents_add_floats_left_to_right():
+    """The agents the examples trade with feed their sums into order sizes.
+
+    The rate-shock demo's agent used the built-in ``sum()`` for its weights
+    and its volatility reading, and on pt-v21 the last-bit difference
+    between 3.11 and 3.13 changed an order at step 194 and the control arm's
+    cost by $47. The same rule as the package's, over the example agents.
+    """
+    root = pathlib.Path(__file__).resolve().parents[1] / "examples"
+    offenders = []
+    for module in sorted(root.rglob("agent*.py")):
+        tree = ast.parse(module.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                    and node.func.id == "sum" and not _counting(node)):
+                offenders.append(f"{module.relative_to(root)}:{node.lineno}")
+    assert not offenders, offenders

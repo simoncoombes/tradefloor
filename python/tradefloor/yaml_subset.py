@@ -1,13 +1,13 @@
 """A reader for the boring part of YAML, and nothing else.
 
-The library depends on nothing. That is a promise rather than an accident:
-`pip install tradefloor` pulls one wheel, and a research
+The library has no dependencies, on purpose. `pip install tradefloor` pulls
+one wheel, and a research
 environment does not acquire a transitive tree because somebody wanted a
 config file. Scenario documents are configuration, so they had to be readable
 without a dependency.
 
 The alternative was `pyyaml` behind an optional extra, which would have made
-the documented first line of the feature -- `Scenario.from_yaml(...)` -- fail
+the documented first line of the feature, `Scenario.from_yaml(...)`, fail
 on a default install. So this reads the subset the scenario schema actually
 uses:
 
@@ -31,14 +31,14 @@ whole grammar.
 
 ## Everything else is refused by name
 
-This is the important half. A hand-written parser that GUESSES at a construct
-it does not implement is worse than no parser: it reads a document as
-something other than what it says. So every YAML feature outside the subset
+A hand-written parser that GUESSES at a construct it does not implement is
+worse than no parser, because it reads a document as something other than
+what it says. So every YAML feature outside the subset
 raises, and says which feature it was:
 
-- tags (`!!python/object`, or any `!`) -- the construct behind every YAML
-  deserialisation CVE, and this reader has no code that could build an object
-  from one;
+- tags (`!!python/object`, or any `!`), the construct behind every YAML
+  deserialisation CVE (this reader has no code that could build an object
+  from one);
 - anchors and aliases (`&`, `*`), including merge keys (`<<`);
 - flow collections (`{...}`, `[...]`);
 - more than one document;
@@ -51,12 +51,12 @@ raises, and says which feature it was:
 Because none of those is implemented, none of them is reachable. A scenario
 file cannot name a Python type, cannot import, cannot construct, and cannot
 alias one part of the document into another. The output is dicts, lists,
-strings, numbers, booleans and None -- and the scenario loader then refuses
+strings, numbers, booleans and None, and the scenario loader then refuses
 every key it does not recognise, so the reachable surface is the schema.
 
 Two limits keep a hostile file cheap to refuse. Blocks nest at most
 :data:`MAX_DEPTH` (32) deep, and an integer longer than Python's digit limit
-(4,300 by default) is refused; before either was checked, the file raised
+(4,300 by default) is refused. Before either was checked, the file raised
 RecursionError or ValueError rather than a :class:`YamlSubsetError`. Every
 pattern here runs in time linear in the line it reads.
 
@@ -66,8 +66,8 @@ one-thirty to a reader; `007` is seven; `2026-08-29` is a datetime object;
 `1e3` and `1.0e3` are TEXT, because YAML 1.1 wants a decimal point and a
 signed exponent; `0x1f` is thirty-one; `1_000` is a thousand. Each of those
 is a value that would mean something other than it looks like, so each raises
-and says what to write instead. Silently picking either answer is the
-quietest defect a configuration reader can have.
+and says what to write instead. A reader that silently picked either answer
+would be wrong in a way nobody notices.
 
 The same rule covers the other direction. `operation: -` is a syntax error to
 a real parser, because a dash opens a block sequence rather than a value, and
@@ -75,9 +75,8 @@ reading it as the string "-" would accept a file nothing else will. Leading
 indicator characters are refused for that reason.
 
 All three classes came out of a differential fuzz against `yaml.safe_load`
-over four thousand generated block documents. That fuzz is the reason this
-reader can be trusted at all, and `tests/test_yaml_subset.py` keeps a
-regression corpus from it.
+over four thousand generated block documents, and `tests/test_yaml_subset.py`
+keeps a regression corpus from it.
 
 ## What it does not claim
 

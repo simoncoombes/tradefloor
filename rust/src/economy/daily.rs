@@ -87,6 +87,7 @@ fn phase_growth_target(stored: f64, range: (f64, f64), range_draw: f64) -> f64 {
 
 /// Inputs that the caller supplies per day.
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct DailyInputs<'a> {
     /// Reference default: 1.0.
     pub volatility: f64,
@@ -282,6 +283,25 @@ pub struct DailyInputs<'a> {
     /// from `ModelParams::unemployment_adjustment_half_life`. 0.0 is off,
     /// and the release adds the drive whole, as it always has.
     pub unemployment_adjustment: f64,
+    /// The monthly share of unemployment's gap to the natural rate closed
+    /// at a release. 0.0 is the shipped 0.06. See
+    /// `ModelParams::unemployment_natural_pull`.
+    pub unemployment_natural_pull: f64,
+    /// Okun's law as its annual coefficient. 0.0 is the shipped monthly
+    /// 0.20 and the recovery term. See
+    /// `ModelParams::unemployment_okun_coefficient`.
+    pub unemployment_okun_coefficient: f64,
+    /// The natural rate of unemployment with no long-term unemployment,
+    /// percent. 0.0 is the shipped 4.0. See
+    /// `ModelParams::unemployment_natural_rate`.
+    pub unemployment_natural_rate: f64,
+    /// The daily share of oil inventory's gap to [`OIL_INVENTORY_NORMAL`]
+    /// closed. 0.0 is off. See `ModelParams::oil_inventory_reversion`.
+    pub oil_inventory_reversion: f64,
+    /// Inflation's monthly response to oil off [`OIL_PASSTHROUGH_ANCHOR`],
+    /// both sides, as a multiple of the shipped 0.01 a dollar. 0.0 is the
+    /// shipped three-way branch. See `ModelParams::oil_inflation_passthrough`.
+    pub oil_inflation_passthrough: f64,
     /// The business-cycle phase and the GDP growth (percent) the fear/greed
     /// index reads, as PUBLISHED (`ModelParams::fear_greed_published_inputs`),
     /// or `None` for the economy's own, as it always read them.
@@ -297,6 +317,7 @@ pub struct DailyInputs<'a> {
 /// 0.5 per cent gate (which that return never crosses, so it never fires),
 /// and the corporate yield moved only at a central-bank meeting.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct YieldDials {
     /// The 10-year's daily noise, percentage points. See
     /// [`crate::params::ModelParams::treasury_10y_noise`].
@@ -322,6 +343,54 @@ pub struct YieldDials {
     /// level then holds through the close, as it does on every preset
     /// without `corporate_yield_daily`: the daily move is not applied.
     pub corporate_pinned: bool,
+    /// The spread's cycle multiplier at the session's start and at its close,
+    /// under `cycle_nowcast_accuracy` or `corporate_spread_cycle`: the daily
+    /// move then carries the meeting formula's whole change,
+    /// `S(VIX', m') - S(VIX, m)`, so the level stays on the formula and a
+    /// meeting has nothing to re-anchor. `None` is the move that stood.
+    pub spread_multiplier: Option<(f64, f64)>,
+    /// A caller pinned the 10-year and it holds through the close
+    /// (`macro_pins_hold`): its step is taken, draw included, and
+    /// discarded, so the 2-year's formula, the flight to quality and the
+    /// corporate yield's daily move read the pinned level.
+    pub treasury_10y_pinned: bool,
+    /// The same for the 2-year.
+    pub treasury_2y_pinned: bool,
+    /// The Fed put's expected cut the curve prices tonight, percentage
+    /// points: `treasury_put_pricing` times the cut the put would ask for at
+    /// a meeting now, no more than the policy rate. 0.0 unless
+    /// `fed_put_gain` and `treasury_put_pricing` are both set. See
+    /// [`crate::params::ModelParams::treasury_put_pricing`].
+    pub priced_put: f64,
+    /// The policy path the curve prices tonight, percentage points, signed:
+    /// `treasury_path_pricing` times the market's forecast of the rate's
+    /// further change. 0.0 unless the dial is set. See
+    /// [`crate::params::ModelParams::treasury_path_pricing`].
+    pub priced_path: f64,
+    /// The next meeting's expected change the curve prices tonight,
+    /// percentage points, signed (`policy_anticipation`): read beside the
+    /// priced path, damped with it. 0.0 unless the dial is set. See
+    /// [`crate::params::ModelParams::policy_anticipation`].
+    pub priced_anticipation: f64,
+    /// `treasury_policy_damping`: the share of the priced policy rate's
+    /// distance from [`TREASURY_NEUTRAL_RATE`] the 10-year's anchor leaves
+    /// out. 0.0 unless the dial is set.
+    pub rate_damping: f64,
+    /// Percentage points off the 10-year's term premium per VIX point above
+    /// 20 while inflation is under 4. See
+    /// [`crate::params::ModelParams::treasury_haven_gain`].
+    pub haven_gain: f64,
+    /// The share of the VIX slope taken out of the corporate spread's
+    /// formula. See [`crate::params::ModelParams::corporate_spread_vix_cut`].
+    pub spread_vix_cut: f64,
+    /// Percentage points of spread (times the multiplier) per unit of the
+    /// index's log fall below its slow average. See
+    /// [`crate::params::ModelParams::corporate_spread_equity_gain`].
+    pub spread_equity_gain: f64,
+    /// The slow average's one-session decay, `0.5^(1/H)` with H
+    /// [`crate::params::ModelParams::corporate_spread_equity_half_life`].
+    /// Read only with `spread_equity_gain` set.
+    pub spread_equity_decay: f64,
 }
 
 /// The largest move the corporate yield takes in one session under
@@ -335,6 +404,26 @@ pub struct YieldDials {
 /// through pt-v19 reads it.
 pub const CORPORATE_DAILY_MOVE_CAP: f64 = 0.50;
 
+/// The VIX level above which the Treasury haven lowers the 10-year's term
+/// premium (`treasury_haven_gain`). 20 is about the tape's long-run mean
+/// VIX (19.5 on ^VIX 1990-2025, S&P 500 and VIX tape in the design
+/// repository; the median is 17.6), so the haven acts on the 38 per cent of
+/// sessions above it, and most on the stressed ones.
+pub const TREASURY_HAVEN_VIX: f64 = 20.0;
+
+/// The policy rate the 10-year's damped pass-through pulls toward
+/// (`treasury_policy_damping`), in per cent: about the long-run mean policy
+/// rate, 2.9 on FRED DFF 1990-2025 and 2.6 on pt-v19's long run. Read only
+/// with the dial set.
+pub const TREASURY_NEUTRAL_RATE: f64 = 2.5;
+
+/// The Treasury haven's cut to the 10-year's term premium: `gain` points per
+/// VIX point above [`TREASURY_HAVEN_VIX`]. Read by the daily anchor and by
+/// the meeting's 10-year target, only with `treasury_haven_gain` set.
+pub fn haven_term_cut(gain: f64, vix: f64) -> f64 {
+    gain * mathx::max(0.0, vix - TREASURY_HAVEN_VIX)
+}
+
 impl Default for YieldDials {
     fn default() -> Self {
         Self {
@@ -345,6 +434,17 @@ impl Default for YieldDials {
             corporate_yield_daily: 0.0,
             vix_pinned: false,
             corporate_pinned: false,
+            spread_multiplier: None,
+            treasury_10y_pinned: false,
+            treasury_2y_pinned: false,
+            priced_put: 0.0,
+            priced_path: 0.0,
+            priced_anticipation: 0.0,
+            rate_damping: 0.0,
+            haven_gain: 0.0,
+            spread_vix_cut: 0.0,
+            spread_equity_gain: 0.0,
+            spread_equity_decay: 0.0,
         }
     }
 }
@@ -359,6 +459,11 @@ impl<'a> Default for DailyInputs<'a> {
             trough_growth_floor: 0.0,
             phase_target_range_draw: 0.0,
             unemployment_adjustment: 0.0,
+            unemployment_natural_pull: 0.0,
+            unemployment_okun_coefficient: 0.0,
+            unemployment_natural_rate: 0.0,
+            oil_inventory_reversion: 0.0,
+            oil_inflation_passthrough: 0.0,
             fear_greed_published: None,
             yields: YieldDials::default(),
             vix_mean_reversion: VIX_MEAN_REVERSION,
@@ -662,6 +767,33 @@ pub fn expected_return_spike_at_level(
 /// arithmetic; read by the release under `unemployment_adjustment_half_life`
 /// and by the engine to seed the impulse.
 pub fn unemployment_drive(unemployment_trend: f64, phase: CyclePhase, growth: f64) -> f64 {
+    unemployment_drive_with(unemployment_trend, phase, growth, 0.0)
+}
+
+/// Oil inventory's normal level: the middle of the 40 to 60 dead zone in
+/// which inventory puts no pressure on the oil price, and the level it
+/// opens at. Read only under `ModelParams::oil_inventory_reversion`.
+pub const OIL_INVENTORY_NORMAL: f64 = 50.0;
+
+/// The oil price at which inflation takes no oil term under
+/// `ModelParams::oil_inflation_passthrough`: the level oil's reversion
+/// target takes at the 2 per cent trend growth the Okun term pivots on,
+/// `OIL_BASELINE + 3 * 2`.
+pub const OIL_PASSTHROUGH_ANCHOR: f64 = OIL_BASELINE + 3.0 * 2.0;
+
+/// [`unemployment_drive`] under `ModelParams::unemployment_okun_coefficient`.
+/// At `okun` 0.0 it is the shipped arithmetic, operation for operation. Off
+/// zero it is the phase's trend and `(2 - growth) * okun / 12`, Okun's law
+/// read as the annual relation it states, with no recovery term.
+pub fn unemployment_drive_with(
+    unemployment_trend: f64,
+    phase: CyclePhase,
+    growth: f64,
+    okun: f64,
+) -> f64 {
+    if okun != 0.0 {
+        return unemployment_trend * 0.3 + (2.0 - growth) * (okun / 12.0);
+    }
     let gdp_effect = (2.0 - growth) * 0.20;
     let recovery_effect = if (phase == CyclePhase::Expansion || phase == CyclePhase::Recovery)
         && growth > 1.0
@@ -673,632 +805,24 @@ pub fn unemployment_drive(unemployment_trend: f64, phase: CyclePhase, growth: f6
     unemployment_trend * 0.3 + gdp_effect + recovery_effect
 }
 
-/// One simulated day of the macro chain.
-///
-/// The reference implementation spread-copies (`{ ...economy }`) and returns new state.
-/// This takes `&EconomyState` and returns a new one for the same reason: the
-/// observable contract is the returned value, and a `&mut` version would make
-/// the "reads `economy.x`, writes `newState.x`" distinction — which is
-/// load-bearing throughout, since many lines read the OLD value after a new
-/// one has been written — impossible to express faithfully.
-pub fn update_economy_daily(
+/// The close's VIX and its three yields (the 10-year, the 2-year and the
+/// corporate yield between meetings), written into `new_state` from
+/// `economy`: the block of [`update_economy_daily`] from `// ── VIX` to the
+/// corporate yield, factored out so [`project_close_yields`] runs the same
+/// arithmetic. `shock_gdp_impact` is the step's shock aggregate. Draws
+/// exactly what the block drew, in the same order.
+pub fn vix_and_yields(
     economy: &EconomyState,
     inputs: &DailyInputs,
+    new_state: &mut EconomyState,
+    shock_gdp_impact: f64,
     rng: &mut impl Rng,
-) -> EconomyState {
+) {
     let volatility = inputs.volatility;
-    let mut new_state = economy.clone();
-    let phase = phase_characteristics_for(economy.cycle_phase, inputs.cycle_us_calibration != 0.0);
     let day = inputs.game_day;
-
     let cal = inputs.macro_calendar;
-    let is_month_start = day % cal.days_per_month == 0;
-    let is_quarter_start = day % cal.days_per_quarter() == 0;
-
-    // ── Shock aggregation ─────────────────────────────────────────────────
-    let mut shock_gdp_impact = 0.0;
-    let mut shock_inflation_impact = 0.0;
-    let mut shock_oil_impact = 0.0;
-    for shock in inputs.active_shocks {
-        shock_gdp_impact += shock.gdp_impact * shock.severity;
-        if shock.kind == ShockKind::OilShock {
-            shock_oil_impact += shock.severity * 50.0;
-        }
-        if shock.kind == ShockKind::Pandemic || shock.kind == ShockKind::War {
-            shock_inflation_impact += shock.severity * 2.0;
-        }
-    }
-
-    // GDP floor scales with volatility, so harder difficulties allow deeper
-    // recessions.
-    let gdp_floor = -5.0 - (volatility - 0.5) * 10.0;
-
-    // ── Phase-change GDP shock ────────────────────────────────────────────
-    // The `+ 0.001` is a tolerance on a float accumulated by repeated
-    // `+= 1/30`, not a spare margin: `months_in_current_phase` is never
-    // exactly 1/30 after the first increment.
-    if economy.months_in_current_phase < 1.0 / cal.month_f64() + 0.001 {
-        // DRAW SITE (uniform) — on EVERY phase-change day, in every phase.
-        //
-        // The original builds a `Record<EconomicCyclePhase, number>` object
-        // literal here and then indexes it. A JavaScript object literal
-        // evaluates all of its values, so `contraction`'s `random()` runs
-        // even when the phase is `trough` and the drawn number is discarded.
-        // A `match` is the natural Rust shape and takes the draw only on the
-        // contraction arm — which is the same output and a DIFFERENT stream
-        // position, shifting every later consumer that day.
-        //
-        // So the draw is hoisted out, exactly as the literal does.
-        let contraction_shock = -(2.0 + rng.next_f64() * (1.0 + volatility));
-        let shock = match economy.cycle_phase {
-            CyclePhase::Contraction => contraction_shock,
-            CyclePhase::Trough => -0.5,
-            CyclePhase::Recovery => 1.0,
-            CyclePhase::Expansion => 0.5,
-            CyclePhase::Peak => 0.0,
-        };
-        if shock != 0.0 {
-            new_state.gdp_growth = clamp(economy.gdp_growth + shock, gdp_floor, 6.0);
-        }
-
-        // DRAW SITE (uniform) -- only when `phase_target_range_draw` is on.
-        //
-        // Placed after the shock draw above so the stream position of
-        // every existing consumer is unchanged while the dial is 0.0, and
-        // guarded by a BRANCH rather than by a zero coefficient, because a
-        // draw taken and multiplied by zero still moves every later
-        // consumer that day.
-        if inputs.phase_target_range_draw != 0.0 {
-            let r = effective_gdp_range(
-                &phase, economy.cycle_phase, inputs.trough_growth_floor);
-            let mid = (r.0 + r.1) / 2.0;
-            let drawn = r.0 + rng.next_f64() * (r.1 - r.0);
-            new_state.phase_gdp_target =
-                mid + inputs.phase_target_range_draw * (drawn - mid);
-        }
-    }
-
-    // ── Quarterly GDP ─────────────────────────────────────────────────────
-    if is_quarter_start {
-        let range = effective_gdp_range(
-            &phase, economy.cycle_phase, inputs.trough_growth_floor);
-        let target_gdp = phase_growth_target(
-            new_state.phase_gdp_target, range, inputs.phase_target_range_draw)
-            + shock_gdp_impact;
-        new_state.gdp_growth = clamp(
-            new_state.gdp_growth
-                + (target_gdp - new_state.gdp_growth) * 0.25
-                + random_normal(rng, 0.0, 0.3 * volatility),
-            gdp_floor,
-            6.0,
-        );
-    }
-
-    // GDP level compounds daily from the CURRENT growth rate.
-    new_state.gdp = economy.gdp * (1.0 + new_state.gdp_growth / 100.0 / inputs.macro_compound_days_per_year);
-
-    // ── Monthly releases ──────────────────────────────────────────────────
-    if is_month_start {
-        let range = effective_gdp_range(
-            &phase, economy.cycle_phase, inputs.trough_growth_floor);
-        let phase_gdp_target = phase_growth_target(
-            new_state.phase_gdp_target, range, inputs.phase_target_range_draw);
-        let gdp_gap = phase_gdp_target - new_state.gdp_growth;
-        // Asymmetry correction: pull twice as hard when GDP is moving against
-        // the phase, so it does not fall fast and recover slowly.
-        //
-        // The two arms return the same 2.0 and clippy would merge them. They
-        // are kept apart because they are two DIFFERENT economic conditions —
-        // a downturn with growth still positive, and an upswing with growth
-        // still negative — that happen to share a coefficient today. Merging
-        // them would make a future change to one silently change both.
-        #[allow(clippy::if_same_then_else)]
-        let gdp_correction_multiplier = if (economy.cycle_phase == CyclePhase::Contraction
-            || economy.cycle_phase == CyclePhase::Trough)
-            && new_state.gdp_growth > 0.0
-        {
-            2.0
-        } else if (economy.cycle_phase == CyclePhase::Recovery
-            || economy.cycle_phase == CyclePhase::Expansion)
-            && new_state.gdp_growth < 0.0
-        {
-            2.0
-        } else {
-            1.0
-        };
-        new_state.gdp_growth = clamp(
-            new_state.gdp_growth
-                + gdp_gap * 0.12 * gdp_correction_multiplier
-                + random_normal(rng, 0.0, 0.1 * volatility),
-            gdp_floor,
-            6.0,
-        );
-
-        // Okun's law: 1pp of GDP below trend (~2%) is ~0.5pp of unemployment.
-        let gdp_effect = (2.0 - new_state.gdp_growth) * 0.20;
-        let nairu = economy.structural_unemployment;
-        let nairu_pull = (nairu - economy.unemployment_rate) * 0.06;
-        let mut recovery_effect = 0.0;
-        if (economy.cycle_phase == CyclePhase::Expansion
-            || economy.cycle_phase == CyclePhase::Recovery)
-            && new_state.gdp_growth > 1.0
-        {
-            recovery_effect = -new_state.gdp_growth * 0.08;
-        }
-        // `unemployment_adjustment_half_life`: the cyclical drive reaches
-        // the rate through a partial adjustment, so a turn's step in growth
-        // and in the phase's trend builds into the monthly change over
-        // months, as unemployment rises through a real recession. A branch,
-        // so 0.0 is the expression that stood, operation for operation; the
-        // one noise draw is taken in the same place either way.
-        new_state.unemployment_rate = if inputs.unemployment_adjustment == 0.0 {
-            clamp(
-                economy.unemployment_rate
-                    + phase.unemployment_trend * 0.3
-                    + gdp_effect
-                    + nairu_pull
-                    + recovery_effect
-                    + random_normal(rng, 0.0, 0.06 * volatility),
-                2.5,
-                15.0,
-            )
-        } else {
-            let drive = unemployment_drive(
-                phase.unemployment_trend, economy.cycle_phase, new_state.gdp_growth);
-            let impulse = economy.unemployment_impulse
-                + inputs.unemployment_adjustment * (drive - economy.unemployment_impulse);
-            new_state.unemployment_impulse = impulse;
-            clamp(
-                economy.unemployment_rate
-                    + impulse
-                    + nairu_pull
-                    + random_normal(rng, 0.0, 0.06 * volatility),
-                2.5,
-                15.0,
-            )
-        };
-
-        let unemployment_change = new_state.unemployment_rate - economy.unemployment_rate;
-        new_state.jobs_created = clamp(
-            200000.0 - unemployment_change * 500000.0
-                + random_normal(rng, 0.0, 30000.0 * volatility),
-            -500000.0,
-            500000.0,
-        );
-
-        // ── Inflation ─────────────────────────────────────────────────────
-        let inflation_target = INFLATION_TARGET;
-        let inflation_mean_rev_coeff = inputs.inflation_reversion;
-
-        // Positive real rates are contractionary.
-        let real_rate_suppression = if economy.federal_funds_rate > economy.inflation_rate {
-            -(economy.federal_funds_rate - economy.inflation_rate) * 0.04
-        } else if economy.federal_funds_rate > 3.0 {
-            -(economy.federal_funds_rate - 3.0) * 0.015
-        } else {
-            0.0
-        };
-
-        let oil_inflation_effect = if economy.oil_price > 80.0 {
-            (economy.oil_price - 80.0) * 0.01
-        } else if economy.oil_price < 50.0 {
-            (economy.oil_price - 50.0) * 0.005
-        } else {
-            0.0
-        };
-
-        let tariff_inflation_effect = (economy.tariff_rate - 5.0) * 0.01;
-
-        let nairu_for_phillips = economy.structural_unemployment;
-        let unemployment_gap = new_state.unemployment_rate - nairu_for_phillips;
-        // D3: the JS coefficient, which `wasm/src` also states. Only the
-        // stale compiled binary said -0.18.
-        let phillips_curve_effect = -unemployment_gap * PHILLIPS_CURVE_COEFF;
-
-        let usd_inflation_effect = -(economy.usd_index - 100.0) * 0.01;
-
-        // Wage growth: tight labour markets drive wages.
-        let mut wage_growth_target =
-            economy.inflation_rate * 0.7 + (nairu_for_phillips - economy.unemployment_rate) * 0.5;
-        // Cost-of-living adjustment: workers demand 80% of inflation as a
-        // floor once inflation is above 3%.
-        if economy.inflation_rate > 3.0 {
-            let cola_floor = economy.inflation_rate * 0.8;
-            wage_growth_target = mathx::max(wage_growth_target, cola_floor);
-        }
-        new_state.wage_growth =
-            economy.wage_growth + (wage_growth_target - economy.wage_growth) * 0.15;
-
-        let mut wage_pressure = mathx::max(0.0, new_state.wage_growth - 2.0) * 0.08;
-        // Wage-price spiral: fast wages AND high inflation reinforce.
-        let spiral_condition = economy.wage_growth > 4.0 && economy.inflation_rate > 3.0;
-        let spiral_boost = if spiral_condition {
-            (economy.wage_growth - 4.0) * (economy.inflation_rate - 3.0) * 0.02
-        } else {
-            0.0
-        };
-        wage_pressure += spiral_boost;
-
-        new_state.inflation_rate = clamp(
-            economy.inflation_rate
-                + (inflation_target - economy.inflation_rate) * inflation_mean_rev_coeff
-                + phase.inflation_trend * 0.04
-                + shock_inflation_impact * 0.02
-                + real_rate_suppression
-                + oil_inflation_effect
-                + tariff_inflation_effect * 0.03
-                + usd_inflation_effect * 0.03
-                + phillips_curve_effect
-                + wage_pressure
-                + random_normal(rng, 0.0, 0.04 * volatility),
-            inputs.inflation_floor,
-            inputs.inflation_ceiling,
-        );
-        new_state.core_inflation = clamp(
-            economy.core_inflation + (new_state.inflation_rate - economy.core_inflation) * 0.3,
-            -1.0,
-            12.0,
-        );
-
-        // ── Confidence ────────────────────────────────────────────────────
-        let confidence_phase_adj = match economy.cycle_phase {
-            CyclePhase::Contraction => -20.0,
-            CyclePhase::Trough => -15.0,
-            CyclePhase::Peak => 5.0,
-            CyclePhase::Recovery => -5.0,
-            CyclePhase::Expansion => 0.0,
-        };
-        let confidence_base = 100.0 + economy.gdp_growth * 5.0 - economy.unemployment_rate * 3.0
-            + confidence_phase_adj;
-        let fear_greed_nudge = (economy.fear_greed_index - 50.0) / 50.0 * 2.0;
-        let market_return_nudge = economy.rolling_market_return_30d * 3.0;
-
-        new_state.consumer_confidence = clamp(
-            economy.consumer_confidence
-                + (confidence_base - economy.consumer_confidence) * 0.25
-                + fear_greed_nudge
-                + market_return_nudge
-                + random_normal(rng, 0.0, 3.0 * volatility),
-            40.0,
-            130.0,
-        );
-        new_state.business_confidence = clamp(
-            economy.business_confidence
-                + (confidence_base - economy.business_confidence) * 0.20
-                + market_return_nudge * 1.5
-                + random_normal(rng, 0.0, 4.5 * volatility),
-            40.0,
-            130.0,
-        );
-
-        // ── Housing ───────────────────────────────────────────────────────
-        let confidence_housing_adj = (new_state.consumer_confidence - 100.0) * 0.1;
-        let housing_target = 100.0 - (economy.mortgage_rate_30y - 5.0) * 4.0
-            + economy.gdp_growth * 2.0
-            + confidence_housing_adj;
-        // Thin trading slows price discovery.
-        let volume_speed_factor = mathx::max(0.3, economy.housing_transaction_volume / 100.0);
-        let housing_mean_rev = (clamp(housing_target, 75.0, 130.0) - economy.housing_index)
-            * 0.08
-            * volume_speed_factor;
-        let recession_effect = if economy.recession_probability > 0.3 {
-            -(economy.recession_probability - 0.3) * 2.0
-        } else {
-            0.0
-        };
-        let housing_change =
-            housing_mean_rev + recession_effect + random_normal(rng, 0.0, 0.3 * volatility);
-        new_state.housing_index = clamp(economy.housing_index + housing_change, 75.0, 180.0);
-
-        let mortgage_effect = mathx::max(-0.3, -(economy.mortgage_rate_30y - 5.0) * 0.05);
-        let housing_gdp_effect = if economy.gdp_growth > 2.0 {
-            0.02
-        } else if economy.gdp_growth < 0.0 {
-            -0.05
-        } else {
-            0.0
-        };
-        // NOTE `randomNormal(0, 1) * 0.02` — the scale is applied OUTSIDE the
-        // wrapper here, unlike every other call site. Same draw either way,
-        // but the arithmetic differs in the last bit, so it is preserved.
-        new_state.home_starts_monthly = mathx::max(
-            500000.0,
-            mathx::min(
-                2000000.0,
-                economy.home_starts_monthly
-                    * (1.0
-                        + mortgage_effect
-                        + housing_gdp_effect
-                        + random_normal(rng, 0.0, 1.0) * 0.02),
-            ),
-        );
-
-        // Volume responds immediately to rate shocks — it freezes long before
-        // prices move.
-        let rate_shock = mathx::max(0.0, economy.mortgage_rate_30y - 5.0);
-        let volume_target = mathx::max(
-            30.0,
-            100.0 - rate_shock * 15.0 - mathx::max(0.0, (economy.unemployment_rate - 5.0) * 5.0),
-        );
-        new_state.housing_transaction_volume = economy.housing_transaction_volume
-            + (volume_target - economy.housing_transaction_volume) * 0.30;
-
-        // ── Labour-market hysteresis ──────────────────────────────────────
-        if economy.cycle_phase == CyclePhase::Contraction
-            || economy.cycle_phase == CyclePhase::Trough
-        {
-            let ltu_target = economy.unemployment_rate * 0.4;
-            new_state.long_term_unemployment_rate = economy.long_term_unemployment_rate
-                + (ltu_target - economy.long_term_unemployment_rate) * 0.05;
-        } else {
-            // Hysteresis: the long-term unemployed are harder to re-employ,
-            // so this falls at only 3%/month.
-            new_state.long_term_unemployment_rate =
-                mathx::max(0.5, economy.long_term_unemployment_rate * 0.97);
-        }
-        new_state.structural_unemployment = 4.0 + new_state.long_term_unemployment_rate * 0.3;
-
-        let lfp_target = if economy.cycle_phase == CyclePhase::Contraction
-            || economy.cycle_phase == CyclePhase::Trough
-        {
-            60.0 - (economy.unemployment_rate - 5.0) * 0.5
-        } else {
-            63.0 + (economy.gdp_growth - 1.0) * 0.3
-        };
-        let lfp_drift = (lfp_target - economy.labor_force_participation) * 0.01;
-        new_state.labor_force_participation = mathx::max(
-            55.0,
-            mathx::min(68.0, economy.labor_force_participation + lfp_drift),
-        );
-
-        // ── Fiscal ────────────────────────────────────────────────────────
-        if economy.cycle_phase == CyclePhase::Contraction
-            || economy.cycle_phase == CyclePhase::Trough
-        {
-            let auto_stabilizer = 1.0;
-            let discretionary = if economy.unemployment_rate > 7.0 {
-                mathx::min(4.0, (economy.unemployment_rate - 5.0) * 0.8)
-            } else {
-                0.0
-            };
-            new_state.fiscal_stimulus = mathx::min(6.0, auto_stabilizer + discretionary);
-            // `+=` on the already-updated growth, and NOT re-clamped — so a
-            // stimulus can push gdp_growth above the 6.0 ceiling the lines
-            // above enforce. Faithful to the original.
-            new_state.gdp_growth += new_state.fiscal_stimulus * FISCAL_MULTIPLIER / 12.0;
-            new_state.government_debt_to_gdp =
-                economy.government_debt_to_gdp + new_state.fiscal_stimulus / 12.0;
-        } else {
-            new_state.fiscal_stimulus = mathx::max(0.0, economy.fiscal_stimulus - 0.2);
-            if new_state.gdp_growth > 2.0 {
-                new_state.government_debt_to_gdp =
-                    mathx::max(60.0, economy.government_debt_to_gdp - 0.05);
-            } else {
-                new_state.government_debt_to_gdp = economy.government_debt_to_gdp;
-            }
-        }
-    }
-
-    // CPI compounds daily whether or not a release happened.
-    new_state.cpi = economy.cpi * (1.0 + new_state.inflation_rate / 100.0 / inputs.macro_compound_days_per_year);
-
-    // ── Oil ───────────────────────────────────────────────────────────────
-    let oil_inventory = economy.oil_inventory_level;
-    let oil_last_opec = economy.oil_last_opec_day;
-
-    let oil_demand_factor = economy.gdp_growth * 0.15;
-    // Supply answers demand, or does not. At 0.0 this is the literal zero
-    // the reference implementation writes, and a BRANCH rather than a
-    // multiply so a negative `gdp_growth` cannot turn a `-0.0` into a
-    // `+0.0` and move a trajectory by a signed zero.
-    //
-    // The zero is why inventory only ever falls: demand draws it down every
-    // day and nothing puts it back, so it reaches its floor and the
-    // pressure term saturates into a standing push on the oil price. At 1.0
-    // supply matches demand in expectation and inventory is driftless,
-    // which is the stationarity condition of this process and not a level
-    // chosen to hit a number.
-    let oil_supply_factor = if inputs.oil_supply_response == 0.0 {
-        0.0
-    } else {
-        oil_demand_factor * inputs.oil_supply_response
-    };
-    let inventory_change =
-        oil_demand_factor - oil_supply_factor + random_normal(rng, 0.0, 0.5 * volatility);
-    let new_oil_inventory = clamp(oil_inventory - inventory_change, 0.0, 100.0);
-    new_state.oil_inventory_level = new_oil_inventory;
-
-    let mut oil_inventory_pressure = 0.0;
-    if new_oil_inventory < 40.0 {
-        oil_inventory_pressure = (40.0 - new_oil_inventory) * 0.08;
-    } else if new_oil_inventory > 60.0 {
-        oil_inventory_pressure = (60.0 - new_oil_inventory) * 0.08;
-    }
-
-    // Summer driving season peaks ~day 180, winter valley ~day 90.
-    //
-    // `(day - 1) % 365 + 1` — JavaScript's `%` keeps the sign of the
-    // dividend, and so does Rust's, so a day of 0 gives -1 % 365 = -1 and a
-    // dayOfYear of 0 in both. Reproduced rather than corrected.
-    //
-    // The AMPLITUDE, not the factor. WHERE it acts is decided at the
-    // reversion target below, because a shape multiplied into a level every
-    // day compounds: the product of these factors is 5.119 over the 252
-    // game-days a certified year passes and 0.921 over a full 365, so a
-    // window shorter than the period reads a near-neutral shape as a trend.
-    //
-    // On the macro calendar: the period is the calendar's year and the
-    // valley its day 90, which are 365 and 90 as shipped.
     let year = cal.days_per_year;
     let day_of_year = ((day - 1) % year) + 1;
-    let oil_seasonal_amplitude = 0.03
-        * mathx::sin(2.0 * std::f64::consts::PI
-            * (day_of_year as f64 - cal.scale_days(90) as f64) / year as f64);
-
-    let oil_usd_drag = -(economy.usd_index - 100.0) * 0.08;
-
-    // ── OPEC ──────────────────────────────────────────────────────────────
-    // A state-dependent draw site: 0 draws on an ordinary day, 1 to 3 on a
-    // decision day depending on which branch the price difference selects.
-    let mut opec_impact = 0.0;
-    if day - oil_last_opec >= cal.opec_interval() {
-        new_state.oil_last_opec_day = day;
-        let oil_price = economy.oil_price;
-        let opec_target = 80.0;
-        let price_diff = oil_price - opec_target;
-
-        // The two outer branches are a pair that should mirror and do not:
-        // 0.6 at 3-to-6 against 0.5 at 2-to-5 is an expected +2.700 against
-        // -1.750, so the rule pushes oil UP on net. At symmetry 1.0 both
-        // sides use the mean of the rule's own two probabilities and the
-        // mean of its own two magnitude ranges, which is the one symmetric
-        // rule that keeps the total intervention it performs.
-        //
-        // A branch, so 0.0 takes the original arithmetic in the original
-        // order and consumes the same draws in the same places either way.
-        let (cut_p, cut_lo, raise_p, raise_lo) = if inputs.oil_opec_symmetry == 0.0 {
-            (0.6, 3.0, 0.5, 2.0)
-        } else {
-            let g = inputs.oil_opec_symmetry;
-            (0.6 - 0.05 * g, 3.0 - 0.5 * g, 0.5 + 0.05 * g, 2.0 + 0.5 * g)
-        };
-        if price_diff < -10.0 {
-            // Well below target: likely a production cut.
-            if rng.next_f64() < cut_p {
-                opec_impact = cut_lo + rng.next_f64() * 3.0;
-            }
-        } else if price_diff > 10.0 {
-            // Well above target: likely a production increase.
-            if rng.next_f64() < raise_p {
-                opec_impact = -(raise_lo + rng.next_f64() * 3.0);
-            }
-        } else {
-            // In the comfort zone: a small adjustment.
-            if rng.next_f64() < 0.2 {
-                opec_impact = (rng.next_f64() - 0.5) * 3.0;
-            }
-        }
-    }
-
-    let oil_target_level = OIL_BASELINE + economy.gdp_growth * 3.0 + shock_oil_impact * 10.0;
-    // Where the seasonal shape acts, as a share of its own amplitude. A
-    // BRANCH at 0.0, so every preset before pt-v18 runs the reference
-    // implementation's arithmetic in its own order: the whole amplitude
-    // multiplies the new price level and the target carries none of it.
-    //
-    // Above 0.0 the amplitude is SPLIT, so its total is conserved and only
-    // the point of application moves. At 1.0 the target carries all of it
-    // and the level's factor is exactly 1.0, which makes the shape modulate
-    // where the price is pulled toward by plus or minus 3 per cent instead
-    // of compounding on the price itself.
-    let (oil_target, oil_level_seasonality) = if inputs.oil_seasonality_target == 0.0 {
-        (oil_target_level, 1.0 + oil_seasonal_amplitude)
-    } else {
-        let g = inputs.oil_seasonality_target;
-        (
-            oil_target_level * (1.0 + g * oil_seasonal_amplitude),
-            1.0 + (1.0 - g) * oil_seasonal_amplitude,
-        )
-    };
-    let oil_mean_rev = (oil_target - economy.oil_price) * 0.03;
-    let oil_volatility = 2.0 * volatility;
-    new_state.oil_price = clamp(
-        (economy.oil_price
-            + oil_mean_rev
-            + oil_inventory_pressure
-            + oil_usd_drag
-            + opec_impact
-            + random_normal(rng, 0.0, oil_volatility)
-            + shock_oil_impact * 0.1)
-            * oil_level_seasonality,
-        35.0,
-        150.0,
-    );
-
-    // ── Gold ──────────────────────────────────────────────────────────────
-    let real_rate = economy.federal_funds_rate - economy.inflation_rate;
-    let real_rate_drift = -real_rate * 0.8;
-    let inflation_hedge = mathx::max(0.0, (economy.inflation_rate - 2.0) * 1.5);
-    // Reference: `vix > 30`, a level endogenous VIX never reaches (measured
-    // ceiling 26.57). Re-sited at the endogenous P94 so the gate is live;
-    // see `CRISIS_VIX_THRESHOLD`. The hinge origin moves with the gate, so
-    // the premium stays continuous at the threshold.
-    let crisis_premium = if economy.vix > inputs.crisis_vix_threshold && economy.gdp_growth < -1.0 {
-        mathx::min(
-            5.0,
-            economy.gdp_growth.abs() * 1.0 + (economy.vix - inputs.crisis_vix_threshold) * 0.15,
-        )
-    } else {
-        0.0
-    };
-    let prev_market_return = economy.previous_day_market_return;
-    let gold_safe_haven = if prev_market_return < -1.0 {
-        prev_market_return.abs() * 2.0
-    } else {
-        0.0
-    };
-
-    // D2, decided: the ADDITIVE equilibrium (~$200 per inflation point). The
-    // deployed WASM multiplicative version moves gold ~0.3% per point — about
-    // $6 on $2,000 gold — which is economically inert and fails REALISM
-    // MANDATE #7 as written. Whether $200/point is too strong is a
-    // calibration question, to be answered with measurements, not by keeping
-    // the wrong shape.
-    let inflation_premium_target = mathx::max(0.0, (economy.inflation_rate - 2.0) * 150.0)
-        + (economy.inflation_rate - 2.5) * 50.0;
-    let real_rate_penalty = -real_rate * 100.0;
-    let gold_equilibrium = GOLD_EQUILIBRIUM_BASE + inflation_premium_target + real_rate_penalty;
-
-    let gold_mean_reversion = (gold_equilibrium - economy.gold_price) * GOLD_MEAN_REVERSION;
-    let sentiment_drift = (50.0 - economy.fear_greed_index) * 0.03;
-
-    let gold_change = real_rate_drift
-        + inflation_hedge
-        + crisis_premium
-        + gold_safe_haven
-        + gold_mean_reversion
-        + sentiment_drift
-        + random_normal(rng, 0.0, 3.0 * volatility);
-    new_state.gold_price = clamp(economy.gold_price + gold_change, 800.0, 5000.0);
-
-    // ── Copper ────────────────────────────────────────────────────────────
-    let copper_demand = economy.gdp_growth * 0.02 + (economy.housing_index - 100.0) * 0.001;
-    let copper_usd_drag = -(economy.usd_index - 100.0) * 0.003;
-    let copper_change =
-        copper_demand + copper_usd_drag + random_normal(rng, 0.0, 0.04 * volatility);
-    new_state.copper_price = clamp(economy.copper_price + copper_change, 2.0, 8.0);
-
-    // ── USD ───────────────────────────────────────────────────────────────
-    let usd_target = 100.0 + (economy.federal_funds_rate - 2.5) * 3.0;
-    let usd_mean_reversion = (usd_target - economy.usd_index) * 0.02;
-    // Reference: `vix > 30` — dead for the same reason as the gold crisis
-    // premium above; re-sited with it. See `CRISIS_VIX_THRESHOLD`.
-    //
-    // Reads the PARAMETER, not the constant. It read the constant until
-    // 0.4.2, so an embedder who moved `crisis_vix_threshold` got a gold gate
-    // at their level and a dollar gate still at 25.5. The two describe one
-    // regime: a crisis is the same crisis whether you watch gold or the
-    // dollar. No behaviour changes at the default, where the two agree.
-    let safe_haven_drift = if economy.vix > inputs.usd_crisis_vix_threshold {
-        (economy.vix - inputs.usd_crisis_vix_threshold) * 0.05
-    } else {
-        0.0
-    };
-    let usd_change =
-        usd_mean_reversion + safe_haven_drift + random_normal(rng, 0.0, 0.3 * volatility);
-    new_state.usd_index = clamp(economy.usd_index + usd_change, 80.0, 130.0);
-
-    // ── Trade balance ─────────────────────────────────────────────────────
-    let tariff_effect = economy.tariff_rate * 0.5;
-    let dollar_effect = -(economy.usd_index - 100.0) * 0.3;
-    new_state.trade_balance = clamp(
-        economy.trade_balance
-            + (tariff_effect + dollar_effect) * 0.01
-            + random_normal(rng, 0.0, 0.5 * volatility),
-        -200.0,
-        50.0,
-    );
-
     // ── VIX ───────────────────────────────────────────────────────────────
     // Pure JS since "Cycle 71". `wasmCalculateVixTarget` is imported by
     // the economy module and never called — an import-driven worklist would
@@ -1549,8 +1073,69 @@ pub fn update_economy_daily(
     let debt_premium = mathx::max(0.0, (economy.government_debt_to_gdp - 100.0) * 0.002);
     let term_premium_10y =
         1.0 + mathx::max(0.0, (economy.inflation_rate - 2.0) * 0.3) + debt_premium;
-    let fed_rate_for_10y = new_state.federal_funds_rate;
+    // THE TREASURY HAVEN (`treasury_haven_gain`): the term premium falls
+    // with the VIX above 20 while inflation is under 4, so the 10-year
+    // rallies through a stressed month in a low-inflation regime. Guarded,
+    // so at 0.0 the premium is the expression that stood.
+    //
+    // WITH THE FLIGHT TO QUALITY BELOW. `flight_to_quality_gain` moves the
+    // yield by an increment, which this anchor's 5 per cent pull erases in
+    // about 60 sessions; the haven moves the anchor, so it lasts while the
+    // VIX does. Both push the stock-bond correlation negative at low
+    // inflation (the flight to quality below 3, the haven below 4), so the
+    // two are fitted together: see `ModelParams::treasury_haven_gain`.
+    // Here in the step the live rate mark projects too
+    // (`rate_intraday_live`), so the projection carries the haven and the
+    // priced put below.
+    let term_premium_10y = if inputs.yields.haven_gain != 0.0
+        && economy.inflation_rate < crate::economy::central_bank::FED_PUT_INFLATION_CEILING
+    {
+        term_premium_10y - haven_term_cut(inputs.yields.haven_gain, new_state.vix)
+    } else {
+        term_premium_10y
+    };
+    // THE PRICED FED PUT (`treasury_put_pricing`): the 10-year's anchor, and
+    // the 2-year's formula, read the policy rate the market expects after
+    // the next meeting rather than the one standing. Guarded, as above.
+    let fed_rate_for_10y = if inputs.yields.priced_put != 0.0 {
+        new_state.federal_funds_rate - inputs.yields.priced_put
+    } else {
+        new_state.federal_funds_rate
+    };
+    // THE PRICED PATH (`treasury_path_pricing`): the anchor, and the 2-year's
+    // formula, read the rate the market expects the cycle to reach. Guarded,
+    // as above.
+    let fed_rate_for_10y = if inputs.yields.priced_path != 0.0 {
+        fed_rate_for_10y + inputs.yields.priced_path
+    } else {
+        fed_rate_for_10y
+    };
+    // THE ANTICIPATED MEETING (`policy_anticipation`): the anchor and the
+    // 2-year's formula read the next decision the market expects, as far as
+    // it is priced tonight. Guarded, as above.
+    let fed_rate_for_10y = if inputs.yields.priced_anticipation != 0.0 {
+        fed_rate_for_10y + inputs.yields.priced_anticipation
+    } else {
+        fed_rate_for_10y
+    };
     let current_10y = new_state.treasury_yield_10y;
+    // THE DAMPED PASS-THROUGH (`treasury_policy_damping`): the 10-year's
+    // anchor reads the priced rate pulled toward the neutral rate; the
+    // 2-year's formula below reads it undamped. Guarded, as above.
+    // The damped rate is the ladder's (the policy rate plus what the Fed put
+    // owes) and the priced path: the put's overlay, owed and priced, passes
+    // through whole.
+    let rate_for_10y_anchor = if inputs.yields.rate_damping != 0.0 {
+        let ladder = new_state.federal_funds_rate + new_state.fed_put_owed + inputs.yields.priced_path;
+        let ladder = if inputs.yields.priced_anticipation != 0.0 {
+            ladder + inputs.yields.priced_anticipation
+        } else {
+            ladder
+        };
+        fed_rate_for_10y - inputs.yields.rate_damping * (ladder - TREASURY_NEUTRAL_RATE)
+    } else {
+        fed_rate_for_10y
+    };
 
     // D5, decided: KEEP the draw. In production `wasm10Y ?? (…)` short-
     // circuits and this normal is never taken — a consequence of `??`, not a
@@ -1558,11 +1143,14 @@ pub fn update_economy_daily(
     // parity for every later normal in the engine.
     new_state.treasury_yield_10y = clamp(
         current_10y
-            + (fed_rate_for_10y + term_premium_10y - current_10y) * 0.05
+            + (rate_for_10y_anchor + term_premium_10y - current_10y) * 0.05
             + random_normal(rng, 0.0, inputs.yields.treasury_10y_noise * volatility),
         0.5,
         12.0,
     );
+    if inputs.yields.treasury_10y_pinned {
+        new_state.treasury_yield_10y = current_10y;
+    }
     // THE 2-YEAR. The formula has no noise of its own: between meetings the
     // policy rate is flat, so the 2-year moved by 0.15 of the 10-year's
     // noise, 0.46 bp a session against the tape's 5.2. Off zero it is its
@@ -1582,6 +1170,9 @@ pub fn update_economy_daily(
     } else {
         target_2y
     };
+    if inputs.yields.treasury_2y_pinned {
+        new_state.treasury_yield_2y = economy.treasury_yield_2y;
+    }
 
     // Bond-stock correlation regime: inflation sets the sign.
     //
@@ -1608,17 +1199,37 @@ pub fn update_economy_daily(
         } else {
             0.0
         };
-        new_state.treasury_yield_10y = clamp(
-            new_state.treasury_yield_10y + bond_stock_yield_shift,
-            0.5,
-            12.0,
-        );
-        new_state.treasury_yield_2y = if own_2y {
-            clamp(new_state.treasury_yield_2y + bond_stock_yield_shift, 0.0, 12.0)
-        } else {
-            new_state.federal_funds_rate * 0.85 + new_state.treasury_yield_10y * 0.15
-        };
+        if !inputs.yields.treasury_10y_pinned {
+            new_state.treasury_yield_10y = clamp(
+                new_state.treasury_yield_10y + bond_stock_yield_shift,
+                0.5,
+                12.0,
+            );
+        }
+        if !inputs.yields.treasury_2y_pinned {
+            new_state.treasury_yield_2y = if own_2y {
+                clamp(new_state.treasury_yield_2y + bond_stock_yield_shift, 0.0, 12.0)
+            } else {
+                new_state.federal_funds_rate * 0.85 + new_state.treasury_yield_10y * 0.15
+            };
+        }
     }
+
+    // CREDIT'S LEVERAGE TERM (`corporate_spread_equity_gain`): the index's
+    // log fall below its own slow average, stepped on the session's return
+    // from the last close. Written whatever the pins, so the meeting's
+    // re-anchor reads it too; nothing runs with the gain at 0.0 unless the
+    // cycle's hazard (`cycle_equity_hazard`) reads the gap, which the engine
+    // signals with a decay set and the gain at 0.0.
+    let equity_gain = inputs.yields.spread_equity_gain;
+    let (gap_before, gap_after) = if equity_gain != 0.0 || inputs.yields.spread_equity_decay != 0.0 {
+        let r = mathx::log(mathx::max(1.0 + inputs.market_day_return_pct / 100.0, 1e-6));
+        let g = inputs.yields.spread_equity_decay * (economy.spread_equity_gap - r);
+        new_state.spread_equity_gap = g;
+        (economy.spread_equity_gap, g)
+    } else {
+        (0.0, 0.0)
+    };
 
     // THE CORPORATE YIELD BETWEEN MEETINGS. It was written only at a
     // central-bank meeting, so fair value's discount rate, and an IG bond
@@ -1649,14 +1260,43 @@ pub fn update_economy_daily(
     // the close moved it by the 10-year's change and the next morning's pin
     // put it back, so it was never the pinned value overnight.
     if inputs.yields.corporate_yield_daily != 0.0 && !inputs.yields.corporate_pinned {
-        let cycle_spread_multiplier = match economy.cycle_phase {
-            CyclePhase::Contraction => 2.8,
-            CyclePhase::Trough => 3.5,
-            CyclePhase::Recovery => 1.4,
-            CyclePhase::Peak => 1.1,
-            CyclePhase::Expansion => 1.0,
-        };
-        let vix_term = if inputs.yields.vix_pinned {
+        let cycle_spread_multiplier =
+            crate::economy::central_bank::spread_multiplier_of(economy.cycle_phase);
+        // THE PRICED MULTIPLIER (`cycle_nowcast_accuracy`,
+        // `corporate_spread_cycle`): the move is the meeting formula's whole
+        // change over the session, the VIX's and the multiplier's, so the
+        // level stays on the formula and the next meeting finds it there.
+        // A pinned VIX still takes no VIX term; the multiplier's change
+        // passes through at the VIX written.
+        //
+        // THE VIX SLOPE'S CUT AND CREDIT'S LEVERAGE TERM
+        // (`corporate_spread_vix_cut`, `corporate_spread_equity_gain`): the
+        // formula's slope scaled and its base carrying `gain * gap`, on both
+        // sides of the change. A VIX pin takes the VIX out, not the index.
+        // Guarded, so with both at 0.0 the expressions are the ones that
+        // stood.
+        let spread_dials = inputs.yields.spread_vix_cut != 0.0 || equity_gain != 0.0;
+        let vix_term = if let Some((m0, m1)) = inputs.yields.spread_multiplier {
+            let vix_close = if inputs.yields.vix_pinned { economy.vix } else { new_state.vix };
+            if spread_dials {
+                let cut = inputs.yields.spread_vix_cut;
+                crate::economy::central_bank::spread_formula_with(
+                    vix_close, m1, cut, equity_gain * gap_after)
+                    - crate::economy::central_bank::spread_formula_with(
+                        economy.vix, m0, cut, equity_gain * gap_before)
+            } else {
+                crate::economy::central_bank::spread_formula(vix_close, m1)
+                    - crate::economy::central_bank::spread_formula(economy.vix, m0)
+            }
+        } else if spread_dials {
+            let vix_part = if inputs.yields.vix_pinned {
+                0.0
+            } else {
+                0.02 * (1.0 - inputs.yields.spread_vix_cut)
+                    * cycle_spread_multiplier * (new_state.vix - economy.vix)
+            };
+            vix_part + equity_gain * cycle_spread_multiplier * (gap_after - gap_before)
+        } else if inputs.yields.vix_pinned {
             0.0
         } else {
             0.02 * cycle_spread_multiplier * (new_state.vix - economy.vix)
@@ -1671,6 +1311,725 @@ pub fn update_economy_daily(
             new_state.treasury_yield_10y + crate::economy::central_bank::CORPORATE_SPREAD_FLOOR,
         );
     }
+}
+
+/// A draw source at the means: every normal is 0.0 and every uniform sits
+/// just under one, so no event fires (a VIX jump, an OPEC move). For a
+/// projection of the close; not an engine stream, and nothing it returns is
+/// kept.
+pub struct MeanDraws;
+
+impl Rng for MeanDraws {
+    fn next_f64(&mut self) -> f64 {
+        1.0 - f64::EPSILON
+    }
+    fn next_normal(&mut self) -> f64 {
+        0.0
+    }
+}
+
+/// The (2-year, 10-year, corporate) yields, in per cent, that
+/// [`update_economy_daily`] would publish from `economy` on `inputs` with its
+/// draws at their means ([`MeanDraws`]) and no active shock: the VIX and
+/// yields block and the credit floor, and nothing else, since no other part
+/// of the step writes or reads what they produce. For the rate indices' live
+/// mark (`rate_intraday_live`). Takes no draw from any engine stream.
+pub fn project_close_yields(economy: &EconomyState, inputs: &DailyInputs) -> (f64, f64, f64) {
+    let mut next = economy.clone();
+    let mut shock_gdp_impact = 0.0;
+    for shock in inputs.active_shocks {
+        shock_gdp_impact += shock.gdp_impact * shock.severity;
+    }
+    vix_and_yields(economy, inputs, &mut next, shock_gdp_impact, &mut MeanDraws);
+    if inputs.daily_credit_floor_gain > 0.0 {
+        next.corporate_bond_yield = mathx::max(
+            next.corporate_bond_yield,
+            next.treasury_yield_10y + inputs.daily_credit_floor_gain * CORPORATE_SPREAD_FLOOR,
+        );
+    }
+    (next.treasury_yield_2y, next.treasury_yield_10y, next.corporate_bond_yield)
+}
+
+/// One simulated day of the macro chain.
+///
+/// The reference implementation spread-copies (`{ ...economy }`) and returns new state.
+/// This takes `&EconomyState` and returns a new one for the same reason: the
+/// observable contract is the returned value, and a `&mut` version would make
+/// the "reads `economy.x`, writes `newState.x`" distinction — which is
+/// load-bearing throughout, since many lines read the OLD value after a new
+/// one has been written — impossible to express faithfully.
+pub fn update_economy_daily(
+    economy: &EconomyState,
+    inputs: &DailyInputs,
+    rng: &mut impl Rng,
+) -> EconomyState {
+    let volatility = inputs.volatility;
+    let mut new_state = economy.clone();
+    let phase = phase_characteristics_for(economy.cycle_phase, inputs.cycle_us_calibration != 0.0);
+    let day = inputs.game_day;
+
+    let cal = inputs.macro_calendar;
+    let is_month_start = day % cal.days_per_month == 0;
+    let is_quarter_start = day % cal.days_per_quarter() == 0;
+
+    // ── Shock aggregation ─────────────────────────────────────────────────
+    let mut shock_gdp_impact = 0.0;
+    let mut shock_inflation_impact = 0.0;
+    let mut shock_oil_impact = 0.0;
+    for shock in inputs.active_shocks {
+        shock_gdp_impact += shock.gdp_impact * shock.severity;
+        if shock.kind == ShockKind::OilShock {
+            shock_oil_impact += shock.severity * 50.0;
+        }
+        if shock.kind == ShockKind::Pandemic || shock.kind == ShockKind::War {
+            shock_inflation_impact += shock.severity * 2.0;
+        }
+    }
+
+    // GDP floor scales with volatility, so harder difficulties allow deeper
+    // recessions.
+    let gdp_floor = -5.0 - (volatility - 0.5) * 10.0;
+
+    // ── Phase-change GDP shock ────────────────────────────────────────────
+    // The `+ 0.001` is a tolerance on a float accumulated by repeated
+    // `+= 1/30`, not a spare margin: `months_in_current_phase` is never
+    // exactly 1/30 after the first increment.
+    if economy.months_in_current_phase < 1.0 / cal.month_f64() + 0.001 {
+        // DRAW SITE (uniform) — on EVERY phase-change day, in every phase.
+        //
+        // The original builds a `Record<EconomicCyclePhase, number>` object
+        // literal here and then indexes it. A JavaScript object literal
+        // evaluates all of its values, so `contraction`'s `random()` runs
+        // even when the phase is `trough` and the drawn number is discarded.
+        // A `match` is the natural Rust shape and takes the draw only on the
+        // contraction arm — which is the same output and a DIFFERENT stream
+        // position, shifting every later consumer that day.
+        //
+        // So the draw is hoisted out, exactly as the literal does.
+        let contraction_shock = -(2.0 + rng.next_f64() * (1.0 + volatility));
+        let shock = match economy.cycle_phase {
+            CyclePhase::Contraction => contraction_shock,
+            CyclePhase::Trough => -0.5,
+            CyclePhase::Recovery => 1.0,
+            CyclePhase::Expansion => 0.5,
+            CyclePhase::Peak => 0.0,
+        };
+        if shock != 0.0 {
+            new_state.gdp_growth = clamp(economy.gdp_growth + shock, gdp_floor, 6.0);
+        }
+
+        // DRAW SITE (uniform) -- only when `phase_target_range_draw` is on.
+        //
+        // Placed after the shock draw above so the stream position of
+        // every existing consumer is unchanged while the dial is 0.0, and
+        // guarded by a BRANCH rather than by a zero coefficient, because a
+        // draw taken and multiplied by zero still moves every later
+        // consumer that day.
+        if inputs.phase_target_range_draw != 0.0 {
+            let r = effective_gdp_range(
+                &phase, economy.cycle_phase, inputs.trough_growth_floor);
+            let mid = (r.0 + r.1) / 2.0;
+            let drawn = r.0 + rng.next_f64() * (r.1 - r.0);
+            new_state.phase_gdp_target =
+                mid + inputs.phase_target_range_draw * (drawn - mid);
+        }
+    }
+
+    // ── Quarterly GDP ─────────────────────────────────────────────────────
+    if is_quarter_start {
+        let range = effective_gdp_range(
+            &phase, economy.cycle_phase, inputs.trough_growth_floor);
+        let target_gdp = phase_growth_target(
+            new_state.phase_gdp_target, range, inputs.phase_target_range_draw)
+            + shock_gdp_impact;
+        new_state.gdp_growth = clamp(
+            new_state.gdp_growth
+                + (target_gdp - new_state.gdp_growth) * 0.25
+                + random_normal(rng, 0.0, 0.3 * volatility),
+            gdp_floor,
+            6.0,
+        );
+    }
+
+    // GDP level compounds daily from the CURRENT growth rate.
+    new_state.gdp = economy.gdp * (1.0 + new_state.gdp_growth / 100.0 / inputs.macro_compound_days_per_year);
+
+    // ── Monthly releases ──────────────────────────────────────────────────
+    if is_month_start {
+        let range = effective_gdp_range(
+            &phase, economy.cycle_phase, inputs.trough_growth_floor);
+        let phase_gdp_target = phase_growth_target(
+            new_state.phase_gdp_target, range, inputs.phase_target_range_draw);
+        let gdp_gap = phase_gdp_target - new_state.gdp_growth;
+        // Asymmetry correction: pull twice as hard when GDP is moving against
+        // the phase, so it does not fall fast and recover slowly.
+        //
+        // The two arms return the same 2.0 and clippy would merge them. They
+        // are kept apart because they are two DIFFERENT economic conditions —
+        // a downturn with growth still positive, and an upswing with growth
+        // still negative — that happen to share a coefficient today. Merging
+        // them would make a future change to one silently change both.
+        #[allow(clippy::if_same_then_else)]
+        let gdp_correction_multiplier = if (economy.cycle_phase == CyclePhase::Contraction
+            || economy.cycle_phase == CyclePhase::Trough)
+            && new_state.gdp_growth > 0.0
+        {
+            2.0
+        } else if (economy.cycle_phase == CyclePhase::Recovery
+            || economy.cycle_phase == CyclePhase::Expansion)
+            && new_state.gdp_growth < 0.0
+        {
+            2.0
+        } else {
+            1.0
+        };
+        new_state.gdp_growth = clamp(
+            new_state.gdp_growth
+                + gdp_gap * 0.12 * gdp_correction_multiplier
+                + random_normal(rng, 0.0, 0.1 * volatility),
+            gdp_floor,
+            6.0,
+        );
+
+        // Okun's law: 1pp of GDP below trend (~2%) is ~0.5pp of unemployment.
+        //
+        // That is an annual relation, and at 0.0 `unemployment_okun_coefficient`
+        // applies 0.20 of it at every monthly release, 2.4 points a year,
+        // beside a recovery term that counts the same growth again. Off
+        // zero the coefficient is annual and divided over the year's twelve
+        // releases, and there is no recovery term. A branch, so 0.0 is the
+        // arithmetic that stood; adding the `+ 0.0` recovery term off zero
+        // moves nothing.
+        let okun = inputs.unemployment_okun_coefficient;
+        let gdp_effect = if okun == 0.0 {
+            (2.0 - new_state.gdp_growth) * 0.20
+        } else {
+            (2.0 - new_state.gdp_growth) * (okun / 12.0)
+        };
+        let nairu = economy.structural_unemployment;
+        // `unemployment_natural_pull`: the share of the gap to the natural
+        // rate closed this release. A branch, so 0.0 multiplies by the
+        // literal 0.06 that stood.
+        let nairu_pull = if inputs.unemployment_natural_pull == 0.0 {
+            (nairu - economy.unemployment_rate) * 0.06
+        } else {
+            (nairu - economy.unemployment_rate) * inputs.unemployment_natural_pull
+        };
+        let mut recovery_effect = 0.0;
+        if okun == 0.0
+            && (economy.cycle_phase == CyclePhase::Expansion
+                || economy.cycle_phase == CyclePhase::Recovery)
+            && new_state.gdp_growth > 1.0
+        {
+            recovery_effect = -new_state.gdp_growth * 0.08;
+        }
+        // `unemployment_adjustment_half_life`: the cyclical drive reaches
+        // the rate through a partial adjustment, so a turn's step in growth
+        // and in the phase's trend builds into the monthly change over
+        // months, as unemployment rises through a real recession. A branch,
+        // so 0.0 is the expression that stood, operation for operation; the
+        // one noise draw is taken in the same place either way.
+        new_state.unemployment_rate = if inputs.unemployment_adjustment == 0.0 {
+            clamp(
+                economy.unemployment_rate
+                    + phase.unemployment_trend * 0.3
+                    + gdp_effect
+                    + nairu_pull
+                    + recovery_effect
+                    + random_normal(rng, 0.0, 0.06 * volatility),
+                2.5,
+                15.0,
+            )
+        } else {
+            let drive = unemployment_drive_with(
+                phase.unemployment_trend, economy.cycle_phase, new_state.gdp_growth, okun);
+            let impulse = economy.unemployment_impulse
+                + inputs.unemployment_adjustment * (drive - economy.unemployment_impulse);
+            new_state.unemployment_impulse = impulse;
+            clamp(
+                economy.unemployment_rate
+                    + impulse
+                    + nairu_pull
+                    + random_normal(rng, 0.0, 0.06 * volatility),
+                2.5,
+                15.0,
+            )
+        };
+
+        let unemployment_change = new_state.unemployment_rate - economy.unemployment_rate;
+        new_state.jobs_created = clamp(
+            200000.0 - unemployment_change * 500000.0
+                + random_normal(rng, 0.0, 30000.0 * volatility),
+            -500000.0,
+            500000.0,
+        );
+
+        // ── Inflation ─────────────────────────────────────────────────────
+        let inflation_target = INFLATION_TARGET;
+        let inflation_mean_rev_coeff = inputs.inflation_reversion;
+
+        // Positive real rates are contractionary.
+        let real_rate_suppression = if economy.federal_funds_rate > economy.inflation_rate {
+            -(economy.federal_funds_rate - economy.inflation_rate) * 0.04
+        } else if economy.federal_funds_rate > 3.0 {
+            -(economy.federal_funds_rate - 3.0) * 0.015
+        } else {
+            0.0
+        };
+
+        // `oil_inflation_passthrough`: 0.0 is the shipped three-way branch,
+        // which pays twice as much above 80 as below 50 and nothing between,
+        // so it has a positive mean about oil's own anchor. Off zero one
+        // coefficient acts either side of `OIL_PASSTHROUGH_ANCHOR`.
+        let oil_inflation_effect = if inputs.oil_inflation_passthrough != 0.0 {
+            (economy.oil_price - OIL_PASSTHROUGH_ANCHOR) * (0.01 * inputs.oil_inflation_passthrough)
+        } else if economy.oil_price > 80.0 {
+            (economy.oil_price - 80.0) * 0.01
+        } else if economy.oil_price < 50.0 {
+            (economy.oil_price - 50.0) * 0.005
+        } else {
+            0.0
+        };
+
+        let tariff_inflation_effect = (economy.tariff_rate - 5.0) * 0.01;
+
+        let nairu_for_phillips = economy.structural_unemployment;
+        let unemployment_gap = new_state.unemployment_rate - nairu_for_phillips;
+        // D3: the JS coefficient, which `wasm/src` also states. Only the
+        // stale compiled binary said -0.18.
+        let phillips_curve_effect = -unemployment_gap * PHILLIPS_CURVE_COEFF;
+
+        let usd_inflation_effect = -(economy.usd_index - 100.0) * 0.01;
+
+        // Wage growth: tight labour markets drive wages.
+        let mut wage_growth_target =
+            economy.inflation_rate * 0.7 + (nairu_for_phillips - economy.unemployment_rate) * 0.5;
+        // Cost-of-living adjustment: workers demand 80% of inflation as a
+        // floor once inflation is above 3%.
+        if economy.inflation_rate > 3.0 {
+            let cola_floor = economy.inflation_rate * 0.8;
+            wage_growth_target = mathx::max(wage_growth_target, cola_floor);
+        }
+        new_state.wage_growth =
+            economy.wage_growth + (wage_growth_target - economy.wage_growth) * 0.15;
+
+        let mut wage_pressure = mathx::max(0.0, new_state.wage_growth - 2.0) * 0.08;
+        // Wage-price spiral: fast wages AND high inflation reinforce.
+        let spiral_condition = economy.wage_growth > 4.0 && economy.inflation_rate > 3.0;
+        let spiral_boost = if spiral_condition {
+            (economy.wage_growth - 4.0) * (economy.inflation_rate - 3.0) * 0.02
+        } else {
+            0.0
+        };
+        wage_pressure += spiral_boost;
+
+        new_state.inflation_rate = clamp(
+            economy.inflation_rate
+                + (inflation_target - economy.inflation_rate) * inflation_mean_rev_coeff
+                + phase.inflation_trend * 0.04
+                + shock_inflation_impact * 0.02
+                + real_rate_suppression
+                + oil_inflation_effect
+                + tariff_inflation_effect * 0.03
+                + usd_inflation_effect * 0.03
+                + phillips_curve_effect
+                + wage_pressure
+                + random_normal(rng, 0.0, 0.04 * volatility),
+            inputs.inflation_floor,
+            inputs.inflation_ceiling,
+        );
+        new_state.core_inflation = clamp(
+            economy.core_inflation + (new_state.inflation_rate - economy.core_inflation) * 0.3,
+            -1.0,
+            12.0,
+        );
+
+        // ── Confidence ────────────────────────────────────────────────────
+        let confidence_phase_adj = match economy.cycle_phase {
+            CyclePhase::Contraction => -20.0,
+            CyclePhase::Trough => -15.0,
+            CyclePhase::Peak => 5.0,
+            CyclePhase::Recovery => -5.0,
+            CyclePhase::Expansion => 0.0,
+        };
+        let confidence_base = 100.0 + economy.gdp_growth * 5.0 - economy.unemployment_rate * 3.0
+            + confidence_phase_adj;
+        let fear_greed_nudge = (economy.fear_greed_index - 50.0) / 50.0 * 2.0;
+        let market_return_nudge = economy.rolling_market_return_30d * 3.0;
+
+        new_state.consumer_confidence = clamp(
+            economy.consumer_confidence
+                + (confidence_base - economy.consumer_confidence) * 0.25
+                + fear_greed_nudge
+                + market_return_nudge
+                + random_normal(rng, 0.0, 3.0 * volatility),
+            40.0,
+            130.0,
+        );
+        new_state.business_confidence = clamp(
+            economy.business_confidence
+                + (confidence_base - economy.business_confidence) * 0.20
+                + market_return_nudge * 1.5
+                + random_normal(rng, 0.0, 4.5 * volatility),
+            40.0,
+            130.0,
+        );
+
+        // ── Housing ───────────────────────────────────────────────────────
+        let confidence_housing_adj = (new_state.consumer_confidence - 100.0) * 0.1;
+        let housing_target = 100.0 - (economy.mortgage_rate_30y - 5.0) * 4.0
+            + economy.gdp_growth * 2.0
+            + confidence_housing_adj;
+        // Thin trading slows price discovery.
+        let volume_speed_factor = mathx::max(0.3, economy.housing_transaction_volume / 100.0);
+        let housing_mean_rev = (clamp(housing_target, 75.0, 130.0) - economy.housing_index)
+            * 0.08
+            * volume_speed_factor;
+        let recession_effect = if economy.recession_probability > 0.3 {
+            -(economy.recession_probability - 0.3) * 2.0
+        } else {
+            0.0
+        };
+        let housing_change =
+            housing_mean_rev + recession_effect + random_normal(rng, 0.0, 0.3 * volatility);
+        new_state.housing_index = clamp(economy.housing_index + housing_change, 75.0, 180.0);
+
+        let mortgage_effect = mathx::max(-0.3, -(economy.mortgage_rate_30y - 5.0) * 0.05);
+        let housing_gdp_effect = if economy.gdp_growth > 2.0 {
+            0.02
+        } else if economy.gdp_growth < 0.0 {
+            -0.05
+        } else {
+            0.0
+        };
+        // NOTE `randomNormal(0, 1) * 0.02` — the scale is applied OUTSIDE the
+        // wrapper here, unlike every other call site. Same draw either way,
+        // but the arithmetic differs in the last bit, so it is preserved.
+        new_state.home_starts_monthly = mathx::max(
+            500000.0,
+            mathx::min(
+                2000000.0,
+                economy.home_starts_monthly
+                    * (1.0
+                        + mortgage_effect
+                        + housing_gdp_effect
+                        + random_normal(rng, 0.0, 1.0) * 0.02),
+            ),
+        );
+
+        // Volume responds immediately to rate shocks — it freezes long before
+        // prices move.
+        let rate_shock = mathx::max(0.0, economy.mortgage_rate_30y - 5.0);
+        let volume_target = mathx::max(
+            30.0,
+            100.0 - rate_shock * 15.0 - mathx::max(0.0, (economy.unemployment_rate - 5.0) * 5.0),
+        );
+        new_state.housing_transaction_volume = economy.housing_transaction_volume
+            + (volume_target - economy.housing_transaction_volume) * 0.30;
+
+        // ── Labour-market hysteresis ──────────────────────────────────────
+        if economy.cycle_phase == CyclePhase::Contraction
+            || economy.cycle_phase == CyclePhase::Trough
+        {
+            let ltu_target = economy.unemployment_rate * 0.4;
+            new_state.long_term_unemployment_rate = economy.long_term_unemployment_rate
+                + (ltu_target - economy.long_term_unemployment_rate) * 0.05;
+        } else {
+            // Hysteresis: the long-term unemployed are harder to re-employ,
+            // so this falls at only 3%/month.
+            new_state.long_term_unemployment_rate =
+                mathx::max(0.5, economy.long_term_unemployment_rate * 0.97);
+        }
+        // `unemployment_natural_rate`: the natural rate with no long-term
+        // unemployment. A branch, so 0.0 adds to the literal 4.0 that stood.
+        let natural_base = if inputs.unemployment_natural_rate == 0.0 {
+            4.0
+        } else {
+            inputs.unemployment_natural_rate
+        };
+        new_state.structural_unemployment =
+            natural_base + new_state.long_term_unemployment_rate * 0.3;
+
+        let lfp_target = if economy.cycle_phase == CyclePhase::Contraction
+            || economy.cycle_phase == CyclePhase::Trough
+        {
+            60.0 - (economy.unemployment_rate - 5.0) * 0.5
+        } else {
+            63.0 + (economy.gdp_growth - 1.0) * 0.3
+        };
+        let lfp_drift = (lfp_target - economy.labor_force_participation) * 0.01;
+        new_state.labor_force_participation = mathx::max(
+            55.0,
+            mathx::min(68.0, economy.labor_force_participation + lfp_drift),
+        );
+
+        // ── Fiscal ────────────────────────────────────────────────────────
+        if economy.cycle_phase == CyclePhase::Contraction
+            || economy.cycle_phase == CyclePhase::Trough
+        {
+            let auto_stabilizer = 1.0;
+            let discretionary = if economy.unemployment_rate > 7.0 {
+                mathx::min(4.0, (economy.unemployment_rate - 5.0) * 0.8)
+            } else {
+                0.0
+            };
+            new_state.fiscal_stimulus = mathx::min(6.0, auto_stabilizer + discretionary);
+            // `+=` on the already-updated growth, and NOT re-clamped — so a
+            // stimulus can push gdp_growth above the 6.0 ceiling the lines
+            // above enforce. Faithful to the original.
+            new_state.gdp_growth += new_state.fiscal_stimulus * FISCAL_MULTIPLIER / 12.0;
+            new_state.government_debt_to_gdp =
+                economy.government_debt_to_gdp + new_state.fiscal_stimulus / 12.0;
+        } else {
+            new_state.fiscal_stimulus = mathx::max(0.0, economy.fiscal_stimulus - 0.2);
+            if new_state.gdp_growth > 2.0 {
+                new_state.government_debt_to_gdp =
+                    mathx::max(60.0, economy.government_debt_to_gdp - 0.05);
+            } else {
+                new_state.government_debt_to_gdp = economy.government_debt_to_gdp;
+            }
+        }
+    }
+
+    // CPI compounds daily whether or not a release happened.
+    new_state.cpi = economy.cpi * (1.0 + new_state.inflation_rate / 100.0 / inputs.macro_compound_days_per_year);
+
+    // ── Oil ───────────────────────────────────────────────────────────────
+    let oil_inventory = economy.oil_inventory_level;
+    let oil_last_opec = economy.oil_last_opec_day;
+
+    let oil_demand_factor = economy.gdp_growth * 0.15;
+    // Supply answers demand, or does not. At 0.0 this is the literal zero
+    // the reference implementation writes, and a BRANCH rather than a
+    // multiply so a negative `gdp_growth` cannot turn a `-0.0` into a
+    // `+0.0` and move a trajectory by a signed zero.
+    //
+    // The zero is why inventory only ever falls: demand draws it down every
+    // day and nothing puts it back, so it reaches its floor and the
+    // pressure term saturates into a standing push on the oil price. At 1.0
+    // supply matches demand in expectation and inventory is driftless,
+    // which is the stationarity condition of this process and not a level
+    // chosen to hit a number.
+    let oil_supply_factor = if inputs.oil_supply_response == 0.0 {
+        0.0
+    } else {
+        oil_demand_factor * inputs.oil_supply_response
+    };
+    let inventory_change =
+        oil_demand_factor - oil_supply_factor + random_normal(rng, 0.0, 0.5 * volatility);
+    // `oil_inventory_reversion`: production and storage close this share of
+    // inventory's gap to its normal level each day, so inventory has a
+    // stationary distribution and the pressure below cannot saturate for
+    // good. A branch, so 0.0 is the integrator that stood; the one draw
+    // above is taken either way.
+    let new_oil_inventory = if inputs.oil_inventory_reversion == 0.0 {
+        clamp(oil_inventory - inventory_change, 0.0, 100.0)
+    } else {
+        clamp(
+            oil_inventory - inventory_change
+                + inputs.oil_inventory_reversion * (OIL_INVENTORY_NORMAL - oil_inventory),
+            0.0,
+            100.0,
+        )
+    };
+    new_state.oil_inventory_level = new_oil_inventory;
+
+    let mut oil_inventory_pressure = 0.0;
+    if new_oil_inventory < 40.0 {
+        oil_inventory_pressure = (40.0 - new_oil_inventory) * 0.08;
+    } else if new_oil_inventory > 60.0 {
+        oil_inventory_pressure = (60.0 - new_oil_inventory) * 0.08;
+    }
+
+    // Summer driving season peaks ~day 180, winter valley ~day 90.
+    //
+    // `(day - 1) % 365 + 1` — JavaScript's `%` keeps the sign of the
+    // dividend, and so does Rust's, so a day of 0 gives -1 % 365 = -1 and a
+    // dayOfYear of 0 in both. Reproduced rather than corrected.
+    //
+    // The AMPLITUDE, not the factor. WHERE it acts is decided at the
+    // reversion target below, because a shape multiplied into a level every
+    // day compounds: the product of these factors is 5.119 over the 252
+    // game-days a certified year passes and 0.921 over a full 365, so a
+    // window shorter than the period reads a near-neutral shape as a trend.
+    //
+    // On the macro calendar: the period is the calendar's year and the
+    // valley its day 90, which are 365 and 90 as shipped.
+    let year = cal.days_per_year;
+    let day_of_year = ((day - 1) % year) + 1;
+    let oil_seasonal_amplitude = 0.03
+        * mathx::sin(2.0 * std::f64::consts::PI
+            * (day_of_year as f64 - cal.scale_days(90) as f64) / year as f64);
+
+    let oil_usd_drag = -(economy.usd_index - 100.0) * 0.08;
+
+    // ── OPEC ──────────────────────────────────────────────────────────────
+    // A state-dependent draw site: 0 draws on an ordinary day, 1 to 3 on a
+    // decision day depending on which branch the price difference selects.
+    let mut opec_impact = 0.0;
+    if day - oil_last_opec >= cal.opec_interval() {
+        new_state.oil_last_opec_day = day;
+        let oil_price = economy.oil_price;
+        let opec_target = 80.0;
+        let price_diff = oil_price - opec_target;
+
+        // The two outer branches are a pair that should mirror and do not:
+        // 0.6 at 3-to-6 against 0.5 at 2-to-5 is an expected +2.700 against
+        // -1.750, so the rule pushes oil UP on net. At symmetry 1.0 both
+        // sides use the mean of the rule's own two probabilities and the
+        // mean of its own two magnitude ranges, which is the one symmetric
+        // rule that keeps the total intervention it performs.
+        //
+        // A branch, so 0.0 takes the original arithmetic in the original
+        // order and consumes the same draws in the same places either way.
+        let (cut_p, cut_lo, raise_p, raise_lo) = if inputs.oil_opec_symmetry == 0.0 {
+            (0.6, 3.0, 0.5, 2.0)
+        } else {
+            let g = inputs.oil_opec_symmetry;
+            (0.6 - 0.05 * g, 3.0 - 0.5 * g, 0.5 + 0.05 * g, 2.0 + 0.5 * g)
+        };
+        if price_diff < -10.0 {
+            // Well below target: likely a production cut.
+            if rng.next_f64() < cut_p {
+                opec_impact = cut_lo + rng.next_f64() * 3.0;
+            }
+        } else if price_diff > 10.0 {
+            // Well above target: likely a production increase.
+            if rng.next_f64() < raise_p {
+                opec_impact = -(raise_lo + rng.next_f64() * 3.0);
+            }
+        } else {
+            // In the comfort zone: a small adjustment.
+            if rng.next_f64() < 0.2 {
+                opec_impact = (rng.next_f64() - 0.5) * 3.0;
+            }
+        }
+    }
+
+    let oil_target_level = OIL_BASELINE + economy.gdp_growth * 3.0 + shock_oil_impact * 10.0;
+    // Where the seasonal shape acts, as a share of its own amplitude. A
+    // BRANCH at 0.0, so every preset before pt-v18 runs the reference
+    // implementation's arithmetic in its own order: the whole amplitude
+    // multiplies the new price level and the target carries none of it.
+    //
+    // Above 0.0 the amplitude is SPLIT, so its total is conserved and only
+    // the point of application moves. At 1.0 the target carries all of it
+    // and the level's factor is exactly 1.0, which makes the shape modulate
+    // where the price is pulled toward by plus or minus 3 per cent instead
+    // of compounding on the price itself.
+    let (oil_target, oil_level_seasonality) = if inputs.oil_seasonality_target == 0.0 {
+        (oil_target_level, 1.0 + oil_seasonal_amplitude)
+    } else {
+        let g = inputs.oil_seasonality_target;
+        (
+            oil_target_level * (1.0 + g * oil_seasonal_amplitude),
+            1.0 + (1.0 - g) * oil_seasonal_amplitude,
+        )
+    };
+    let oil_mean_rev = (oil_target - economy.oil_price) * 0.03;
+    let oil_volatility = 2.0 * volatility;
+    new_state.oil_price = clamp(
+        (economy.oil_price
+            + oil_mean_rev
+            + oil_inventory_pressure
+            + oil_usd_drag
+            + opec_impact
+            + random_normal(rng, 0.0, oil_volatility)
+            + shock_oil_impact * 0.1)
+            * oil_level_seasonality,
+        35.0,
+        150.0,
+    );
+
+    // ── Gold ──────────────────────────────────────────────────────────────
+    let real_rate = economy.federal_funds_rate - economy.inflation_rate;
+    let real_rate_drift = -real_rate * 0.8;
+    let inflation_hedge = mathx::max(0.0, (economy.inflation_rate - 2.0) * 1.5);
+    // Reference: `vix > 30`, a level endogenous VIX never reaches (measured
+    // ceiling 26.57). Re-sited at the endogenous P94 so the gate is live;
+    // see `CRISIS_VIX_THRESHOLD`. The hinge origin moves with the gate, so
+    // the premium stays continuous at the threshold.
+    let crisis_premium = if economy.vix > inputs.crisis_vix_threshold && economy.gdp_growth < -1.0 {
+        mathx::min(
+            5.0,
+            economy.gdp_growth.abs() * 1.0 + (economy.vix - inputs.crisis_vix_threshold) * 0.15,
+        )
+    } else {
+        0.0
+    };
+    let prev_market_return = economy.previous_day_market_return;
+    let gold_safe_haven = if prev_market_return < -1.0 {
+        prev_market_return.abs() * 2.0
+    } else {
+        0.0
+    };
+
+    // D2, decided: the ADDITIVE equilibrium (~$200 per inflation point). The
+    // deployed WASM multiplicative version moves gold ~0.3% per point — about
+    // $6 on $2,000 gold — which is economically inert and fails REALISM
+    // MANDATE #7 as written. Whether $200/point is too strong is a
+    // calibration question, to be answered with measurements, not by keeping
+    // the wrong shape.
+    let inflation_premium_target = mathx::max(0.0, (economy.inflation_rate - 2.0) * 150.0)
+        + (economy.inflation_rate - 2.5) * 50.0;
+    let real_rate_penalty = -real_rate * 100.0;
+    let gold_equilibrium = GOLD_EQUILIBRIUM_BASE + inflation_premium_target + real_rate_penalty;
+
+    let gold_mean_reversion = (gold_equilibrium - economy.gold_price) * GOLD_MEAN_REVERSION;
+    let sentiment_drift = (50.0 - economy.fear_greed_index) * 0.03;
+
+    let gold_change = real_rate_drift
+        + inflation_hedge
+        + crisis_premium
+        + gold_safe_haven
+        + gold_mean_reversion
+        + sentiment_drift
+        + random_normal(rng, 0.0, 3.0 * volatility);
+    new_state.gold_price = clamp(economy.gold_price + gold_change, 800.0, 5000.0);
+
+    // ── Copper ────────────────────────────────────────────────────────────
+    let copper_demand = economy.gdp_growth * 0.02 + (economy.housing_index - 100.0) * 0.001;
+    let copper_usd_drag = -(economy.usd_index - 100.0) * 0.003;
+    let copper_change =
+        copper_demand + copper_usd_drag + random_normal(rng, 0.0, 0.04 * volatility);
+    new_state.copper_price = clamp(economy.copper_price + copper_change, 2.0, 8.0);
+
+    // ── USD ───────────────────────────────────────────────────────────────
+    let usd_target = 100.0 + (economy.federal_funds_rate - 2.5) * 3.0;
+    let usd_mean_reversion = (usd_target - economy.usd_index) * 0.02;
+    // Reference: `vix > 30` — dead for the same reason as the gold crisis
+    // premium above; re-sited with it. See `CRISIS_VIX_THRESHOLD`.
+    //
+    // Reads the PARAMETER, not the constant. It read the constant until
+    // 0.4.2, so an embedder who moved `crisis_vix_threshold` got a gold gate
+    // at their level and a dollar gate still at 25.5. The two describe one
+    // regime: a crisis is the same crisis whether you watch gold or the
+    // dollar. No behaviour changes at the default, where the two agree.
+    let safe_haven_drift = if economy.vix > inputs.usd_crisis_vix_threshold {
+        (economy.vix - inputs.usd_crisis_vix_threshold) * 0.05
+    } else {
+        0.0
+    };
+    let usd_change =
+        usd_mean_reversion + safe_haven_drift + random_normal(rng, 0.0, 0.3 * volatility);
+    new_state.usd_index = clamp(economy.usd_index + usd_change, 80.0, 130.0);
+
+    // ── Trade balance ─────────────────────────────────────────────────────
+    let tariff_effect = economy.tariff_rate * 0.5;
+    let dollar_effect = -(economy.usd_index - 100.0) * 0.3;
+    new_state.trade_balance = clamp(
+        economy.trade_balance
+            + (tariff_effect + dollar_effect) * 0.01
+            + random_normal(rng, 0.0, 0.5 * volatility),
+        -200.0,
+        50.0,
+    );
+
+    // The VIX and the three yields, factored out so the rate indices'
+    // live mark (`rate_intraday_live`) projects tonight's curve with the
+    // very arithmetic this step runs. Same expressions, same draws, same
+    // order.
+    vix_and_yields(economy, inputs, &mut new_state, shock_gdp_impact, rng);
 
     // ── Fear/greed ────────────────────────────────────────────────────────
     // `fear_greed_published_inputs`: the phase and growth the index reads
@@ -3555,5 +3914,215 @@ mod anchor_weight_level {
         let at_cap = anchor_weight_at_level(0.45, 1.0, 1.95, 0.0, 1.95 * 18.5, 18.5);
         assert_eq!(anchor_weight_at_level(0.45, 1.0, 1.95, 0.0, 80.0, 18.5), at_cap);
         assert_eq!(anchor_weight_at_level(0.45, 1.0, 1.95, 1.0, 9.0, 18.5), 0.0);
+    }
+}
+
+#[cfg(test)]
+mod live_projection {
+    use super::*;
+    use crate::economy::state::{create_initial_economy_state, InitialEconomyOptions};
+
+    /// The live mark's projection is the step's own yields with its draws at
+    /// their means, BIT FOR BIT, whatever else the step does that day: a
+    /// month start (releases), a quarter start, each phase, both signs of
+    /// the session, the corporate yield's daily move and the credit floor.
+    #[test]
+    fn the_projection_is_the_steps_yields_at_the_means() {
+        let phases = [CyclePhase::Expansion, CyclePhase::Peak, CyclePhase::Contraction,
+                      CyclePhase::Trough, CyclePhase::Recovery];
+        let mut checked = 0;
+        for (k, phase) in phases.iter().enumerate() {
+            for (day, ret) in [(17_i64, -2.3), (30, 1.1), (90, 0.0), (91, -0.4)] {
+                for (inflation, floor) in [(2.1, 0.0), (5.0, 1.0), (3.5, 1.0)] {
+                    let mut e = create_initial_economy_state(&InitialEconomyOptions::default());
+                    e.cycle_phase = *phase;
+                    e.inflation_rate = inflation;
+                    e.vix = 14.0 + 6.0 * k as f64;
+                    let inputs = DailyInputs {
+                        game_day: day,
+                        market_day_return_pct: ret,
+                        vix_return_source: 1.0,
+                        daily_credit_floor_gain: floor,
+                        yields: YieldDials {
+                            treasury_10y_noise: 0.038,
+                            treasury_2y_noise: 0.022,
+                            flight_to_quality_gain: 0.016,
+                            flight_to_quality_day: 1.0,
+                            corporate_yield_daily: 1.0,
+                            ..YieldDials::default()
+                        },
+                        ..Default::default()
+                    };
+                    let full = update_economy_daily(&e, &inputs, &mut MeanDraws);
+                    let (y2, y10, corp) = project_close_yields(&e, &inputs);
+                    assert_eq!(y2.to_bits(), full.treasury_yield_2y.to_bits());
+                    assert_eq!(y10.to_bits(), full.treasury_yield_10y.to_bits());
+                    assert_eq!(corp.to_bits(), full.corporate_bond_yield.to_bits());
+                    checked += 1;
+                }
+            }
+        }
+        assert_eq!(checked, 60);
+    }
+
+    /// The session's move reaches the projection through the flight to
+    /// quality and the corporate yield's VIX term, which is what the live
+    /// mark prices.
+    #[test]
+    fn the_projection_moves_with_the_session() {
+        let e = create_initial_economy_state(&InitialEconomyOptions::default());
+        let at = |ret: f64| {
+            project_close_yields(&e, &DailyInputs {
+                market_day_return_pct: ret,
+                vix_return_source: 1.0,
+                yields: YieldDials {
+                    flight_to_quality_gain: 0.016,
+                    flight_to_quality_day: 1.0,
+                    corporate_yield_daily: 1.0,
+                    ..YieldDials::default()
+                },
+                ..Default::default()
+            })
+        };
+        let (down, flat, up) = (at(-2.0), at(0.0), at(2.0));
+        assert!(down.1 < flat.1 && flat.1 < up.1, "{down:?} {flat:?} {up:?}");
+    }
+}
+
+/// Unemployment's anchor and oil's interior (issues #170 to #172): each
+/// switch at 0.0 is the arithmetic that stood, and off zero it does what
+/// its docstring says, read off one release with a draw-free generator.
+#[cfg(test)]
+mod macro_anchors {
+    use super::*;
+    use crate::economy::state::{create_initial_economy_state, InitialEconomyOptions};
+
+    struct Silent(f64);
+    impl crate::rng::Rng for Silent {
+        fn next_f64(&mut self) -> f64 {
+            self.0
+        }
+        fn next_normal(&mut self) -> f64 {
+            0.0
+        }
+    }
+
+    const MONTH: i64 = DAYS_PER_MONTH;
+
+    fn economy() -> EconomyState {
+        create_initial_economy_state(&InitialEconomyOptions::default())
+    }
+
+    fn step(e: &EconomyState, inputs: DailyInputs) -> EconomyState {
+        update_economy_daily(e, &inputs, &mut Silent(0.5))
+    }
+
+    fn release() -> DailyInputs<'static> {
+        DailyInputs { game_day: MONTH, ..Default::default() }
+    }
+
+    /// The pull is `k * (natural - u)` in place of `0.06 * (natural - u)`:
+    /// the rise moves by exactly the difference, and 0.06 set by hand is the
+    /// shipped release bit for bit.
+    #[test]
+    fn the_natural_pull_replaces_the_shipped_share() {
+        let mut e = economy();
+        // Clear of both clamps, so the difference is the pull's alone.
+        e.unemployment_rate = 6.0;
+        e.structural_unemployment = 4.5;
+        let off = step(&e, release());
+        let same = step(&e, DailyInputs { unemployment_natural_pull: 0.06, ..release() });
+        assert_eq!(same.unemployment_rate.to_bits(), off.unemployment_rate.to_bits());
+        let on = step(&e, DailyInputs { unemployment_natural_pull: 0.3, ..release() });
+        let want = (0.3 - 0.06) * (4.5 - 6.0);
+        assert!((on.unemployment_rate - off.unemployment_rate - want).abs() < 1e-12);
+        // Nothing else in the release reads the dial.
+        // The Phillips term reads this month's rate, so inflation moves.
+        assert_ne!(on.inflation_rate.to_bits(), off.inflation_rate.to_bits());
+        assert_eq!(on.gdp_growth.to_bits(), off.gdp_growth.to_bits());
+    }
+
+    /// Okun's law read as annual: in an expansion at 3 per cent growth the
+    /// shipped drive is -0.2 for Okun and -0.24 for the recovery term every
+    /// month; off zero it is `(2 - 3) * beta / 12` and no recovery term.
+    #[test]
+    fn the_okun_coefficient_is_annual_and_drops_the_recovery_term() {
+        let phase = phase_characteristics_for(CyclePhase::Expansion, false);
+        let shipped = unemployment_drive(phase.unemployment_trend, CyclePhase::Expansion, 3.0);
+        assert_eq!(
+            unemployment_drive_with(phase.unemployment_trend, CyclePhase::Expansion, 3.0, 0.0)
+                .to_bits(),
+            shipped.to_bits());
+        assert!((shipped - (-0.05 * 0.3 - 0.2 - 0.24)).abs() < 1e-12);
+        let annual =
+            unemployment_drive_with(phase.unemployment_trend, CyclePhase::Expansion, 3.0, 0.5);
+        assert!((annual - (-0.05 * 0.3 - 0.5 / 12.0)).abs() < 1e-12);
+
+        // And the release adds exactly that drive in place of the shipped
+        // one. The economy opens in an expansion; growth after its monthly
+        // step is the same in both, and no fiscal term touches it there.
+        let e = economy();
+        assert_eq!(e.cycle_phase, CyclePhase::Expansion);
+        let off = step(&e, release());
+        let on = step(&e, DailyInputs { unemployment_okun_coefficient: 0.5, ..release() });
+        assert_eq!(on.gdp_growth.to_bits(), off.gdp_growth.to_bits());
+        let g = off.gdp_growth;
+        let d_off = unemployment_drive(phase.unemployment_trend, CyclePhase::Expansion, g);
+        let d_on = unemployment_drive_with(phase.unemployment_trend, CyclePhase::Expansion, g, 0.5);
+        let moved = on.unemployment_rate - off.unemployment_rate;
+        assert!((moved - (d_on - d_off)).abs() < 1e-12, "{moved} {}", d_on - d_off);
+    }
+
+    /// The release resets the NAIRU to the natural rate plus 0.3 times
+    /// long-term unemployment, and 4.0 set by hand is the shipped release.
+    #[test]
+    fn the_natural_rate_sets_the_nairu() {
+        let e = economy();
+        let off = step(&e, release());
+        let same = step(&e, DailyInputs { unemployment_natural_rate: 4.0, ..release() });
+        assert_eq!(same.structural_unemployment.to_bits(), off.structural_unemployment.to_bits());
+        let on = step(&e, DailyInputs { unemployment_natural_rate: 5.0, ..release() });
+        assert!((on.structural_unemployment - off.structural_unemployment - 1.0).abs() < 1e-12);
+        assert!((on.structural_unemployment
+            - (5.0 + 0.3 * on.long_term_unemployment_rate)).abs() < 1e-12);
+    }
+
+    /// Inventory closes `k` of its gap to 50 each day beside the shipped
+    /// step, on any day, release or not.
+    #[test]
+    fn inventory_reverts_toward_its_normal_level() {
+        let mut e = economy();
+        e.oil_inventory_level = 90.0;
+        let day = DailyInputs { game_day: MONTH + 3, ..Default::default() };
+        let off = step(&e, day);
+        let on = step(&e, DailyInputs { oil_inventory_reversion: 0.01, ..day });
+        let want = 0.01 * (OIL_INVENTORY_NORMAL - 90.0);
+        assert!((on.oil_inventory_level - off.oil_inventory_level - want).abs() < 1e-12);
+        // Below the normal level it pushes the other way.
+        e.oil_inventory_level = 10.0;
+        let off = step(&e, day);
+        let on = step(&e, DailyInputs { oil_inventory_reversion: 0.01, ..day });
+        assert!((on.oil_inventory_level - off.oil_inventory_level - 0.4).abs() < 1e-12);
+    }
+
+    /// The shipped pass-through pays a rise from 75 and not the matching
+    /// fall; off zero a rise and a fall about the anchor pay equal and
+    /// opposite amounts.
+    #[test]
+    fn the_oil_pass_through_is_symmetric_about_its_anchor() {
+        let at = |oil: f64, c: f64| {
+            let mut e = economy();
+            e.oil_price = oil;
+            step(&e, DailyInputs { oil_inflation_passthrough: c, ..release() }).inflation_rate
+        };
+        // Shipped: +10 from 75 crosses 80 and pays; -10 pays nothing.
+        assert!(at(85.0, 0.0) - at(75.0, 0.0) > 0.04);
+        assert_eq!(at(65.0, 0.0).to_bits(), at(75.0, 0.0).to_bits());
+        // Symmetric about 81.
+        assert_eq!(OIL_PASSTHROUGH_ANCHOR, 81.0);
+        let up = at(96.0, 1.0) - at(81.0, 1.0);
+        let down = at(66.0, 1.0) - at(81.0, 1.0);
+        assert!((up - 0.15).abs() < 1e-9, "{up}");
+        assert!((up + down).abs() < 1e-9, "{up} {down}");
     }
 }

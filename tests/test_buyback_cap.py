@@ -26,13 +26,19 @@ def prices(model, days=20):
 # Every preset through pt-v19. pt-v20 sets buyback_yield_cap to 0.15 since its graded
 # arm (2026-09-26; validation/pt-v20/programme/ptv20-registration.md),
 # which the test below holds. Was parametrized over every preset.
-@pytest.mark.parametrize("preset", [p for p in tf.preset_names() if p != "pt-v20"])
+# pt-v21 (0.10.0) inherits pt-v20's value, so it leaves this list too.
+@pytest.mark.parametrize("preset", [p for p in tf.preset_names()
+                                    if p not in ("pt-v20", "pt-v21")])
 def test_off_on_every_shipped_preset(preset):
     assert tf.ModelParams.from_preset(preset).to_dict()["buyback_yield_cap"] == 0.0
 
 
 def test_pt_v20_sets_the_graded_arms_value():
     assert tf.ModelParams.from_preset("pt-v20").to_dict()["buyback_yield_cap"] == 0.15
+
+def test_pt_v21_keeps_pt_v20s_value():
+    assert tf.ModelParams.from_preset("pt-v21").to_dict()["buyback_yield_cap"] == 0.15
+
 
 
 def test_a_ceiling_no_name_reaches_changes_nothing():

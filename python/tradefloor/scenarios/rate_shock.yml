@@ -24,7 +24,7 @@
 # For the simulated rate indices this is NOT a parallel curve shift, because
 # neither treasury yield is written. Measured on `Universe.random(20,
 # seed=101, bonds=True)`, median of seeds 3/11/29, each against the same seed
-# without the shock. On pt-v20, the default from 0.8.5: the corporate index
+# without the shock. On pt-v20, the default from 0.8.5 to 0.9.1: the corporate index
 # reprices on the day (IGCORP -12.01% on day 50); the 2-year, which has its
 # own process and closes 5% of its gap to the policy rate each session, moves
 # -0.11% on day 51 and reaches -3.29% by day 120; and the 10-year drifts up

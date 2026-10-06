@@ -119,7 +119,42 @@ pub struct ModelParams {
     /// Baseline daily sigma of the shared market factor. It anchors the
     /// factor's variance process and is the unit the crash amplifier's
     /// threshold is measured in.
+    /// pt-v21 ships 0.007099478.
     pub market_factor_sigma: f64,
+    /// The power of the roster's cap-weighted beta each name's beta is divided
+    /// by when the engine is built: `beta_i / B^d`, with `B = sum(cap_i *
+    /// beta_i) / sum(cap_i)` over the public names at their opening caps. 0.0,
+    /// which every preset through pt-v20 carries, is the beta the instrument
+    /// gave, bit for bit: no sum is taken. 1.0 makes the roster's cap-weighted
+    /// beta exactly one, so the market factor is the systematic part of the
+    /// roster's OWN index, as a real index's constituents' betas measured
+    /// against it average one by definition. Read once, at construction
+    /// (`Engine::with_params_from_opening`); every reader of `stock.beta` then
+    /// sees the normalised value, and a snapshot carries it. A name added later
+    /// (`add_company`) keeps the beta it is given. In [0, 1].
+    ///
+    /// Why. The certification's tail row (`index_tail_dn3_pct`, sessions
+    /// at or below -3 per cent on 40-name random rosters) reads 0.62 to
+    /// 0.67 on R17A against [0.64, 2.34], while the long run's certified
+    /// roster (seed 111) reads the tape's rate (31.5 sessions under -3 per
+    /// cent a decade against 30.1). The two rosters differ in the index's
+    /// systematic exposure: roster 111's cap-weighted beta is 1.06 with
+    /// technology 33 per cent of its cap, a random roster's median is 0.97
+    /// with technology 7 per cent, so the random index's volatility is 15.4
+    /// per cent against roster 111's 17.1 (one year from the opening, 360
+    /// and 60 held-out seeds) and the tape's 18.1. Normalising the beta
+    /// moves the two the opposite ways (15.4 to 15.7, 17.1 to 16.2), and a
+    /// market factor raised to restore roster 111 then lifts every roster's
+    /// systematic variance alike.
+    ///
+    /// Measured (sim/r17-tails, on R17A). At 1.0 with `market_factor_sigma`
+    /// 10 per cent higher, the tail row reads 0.81 and 0.85 over 360
+    /// certification seeds per set (201-400 and 431-590, and the same plus
+    /// 20000) against R17A's 0.58 and 0.56, and roster 111's 21-year
+    /// histories read an index volatility of 19.5 (R17A 18.8, tape 18.1)
+    /// and 8.8 sessions under -5 per cent a decade (7.5, tape 6.2).
+    /// pt-v21 ships 1.0.
+    pub market_beta_normalise: f64,
     /// How much the sector draw's variance follows VIX, on the same
     /// `(VIX / anchor)^2` target the market factor's variance uses
     /// (`factor_vol.rs`). At 0.0 the sector sigma is static, bit-identical by
@@ -238,8 +273,9 @@ pub struct ModelParams {
     /// This form can take real holdings data.
     pub qe_pe_stock_gain: f64,
     /// Multiplier on every name's idiosyncratic GARCH sigma. 1.0 leaves it
-    /// unscaled; shipped presets run 0.51 to 0.84, and pt-v16 onward ship
+    /// unscaled; shipped presets run 0.51 to 0.84, and pt-v16 to pt-v20 ship
     /// 0.5125981926.
+    /// pt-v21 ships 0.52.
     pub idio_sigma_scale: f64,
     /// How strongly a name's idiosyncratic volatility follows its market
     /// beta, as an exponent. 0.0 on every shipped preset, which gives every
@@ -270,11 +306,12 @@ pub struct ModelParams {
     pub idio_sigma_beta_exponent: f64,
     /// Order-flow impact coefficient: the scale of the price move that
     /// injected order flow causes, before `informed_flow_fraction` splits it.
-    /// 50.0 on every shipped preset.
+    /// 50.0 on every preset through pt-v20.
+    /// pt-v21 ships 800.
     pub order_flow_coefficient: f64,
     /// Which participation law the order-flow impact multiplier follows, a
-    /// switch. 0.0, on every shipped preset, is the clamped linear law; 1.0
-    /// is linear up to a knee and a square root above it.
+    /// switch. 0.0, on every preset through pt-v20, is the clamped linear law;
+    /// 1.0 is linear up to a knee and a square root above it.
     ///
     /// At 0.0 the multiplier is `max(0.2, min(participation, 10) * 0.15)`.
     /// At 1.0 it is `0.15 * participation` up to the knee at ten and
@@ -323,9 +360,10 @@ pub struct ModelParams {
     /// `tick(order_flow=...)`, and from an agent's fills on presets where
     /// `fill_impact_coefficient` is 0.0, which is every preset before
     /// pt-v20, so there this dial does change what agents pay.
+    /// pt-v21 ships 1.0.
     pub order_flow_impact_law: f64,
     /// How many times the order-flow impact divides by the name's depth, a
-    /// switch. 0.0, on every shipped preset, divides twice; 1.0 divides
+    /// switch. 0.0, on every preset through pt-v20, divides twice; 1.0 divides
     /// once.
     ///
     /// `order_imbalance` already returns participation, the tick's flow
@@ -363,6 +401,7 @@ pub struct ModelParams {
     /// reaches the channel from `flow_per_tick` and `tick(order_flow=...)`,
     /// and from an agent's fills on presets where `fill_impact_coefficient`
     /// is 0.0, which is every preset before pt-v20.
+    /// pt-v21 ships 1.0.
     pub order_flow_depth_law: f64,
     /// Share of order-flow impact that is permanent (information), from 0 to
     /// 1. 0.35 on every shipped preset.
@@ -598,8 +637,9 @@ pub struct ModelParams {
     /// around the nominal-output path without shifting it. pt-v20 ships
     /// 0.09. Read only with `earnings_cycle_depth` non-zero.
     pub earnings_cycle_upside: f64,
-    /// Half-life in sessions of the pull toward the phase's level, 60 on
-    /// every shipped preset. Read only with `earnings_cycle_depth` non-zero.
+    /// Half-life in sessions of the pull toward the phase's level, 60 on every
+    /// preset through pt-v20. Read only with `earnings_cycle_depth` non-zero.
+    /// pt-v21 ships 150.
     pub earnings_cycle_half_life: f64,
     /// The daily sd of the earnings level's own noise; 0.0 is the phase path
     /// alone and takes no draw. Read only with `earnings_cycle_depth`
@@ -645,6 +685,29 @@ pub struct ModelParams {
     /// (`Engine::published_cycle_phase`), and its snapshot and state hash
     /// carry them only while this is set.
     pub cycle_publication_lag: f64,
+    /// Draws each turn's publication lag instead of using the fixed
+    /// `cycle_publication_lag`. 0.0, which every preset through pt-v20 carries,
+    /// is the fixed lag, under which the published phase is the true phase
+    /// shifted by exactly that many sessions: a clock, since a recession's
+    /// length has an sd of 2.2 months on the US table, so a peak published 252
+    /// sessions late lands a median 1.9 months before the recovery.
+    ///
+    /// At 1.0 each true turn `k`, at close `tau_k`, draws its own lag `L_k`,
+    /// uniform in whole sessions: [84, 252] for a turn into a peak or a
+    /// contraction (the NBER announced peaks 4 to 12 months after them,
+    /// 1980-2020) and [168, 441] for a turn into a trough, a recovery or an
+    /// expansion (troughs 8 to 21 months). It is published at the close
+    /// `pi_k = max(pi_(k-1), tau_k + L_k)`, so announcements stay in order,
+    /// and the published phase is that of the latest turn with `pi_k` at or
+    /// before the close. The draw is stateless and takes nothing from any
+    /// stream: `u_k = splitmix64_mix(key ^ splitmix64_mix(PUBLICATION_TAG <<
+    /// 32 | k))`, the key derived from the root seed
+    /// (`rng::publication_key`), so every other draw is untouched. Turns are
+    /// counted from the opening. `cycle_publication_lag` is not read while
+    /// this is set. The snapshot and the state hash carry the schedule
+    /// (`Engine::cycle_publication`) only while this is set. A switch.
+    /// pt-v21 ships 1.0.
+    pub cycle_publication_lag_draw: f64,
     /// Sessions between the end of a quarter and the publication of its GDP
     /// growth, as the BEA's advance estimate comes about a month after the
     /// quarter. 0.0, on every preset through pt-v19, reports `gdp_growth`
@@ -685,6 +748,203 @@ pub struct ModelParams {
     /// (inflation, confidence, the bank, the cycle's hazards). The snapshot
     /// and the state hash carry the impulse only while this is set.
     pub unemployment_adjustment_half_life: f64,
+    /// The share of unemployment's gap to the natural rate closed at each
+    /// monthly release, a dial. 0.0, on every shipped preset, keeps the
+    /// release's own constant 0.06 and is a branch, so every preset reproduces bit for bit
+    /// and a value of 0.0 is left out of the model's digest.
+    ///
+    /// # Why the shipped pull holds nothing
+    ///
+    /// The release adds the phase's trend, Okun's law on the day's growth
+    /// and a recovery term, and pulls toward the natural rate at 0.06 of
+    /// the gap. On pt-v20, seeds 101-108 over 5,292 sessions, those drivers
+    /// average -0.26 points a month (-0.46 in an expansion, where the
+    /// economy spends 72 per cent of its months), against a pull of 0.06
+    /// times a gap of at most 2 points. So the rate runs to its 2.5 floor
+    /// and stays: on pt-v20, seeds 101-108 over 1,008 sessions, it sits at
+    /// the floor on 78 per cent of days and ends there on 5 of 8 seeds
+    /// (issue #172). FRED UNRATE has never been below 2.5 (1948 to 2026:
+    /// mean 5.65, 10th to 90th percentile 3.7 to 7.8) and spent 2 per cent
+    /// of months at or under 3.0, all of them in 1951 to 1953.
+    ///
+    /// # The natural rate
+    ///
+    /// The pull acts toward `EconomyState::structural_unemployment`, the
+    /// rate the Phillips curve and wage growth already read as the NAIRU:
+    /// 4.0 plus 0.3 times long-term unemployment, so 4.15 after a long
+    /// expansion and up to about 4.6 after a deep recession. The CBO's
+    /// natural rate (FRED NROU) averaged 4.50 over 2015 to 2026 (range 4.40
+    /// to 4.75) and 4.80 over 2000 to 2026. Anchoring to the rate the
+    /// Phillips curve reads, and not to a second constant, means a held
+    /// unemployment rate stops pushing inflation one way. UNRATE's mean of
+    /// 5.65 sits above the NAIRU because recessions raise it quickly and
+    /// expansions bring it down slowly, which the cycle supplies.
+    ///
+    /// # The dial
+    ///
+    /// The release's pull is `k * (natural - unemployment)` a month in
+    /// place of `0.06 * (natural - unemployment)`. A month's share k is a
+    /// half-life of `ln 2 / -ln(1 - k)` months: 0.03 is 23 months, 0.05 is
+    /// 13.5, 0.10 is 6.6. Alone it cannot hold the rate near the natural
+    /// rate without losing its persistence, because the drivers' -0.26 a
+    /// month set the gap at about `-0.26 / k`. Measured on pt-v20, seeds
+    /// 101-108 over 2,520 sessions: at 0.3 alone the rate still sits at the
+    /// floor on 8 per cent of days, with a 12-month autocorrelation of
+    /// 0.22. With `unemployment_okun_coefficient` at 0.5 the drivers average
+    /// about -0.02 a month, and the constant 0.06 already keeps the rate off
+    /// the floor (mean 3.79, 0.37 under the natural rate); 0.10 takes the
+    /// mean to 3.94 and 0.03 lets the floor back on 6 per cent of days. It
+    /// takes no draw.
+    pub unemployment_natural_pull: f64,
+    /// Okun's law at the monthly release, as the annual coefficient it states:
+    /// points of unemployment a year per point of growth below 2 per cent. 0.0,
+    /// on every preset through pt-v20, is the shipped term and is a branch, so
+    /// every preset reproduces bit for bit and a value of 0.0 is left out of
+    /// the model's digest.
+    ///
+    /// # The shipped term
+    ///
+    /// At 0.0 the release adds `(2 - growth) * 0.20` and, in an expansion
+    /// or recovery above 1 per cent growth, `-growth * 0.08`, every month.
+    /// The comment above it says 1 point of growth below trend is about
+    /// 0.5 points of unemployment, which is Okun's law as an annual
+    /// relation. Applied at every monthly release it is 2.4 points a year.
+    /// The recovery term counts the same growth a second time: at 3 per
+    /// cent growth it is -0.24 a month, six times the Okun term at a
+    /// coefficient of 0.5. Together they take an expansion's unemployment
+    /// down 5.5 points a year; UNRATE fell 0.6 a year over 2010 to 2019 and
+    /// 0.5 a year over 1992 to 2000.
+    ///
+    /// # Off zero
+    ///
+    /// The release adds `(2 - growth) * beta / 12` a month and no recovery
+    /// term, in the release and in the impulse
+    /// `unemployment_adjustment_half_life` adjusts. The phase's trend, the
+    /// natural-rate pull and the noise act as before. Okun (1962) put the
+    /// coefficient near 1/3; Ball, Leigh and Loungani (Journal of Money,
+    /// Credit and Banking 49(7), 2017) estimate about 0.4 to 0.5 for the
+    /// US, stable since 1948. 0.5 is the value the shipped comment states.
+    /// A contraction at the model's mean growth of -2.6 per cent then adds
+    /// about 0.28 a month with the phase's trend, a rise near 2 points over
+    /// a nine-month recession; UNRATE rose 1.6 to 2.4 points in 1990-91 and
+    /// 2001 and 5.0 in 2007-09. Measured on pt-v20, seeds 101-108 over
+    /// 2,520 sessions, the largest rise in the 18 months after a
+    /// contraction begins goes from 4.5 points at 0.0 to 1.8 at 0.5 and 3.1
+    /// at 1.0 with `unemployment_natural_rate` 5.0.
+    ///
+    /// The central bank's recession cuts read unemployment's LEVEL (above
+    /// 7, 8 and 10 per cent) and its Taylor rule a fixed 4.0 target. At 0.5
+    /// on the shipped natural rate a recession no longer reaches 7, so the
+    /// policy rate changes 0.6 times a year where it changed 1.9 times, and
+    /// cuts 0.4 points in the year after a contraction begins where it cut
+    /// 1.3. At 1.0 with a natural rate of 5.0 it changes 1.7 times a year
+    /// and cuts 1.2. It takes no draw.
+    /// pt-v21 ships 0.75.
+    pub unemployment_okun_coefficient: f64,
+    /// The natural rate of unemployment with no long-term unemployment,
+    /// percent, a dial. 0.0, on every shipped preset, is the release's own
+    /// constant 4.0 and is a branch, so every preset reproduces bit for bit and a value
+    /// of 0.0 is left out of the model's digest.
+    ///
+    /// The monthly release sets `EconomyState::structural_unemployment` to
+    /// this plus 0.3 times long-term unemployment, the NAIRU the Phillips
+    /// curve, wage growth and the natural-rate pull read. Moving it moves
+    /// unemployment and its NAIRU together, so the Phillips gap is
+    /// unchanged and what moves is everything that reads the level:
+    /// consumer and business confidence, housing volume above 5 per cent,
+    /// participation in a contraction and discretionary fiscal stimulus
+    /// above 7 per cent.
+    ///
+    /// The constant 4.0 gives a NAIRU of 4.15 to about 4.6, which matches
+    /// the CBO's natural rate (FRED NROU) over 2015 to 2026, 4.40 to 4.75.
+    /// Over 1990 to 2026 NROU averaged 4.97 and over 1949 to 2026 5.40,
+    /// and UNRATE averaged 5.65 over both 1948 to 2026 and 1990 to 2026,
+    /// with a 120-month window's mean between 4.62 and 7.12 (10th to 90th
+    /// percentile, 1948 to 2026). A screen that wants the long history and
+    /// not the last decade would set about 4.5 to 5.0. The bank's Taylor
+    /// rule keeps its own 4.0 target, so a higher natural rate is also a
+    /// standing dovish gap: at 5.0 with `unemployment_okun_coefficient` 1.0
+    /// the policy rate averages 0.58 points lower on pt-v20 (seeds 101-108,
+    /// 2,520 sessions). It takes no draw.
+    pub unemployment_natural_rate: f64,
+    /// The daily share of oil inventory's gap to its normal level, 50,
+    /// closed by production and storage, a dial. 0.0, on every preset through
+    /// pt-v20, is a branch, so every preset reproduces bit for bit and a
+    /// value of 0.0 is left out of the model's digest.
+    ///
+    /// # The defect at 0.0
+    ///
+    /// Inventory is a pure integrator of demand against supply plus noise
+    /// (driftless at `oil_supply_response` 1.0), and outside its 40 to 60
+    /// dead zone it pushes the oil price by `0.08` a day per unit, up to
+    /// plus or minus 3.2 a day at its bounds. Oil's own reversion is 0.03 a
+    /// day toward about 81, so a saturated push rests oil at about 190 or
+    /// -25, outside both clamps (issue #170). Nothing returns inventory to
+    /// the dead zone, so a random walk that wanders far enough pins oil at
+    /// a clamp for the rest of the run. On pt-v20, seeds 101-108 over 1,008
+    /// sessions, one seed's inventory reached 100 and its oil sat at the 35
+    /// floor on 44 per cent of days.
+    ///
+    /// # Off zero
+    ///
+    /// Inventory moves by `k * (50 - inventory)` a day beside demand,
+    /// supply and noise, so it is an Ornstein-Uhlenbeck process around the
+    /// middle of the dead zone, with a standard deviation of
+    /// `0.5 / sqrt(2k)` units at `oil_supply_response` 1.0. That gives the
+    /// oil price a stable interior: the push is bounded in distribution
+    /// and oil's own reversion holds the level. In the theory of storage
+    /// (Working, American Economic Review 39(6), 1949; Brennan, AER 48(1),
+    /// 1958) stocks above normal depress the spot price and draw down as
+    /// carry turns costly, and stocks below normal raise it until
+    /// production and imports refill them, so inventory reverts to a
+    /// normal level; Pindyck (Journal of Political Economy 102(2), 1994)
+    /// estimates that adjustment for crude and products. The coefficient is
+    /// not identified by those papers and is a dial: at 0.002 (a half-life
+    /// of 347 sessions) inventory's spread is 7.9 units, and oil's
+    /// multi-year swings come from inventory's slow excursions out of the
+    /// dead zone, as the long-run factor of Schwartz and Smith (Management
+    /// Science 46(7), 2000) does. With `oil_supply_response` at 0.0
+    /// inventory's mean sits at `50 - 0.15 * growth / k`, so the dial is
+    /// meant beside a supply response of 1.0. It takes no draw.
+    /// pt-v21 ships 0.002.
+    pub oil_inventory_reversion: f64,
+    /// Inflation's monthly response to the oil price, the same either side of
+    /// oil's anchor, as a multiple of the 0.01 a dollar the release pays
+    /// above 80.
+    /// 0.0, on every preset through pt-v20, is the
+    /// shipped three-way branch and is a branch, so every preset
+    /// reproduces bit for bit and a value of 0.0 is left out of the
+    /// model's digest.
+    ///
+    /// # The asymmetry at 0.0
+    ///
+    /// The release adds `(oil - 80) * 0.01` above 80, `(oil - 50) * 0.005`
+    /// below 50 and nothing between. Oil opens at 75 and reverts toward
+    /// about 81, so a rise of 10 pays at 0.01 and the matching fall of 10
+    /// pays nothing: for any oil path symmetric about its anchor the term
+    /// has a positive mean, and oil raises inflation while it is itself
+    /// driftless (issue #171). Measured on pt-v20, seeds 101-108 over 1,008
+    /// sessions, the slope of the monthly inflation change on oil's
+    /// distance above 75 is 0.0008 and below 75 -0.0001.
+    ///
+    /// # Off zero
+    ///
+    /// The release adds `0.01 * c * (oil - 81)`, where 81 is the level oil's own
+    /// reversion target takes at the 2 per cent trend growth Okun's law
+    /// pivots on (`OIL_BASELINE + 3 * 2`), so oil at its anchor adds
+    /// nothing and a rise and a fall of equal size add equal and opposite
+    /// amounts. Kilian and Vigfusson (Quantitative Economics 2(3), 2011)
+    /// find no evidence that the US economy responds asymmetrically to oil
+    /// price increases and decreases once the response is estimated
+    /// symmetrically in the shock. At 1.0, the shipped coefficient above
+    /// 80 on both sides, a sustained 10 per cent rise from 81 adds 0.08 a
+    /// month, which the inflation reversion of 0.55 holds at about 0.15
+    /// points of inflation; energy is about 7 per cent of the CPI basket (BLS
+    /// relative importance), and motor fuel, about half of it, moves
+    /// roughly half as much as crude, a direct effect near 0.2 points. It
+    /// takes no draw.
+    /// pt-v21 ships 1.0.
+    pub oil_inflation_passthrough: f64,
     /// Switch that makes the fear/greed index read the business cycle and
     /// GDP growth as published instead of as they are. 0.0, on every preset
     /// through pt-v19, is off; pt-v20 sets 1.0.
@@ -742,11 +1002,13 @@ pub struct ModelParams {
     /// 2-year is its own process, pulled toward the formula at the 10-year's
     /// rate (0.05 a session), with this noise; one more normal on the
     /// economy stream, taken only under the dial.
+    /// pt-v21 ships 0.008.
     pub treasury_2y_noise: f64,
     /// The flight to quality's size: percentage points of 10-year yield per
     /// percent of index return, down with the market when inflation is
     /// under 3 percent and up when it is over 4. 0.02 on every preset
     /// through pt-v19; pt-v20 ships 0.008.
+    /// pt-v21 ships 0.013.
     pub flight_to_quality_gain: f64,
     /// Which return the flight to quality reads, a switch. 0.0, on every
     /// preset through pt-v19, reads the previous session's closing minute;
@@ -767,6 +1029,120 @@ pub struct ModelParams {
     /// the 10-year's move plus the meeting formula's VIX slope on the
     /// session's VIX change; the next meeting re-anchors the level.
     pub corporate_yield_daily: f64,
+    /// THE MARKET'S CYCLE NOWCAST. 0.0, which every preset through pt-v20
+    /// carries, prices the TRUE phase: the earnings anticipation reads `g` of
+    /// the phase the economy is in and the corporate spread its multiplier, so
+    /// every true turn moves `A` by `g_next - g` at the close it happens on
+    /// (about -4.5, -3.3, +4.1 and +4.0 per cent on pt-v20, into peak,
+    /// contraction, trough and recovery) and the first meeting after it
+    /// re-anchors the spread by `base * dm` (111 bp on average, up to 304),
+    /// while the daily VIX term's ratio to 2 bp a point returns the true
+    /// multiplier on any unclamped session: a price-only agent reads the hidden
+    /// phase off one close (r13 audit).
+    ///
+    /// Off zero the market holds a belief `pi` over the five phases, in
+    /// `phase_cycle` order, a forward filter on the engine's own chain
+    /// (exponential sojourns at the mean sojourns
+    /// `earnings_anticipation_terms` already uses, `lambda_j = 1 /
+    /// mean_sojourn_j`). At each close one report names a phase: the phase
+    /// the session ran in with this probability, otherwise one of the other
+    /// four uniformly, from one uniform on `stream::CYCLE_NOWCAST`. The
+    /// filter predicts (`pi'_j = pi_j (1 - lambda_j) + pi_(j-1)
+    /// lambda_(j-1)`), multiplies by `q` on the reported phase and by
+    /// `(1 - q) / 4` elsewhere, and normalises, so no session moves the
+    /// belief's log-odds by more than ln(4q / (1 - q)). The anticipation
+    /// reads `pi . g + c e` in place of `g` of the true phase, and the
+    /// corporate spread prices `pi . m` (see `corporate_spread_cycle`).
+    ///
+    /// The belief opens one-hot on the opening phase (and on a restore from
+    /// a snapshot that carries none), and a pinned phase is public news: the
+    /// pin puts it one-hot on the pinned phase and that session's close takes
+    /// no report, so a driven path that pins the phase prices exactly what it
+    /// priced at 0.0. The belief and its generator are carried in the
+    /// snapshot (`economy.cycle_nowcast`, `cycle_nowcast_rng`) and the state
+    /// hash only while the dial is set. Proposed for pt-v20 at 0.4 (the
+    /// thirteenth registration): the market is 50 per cent sure of a new
+    /// phase about 10 sessions after it starts and 90 per cent after about
+    /// 19. In {0} and (0.2, 1]; 0.2 would be a report that carries nothing.
+    /// pt-v21 ships 0.4.
+    pub cycle_nowcast_accuracy: f64,
+    /// The share of the corporate spread's cycle multiplier replaced by its
+    /// occupancy-weighted mean over the phases (about 1.22 on the US table):
+    /// the market prices `(1 - s) m + s m_bar`, where `m` is the belief's `pi .
+    /// m` under `cycle_nowcast_accuracy` and the true phase's multiplier
+    /// without it. 0.0, which every preset through pt-v20 carries, is the
+    /// multiplier as it stood; 1.0 leaves the spread's widening to the VIX
+    /// alone.
+    ///
+    /// While either this or `cycle_nowcast_accuracy` is set, the meeting
+    /// re-anchors to the priced multiplier, and on a preset with
+    /// `corporate_yield_daily` the daily move carries the meeting formula's
+    /// whole change `S(VIX', m') - S(VIX, m)` (the 50 bp daily cap and the floor
+    /// still apply), so the level is on the formula every session and a
+    /// meeting has nothing to re-anchor. With the nowcast at 0.4, 0.0 here
+    /// leaves the spread's daily sd at 7.7 bp against FRED BAA10Y's 3.1
+    /// (belief moves times the full multiplier); 0.75 gives 3.8. Proposed
+    /// for pt-v20 at 0.75. In [0, 1].
+    /// pt-v21 ships 0.75.
+    pub corporate_spread_cycle: f64,
+    /// The share of the anticipated earnings level's EXPECTED drift the
+    /// valuation leaves out. 0.0, which every preset through pt-v20 carries,
+    /// prices `A - e` as `earnings_anticipation_half_life` defines it:
+    /// `A = c e + g_phase` is the discounted mean of the level's expected path, so its
+    /// expected change is `rho (A - e)` a session (`rho = ln 2 / half-life`), a
+    /// drift the phase alone predicts. On pt-v20 that drift is -2.9 points over
+    /// the 63 sessions after a contraction begins and +4.5 after a recovery
+    /// begins, and the price inherits it as excess return a timing rule can
+    /// harvest (r13 macro-clock audit: 2x while the published phase is peak or
+    /// contraction beat holding in 0.97 of 90 histories).
+    ///
+    /// Off zero the engine keeps `D`: at each close `D <- D * 2^(-1/h_D) +
+    /// share * rho * (A - e)`, with `A - e` as the last refresh left it and
+    /// `h_D` from `earnings_anticipation_drift_half_life`, and the valuation
+    /// reads `(A - e) - D`. The price then moves with the news about `A`
+    /// (the turns, the level's noise) and not with its expected catch-up,
+    /// and `h_D` lets the left-out share return slowly. `D` is zeroed after
+    /// the burn-in. The snapshot and the state hash carry `D` and the last
+    /// `A - e` only while this is set. Read only with
+    /// `earnings_anticipation_half_life` and `earnings_cycle_depth` set.
+    /// In [0, 1].
+    /// pt-v21 ships 0.9.
+    pub earnings_anticipation_drift_share: f64,
+    /// The half-life, in sessions, of `D` under
+    /// `earnings_anticipation_drift_share`. 0.0 is 1260. Read only with the
+    /// share set. In [0, 5040].
+    /// pt-v21 ships 252.
+    pub earnings_anticipation_drift_half_life: f64,
+    /// A risk-management cut: the TRUE growth rate, in per cent a year, below
+    /// which the central bank cuts 25 bp at a meeting when inflation is under
+    /// target plus 1.5 and the rate is above zero. The branch sits after the
+    /// stagflation guard and before the lift-off branch, and moves
+    /// `hawkish_dovish_score` by -0.2. 0.0, which every preset through pt-v20
+    /// carries, is off (a threshold of exactly zero is not offered). The
+    /// ladder's other cut branches read unemployment, which under
+    /// `unemployment_adjustment_half_life` 84 rises over months, so on pt-v20
+    /// the first cut of an easing comes a median 105 sessions after a
+    /// contraction begins, at the trough, and "after the first cut" means "the
+    /// recovery rally"; the Fed's first cut came 0 to 13 months BEFORE the NBER
+    /// peak in 1989, 1990, 2001, 2007 and 2019 (FRED DFEDTAR and DFEDTARU). In
+    /// [-5, 5]. pt-v21 ships 2.
+    pub fed_growth_cut: f64,
+    /// Whether a field a caller pins holds through that night's close. 0.0,
+    /// which every preset through pt-v20 carries, lets the close's own step
+    /// move a pinned field (the VIX's law, the cycle's hazard roll, the
+    /// 10-year's and the 2-year's daily step, a meeting's decision and its
+    /// re-anchoring of the curve) and the next morning's pin write it back, so
+    /// a held field is never the pinned value overnight: a held contraction
+    /// flips to trough at the close about three times in 315 sessions, the
+    /// earnings anticipation re-marks every name about +4 per cent at that
+    /// close and -4 the next morning, and the published phase shows a one-day
+    /// trough a year later. 1.0 holds every field pinned today at its pinned
+    /// value through the close, the meeting included (the corporate yield
+    /// already does under `corporate_yield_daily`); the close's draws are all
+    /// still taken, so the economy stream's schedule does not move. A pin that
+    /// changes the phase starts the new phase's clock, as the model's own
+    /// transition does. A switch. pt-v21 ships 1.0.
+    pub macro_pins_hold: f64,
     /// The share of each idiosyncratic shock that moves the name's fair
     /// value for good instead of its mispricing, in [0, 1]. 0.0, on every
     /// preset through pt-v19, sends the whole shock to the mispricing;
@@ -842,6 +1218,35 @@ pub struct ModelParams {
     /// van den Hoek 2012). The same ceiling applies to the market jump's
     /// permanent share. Read only with `fair_value_market_share` non-zero.
     pub fair_value_market_vol_cap: f64,
+    /// A floor under the market's permanent share above the ceiling
+    /// `fair_value_market_vol_cap` sets: the share of what the ceiling takes
+    /// off that moves fair value for good anyway. 0.0, which every preset
+    /// through pt-v20 carries, is the ceiling as it stood (the share falls as
+    /// `cap / sigma` and the rest reverts on the mispricing half-life); 1.0 is
+    /// no ceiling. Off zero the share above the ceiling is `capped + this *
+    /// (share - capped)`, `capped` the ceiling's share, so even the most
+    /// turbulent market move keeps at least this share of it. It applies
+    /// wherever the ceiling does: the session's ticks, the night and the market
+    /// jump.
+    ///
+    /// Why. With the ceiling alone, a fear regime's market moves are almost
+    /// wholly transient: a crash sits in `s` and comes back on the 60-session
+    /// half-life, so the index rises after a VIX spike on a schedule the VIX
+    /// announces. On the r15 screen's leading arm (R15F, 90 held-out
+    /// histories) the index gained 1.96, 4.81 and 7.61 per cent over its
+    /// unconditional drift 21, 63 and 126 sessions after a one-day VIX rise
+    /// in the history's top 1 per cent, against -1.44, -0.50 and +2.75 (se
+    /// 1.14, 1.47, 1.89) on the S&P 500 and VIX 1990-2025; the C10 rules
+    /// that lever up after such a rise were ahead in 0.69 to 0.72 of the
+    /// histories, where on the tape's 21-year windows they are ahead in 0
+    /// to 0.35. Measured on R15F at 0.5 with
+    /// `fair_value_vix_release_half_life` 504 (box r16g1, held-out seeds):
+    /// +0.41/+1.98/+4.73 per cent, the lever-up rules ahead in 0.61 to 0.64
+    /// of histories, no C10c breach of 384, V1 0.90/0.83 (R15F 0.86/0.82),
+    /// all 40 registered rows in. Read only with `fair_value_market_share`
+    /// and `fair_value_market_vol_cap` non-zero. In [0, 1].
+    /// pt-v21 ships 0.5.
+    pub fair_value_market_excess_share: f64,
     /// Volatility feedback: a discount on every name's fair value while the
     /// VIX is above `fair_value_vix_knee`, `exp(-this * beta * ln(vix /
     /// knee))`, in [0, 1]. 0.0, on every preset through pt-v19, is none;
@@ -877,6 +1282,167 @@ pub struct ModelParams {
     /// without a session of its own. The snapshot and the state hash carry
     /// the exposure only while this and the gain are both set.
     pub fair_value_vix_half_life: f64,
+    /// Half-life, in sessions, at which the volatility feedback's smoothed
+    /// exposure falls back toward a LOWER target: the discount is built at
+    /// `fair_value_vix_half_life` and given back at this. 0.0, which every
+    /// preset through pt-v20 carries, is the one half-life both ways, as it
+    /// stood. Read only with the gain and `fair_value_vix_half_life` set; no
+    /// new state (the exposure the snapshot and the state hash already carry).
+    ///
+    /// Why. At one half-life of 5 sessions the discount is given back as
+    /// fast as the VIX falls, so the index's rise after a VIX spike runs on
+    /// a schedule the published VIX announces: on the r15 screen's leading
+    /// arm (R15F) the discount's give-back alone was worth +2.5 and +3.8
+    /// per cent 63 and 126 sessions after a one-day VIX rise in the
+    /// history's top 1 per cent (desk decomposition, seeds 201-206), where
+    /// the S&P 500's whole excess return after the same events 1990-2025
+    /// was -0.5 and +2.75. A fear premium that outlasts the VIX's own fall,
+    /// as required returns stay high after a crisis while risk appetite
+    /// recovers, gives the same depth with a slower, smaller rebound.
+    /// Measured on R15F at 504 with `fair_value_market_excess_share` 0.5
+    /// (box r16g1, held-out seeds): the give-back's share of the 126-session
+    /// rise goes from +1.98 to -0.04 per cent, the audit's xfb lever rule
+    /// from +0.96 to +0.26 points a year over the exposure-matched position
+    /// (ahead 0.64 to 0.57), and D2's sessions back to the high from 67 to
+    /// 78 (real 126); the driven 2020 fall (F1) is unchanged. In [0, 2520].
+    /// pt-v21 ships 504.
+    pub fair_value_vix_release_half_life: f64,
+    /// A knee on how far a name's own fair-value level `v` may sit below the
+    /// roster's: the depth, in log units below the equal-weighted mean `v` of
+    /// the public, solvent, traded names, past which the close pulls the name's
+    /// level back toward the knee at `fair_value_relative_half_life`. 0.0,
+    /// which every preset through pt-v20 carries, is a branch: no pull, nothing
+    /// read. Off zero, each close adds `(1 - 0.5^(1/h)) (-k - rel)` to the
+    /// level of every name whose `rel = v - mean(v)` is below `-k`, and nothing
+    /// to any other name. It draws nothing and holds no state beyond `v` (which
+    /// the snapshot and the state hash already carry), and it runs only while
+    /// the model carries the levels. The pull moves the fair value, not `s`, so
+    /// the price follows it at the next tick.
+    ///
+    /// Why. `v` is a random walk with no anchor: the permanent share of a
+    /// name's own news, its beta's share of every market move, and its
+    /// earnings surprises all add to it for good, each with its `-dv^2/2`,
+    /// so a high-beta name loses `(beta^2 - 1) sigma_m^2 / 2` a year against
+    /// the market through every turbulent year. Over a century the spread of
+    /// the levels grows without bound: on R16A (seeds 201-208, 100 years) the
+    /// equal-weighted relative level's cross-sectional sd is 1.0 at 21 years,
+    /// 1.5 at 50 and 2.0 at 100, and a name's deepest relative level reaches
+    /// -11. A name that far down, with the market's own trough on top, prints
+    /// at the 0.01 price floor and sits there (the thirteenth grade's
+    /// H1-100y: a name at the floor for 277 sessions). A real company that
+    /// falls that far is restructured, recapitalised or taken over; one that
+    /// is not leaves the index. With a fixed roster the knee stands in for
+    /// that: only the names past the knee are touched, and every other
+    /// name's level is left as it was. Measured on R16A at 4.0 with a
+    /// 63-session half-life (box r17floor1c, 100-year runs on held-out seeds
+    /// 201-212, 20201-20212 and 30201-30236): no name at the floor, where R16A
+    /// has 3,171 name-days at it on 20201-20212; the lowest close of any name
+    /// e^1.88 times the floor or more; H1-100y's other clauses as R16A's. A
+    /// 21-year history reaches the knee in 5 to 7 of 90. In [0, 20].
+    /// pt-v21 ships 4.
+    pub fair_value_relative_knee: f64,
+    /// Half-life, in sessions, of the pull `fair_value_relative_knee` puts on
+    /// a name's fair-value level below the knee. Read only with the knee
+    /// set, and then it must be positive. In [0, 25200].
+    /// pt-v21 ships 63.
+    pub fair_value_relative_half_life: f64,
+    /// How much of a pinned VIX is priced the moment it is published: the share
+    /// of the gap between the smoothed exposure and the pinned VIX's own excess
+    /// that the pin closes. 0.0, which every preset through pt-v20 carries,
+    /// leaves the smoothed exposure the discount reads
+    /// (`EconomyState::vix_feedback`) to the close's pull at
+    /// `fair_value_vix_half_life`, so a VIX a scenario forces is published at
+    /// the open and reaches the price over weeks: under a VIX held at x3.5 for
+    /// 25 sessions the paired index falls a further 22 per cent (log) after the
+    /// published jump, and an agent that reads the VIX front-runs it. Above
+    /// zero the pin moves the exposure this share of the way to the pinned
+    /// VIX's excess in the pin's re-mark and holds it there through that
+    /// session's close, so the discount lands with the published VIX; the pull
+    /// resumes on the first session nobody pins. 1.0 closes the whole gap. 0.8
+    /// gives the real same-day slope: on the 2008 and 2020 replays the index's
+    /// log return on the day's log VIX change, sessions above a VIX of 40,
+    /// reads -0.335 / -0.341 against the S&P 500's -0.345 / -0.307 (1.0 reads
+    /// -0.42 / -0.44, the smoothed exposure alone -0.04 / -0.06). With
+    /// `macro_pins_hold` and `corporate_yield_daily` also on, and no corporate
+    /// level or spread pinned that session, the pin also charges the corporate
+    /// yield the close's own VIX term on the pin's change, which the close
+    /// skips under a VIX pin, so a pinned rise reaches credit as the fall after
+    /// the release does. Read only with the gain and the half-life set. In [0,
+    /// 1]. pt-v21 ships 0.8.
+    pub pinned_vix_feedback: f64,
+    /// How much of a session's market-factor variance a pinned VIX's priced
+    /// move may take (`pinned_vix_feedback`). 0.0, which every preset through
+    /// pt-v20 carries, draws the session's market factor at the state's full
+    /// variance on top of the discount the pin priced, so on a replay that pins
+    /// the real VIX every session the priced move and the draw add and the
+    /// month's volatility counts the VIX twice. Above zero the priced move `J`
+    /// (the discount's change today, at a beta of one) is part of the day's
+    /// variance `v`: the session draws at `v * max(1 - J^2 / v, 1 - share)`, so
+    /// a small priced move leaves the day's total at `v` and a large one keeps
+    /// at least `1 - share` of the draw. Real: above a VIX of 40 the daily log
+    /// VIX change explains 0.61 (2020) to 0.72 (2007-09) of the S&P 500's daily
+    /// variance (corr -0.78 / -0.85, slope -0.31 / -0.35 on the log change).
+    /// Read only with `pinned_vix_feedback` on. In [0, 1]. pt-v21 ships 0.7.
+    pub pinned_vix_variance_share: f64,
+    /// The VIX level from which a PINNED VIX is priced below the knee
+    /// (`pinned_vix_calm_share`). 0.0, which every preset through pt-v20
+    /// carries, is none: a pin is priced only on its excess over
+    /// `fair_value_vix_knee`, so a scenario that forces the VIX from 12 to 30
+    /// moves no price at all. Above zero, with the share set, the target a pin
+    /// moves the smoothed exposure toward (`pinned_vix_feedback`) is the larger
+    /// of the knee's excess `ln(vix / fair_value_vix_knee)` and
+    /// `pinned_vix_calm_share * ln(vix / this)`: a second, shallower line that
+    /// starts at this level. Only a pin reads it; the close's pull on an
+    /// unpinned session still reads the knee alone, since a VIX the market
+    /// itself reached comes with the fall that raised it.
+    ///
+    /// Why. The SF1 row (a forced VIX priced the day it is published)
+    /// read 0.82 on held-out seeds and 0.33 on the thirteenth grade's: on
+    /// every seed whose VIX was under 16 on the day a x2.5 pin landed, the
+    /// pinned VIX stayed under the knee of 40, the paired move was zero and
+    /// the statistic a ratio of noise (11 of 30 held-out seeds 201-230, 15
+    /// of 30 on 20201-20230). The S&P 500 prices a VIX rise below 40 too:
+    /// the index's same-day log return on the log VIX change is -0.110
+    /// (corr -0.73) on sessions closing under 40, -0.05 on one-day spikes
+    /// of 16 per cent or more from under 20 (1990-2025). The real median
+    /// VIX, 17.6 over 1990-2025, is the natural level for the line to start.
+    ///
+    /// Measured on R16A (sim/r17-sf1 screen r17sf1s1, held-out set A
+    /// 201-230/501-530/801-830 and set B, the same plus 20000) with 17.6,
+    /// `pinned_vix_calm_share` 0.2 and `pinned_vix_priced_cap` 1.0: SF1 on
+    /// the graded 12 seeds 1.06 / 1.03 (R16A 0.82 / 0.66), every one of 30
+    /// seeds on set B at 0.86 or more; the driven 2022 P/E per 100 bp of Baa
+    /// -7.1 / -7.2 against the S&P 500's -5.2 (R16A -3.8 / -4.0); the driven
+    /// 2020 sessions back to the high 97.5 / 71 against 126 (R16A 78 / 61).
+    /// Read only with `pinned_vix_feedback` on. In [0, 200].
+    /// pt-v21 ships 17.6.
+    pub pinned_vix_calm_knee: f64,
+    /// The slope of the calm line (`pinned_vix_calm_knee`) as a share of the
+    /// knee's: log exposure per log VIX above the calm knee. 0.0, which every
+    /// preset through pt-v20 carries, is none. At 0.2 with
+    /// `fair_value_vix_discount` 0.35 and `pinned_vix_feedback` 0.8 a pin under
+    /// the knee moves the index 0.056 log points per log point of VIX the day
+    /// it lands, against the S&P 500's 0.05 on one-day spikes from under 20
+    /// (1990-2025); 0.3 and 0.4 take the driven 2022 P/E slope to -8.7 and
+    /// -10.2 (band -10.4 to -2.6). Read only with `pinned_vix_feedback` on and
+    /// the calm knee set. In [0, 1]. pt-v21 ships 0.2.
+    pub pinned_vix_calm_share: f64,
+    /// A switch: a pin never lifts the volatility feedback's exposure past the
+    /// share of its target it prices the day it lands (`pinned_vix_feedback`).
+    /// 0.0, which every preset through pt-v20 carries, is the share-of-the-gap
+    /// step as it stood, so a VIX held at one pinned level closes the rest of
+    /// the gap over the following pinned sessions (80 per cent on the day at
+    /// 0.8, 96 by the next, and so on): a fall an agent reading the published
+    /// VIX can sell ahead of. 1.0 caps the step at `pinned_vix_feedback *
+    /// target`, or at the exposure already standing if that is higher and the
+    /// target higher still, so a held pin prices once and holds; a pin below
+    /// the exposure steps down as before. Without it a pin at 0.8 reads SF1
+    /// near 0.8 even where it prices a large move (0.76 to 0.90 on R16A's seeds
+    /// above the knee), so the row sits a noise's width over its 0.75 floor;
+    /// with it the row reads 1.02 to 1.06 on both held-out sets (screen
+    /// r17sf1s1). Read only with `pinned_vix_feedback` on and below 1.0. In [0,
+    /// 1]. pt-v21 ships 1.0.
+    pub pinned_vix_priced_cap: f64,
     /// A ceiling on the annual buyback yield `buyback_payout_share * eps /
     /// price` that the buyback term compounds over the elapsed years. In
     /// [0, 1], and 0.0 means no ceiling.
@@ -893,6 +1459,1087 @@ pub struct ModelParams {
     /// at this value, so the term's elasticity stays under one. Read only
     /// with `buyback_payout_share` non-zero.
     pub buyback_yield_cap: f64,
+    /// The buyback term as accrued state. A switch: 0.0, which every preset
+    /// through pt-v20 carries, is the term that stood, `exp(b(P_today) *
+    /// elapsed / 252)` with `b = min(buyback_payout_share * eps / P_today,
+    /// buyback_yield_cap)`.
+    ///
+    /// That term reads the yield at today's price and applies it to every
+    /// elapsed year, so `d ln FV / d ln P_today = -b t`: fair value moves
+    /// against the price it anchors, with a gain that grows linearly in the
+    /// elapsed years. On pt-v20 the measured slope is -0.29 by year 10 and
+    /// -0.49 by year 40; once `b t` passes one the close's re-mark stops
+    /// contracting and the price flips each session, and over 100-year runs
+    /// (30 seeds x 40 names) the median name vol goes from 0.23 to 1.70 by
+    /// years 40-50 with the worst name's tick autocorrelation at -1.000.
+    /// Because the elapsed days enter the level, relabelling the calendar
+    /// origin moves prices by up to 1.50 in logs on one seed.
+    ///
+    /// 1.0: each name carries a running log share-count reduction `L`
+    /// (`TickStock::buyback_log_shares`). The close adds
+    /// `min(buyback_payout_share * E * exp(L) / P_close, buyback_yield_cap)
+    /// / 252`, with `E` the earnings the valuation holds (nominal scale and
+    /// fair-value level included), and fair value reads `exp(L)`. `L` is
+    /// fixed within a session, so the elasticity is zero, and it does not
+    /// read the calendar. New listings start at 0; loss-makers and bankrupt
+    /// names do not accrue. The snapshot and the state hash carry `L` only
+    /// while this and `buyback_payout_share` are both set. In {0, 1}.
+    /// pt-v21 ships 1.0.
+    pub buyback_accrual: f64,
+    /// Whether the rate indices (`UST2Y`, `UST10Y`, `IGCORP`) re-mark to the
+    /// curve the close's macro step publishes at that close, beside the
+    /// equities' re-mark (`macro_publication_repricing`), and to a
+    /// `pin_macro`'s curve when it is written. 0.0, which every preset through
+    /// pt-v20 carries, leaves them on the curve they were marked at until the
+    /// next open's repricing, so each index prices each close's curve one
+    /// session late: on pt-v20 its close-to-close return matches
+    /// `carry - D dy + C dy^2 / 2` to 0.000 bp on the PREVIOUS close's curve move and misses
+    /// the same close's by 4.7, 33.6 and 34.9 bp (median), corr(equity index on
+    /// day d, IGCORP on day d) is +0.002 against +0.490 with day d+1, and an
+    /// after-close fill trades at the stale level (r13 audit).
+    ///
+    /// Off zero the close's step is followed by `RateBook::remark_now`: every
+    /// level reprices to the published curve, without carry, and prints
+    /// there. The night's carry still accrues at the next open, at the yield
+    /// marked here. The tape's `repriced` column books the re-mark and the
+    /// open's move for rate rows as it does for equities. A switch.
+    /// pt-v21 ships 1.0.
+    pub rate_close_remark: f64,
+    /// Whether the rate indices mark intraday to the curve the session so far
+    /// implies for tonight's close. 0.0, which every preset through pt-v20
+    /// carries, holds them at the published curve all session, and on pt-v20
+    /// the close's move is then readable from the session (the 10-year's flight
+    /// to quality reads the session return, the corporate yield reads the VIX
+    /// the return moves): with `rate_close_remark` alone a sign-timing agent on
+    /// IGCORP still earns +13.2 per cent a year at 1x net worth.
+    ///
+    /// Off zero, while the market is open, each index marks to the published
+    /// yield plus `E[tonight's yield | the session so far] - E[tonight's
+    /// yield | the open]`, where `E` is the close's own daily step
+    /// (`economy::daily::vix_and_yields`) run with its draws at their means
+    /// and no meeting, and the rest of the session's market move is
+    /// integrated by an eight-point equal-probability rule on the index's
+    /// conditional variance times the share of the intraday variance
+    /// profile still to come. The mark refreshes on a five-minute grid and
+    /// commits nothing: the level and its yield move only at the open, a pin
+    /// and the close, so the close-to-close return is the one-step formula
+    /// on the same close's curve. The two expectations are carried in the
+    /// snapshot and the state hash while this is set. A switch; requires
+    /// `rate_close_remark`.
+    /// pt-v21 ships 1.0.
+    pub rate_intraday_live: f64,
+    /// A market-stress cut at a meeting, in points per step. 0.0, which every
+    /// preset through pt-v20 carries, is the ladder as it stood, which has no
+    /// stress term: on pt-v20 P(a cut within 42 sessions | VIX 30-40) is 0.29
+    /// with P(hike) 0.25, against 0.53 and 0.01 on FRED's target rate over
+    /// 1990-2025 (r13 audit).
+    ///
+    /// Off zero the engine keeps the highest published VIX since the last
+    /// meeting; at a meeting where it is at or over `fed_stress_vix`,
+    /// inflation is under target plus `fed_stress_inflation_gap` and the
+    /// rate is over zero, the bank cuts `min(rate, cut * min(4, 1 +
+    /// floor((level - fed_stress_vix) / 10)))`, replacing any smaller cut or
+    /// any hike the ladder chose (an emergency cut over 0.25), and the
+    /// dovish score moves -0.2. No draw. The level is carried in the
+    /// snapshot and the state hash while this is set. In [0, 1].
+    /// pt-v21 ships 0.1.
+    pub fed_stress_cut: f64,
+    /// The VIX at which `fed_stress_cut` starts. Read only with the cut on.
+    /// In [10, 200].
+    pub fed_stress_vix: f64,
+    /// How far over target inflation may be for `fed_stress_cut` to fire, in
+    /// points. Read only with the cut on. 1.0 as defined; about 80 per cent
+    /// of sim stress days carry inflation of 3 or more, so at 1.0 the gate
+    /// binds and the bank still hikes in stress. In [0, 10].
+    /// pt-v21 ships 2.
+    pub fed_stress_inflation_gap: f64,
+    /// A market-wide scale on each sector's dividend payout
+    /// (`crate::sectors::Sector::dividend_payout`, the share of earnings a
+    /// paying name distributes at its sector's anchor multiple). 0.0, which
+    /// every preset through pt-v20 carries, is no dividend: a branch, no state,
+    /// no draw.
+    ///
+    /// Off zero, a name pays a cash dividend each quarter. Its payout is
+    /// `min(1, this * sector payout)` when its earnings are positive and its
+    /// revenue growth is under `dividend_growth_cutoff`, and 0 otherwise; its
+    /// target yield is that payout times its earnings over its price at
+    /// construction, both public. Ex-dates fall every 63 sessions from a
+    /// per-name phase (a hash of the ticker, no draw); the amount is
+    /// declared 21 sessions before each ex-date by a Lintner partial
+    /// adjustment toward the target yield times an EMA of the name's own
+    /// closes (`dividend_adjustment_speed`, capped by
+    /// `dividend_yield_ceiling`). Fair value accrues the declared amount
+    /// between ex-dates, and at the ex-date open the price drops by the
+    /// amount exactly, so a holder's total return is the price return plus
+    /// the yield. The rule reads the name's own past closes and nothing the
+    /// engine hides. US large caps paid about 1.8 per cent a year over
+    /// 2001-2025 (Damodaran, S&P 500), with dividends smooth against
+    /// earnings (Lintner 1956). The snapshot and the state hash carry the
+    /// per-name state only while this is set. In [0, 2].
+    /// pt-v21 ships 1.2.
+    pub dividend_payout_share: f64,
+    /// Revenue growth at or above which a profitable name pays no dividend.
+    /// 0.30, which every preset carries, is read only with
+    /// `dividend_payout_share` set. In [0, 10].
+    pub dividend_growth_cutoff: f64,
+    /// The dividend's annual Lintner adjustment speed toward its target:
+    /// the declared amount moves `1 - (1 - this)^(1/4)` of the way each
+    /// quarter. 0.4, which every preset carries, is read only with
+    /// `dividend_payout_share` set. It is calibrated to the sd of the
+    /// index's annual dividend growth (5.2 per cent against a real 7.1,
+    /// Shiller 1990-2023), not measured: Lintner fits of the S&P 500's
+    /// dividend give 0.11 to 0.13 a year on earnings and about 0 on the
+    /// price, the rule's input. In (0, 1].
+    pub dividend_adjustment_speed: f64,
+    /// A ceiling on a declared quarterly dividend, as a multiple of the
+    /// name's target yield at the declaring close: the amount is at most
+    /// `this * target yield * close / 4`. A forced cut once the yield has
+    /// doubled, so a collapsed name does not pay tens of per cent a year.
+    /// 2.0, which every preset carries, is read only with
+    /// `dividend_payout_share` set. In [1, 100].
+    pub dividend_yield_ceiling: f64,
+    /// Switch. At 1, a name's buyback share is `max(0, buyback_payout_share -
+    /// its dividend payout)`, so `buyback_payout_share` reads as the TOTAL
+    /// payout and a dividend substitutes for buybacks (Grullon and Michaely
+    /// 2002). 0.0, which every preset through pt-v20 carries, leaves the
+    /// buyback term as it stands; read only with `dividend_payout_share` set. 0
+    /// or 1. pt-v21 ships 1.0.
+    pub dividend_buyback_substitution: f64,
+    /// The night's share of the day's MARKET-factor variance. 0.0, which every
+    /// preset through pt-v20 carries, is no split: the session carries the
+    /// whole day and nothing moves a price between the close and the open
+    /// unless `overnight_variance_ratio` adds a night of its own.
+    ///
+    /// Off zero the day's variance is SPLIT, not added to. At each open
+    /// `Engine::apply_overnight` draws the market factor's night at
+    /// `sqrt(w)` times its conditional daily sigma, and every tick of the
+    /// session draws it at `sqrt(1 - w)` times its usual scale, so the
+    /// night and the session sum to the day the market GJR was fitted to.
+    /// The night's draw joins the GJR's day innovation, so the variance
+    /// process sees the whole day. The split has to stay exact: the GJR's
+    /// persistence is 0.8946 + 0.0844 k^2 at an innovation scale k, and a
+    /// night plus session of 1.17 days (k^2 = 1.17) took the index's
+    /// volatility from 17.4 to 33 per cent in the earnings-gaps prototype.
+    ///
+    /// The night's market draw takes the session's down tilt and lagged
+    /// wire, with the tilt's mean given back and ALL of the mean the lagged
+    /// wire's multiple adds (whatever `market_beta_down_asym_lag_recentre`
+    /// says), but not the crash amplifier: one draw carrying half the day's
+    /// variance crosses the amplifier's threshold far more often than 390
+    /// tick draws do. The session's live lagged-wire condition
+    /// (`market_beta_down_asym_lag_live`) reads the day's factor less the
+    /// night's draw. Both keep the session from following the gap: with the
+    /// night on pt-v20's un-recentred wire and in its live condition, the
+    /// equal-weight session return's slope on the night's was +0.099
+    /// against a real +0.022 (the review of 50dfeed). Under
+    /// `fair_value_market_linear` only its plain loading is permanent, as
+    /// the tick's is. Real large caps carry about 0.46 of the forty names'
+    /// equal-weighted market variance overnight (2015-2025, the mean of the
+    /// names' log returns). Refused beside `overnight_variance_ratio`. In
+    /// [0, 0.9].
+    /// pt-v21 ships 0.55.
+    pub overnight_market_share: f64,
+    /// The night's share of the day's SECTOR and IDIOSYNCRATIC variance, as
+    /// `overnight_market_share` is of the market's: drawn at `sqrt(w)` at the
+    /// open and at `sqrt(1 - w)` through the session. 0.0, which every preset
+    /// through pt-v20 carries, is no split.
+    ///
+    /// The night's own draw joins the name's `random_noise` slot, so the
+    /// name's GJR steps on the whole day, and it moves the name's fair-value
+    /// level at `fair_value_news_share`, as the session's own noise does.
+    /// Real large caps carry a median 0.31 of their idiosyncratic variance
+    /// overnight, event nights included (the forty names 2015-2025, EDGAR
+    /// 8-K Item 2.02 dates). In [0, 0.9].
+    /// pt-v21 ships 0.1.
+    pub overnight_idio_share: f64,
+    /// Degrees of freedom of the night's idiosyncratic draw. 0.0, which every
+    /// preset through pt-v20 carries, is a normal. Off zero, an integer in [3,
+    /// 30]: the draw becomes a unit-variance student t, the normal times
+    /// `sqrt((nu - 2) / chi2_nu)`, the chi-square the sum of `nu` squared
+    /// normals taken on the overnight stream at a site of its own
+    /// (`Site::OvernightIdioChi2`), and only while the dial is set and a split
+    /// is on, so the stream's schedule moves only on a model that reads it.
+    /// Real nights have a kurtosis of about 33 against a session's 4.5 (the
+    /// forty names 2015-2025). pt-v21 ships 4.
+    pub overnight_idio_df: f64,
+    /// The earnings calendar's master switch and the surprise's size, in
+    /// units of the name's current idiosyncratic daily sigma. 0.0, which
+    /// every preset through pt-v20 carries, is no calendar.
+    ///
+    /// Off zero every public company reports once a quarter: on session
+    /// `63 q + o + j`, where `o` is the name's own offset into the quarter,
+    /// drawn once from the forty real names' median offsets (EDGAR 8-K Item
+    /// 2.02 acceptance times, 2015-2025: the reaction session falls a median
+    /// 18 sessions after the quarter's first), and `j` a jitter in [-3, 3]
+    /// drawn each quarter, the session held inside the quarter. The draws are
+    /// keyed on the engine's seed, the company's id and the quarter
+    /// (`rng::stream::EARNINGS`), so the calendar is a function of the run
+    /// and takes no draw from any stream; `Engine.earnings_calendar()` lists
+    /// the dates ahead, as a real calendar does, and nothing about the
+    /// surprise.
+    ///
+    /// The surprise is realised at the reaction session's OPENING PRINT: `x
+    /// = s * sigma * t / sd(t) - (s sigma)^2 / 2`, mean one in level, joins
+    /// the name's fair-value level, and the open prints it. `sigma` is the
+    /// name's NON-MARKET daily sigma: its GJR sigma at its idiosyncratic
+    /// scale and size multiplier and its sector loading on the sector's
+    /// sigma, in quadrature: the part of the name's draws a residual on the
+    /// market reads as idiosyncratic. On the forty-name roster at 3.7, with
+    /// `earnings_session_sigma` 1.9, the reaction session reads 3.45 of the
+    /// name's realised non-event idiosyncratic sd, against a real 3.47
+    /// (held-out seeds 2001-2016). Needs a split (`overnight_idio_share` or
+    /// `overnight_market_share`) so the opening print realises it. Real
+    /// reaction days carry 10.2 times a normal day's idiosyncratic variance
+    /// (bootstrap 7.3 to 12.6) and 76 per cent of it in the night. In [0, 20].
+    /// pt-v21 ships 3.5.
+    pub earnings_surprise_sigma: f64,
+    /// Degrees of freedom of the earnings surprise. 0.0 is a normal; off
+    /// zero an integer in [3, 30], a unit-variance student t. Read only with
+    /// `earnings_surprise_sigma` non-zero.
+    pub earnings_surprise_df: f64,
+    /// The reaction session's own discovery, in the surprise's units: a
+    /// normal part, mean one in level, walked into the name's fair-value
+    /// level one open minute at a time through the reaction session, at the
+    /// intraday volatility profile's weights, so the session trades it in as
+    /// it arrives: no drift, and the first tick carries about 1/390 of it
+    /// (`Engine::walk_earnings_sessions`; the draws keyed on the minute).
+    /// Until the review of 50dfeed it joined fair value in one piece after
+    /// the opening print and printed on the first tick. 0.0 is none. Read
+    /// only with `earnings_surprise_sigma` non-zero. In [0, 20].
+    /// pt-v21 ships 1.9.
+    pub earnings_session_sigma: f64,
+    /// The same on the session after the reaction session, walked in the
+    /// same way: the real day-after idiosyncratic variance is 1.71 times a
+    /// normal day's
+    /// (bootstrap 1.34 to 2.14). 0.0 is none. Read only with
+    /// `earnings_surprise_sigma` non-zero. In [0, 20].
+    /// pt-v21 ships 1.1.
+    pub earnings_followthrough_sigma: f64,
+    /// The reaction session's volume scale: every tick of a name's reaction
+    /// session trades this multiple of what it otherwise would. 0.0, like
+    /// 1.0, is no multiple. Real reaction sessions trade 2.16 times a normal
+    /// session (bootstrap 2.06 to 2.25). Read only with
+    /// `earnings_surprise_sigma` non-zero. In [0, 10].
+    /// pt-v21 ships 1.2.
+    pub earnings_volume_multiple: f64,
+    /// The share of the aggregate earnings cycle's move that a name's fair
+    /// value holds back until its next report. 0.0, which every preset
+    /// carries, is none: the cycle (`earnings_cycle_depth`) reaches every
+    /// name's valuation the session it moves, through the common multiplier.
+    ///
+    /// Off zero, at each close's macro step this share of the change in the
+    /// cycle's level (and its anticipation) is taken out of every traded
+    /// name's fair-value level and kept aside for it, and the name's next
+    /// report gives the whole kept amount back at its opening print, with
+    /// the surprise: the market learns a company's part of the cycle from
+    /// the company's own report. Read only with `earnings_surprise_sigma`
+    /// and `earnings_cycle_depth` non-zero; the amounts kept are carried by
+    /// the snapshot and the state hash only then. In [0, 1].
+    pub earnings_cycle_report_share: f64,
+    /// THE BUSINESS CYCLE IN THE MARKET'S VOLATILITY: the market factor's
+    /// volatility in a contraction or a trough over its volatility in every
+    /// other phase, read on the TRUE phase (`EconomyState::cycle_phase`, not
+    /// the published one). 0.0, which every preset through pt-v20 carries, is
+    /// off: the close takes a branch that reads nothing and moves nothing, and
+    /// the snapshot and state hash do not carry the multiplier.
+    ///
+    /// Off zero the close keeps `l`, the log of a multiplier on the market
+    /// factor's volatility, and moves it toward its phase's value:
+    ///
+    /// ```text
+    /// l*  = ln(k_e)            expansion, peak, recovery
+    ///     = ln(R * k_e)        contraction, trough
+    /// l  <- l + (1 - 2^(-1/h)) * (l* - l)      (h = market_vol_cycle_half_life;
+    ///                                           h = 0, and the first close, set l = l*)
+    /// ```
+    ///
+    /// `k_e` is `market_vol_cycle_expansion`. The level the factor's
+    /// variance baseline is scaled by is multiplied by `exp(2 l)`, and the
+    /// VIX-coupling denominator passed to the factor's close by
+    /// `exp(d l)`; the VIX anchor's slow memory and the anchor level the
+    /// VIX reverts to are scaled by the same `exp(d l)`, so at `d = 1` fear
+    /// is read against the phase's normal level. `d` is
+    /// `market_vol_cycle_relative` while `l >= 0` (a stormier phase than
+    /// normal) and `market_vol_cycle_relative_calm` while `l < 0` (a calmer
+    /// one), and `exp(d l)` is floored at `VIX_STATE_FLOOR / vix_anchor`
+    /// (below). A FORCED close (a VIX a scenario pinned) moves `l` but does
+    /// not apply it: the pinned VIX already carries the phase.
+    ///
+    /// # Why
+    ///
+    /// Real index volatility is countercyclical. S&P 500 daily realised
+    /// volatility on NBER recession months over the rest is 1.66 (1950-2025,
+    /// 23.8 against 14.3 per cent), 1.87 (1928-2025) and 2.24 (1990-2025);
+    /// the VIX's median is 27.5 in a recession against 17.0 outside one
+    /// (the tape's VIX, Yahoo ^VIX, which agrees with FRED VIXCLS, by
+    /// NBER USREC month, 1990-2025). pt-v20 reads 1.27 and 17.2
+    /// against 17.0 on held-out histories: under `vix_level_identity` the
+    /// phase table is not read, and nothing else puts the cycle into the
+    /// market variance, so its bears fall anywhere (35 to 38 per cent,
+    /// by window, overlap a contraction against 7 of 11 post-war S&P
+    /// bears) and its index moves
+    /// like a random walk at its own moments (2.1-2.4 bears a decade against
+    /// 1.45 post-war). Calm expansions with strong drift and bears gathered
+    /// in recessions are what make real bears rarer (Schwert 1989; Hamilton
+    /// and Lin 1996).
+    ///
+    /// # Small multipliers
+    ///
+    /// A multiplier under one scales the VIX's denominator and anchor DOWN
+    /// by `exp(d l)`, while the VIX itself is floored at 10
+    /// (`VIX_STATE_FLOOR`). Unfloored, a multiplier under about 0.5 at a
+    /// power of 1 put the denominator under the VIX's floor: the VIX over
+    /// its denominator ran away and the factor variance went to its 32x
+    /// ceiling, so a quiet phase read as a panic (bear-dynamics review: a
+    /// contraction multiplier of 0.05 at power 1 gave index volatility of
+    /// 64 per cent; an expansion multiplier of 0.05, 65 per cent; and the
+    /// response turned non-monotone below about 0.5). The variance floor
+    /// (`market_vol_floor_multiple`) does NOT bound that, which is what this
+    /// line said until the review. The scale is therefore floored at
+    /// `VIX_STATE_FLOOR / vix_anchor` (about 0.48 on the certified roster),
+    /// which binds only in that region; the shipped candidates' scales are
+    /// 0.8 or more. A small ratio is a quiet contraction, which no tape
+    /// shows.
+    ///
+    /// # The fair-value market-volatility cap
+    ///
+    /// `fair_value_market_vol_cap` (1.5 on pt-v20) splits the market
+    /// factor's move into a permanent fair-value part and a transient one
+    /// once the factor's conditional sigma exceeds the cap times
+    /// `market_factor_sigma` (market/tick.rs, `fair_value_market_vol_cap`).
+    /// It reads the UNSCALED `market_factor_sigma`, not the phase's
+    /// `exp(l)` times it. So a contraction's higher baseline counts as
+    /// fear there and more of a contraction's moves are transient, while at
+    /// `d = 1` the VIX coupling reads fear against the phase's own level.
+    /// On the bear-dynamics review's regrade of the 90 held-out histories
+    /// the mean permanent share in a contraction goes from 0.96 to 0.93
+    /// (arm E75R250d75) and in an expansion from 0.96 to 0.97. Small per
+    /// session, but it is the contraction's sessions that carry the large
+    /// moves, and their transient part reverts: that is a faster recovery
+    /// and more long-horizon mean reversion (V1b, the five-year variance
+    /// ratio, read 0.58-0.60 on the cycle arms against 0.66 unscaled, on
+    /// fresh seeds 2001-2090). `market_vol_cycle_cap_relative` scales the
+    /// ceiling by `exp(p l)` in a stormier phase, so the cap reads fear
+    /// against the phase's normal volatility as the VIX does; at 0.0 the
+    /// ceiling is the unscaled one, as it was.
+    ///
+    /// # Measured settings (bear-dynamics fix, fresh held-out seeds)
+    ///
+    /// On 180 fresh histories (seeds 2001-2180, 21 years, years 2-21, the
+    /// certified roster), pt-v20 with ratio 2.5, expansion 0.8, half-life
+    /// 21, `market_vol_cycle_relative` 0.75, `market_vol_cycle_relative_calm`
+    /// 0 and `market_vol_cycle_cap_relative` 1 reads 1.71 bears a decade
+    /// against 1.94 off, time with the VIX above 30 of 5.88 per cent against
+    /// 6.12 off (floor 4.1), index volatility in a contraction over the rest
+    /// of 1.87 (real 1.87, 1928-2025), the VIX's median in a contraction
+    /// over the rest of 1.46 (real 1.62) and 54 per cent of bears touching
+    /// a contraction (real 64). The first arm recommended (expansion 0.75,
+    /// ratio 2.5, one power of 0.75 on both sides) read 4.02 per cent above
+    /// 30 on seeds 2001-2090 and 2.82 on 2001-2011.
+    ///
+    /// # Measured settings (bearcycle fix, sim/r15-bearcycle)
+    ///
+    /// On top of the r14 screen's N4 arm, with both pin switches on
+    /// (`market_vol_cycle_pin_neutral`, `market_vol_cycle_pin_phase`), a
+    /// contraction multiplier of 2.1 over an expansion of 0.85 (ratio
+    /// 2.47), half-life 10, `market_vol_cycle_relative` 0.75,
+    /// `market_vol_cycle_relative_calm` 0 and `market_vol_cycle_cap_relative`
+    /// 1 read, on the 90 held-out histories (201-230, 501-530, 801-830):
+    /// index volatility in a contraction over the rest 1.98 (real 1.87), the
+    /// VIX's median 1.67 (real 1.62), 50 per cent of 20 per cent bears
+    /// touching a contraction (real 64), and all forty registered rows in
+    /// (box r15bcg1). The half-life and the power matter for the audit's
+    /// timing rules: at 21 sessions and a power of 1 (the r14 screen's
+    /// N4B85), 23 levered turn rules and 12 spread rules beat holding by
+    /// more than a point a year in more than two thirds of histories; at 10
+    /// sessions and a power of 0.75, none (N4: 0 and 2). A calmer expansion
+    /// (0.8) brought 18 turn rules back.
+    ///
+    /// In [0, 5]; 0 is off.
+    /// pt-v21 ships 2.4706 (42/17).
+    pub market_vol_cycle_ratio: f64,
+    /// The market factor's volatility multiplier outside a contraction or a
+    /// trough (`k_e` in `market_vol_cycle_ratio`'s formula). 0.0 derives it
+    /// from the cycle's stationary phase shares, `1 / sqrt(1 - s + R^2 s)`
+    /// with `s` the contraction-and-trough share of days
+    /// (`economy::cycle::stationary_phase_shares_for`), so the share-weighted
+    /// factor variance is unchanged. That form scales the factor alone, which
+    /// is about 72 per cent of the index's variance, and so leaves the
+    /// index's expansion volatility nearly where it was (bear-dynamics
+    /// design: B3 2.17-2.38 on the derived arms), which is why an explicit
+    /// value exists. Unread at `market_vol_cycle_ratio` 0.0. In [0, 2].
+    /// pt-v21 ships 0.82.
+    pub market_vol_cycle_expansion: f64,
+    /// Half-life, in sessions, of the cycle multiplier's move (in logs)
+    /// toward its phase's value. 0.0 is instant. Unread at
+    /// `market_vol_cycle_ratio` 0.0. In [0, 2520].
+    /// pt-v21 ships 10.
+    pub market_vol_cycle_half_life: f64,
+    /// The power of the cycle multiplier by which the VIX-coupling
+    /// denominator, the VIX anchor's slow memory and the anchor level are
+    /// scaled (`d` in `market_vol_cycle_ratio`'s formula). 1.0 reads fear
+    /// against the phase's normal level; 0.0 against the unconditional
+    /// level, where the variance's VIX coupling reads a contraction's higher
+    /// VIX as fear and amplifies the multiplier (sessions under -5 per cent
+    /// 16.6-19.9 a decade against a band ceiling of 12.4 on the design's
+    /// d = 0 arms). Read while the multiplier is at or over one;
+    /// `market_vol_cycle_relative_calm` is the power under one. Unread at
+    /// `market_vol_cycle_ratio` 0.0. In [0, 1].
+    /// pt-v21 ships 0.75.
+    pub market_vol_cycle_relative: f64,
+    /// The power `d` of `market_vol_cycle_ratio`'s formula while the
+    /// multiplier is UNDER one (`l < 0`: an expansion, peak or recovery at
+    /// `market_vol_cycle_expansion` under one). 0.0 reads a calm phase's
+    /// fear against the unconditional level: the VIX anchor and the
+    /// coupling's denominator stay where they are while the variance
+    /// baseline falls.
+    ///
+    /// Why a second power. On the tape the VIX's median in an expansion
+    /// is 17.0 against 17.6 over all sessions (1990-2025): the calm phase's
+    /// normal fear is the unconditional one, while a recession's is 27.5.
+    /// One power on both sides lowered the expansion's anchor with its
+    /// variance (the anchor times `0.75^d`), and the VIX fell with the
+    /// variance it reads: on the bear-dynamics grid the arm E75R250d75's
+    /// expansion VIX median was 14.2 and time above 30 in an expansion 3.0
+    /// per cent (tape 5.2), so B1 (time above 30, floor 4.1) read 4.9 on
+    /// the 90 held-out histories and 2.8 on fresh seeds 2001-2011. At 0.0
+    /// the calm side keeps the coupling's reference too, so the fear loop
+    /// deepens the calm (the variance falls further for a given
+    /// multiplier) while the VIX falls less per unit of variance.
+    /// Unread at `market_vol_cycle_ratio` 0.0. In [0, 1].
+    pub market_vol_cycle_relative_calm: f64,
+    /// The power `p` by which the cycle multiplier scales the ceiling of
+    /// `fair_value_market_vol_cap` while the multiplier is over one: the
+    /// ceiling is `cap * market_factor_sigma * exp(p l)` for `l > 0`, and
+    /// unscaled otherwise. 0.0 leaves it unscaled.
+    ///
+    /// Why. The cap makes the part of the market's moves above a ceiling
+    /// on the factor's sigma transient, as mean reversion in real index
+    /// returns concentrates in turbulent periods. The ceiling is in
+    /// multiples of the UNSCALED sigma, so with the cycle multiplier on, a
+    /// contraction's normal volatility (twice an expansion's on the
+    /// candidate arms) counts as turbulence, and much of a contraction's
+    /// fall reverts: the index recovers faster and its five-year variance
+    /// ratio falls (see `market_vol_cycle_ratio`, # The fair-value
+    /// market-volatility cap). At `p = 1` only volatility above the
+    /// phase's own normal counts. Unread at `market_vol_cycle_ratio` 0.0.
+    /// In [0, 1].
+    /// pt-v21 ships 1.0.
+    pub market_vol_cycle_cap_relative: f64,
+    /// A switch, 0.0 or 1.0: on a session whose VIX a caller pinned
+    /// (`pin_macro(vix=...)`: a replay's path, a scenario's VIX
+    /// transmission) the cycle multiplier is not applied -- the session's
+    /// cap scale, tonight's variance level and coupling denominator and
+    /// the VIX anchor's scale all read a multiplier of one -- and the
+    /// multiplier itself steps toward one at its half-life instead of
+    /// toward its phase's value, so when the pins stop it rises or falls
+    /// from there to where its phase puts it rather than jumping. 0.0,
+    /// every preset through pt-v20, is the multiplier as it was. A forced close
+    /// (`vix_sets_variance`) already did not apply it; this extends the
+    /// rule to every pinned VIX. Unread at `market_vol_cycle_ratio` 0.0.
+    ///
+    /// Why. A pinned VIX is the caller's statement of the market's fear,
+    /// and the variance the model takes from it already carries the state.
+    /// The long run's 2020 replay pins the real VIX of 2020-21 over an
+    /// engine whose own cycle is in an expansion on almost every seed (six
+    /// of six on 201-206 held the expansion through the whole replay but
+    /// one, which the engine does not know is 2020). There an expansion
+    /// multiplier under one scaled the replay's variance by `k_e^2`
+    /// whatever the pinned VIX said: on N4 with the cycle at expansion
+    /// 0.85 the replay's worst month read 59 per cent against 69 without
+    /// it (A1, floor 66.2) and the peak stock correlation 0.70 against
+    /// 0.73 (A3), the multiplier at ln 0.85 on every replay session
+    /// (sim/r14 e2e2d21, r14 screen arm N4B85, seeds 201-230, 501-530,
+    /// 801-830). With the switch the replay reads what it reads without
+    /// the cycle, given the state the burn-in left.
+    /// pt-v21 ships 1.0.
+    pub market_vol_cycle_pin_neutral: f64,
+    /// A switch, 0.0 or 1.0: the rule `market_vol_cycle_pin_neutral`
+    /// states for a pinned VIX, on a session whose cycle PHASE a caller
+    /// pinned (`pin_macro(cycle=...)`: a scenario's `macro.cycle` shock).
+    /// 0.0, every preset through pt-v20, is the multiplier as it was. Unread at
+    /// `market_vol_cycle_ratio` 0.0.
+    ///
+    /// Why. A scenario that pins the phase states the recession and brings
+    /// its own transmission with it -- the packaged recession.yml triples
+    /// the VIX for sixty sessions, widens credit and cuts earnings 35 per
+    /// cent, and its S1a/S2 were tuned on the model without the multiplier
+    /// (fix/ptv20-recession2). Applied on top, the contraction's doubled
+    /// factor volatility over the 315 pinned sessions deepened the fall and
+    /// moved the low later, onto the scenario's turn (median low day 380
+    /// against 294, drawdown -66 per cent against -60, VIX at the low 68
+    /// against 43, seeds 201-212), and the index's level 252 sessions
+    /// after the low is where the recovering earnings put it either way
+    /// (0.70 of the peak against 0.69), so the rise from the deeper low
+    /// read +106 per cent against +72 (S2, band +25 to +80; +102 against
+    /// +64 on 201-230 in the r14 screen).
+    /// pt-v21 ships 1.0.
+    pub market_vol_cycle_pin_phase: f64,
+    /// The share `g` of the contraction's excess, in logs, that the TROUGH
+    /// gives back: the trough's target is `ln(k_e) + (1 - g) ln(R)`. 0.0,
+    /// every preset, is the trough at the contraction's multiplier, as it
+    /// was; 1.0 is the trough at the expansion's. Unread at
+    /// `market_vol_cycle_ratio` 0.0. In [0, 1].
+    ///
+    /// Why. The trough is the cycle turning up, and real volatility falls
+    /// as it does: the VIX and realised volatility peak near the market's
+    /// low, which leads the NBER trough. 2009: the VIX 49.7 at the 9 March
+    /// low, 26.4 at the 30 June trough; 2020: 61.6 at the 23 March low,
+    /// 34.2 at the April trough (Yahoo ^VIX, the long run's tape
+    /// 1990-2025). Held at the contraction's level through the trough, the
+    /// multiplier keeps the storm on while the recovery starts. See
+    /// `market_vol_cycle_release_half_life`.
+    pub market_vol_cycle_trough_release: f64,
+    /// The half-life, in sessions, of the cycle multiplier's move while it
+    /// FALLS toward a lower target (a phase turning up, or a trough under
+    /// `market_vol_cycle_trough_release`). 0.0, every preset, is
+    /// `market_vol_cycle_half_life` both ways, as it was. Unread at
+    /// `market_vol_cycle_ratio` 0.0. In [0, 2520].
+    ///
+    /// Why. Volatility falls fast after a bear's low. At the four VIX-era
+    /// lows (1990-10-11, 2002-10-09, 2009-03-09, 2020-03-23) the VIX read
+    /// 34, 42, 50 and 62, and 63 sessions later 27, 26, 30 and 32 (medians
+    /// of the 21 sessions around); the index's realised volatility over
+    /// sessions 42-63 after the low was 12.5, 21.4, 26.0 and 26.4 per cent
+    /// against 20.8, 30.4, 38.1 and 82.7 over the 21 before (Yahoo ^GSPC
+    /// and ^VIX, the long run's tape). One half-life both ways keeps a
+    /// contraction's multiplier on well into the recovery.
+    pub market_vol_cycle_release_half_life: f64,
+    /// The share `g` of the contraction's excess, in logs, that the index's
+    /// RALLY OFF ITS LOW gives back in a contraction or a trough: the phase's
+    /// target is `ln(k_e) + e (1 - g s) ln(R)`, `e` the phase's own share of
+    /// the excess (1 in a contraction, `1 - market_vol_cycle_trough_release` in
+    /// a trough) and `s` the rally, `min(1, (c - L) /
+    /// market_vol_cycle_recovery_scale)`: `c` the index's log level at the last
+    /// close, `L` its lowest close since its highest of the last 252 sessions
+    /// (the window `fed_drawdown_hold` reads, total public market cap). 0.0,
+    /// every preset through pt-v20, is the multiplier as it was and keeps no
+    /// window. Unread at `market_vol_cycle_ratio` 0.0. In [0, 1].
+    ///
+    /// Why. The release reads the market, not the cycle's phase. Real
+    /// volatility falls as the index climbs off its low, which leads the
+    /// NBER trough (2009: the VIX 49.7 at the 9 March low and 26.4 at the
+    /// 30 June trough; 2020: 61.6 at the 23 March low and 34.2 at the April
+    /// trough, Yahoo ^VIX), and a release keyed to the trough phase is a
+    /// release a rule reading the published phase can time: R19V with
+    /// `market_vol_cycle_trough_release` 1.0 levered the published
+    /// contraction and trough ahead of the constant position in 0.689 of
+    /// 270 pooled held-out histories against C10c's 2/3 (sim/r20 screen).
+    /// pt-v21 ships 0.45.
+    pub market_vol_cycle_recovery_release: f64,
+    /// The rally off the low, in log points of the index, at which
+    /// `market_vol_cycle_recovery_release` is fully given back. Read only with
+    /// that dial set, where it must be in (0, 2]; 0.0 on every preset through
+    /// pt-v20. pt-v21 ships 0.1.
+    pub market_vol_cycle_recovery_scale: f64,
+    /// The published VIX's stress premium: the gain `g` of a premium the QUOTE
+    /// carries over the engine's VIX state while the variance read-back's
+    /// memory is high. 0.0, which every preset through pt-v20 carries, is none:
+    /// `Engine::published_vix` is the state bit for bit and no state is
+    /// written.
+    ///
+    /// The VIX loop damps its state against the anchor's slow memory
+    /// (`vix_anchor_memory`, `vix_anchor_weight`), which the loop needs for
+    /// stability and which costs the quote its stress level: on pt-v20's
+    /// held-out histories the median VIX over trailing 21-session realised
+    /// volatility, on sessions whose realised volatility is 40 or more,
+    /// reads 0.668 against the S&P 500 and ^VIX tape's 0.831 (1990-2025,
+    /// calendar-year bootstrap SE 0.045), and the time above 50 is 0.41 per
+    /// cent against 0.84. Off zero, the close keeps a memory `m` of the
+    /// read-back's log deviation from the anchor's centre at
+    /// `vix_anchor_memory`'s rate (in a free run it equals the anchor's own
+    /// memory; a session whose VIX is pinned sets it to 0.0), and the
+    /// published quote is `min(vix * exp(pi), vix_ceiling)` with
+    /// `pi = cap * (1 - exp(-g * max(0, m - knee) / cap))`.
+    ///
+    /// The quote feeds nothing back: every internal reader of the VIX (the
+    /// variance couplings, the fair-value discount, the book, rates, the
+    /// central bank, fear and greed, the crisis thresholds, the anchor
+    /// memory) reads the state, so with the premium on every price and
+    /// every other macro series is the one the premium-off run gives.
+    /// `state_snapshot()["economy"]["vix"]` is the state. Requires
+    /// `vix_level_identity` and `vix_anchor_memory`. In [0, 10].
+    /// pt-v21 ships 3.
+    pub vix_stress_premium: f64,
+    /// Where the stress premium starts, on the anchor memory's log scale
+    /// (0.0 is the anchor's centre). Read only with `vix_stress_premium`
+    /// non-zero. In [0, 3]: at or above zero, so a pinned session, whose
+    /// memory is 0.0, publishes the pin.
+    /// pt-v21 ships 0.6.
+    pub vix_stress_premium_knee: f64,
+    /// The most the published quote can exceed the state, in log units:
+    /// the premium approaches this and never passes it. Must be positive
+    /// with `vix_stress_premium` non-zero, and is read by nothing
+    /// otherwise. In [0, 1].
+    /// pt-v21 ships 0.35.
+    pub vix_stress_premium_cap: f64,
+    /// The Fed put: percentage points of policy-rate cut per unit of the
+    /// index's log fall since the last meeting. 0.0, which every preset through
+    /// pt-v20 carries, is off: no state is written, the Taylor ladder decides
+    /// every meeting and the curve reads the policy rate as it stands.
+    ///
+    /// The ladder has no financial-conditions term, so pt-v20 does not ease
+    /// into a sell-off and hikes into one as often as it cuts: on held-out
+    /// histories (seeds 201-230, 21 years) the policy rate moves -0.03pp
+    /// over the 63 sessions after a VIX close at or above 30 (inflation
+    /// under 4, rate at least 0.5), against -0.41 (calendar-year bootstrap
+    /// SE 0.14) on the S&P 500 and VIX tape with FRED DFF, 1990-2025, and
+    /// 52 per cent of its rate changes at a VIX close of 30 or more with
+    /// inflation under 4 are hikes (n 108), against none of the 9 FOMC
+    /// target changes on the same filter (FRED DFEDTAR and DFEDTARU; none of
+    /// the 14 at a VIX of 30 or more at any inflation, the other 5 cuts
+    /// coming at CPI 4.1 to 6.2). Cieslak and Vissing-Jorgensen (2021, RFS)
+    /// find about 30bp of cut per 10 per cent intermeeting fall, a gain of
+    /// about 3. At 5, the value screened for pt-v20, with the threshold at
+    /// 0.0, any intermeeting fall of 2.5 per cent or more rounds to a
+    /// quarter-point cut: rate changes double (4.9 a year against 2.35
+    /// without the put and 3.0 real) and the mean policy rate falls from
+    /// about 2.6 to 1.9, against 2.88 real (review, held-out seeds 801-830).
+    ///
+    /// Off zero, each close adds the log change of total public market cap
+    /// to `EconomyState::intermeeting_return`. At a meeting with inflation
+    /// under 4 the put asks for `E = gain * max(0, -I - fed_put_threshold)`,
+    /// rounded to a quarter point and no more than the rate; that cut
+    /// replaces the ladder's decision when the ladder would cut less, hike
+    /// or hold, and a VIX at or above 30 holds any hike. What the put takes
+    /// off the ladder's path is owed (`EconomyState::fed_put_owed`), the
+    /// Taylor rate the ladder reads is lowered by it, and it is given back a
+    /// quarter point at a calm meeting (VIX under 30, no put cut, the ladder
+    /// not cutting) once the put's own decaying stock (`EconomyState::fed_put`,
+    /// half-life `fed_put_half_life`) is an eighth of a point under it. The
+    /// intermeeting return restarts at every meeting. The put's arithmetic
+    /// takes no draw and leaves the meeting's draw table as it stands; the
+    /// rate path it moves can change which of the economy's state-dependent
+    /// draw sites fire later, as any macro dial's does, and a meeting
+    /// `fed_put_emergency_vix` calls takes a meeting's draws. The snapshot
+    /// and the state hash carry the four fields only while this is non-zero.
+    /// In [0, 10].
+    /// pt-v21 ships 3.
+    pub fed_put_gain: f64,
+    /// The intermeeting log fall the Fed put ignores. 0.0 is none; 0.05
+    /// lets a five per cent fall pass. Read only with `fed_put_gain`
+    /// non-zero. In [0, 0.2].
+    pub fed_put_threshold: f64,
+    /// Half-life, in sessions, of the Fed put's stock (`EconomyState::fed_put`),
+    /// which sets how long a put cut stays in before the calm meetings give
+    /// it back. Must be positive with `fed_put_gain` non-zero; read by
+    /// nothing otherwise. In [0, 504].
+    /// pt-v21 ships 126.
+    pub fed_put_half_life: f64,
+    /// A VIX close at or above which the bank meets between meetings, as it
+    /// did on 2001-01-03, 2001-09-17, 2008-01-22, 2008-10-08 and in March
+    /// 2020: with inflation under 4, a policy rate above zero, at least 21
+    /// sessions since the last meeting and the next one not yet due, the
+    /// next meeting is brought forward to tonight. 0.0 is never. Read only
+    /// with `fed_put_gain` non-zero. In [0, 90]; a level under about 25 calls
+    /// a meeting every 21 sessions in an ordinary market.
+    ///
+    /// The meeting it calls is an ordinary meeting, with two costs. It
+    /// takes a meeting's draws from the economy stream (the announcement
+    /// variant and the next meeting's date) on a session the calendar would
+    /// not, so from the first one on an arm with this set no longer shares
+    /// the control's economy draws. And it re-anchors the corporate yield
+    /// to the meeting's formula at the session's VIX: on the prototype
+    /// screened for the design (box bhf1, held-out seeds 201-230), meetings
+    /// called at a VIX of 40 widened the spread by 2.3 to 3.75 points at
+    /// once, and the 10th percentile of each history's worst session went
+    /// from -12.3 to -14.7 per cent. 0.0 avoids both.
+    /// pt-v21 ships 50.
+    pub fed_put_emergency_vix: f64,
+    /// The share of the Fed put's expected cut the curve prices before the
+    /// meeting. 0.0 prices none, so the 10-year and 2-year move only when the
+    /// cut lands. Off zero the daily anchor of the 10-year reads the policy
+    /// rate minus this share of `E` (no more than the rate), and the
+    /// meeting's surprise on the 10-year is the rate change plus the same
+    /// share of `E`, so a priced cut is not news on the day. Read only with
+    /// `fed_put_gain` non-zero. In [0, 1].
+    /// pt-v21 ships 1.0.
+    pub treasury_put_pricing: f64,
+    /// The Treasury haven: percentage points off the 10-year's term premium per
+    /// VIX point above 20, while inflation is under 4, in the daily anchor and
+    /// in the meeting's 10-year target. 0.0, which every preset through pt-v20
+    /// carries, is none.
+    ///
+    /// In 63-session windows with the index down more than 10 per cent and
+    /// inflation under 4, the 10-year falls 0.62pp on FRED DGS10 against the
+    /// tape, 1990-2025 (SE 0.11), and 0.00 on pt-v20's held-out histories;
+    /// the monthly correlation of the index with the 10-year's fall, in
+    /// months starting with inflation under 3, is -0.19 real (SE 0.08) and
+    /// +0.02 on pt-v20 (Connolly, Stivers and Sun 2005; Baele, Bekaert and
+    /// Inghelbrecht 2010; Campbell, Sunderam and Viceira 2017). No draw.
+    /// No state. In [0, 0.05].
+    ///
+    /// Fit it with `flight_to_quality_gain`. That dial moves the 10-year by
+    /// an increment on the session's return, which the anchor's 5 per cent
+    /// daily pull erases in about 60 sessions, so it sets the daily
+    /// stock-bond correlation and barely moves the 63-session one; this
+    /// moves the anchor, so it lasts while the VIX stays up. Both make the
+    /// monthly correlation more negative at low inflation, and the flight
+    /// to quality does more of it. With the put at 5 (box bhf1, held-out
+    /// seeds 201-230), the correlation in months starting with inflation
+    /// under 3 read -0.20 with this at 0.0, -0.24 at 0.015, and -0.32 at
+    /// 0.015 with the flight to quality raised from pt-v20's 0.008 to
+    /// 0.016, against -0.19 real and a proposed band of [-0.35, -0.02]; on
+    /// seeds 501-530 (box bhf2) 0.010 read -0.21 against 0.015's -0.22,
+    /// both at 0.008. So at a flight to quality of 0.016 take this to 0.010,
+    /// and at 0.020 or more to 0.0 to 0.010; neither pair has been run.
+    /// pt-v21 ships 0.014.
+    pub treasury_haven_gain: f64,
+    /// Sessions after a stressed close in which the bank does not raise the
+    /// policy rate. 0.0, which every preset through pt-v20 carries, is off: no
+    /// state, and the ladder, the stress cut and the put decide as they stood.
+    ///
+    /// With the stress cut and the put on (r14's N4 arm, held-out seeds
+    /// 201-230, 501-530 and 801-830), 0.19 of the sessions with a published
+    /// VIX of 30 or more are followed by a hike within 42 sessions, against
+    /// 0.07 on FRED's target rate (DFEDTAR and DFEDTARU against VIXCLS,
+    /// 1990-2025) and about 0.01 with CPI under 4: the hikes are lift-off
+    /// from zero and the put giving its cut back at the first calm meeting,
+    /// a median 26 on the state VIX, weeks after the stress. The shortest
+    /// real wait from a VIX of 30 to the next hike at CPI under 4 was about
+    /// 30 sessions (February to March 2018); after 1998, 2002, 2011 and 2015
+    /// it was four months to four years.
+    ///
+    /// Off zero the engine counts the sessions since the last close whose
+    /// published VIX was at or over `fed_stress_vix`. At a meeting within
+    /// this many sessions of it, with inflation under target plus
+    /// `fed_stress_inflation_gap`, a rise the ladder chose is held (the
+    /// dovish score does not move) and the put gives nothing back. A cut
+    /// stands. No draw. The count is carried in the snapshot and the state
+    /// hash while this is set. In [0, 504].
+    ///
+    /// Measured (box r15pcfin, arm PC1: N4 with this at 42,
+    /// `fed_stress_cut` 0.10, `fed_put_gain` 4 and the priced path at
+    /// `treasury_path_pricing` 1, half-life 63, damping 0.5; held-out seeds
+    /// 201-230, 501-530 and 801-830): P(hike within 42 | VIX 30+) 0.011
+    /// against N4's 0.19, P(cut within 42 | VIX 40+) 0.49 against 0.38,
+    /// and the 63-session policy change after a VIX of 30, -0.56 against
+    /// -0.69 (-0.41 real).
+    /// pt-v21 ships 42.
+    pub fed_stress_hold: f64,
+    /// The share of the policy path it expects that the curve prices: the
+    /// 10-year's daily anchor and the meeting's 10-year target, and the
+    /// 2-year's formula, read the policy rate plus this times the market's
+    /// forecast of the rate's further change, `M`. 0.0, which every preset
+    /// through pt-v20 carries, is off: no state, and the curve reads the rate
+    /// as it stands.
+    ///
+    /// The curve and the corporate yield read the rate as it stands, and
+    /// the ladder's rate changes are serially correlated, so the rate's
+    /// next moves are forecastable from its last ones and the discount rate
+    /// every fair value reads keeps moving after a decision in a direction
+    /// known the day it is published. On r14's N4 arm (held-out seeds
+    /// 201-230), a cut that follows a cut is followed by a further -0.16pp
+    /// by 63 sessions and -0.36 by 126, and the corporate yield falls a
+    /// further 0.18pp by 63 sessions and 0.30 by 126 after a cut, which is
+    /// the index's excess drift after a cut (+0.46 and +1.08 per cent).
+    ///
+    /// Off zero `M` is the sum of the policy rate's past changes, each
+    /// decayed at `treasury_path_half_life` sessions: the market's forecast
+    /// that a cycle continues. The Fed put's own cut and give-back are left
+    /// out (a change counts with the change in `fed_put_owed` added back),
+    /// since what the put takes is given back. At a meeting the rate change moves `M` by its own
+    /// size, and the 10-year's surprise is the change in the rate plus this
+    /// times the change in `M`, so the expected path is priced the day it is
+    /// published and not in the weeks after. No draw. `M` is carried in the
+    /// snapshot and the state hash while this is set. In [0, 3]; needs
+    /// `treasury_path_half_life`.
+    /// pt-v21 ships 1.0.
+    pub treasury_path_pricing: f64,
+    /// The half-life, in sessions, of each policy change's weight in the
+    /// market's forecast `M` (`treasury_path_pricing`). Read only with the
+    /// pricing on, which needs it above 0. In [0, 504].
+    /// pt-v21 ships 63.
+    pub treasury_path_half_life: f64,
+    /// The share of the ladder's rate's distance from a neutral 2.5 per cent
+    /// that the 10-year's anchor and the meeting's 10-year target leave out:
+    /// the rate the ladder sets (the policy rate plus what the Fed put owes)
+    /// plus the priced path is pulled toward neutral, and the put's own overlay
+    /// (its cut, and what the curve prices of it) passes through whole. 0.0,
+    /// which every preset through pt-v20 carries, is off: the 10-year reads the
+    /// policy rate one for one, and a meeting's surprise moves it by the whole
+    /// change. The 2-year's formula reads the rate undamped.
+    ///
+    /// With `treasury_path_pricing` on, a change moves the 10-year by
+    /// `(1 - d)(1 + k)` of itself on the day, so this keeps the day's move
+    /// what it was while the forecast takes the drift out of the weeks
+    /// after. No draw, no state. In [0, 0.9].
+    ///
+    /// Measured with the pricing at 1 and half-life 63 (box r15pcfin, arm
+    /// PC1, as under `fed_stress_hold`): the index's excess after a cut is
+    /// +0.44 per cent by 63 sessions and +0.97 by 126 against N4's +0.55 and
+    /// +1.23 (SE 0.15 at 63); C10c 21 of 384 rules against 27; in
+    /// tf.evaluate, fedcut63 over a constant 1.35x a median +0.26 pts/yr,
+    /// ahead 12 of 20. The pricing alone at 1 took the drift to +0.05 by 63
+    /// sessions but doubled the 10-year's move in months with a rate change
+    /// (monthly sd 0.60 against 0.35) and took the monthly stock-bond
+    /// correlation at inflation under 3 from -0.20 to -0.01; this keeps the
+    /// day's move and the correlation (-0.26) where they were.
+    /// pt-v21 ships 0.5.
+    pub treasury_policy_damping: f64,
+    /// How much of the next meeting's expected policy change the curve prices
+    /// before the meeting. 0.0, which every preset through pt-v20 carries, is
+    /// off: no state, and the curve learns a decision on the day it is
+    /// published.
+    ///
+    /// On pt-v20 the curve and the corporate yield move with a decision on
+    /// the day it is published (the 10-year by the whole change on R16A, a
+    /// 30 bp hike taking the index down 1.1 per cent that session), and the
+    /// priced path's forecast then decays until the next meeting, so the
+    /// yields drift down and the index up in the weeks after a hike: on
+    /// R16A's thirteenth grade, 2x the index for 21 sessions after a
+    /// published rise in the policy rate beat the exposure-matched position
+    /// in 0.68 of the 90 exam histories (C10c, limit 2/3). On the S&P 500
+    /// and FRED's target rate 1990-2025 the 2-year rises about 0.46 points
+    /// over the 63 sessions before a hike and 0.01 on the day, the 10-year
+    /// and Baa do not move on the day, and the index's excess return over
+    /// the 21 sessions after a hike is -0.5 per cent (se 0.5).
+    ///
+    /// Off zero, at each close the engine takes the change the next meeting
+    /// would make if it were held tonight on the published economy (the
+    /// published phase, growth and VIX; inflation, unemployment and the rate
+    /// as they stand), a shadow meeting on a silent draw source that takes
+    /// no draw from any stream, and the curve prices `a` times it times the
+    /// fraction of the meeting interval already elapsed: `P = a w S`.
+    /// The 10-year's anchor and the 2-year's formula read the rate plus `P`
+    /// (damped as the priced path is, under `treasury_policy_damping`), and
+    /// the close moves the 10-year, the 2-year and the corporate yield by
+    /// the change in what they price, so a decision the market saw coming
+    /// is in the curve before the meeting and the meeting moves it by the
+    /// surprise alone. A cut is priced at `policy_anticipation_cut_share`
+    /// times that. Above 1 the curve prices more than the next meeting:
+    /// the ladder's changes come in runs, so 2 prices the next two meetings
+    /// as if the second repeated the first (the 2-year rose 0.46 points
+    /// before real hikes that averaged 0.33). `P` is carried in the snapshot
+    /// and the state hash while this is set. In [0, 3].
+    ///
+    /// Measured on R16A with this at 2 and `treasury_haven_gain` taken from
+    /// 0.015 to 0.010 (boxes c10c1 to c10c3; held-out sets A, 201-230,
+    /// 501-530 and 801-830, and B, the same plus 20000; 90 histories each):
+    /// the index's excess on a hike's day -0.04 per cent on both sets
+    /// against R16A's -1.08 and -1.06, and -0.12 and -0.07 by 21 sessions
+    /// (R16A -0.75 and -0.70, so +0.33 and +0.36 of rebound after the day);
+    /// the 2-year +0.59 points over the 63 sessions before a hike and -0.09
+    /// on the day (set A). The rule 2x for 21 sessions after a published
+    /// rise reads -0.19/0.41 and -0.16/0.44 (median/ahead) against R16A's
+    /// +0.36/0.62 and +0.41/0.64; C10c breaches 0 and 0 against 0 and 3.
+    /// The haven cut keeps H5 (-0.318 and -0.317, floor -0.35) where R16A
+    /// had it: at 2 with the haven at 0.015 it read -0.336 and -0.333.
+    /// pt-v21 ships 1.8.
+    pub policy_anticipation: f64,
+    /// The share of `policy_anticipation` a shadow meeting's cut is priced
+    /// at: 0.0 prices rises only, 1.0 cuts as rises. Read only with
+    /// `policy_anticipation` set. The priced put (`treasury_put_pricing`)
+    /// and the priced path already price the put's cut and a cycle's next
+    /// cut, and a stress cut is news, so the rises are priced first.
+    /// In [0, 1].
+    pub policy_anticipation_cut_share: f64,
+    /// The share of the VIX slope taken out of the corporate spread's formula,
+    /// `(1 + 0.02 (1 - cut) (VIX - 12) + ...) * multiplier`, in the meeting's
+    /// re-anchor, the close's daily move and a pinned VIX's credit leg. 0.0,
+    /// which every preset through pt-v20 carries, is the slope that stood.
+    ///
+    /// The VIX reverts within days of a sell-off while the index stays down,
+    /// so a spread that is the VIX's formula widens with the session and
+    /// then narrows back through the month. On the r14 screen's N4 arm
+    /// (sim/r14 e2e2d21, ten held-out histories of 3000 sessions) 76 per
+    /// cent of the same-close covariance between the index and minus the
+    /// corporate yield's change is reversed over the next 20 sessions and
+    /// the spread change's variance ratio at 21 sessions is 0.55; on the
+    /// screen's 90 histories the spread's daily sd is 4.4 bp against 3.1 on
+    /// FRED BAA10Y (1990-2026), and the daily stock-IG correlation on held
+    /// closes reads 0.43 and the monthly 0.15, against +0.27 and +0.47 for
+    /// SPY and LQD, 2015-2025. See
+    /// `corporate_spread_equity_gain`, which puts the credit's link to the
+    /// index on the index itself. No draw. No state. In [0, 1].
+    /// pt-v21 ships 1.0.
+    pub corporate_spread_vix_cut: f64,
+    /// Credit's leverage term: percentage points of corporate spread, times the
+    /// cycle's spread multiplier, per unit of the index's log fall below its
+    /// own slow average (`EconomyState::spread_equity_gap`, half-life
+    /// `corporate_spread_equity_half_life`). 0.0, which every preset through
+    /// pt-v20 carries, is off: no state is written and the spread is the VIX's
+    /// formula.
+    ///
+    /// In a structural model of default (Merton 1974; Collin-Dufresne,
+    /// Goldstein and Martin 2001) the spread widens as the firm's equity
+    /// falls against its debt and stays wide until the equity recovers or
+    /// the firm re-levers, so the credit move made on a down day is not
+    /// given back when the VIX reverts. Off zero, each close steps
+    /// `D = 0.5^(1/H) (D - ln(1 + r))` on the session's index return `r`
+    /// (from the last close, the quantity the flight to quality reads), and
+    /// the formula's base gains `gain * D`: in the close's daily move
+    /// (`corporate_yield_daily`), in the meeting's re-anchor and in the
+    /// rate indices' live projection of the close. A VIX pin does not stop
+    /// it; a pinned corporate yield or spread does, as it stops the VIX
+    /// term. No draw. The snapshot and the state hash carry the gap only
+    /// while this is non-zero.
+    ///
+    /// Measured on the r14 screen's N4 arm with `corporate_spread_vix_cut`
+    /// 1.0, this at 2.0, `corporate_spread_equity_half_life` 126 and
+    /// `treasury_10y_noise` 0.025 (box r15bondcorr3, held-out seeds
+    /// 201-230, 501-530 and 801-830): the daily stock-IG correlation on held
+    /// closes reads 0.378 (N4 0.434), the monthly 0.279 (N4 0.151), graded
+    /// row R4 on the last print +0.165 (N4 +0.181), the spread's daily sd
+    /// 3.0 bp (N4 4.3) and the share of the same-close covariance reversed
+    /// within 20 sessions 0.29 (N4 0.71); all 40 registered rows pass. The
+    /// held close still reads about 0.21 above the last print, because the
+    /// close's re-mark carries the corporate yield's change into the
+    /// equities, and most of that change on a meeting day is the 10-year's
+    /// jump (27 bp sd on meeting sessions against 4 bp on the rest). In
+    /// [0, 10].
+    /// pt-v21 ships 1.8.
+    pub corporate_spread_equity_gain: f64,
+    /// Half-life, in sessions, of the index's slow average that
+    /// `corporate_spread_equity_gain` measures the fall against: how long a
+    /// spread widened by a fall stays wide while the index stays down. Must
+    /// be positive with the gain set; read by nothing otherwise. In [0, 1260].
+    /// pt-v21 ships 126.
+    pub corporate_spread_equity_half_life: f64,
+    /// Monthly cycle hazard added per unit of the index's log fall below its
+    /// slow average beyond `cycle_equity_hazard_knee`, in an expansion and at a
+    /// peak (`adjust_transition_probability`, economy/cycle.rs). The fall is
+    /// `EconomyState::spread_equity_gap`, credit's leverage gap, at
+    /// `corporate_spread_equity_half_life`; with this set the gap runs even
+    /// when `corporate_spread_equity_gain` is 0.0. 0.0, which every preset
+    /// through pt-v20 carries, adds nothing and leaves the gap unrun unless the
+    /// credit gain runs it. In [0, 20].
+    ///
+    /// Why. A bear market that begins in an expansion raises the chance the
+    /// expansion ends: the wealth effect and tighter financial conditions,
+    /// and the index's standing as a leading indicator (Estrella and
+    /// Mishkin 1998; the Conference Board's leading index carries the
+    /// S&P 500). The engine's cycle read no market at all, so its 20 per
+    /// cent bears fell in an expansion as often as in a recession: 0.48 of
+    /// them have a true contraction between the peak and the trough plus 63
+    /// sessions on R17T (620 bears over 180 held-out histories, sets A and
+    /// B), against 7 of 11 post-war S&P 500 bears (0.64); 0.89 bears a
+    /// decade fall outside a recession against the tape's 0.53.
+    /// pt-v21 ships 5.
+    pub cycle_equity_hazard: f64,
+    /// The index's log fall below its slow average (the gap
+    /// `cycle_equity_hazard` reads) under which that dial adds nothing. Read
+    /// only with `cycle_equity_hazard` set. In [0, 1].
+    /// pt-v21 ships 0.1.
+    pub cycle_equity_hazard_knee: f64,
+    /// Monthly hazard added in an expansion and at a peak where the economy
+    /// runs without a market: the stationary opening's law
+    /// (`cycle_stationary_opening`) and the macro burn-in
+    /// (`macro_burn_in_days`). Neither has an index, so `cycle_equity_hazard`
+    /// adds nothing there, and the phase the run opens in is drawn from a cycle
+    /// whose expansions last longer than the run's. This stands in for the
+    /// market's hazard: set it so the phase a run opens in has the run's own
+    /// phase shares. That is below the mean of `cycle_equity_hazard * max(0,
+    /// gap - knee)` over a run's expansion and peak sessions, because the
+    /// market's hazard comes in bursts and a constant of the same mean ends
+    /// more expansions. 0.0, which every preset through pt-v20 carries, adds
+    /// nothing and the opening law is the one that stood. Read only in those
+    /// two places, never in a session with a market. In [0, 1].
+    ///
+    /// Why. With `cycle_equity_hazard` at 5 and a knee of 0.1 on R17T a
+    /// contraction or trough holds 0.08 of year 0's sessions and 0.10 to
+    /// 0.12 of each later year's (90 held-out histories, sets A and B). The
+    /// mean added hazard over expansion and peak sessions is 0.010 to 0.012
+    /// a month (30 histories, seeds 50201-50230), but at 0.011 the opening
+    /// holds 0.667 expansion and 0.153 recovery against the run's 0.690 and
+    /// 0.140; at 0.007 each of the five shares is within 0.01 of the run's
+    /// (1500 openings, docs/MODEL.md).
+    /// pt-v21 ships 0.011.
+    pub cycle_equity_hazard_opening: f64,
+    /// Sessions of market the run has lived before day zero: the last this many
+    /// days of the economy's burn-in (`macro_burn_in_days`), played on a copy
+    /// of the opening engine with the economy's recorded phase set each day and
+    /// every stream drawn from generators of its own. The run then opens with
+    /// that copy's volatility state: the factor variance components and their
+    /// return memory, the VIX and its slow level, the anchor's and the stress
+    /// premium's memories, the cycle's volatility multiplier, and each name's
+    /// and sector's variance and jump excitation. Nothing else is copied, so
+    /// prices, fair values, the economy and every draw the run itself takes are
+    /// the ones the engine would open with. 0.0, which every preset through
+    /// pt-v20 carries, runs nothing and the market opens at the constructor's
+    /// baseline. Read only at construction, and only when the opening is
+    /// settled (not when a caller supplies the macro state). A whole number in
+    /// [0, 2520].
+    ///
+    /// Why. The burn-in runs the economy without a market, so every
+    /// volatility state opens at the phase-free baseline: a run that opens
+    /// in an expansion starts with its factor variance at 1.8 times the
+    /// level its expansions hold, the VIX near 19 where they hold 16, and
+    /// index volatility of 0.17 in its first months against 0.145, which
+    /// takes two quarters to settle; a run that opens in a contraction
+    /// starts calm. Year 0 then reads about 0.004 hotter than the years
+    /// after it over 1350 held-out histories on R17T and R17Bd, which
+    /// PH5's volatility clause reads. The slow variance component's
+    /// persistence (0.9913 a session) leaves 0.11 of the opening's gap
+    /// after 252 sessions and 0.012 after 504.
+    /// pt-v21 ships 504.
+    pub market_prehistory_sessions: f64,
+    /// Whether the run also opens with the valuation state the market's
+    /// prehistory (`market_prehistory_sessions`) left on its copy: a switch,
+    /// 0.0 or 1.0. On, the copy's end hands back, beside the volatility state,
+    /// each name's mispricing (which the opening's split takes in place of its
+    /// draw), the VIX feedback's exposure, the anticipation's drift, the
+    /// earnings cycle, credit's leverage gap (with the corporate yield moved by
+    /// what it adds to the spread) and the Fed put's owed cut and stock (with
+    /// the policy rate and the curve lowered by the owed cut) and the market's
+    /// forecast of the policy path (with the curve moved by what it prices).
+    /// Whatever moves fair value is booked into the names' fair-value levels by
+    /// the opening's split, so no opening price moves. 0.0, which every preset
+    /// through pt-v20 carries, carries none of it. Requires
+    /// `market_prehistory_sessions` above zero; read only at construction.
+    ///
+    /// Why. Those states open where a market that never traded leaves them
+    /// and drift over the first year: on R17Bd with a 252-session prehistory
+    /// the names' mean mispricing fell to -0.013 by month 6 and the VIX
+    /// feedback's exposure built from 0 to 0.035 by month 12, while the Fed
+    /// put's owed cut built from 0 to 0.24 and took the policy rate down by
+    /// a quarter point. Year 0's index return was 1.95 points below year 1's
+    /// over 1350 held-out histories, all in its first two quarters, which
+    /// PH5's return clause reads.
+    /// pt-v21 ships 1.0.
+    pub market_prehistory_valuation: f64,
+    /// The share of the intermeeting fall the Fed put's cut left unanswered
+    /// that the next meeting's clock starts from. 0.0, which every preset
+    /// through pt-v20 carries, restarts the clock at zero at every meeting, as
+    /// it stood. Read only with `fed_put_gain` non-zero. In [0, 1].
+    ///
+    /// The put rounds its ask to a quarter point, so at a gain of 3 an
+    /// intermeeting fall under about 4.2 per cent asks for nothing, and a
+    /// bear that falls 3 to 4 per cent between each pair of meetings is
+    /// never answered however far it goes: on R19V's held-out histories
+    /// (sets A and B, 602 bears of 20 per cent) the median policy change
+    /// from peak to trough sits on -0.50, the quarter-point atom, with 0.44
+    /// to 0.48 of bears cut by 0.75 or more by their trough and 0.70 to 0.73
+    /// by 63 sessions after it. Off zero, at a meeting where the put was
+    /// live and not held at the rate, the clock restarts at this share of
+    /// `min(0, I + c / gain)`, where `I` is the intermeeting return the
+    /// meeting read and `c` the cut the put took: the fall its cut did not
+    /// answer, which the index's later returns then add to or take back.
+    /// Nothing is carried when the put's cut stopped at the policy rate, or
+    /// with inflation at or above the put's ceiling. The priced put
+    /// (`treasury_put_pricing`) reads the same clock. No draw. No state
+    /// beyond the intermeeting return the put already carries.
+    /// pt-v21 ships 1.0.
+    pub fed_put_carry: f64,
+    /// The index's log fall from its highest close of the last 252 sessions
+    /// (total public market cap, close to close) at or above which a meeting
+    /// holds any rise, as the stress hold does (`fed_stress_hold`): with
+    /// inflation under target plus `fed_stress_inflation_gap`, a rise the
+    /// ladder chose is held and the Fed put gives nothing back. 0.0, which
+    /// every preset through pt-v20 carries, is off: no state. On, the engine
+    /// keeps the window's returns, carried in the snapshot and the state hash,
+    /// and a market prehistory hands its window to the run. In [0, 1].
+    ///
+    /// The stress hold reads the VIX, which reverts within weeks of a
+    /// sell-off while the index stays down, so a bear whose VIX has settled
+    /// is hiked into: on R19V's held-out histories (sets A and B) 0.43 to
+    /// 0.47 of 20 per cent bears see a rise between peak and trough, and
+    /// those rises leave the median policy change from peak to trough on the
+    /// -0.50 atom. The FOMC's rises at CPI under 4 came with the S&P 500
+    /// within about 10 per cent of its high, December 2018 (16 per cent
+    /// down) the exception.
+    /// pt-v21 ships 0.12.
+    pub fed_drawdown_hold: f64,
     /// The cross-sectional sd of each name's opening mispricing. 0.0 adopts
     /// each name's whole day-zero premium of price over fair value as its
     /// mispricing `s`.
@@ -1496,6 +3143,7 @@ pub struct ModelParams {
     /// process's persistence and is subject to the same stationarity limit
     /// as the per-name one, and to the same reparameterization in the
     /// survey.
+    /// pt-v21 ships 0.9446.
     pub market_vol_beta: f64,
     /// GJR leverage on the market factor's variance update: the extra weight
     /// a down day's squared shock gets. 0.0 is the symmetric update, carried
@@ -1512,10 +3160,223 @@ pub struct ModelParams {
     /// leverage effect, and on those presets `corr_asymmetry` sits at
     /// -0.016 against a real +0.015 with no other dial able to move it.
     ///
-    /// Applies to the fast component only. The leverage effect is a
-    /// same-week phenomenon, and the slow component carries long-horizon
-    /// clustering with no asymmetry.
+    /// Applies to the fast component only. The slow component's own asymmetry
+    /// is `market_vol_slow_gamma`, 0.0 on every preset through pt-v20. pt-v21
+    /// ships 0.06.
     pub market_vol_gamma: f64,
+    /// GJR asymmetry on the SLOW component of the market factor's variance.
+    /// 0.0, which every preset through pt-v20 carries, is the symmetric slow
+    /// step: the close takes a branch that makes the call it always made.
+    ///
+    /// Off zero, a down day loads `a_s + gamma` on the squared factor where
+    /// an up day loads `a_s`, and the carried share gives back `gamma/2`:
+    ///
+    /// ```text
+    /// v_s' = (1 - a_s - b_s) * target_s + (a_s + gamma * 1[F < 0]) * F^2
+    ///        + (b_s - gamma/2) * v_s,     (a_s, b_s) = (gain * p_s, (1 - gain) * p_s)
+    /// ```
+    ///
+    /// so the slow component's own persistence `p_s` and its resting level
+    /// are unchanged (over a symmetric factor the down arm loads `gamma/2`
+    /// on average, which is what the carried share gives back).
+    ///
+    /// # What it does to the mixture
+    ///
+    /// The slow component is fed the day factor, whose variance is the
+    /// MIXTURE's, so moving `gamma/2` from its own level onto the shock
+    /// makes it follow the faster mixture more closely. On pt-v20's
+    /// coefficients the joint mean recursion's slow pole goes from 0.9855
+    /// (a 47-session half-life) to 0.9814 at 0.3 and 0.9805 at 0.6 (35
+    /// sessions), and its fast pole from 0.923 to 0.733. The unclamped
+    /// fourth moment of the joint recursion (spectral radius of
+    /// `E[A (x) A]` over a normal factor) is finite on pt-v20 at 0.0
+    /// (0.984) and stops being so at 0.129 (1.016 at 0.3, 1.039 at 0.6):
+    /// past that the `market_vol_ceiling_multiple` clamp bounds the tail,
+    /// as it does on pt-v1, whose single component violates the condition
+    /// knowingly (`factor_vol.rs`,
+    /// `the_recursion_reverts_and_the_clamp_carries_the_fourth_moment`).
+    ///
+    /// # Why
+    ///
+    /// `market_vol_gamma` (the tape's GJR, 0.1556) acts on the fast 65 per
+    /// cent of the factor's variance, and the factor is about three
+    /// quarters of the index's, so the index's response to a fall is about
+    /// a third of the tape's and it is gone within a month. Measured on
+    /// held-out pt-v20 histories (crash-vol-state design, design
+    /// repository): the sum over lags 1-20 of corr(r_t, |r_t+k|) reads
+    /// -0.53 against the S&P 500's -1.35 (1990-2025; every 20-year US
+    /// window since 1926 lies in -0.79 to -1.75), and monthly skew -0.24
+    /// against -0.80. Index leverage decays over weeks to months (Bouchaud,
+    /// Matacz and Potters 2001; Corsi and Reno 2012), which is the slow
+    /// component's timescale.
+    ///
+    /// # Measured (held-out seeds 201-230, 501-530, 801-830; boxes cvsg1, cvsg2)
+    ///
+    /// On pt-v20, 90 histories of 21 years, the leverage sum reads -0.51,
+    /// -0.62, -0.68, -0.76, -0.78, -0.82 and -0.87 at 0, 0.1, 0.15, 0.2,
+    /// 0.3, 0.45 and 0.6, and monthly skew -0.26, -0.37, -0.42, -0.43,
+    /// -0.47, -0.60 and -0.57 (the tape -1.35 and -0.80). Two registered
+    /// rows bind: B5, the sessions under -5 per cent a decade (ceiling
+    /// 12.4), reads 11.5 at 0, 11.7 at 0.2, 12.3 at 0.3 and 12.7 and 12.9 at
+    /// 0.45 and 0.6; and D1's excess kurtosis in the held-out-seeds cell
+    /// (ceiling 24.0) reads 18.8 at 0, 23.4 at 0.2 and 24.1 to 24.9 from
+    /// 0.3. So 0.3, 0.45 and 0.6 fail, and 0.2 is the largest value tried
+    /// that passes the rows graded at it. That is not the full grade:
+    ///
+    /// - Graded at 0.1, 0.15 and 0.2 (box cvsg2): A1-A3, B1-B8, C1, C2 and
+    ///   D1 in all four certification cells, all pass; V1a and V1b from the
+    ///   same long run pass (V1b 0.649 at 0.2, floor 0.55).
+    /// - Graded at 0, 0.3, 0.45 and 0.6 only (box cvsg1), so inferred at
+    ///   0.1-0.2: B9, C4a, C4b, C5-C8, R1-R6, E1, D2, F1, L1 and C10. All
+    ///   pass on those arms.
+    /// - Not measured at any value: C3, C9, R7a, R7b, S1a, S1b and S2.
+    ///
+    /// The certification's VIX AR(1) row (reported, not gated) moves up:
+    /// on pt-v20 it passes panel_252 and held-out seeds and reads
+    /// refused/below in panel_504; at 0.1 it passes all three; it reads
+    /// refused/above in panel_252 from 0.15 and in panel_504 at 0.2.
+    ///
+    /// Read only with `market_vol_slow_weight` non-zero: the single-component
+    /// close has no slow component. In [0, 1], with
+    /// `(1 - market_vol_slow_gain) * market_vol_slow_persistence - gamma/2`
+    /// at or above zero so the carried share cannot go negative.
+    /// pt-v21 ships 0.05.
+    pub market_vol_slow_gamma: f64,
+    /// Gain of the market factor's variance on its RETURN MEMORY, in log
+    /// variance per unit of the memory. 0.0, which every preset through pt-v20
+    /// carries, is off: the memory never moves, the snapshot and state hash
+    /// do not carry it, and the variance is the component mixture bit for
+    /// bit.
+    ///
+    /// Off zero the engine keeps `l`, an exponentially weighted memory of
+    /// the day factor in baseline sd units, sign flipped so a fall adds:
+    ///
+    /// ```text
+    /// u  = -F / sigma_b             (a fall)
+    ///    = -(1 - down) * F / sigma_b  (a rise)
+    ///      - down * sqrt(v / b) / sqrt(2 pi)   (re-centred)
+    /// l' = phi * l + (1 - phi) * u,   phi = 0.5^(1 / half_life)
+    /// ```
+    ///
+    /// where `b = sigma_b^2 = market_factor_sigma^2` and `v` is the variance
+    /// the day was drawn at. The variance the next session draws with --
+    /// and the index-variance identity, and so the VIX, reads -- is
+    ///
+    /// ```text
+    /// clamp(mixture * exp(k * l - k^2 * s^2 / 2)),
+    /// s^2 = (1 - phi) / (1 + phi) * ((1 + (1 - down)^2) / 2 - down^2 / (2 pi))
+    /// ```
+    ///
+    /// `s^2` is the memory's stationary variance at the baseline, so the
+    /// multiplier's mean is about one. The GJR components are fed the day
+    /// factor over the square root of the multiplier the day was drawn at
+    /// (the variance over the mixture), so a fall is not counted twice.
+    ///
+    /// A FORCED close (a scenario's `vix_sets_variance`) moves the memory
+    /// with the day's factor but sets the variance to the law's level
+    /// without the multiplier, so a scenario's asserted fear is the fear the
+    /// session draws at; the first free close after it applies the memory.
+    ///
+    /// This is a return-path memory (Black 1976; Christie 1982; the
+    /// exponential leverage kernel of Bouchaud, Matacz and Potters 2001),
+    /// which a GARCH recursion on squared shocks cannot express: a GJR term
+    /// remembers the size of a fall, not the fall.
+    ///
+    /// Measured (held-out seeds 201-230, 501-530, 801-830, box cvsg1): at a
+    /// gain of 3 on a 40-session half-life with `market_vol_slow_gamma` 0.3
+    /// and `market_factor_sigma` cut 10 per cent, the leverage sum reads
+    /// -0.96 against pt-v20's -0.51, but B5 reads 15.3 against a ceiling of
+    /// 12.4 and C10 fails (a rule on the corporate yield's 99.9th-percentile
+    /// rise runs ahead in 0.70 of histories), so it is not ready for a
+    /// preset while the corporate yield's one-session steps and the
+    /// roster's concentration supply most of the index's -5 per cent days.
+    /// In [0, 50].
+    /// pt-v21 ships 2.5.
+    pub market_vol_leverage: f64,
+    /// Half-life of the return memory, in sessions. Unread at
+    /// `market_vol_leverage` 0.0; must be positive off it. In [0, 2520].
+    /// pt-v21 ships 15.
+    pub market_vol_leverage_half_life: f64,
+    /// How much of an UP day the return memory ignores. 0.0 counts up and
+    /// down days alike, so the memory is linear in the return path; 1.0
+    /// counts falls only, and the memory is re-centred on the mean that
+    /// asymmetry adds at the variance the day was drawn at. Unread at
+    /// `market_vol_leverage` 0.0. In [0, 1].
+    pub market_vol_leverage_down: f64,
+    /// The unit the return memory counts a day in, as a power `s` on the day's
+    /// own sd: `u = -F / (sigma_b^(1-s) * sqrt(v)^s)`, `v` the variance the day
+    /// was drawn at. 0.0, which every preset through pt-v20 carries, is the
+    /// baseline sd `sigma_b`, the form that stood; 1.0 is the day's z-score.
+    /// Unread at `market_vol_leverage` 0.0. In [0, 1].
+    ///
+    /// Why. In baseline units a day drawn at twice the baseline sd moves the
+    /// memory twice as far, so the memory's spread -- and the multiplier's
+    /// spread `exp(k l)` -- grows with the variance it drives: a fall in a
+    /// storm raises the next session's variance by more than the same
+    /// z-score in a calm, which is a crash amplifier rather than a leverage
+    /// effect. Measured on pt-v20 (box cvsg1) that form bought its leverage
+    /// sum with B5 (15.3 against 12.4) and needed `market_factor_sigma` cut
+    /// by a tenth to hold the level, because `E[u^2] = E[v / b] > 1` puts the
+    /// multiplier's mean over one. Counted in z-scores the memory's
+    /// stationary variance is `s^2` at every level, so the multiplier's mean
+    /// is one without a level cut and the response to a fall is the
+    /// response to its surprise, which is the tape's shape: the log VIX's
+    /// response to a return scales with the return over the prevailing
+    /// volatility (Bouchaud, Matacz and Potters 2001 normalise the index
+    /// kernel the same way).
+    /// pt-v21 ships 1.0.
+    pub market_vol_leverage_standardise: f64,
+    /// Degrees of freedom of the day's market draw: each session's
+    /// market-factor variance is multiplied by `m = (nu - 2) / X`, `X` a
+    /// chi-square with `nu` degrees of freedom drawn once at the open, so
+    /// the day's market factor is a Student t with `nu` degrees of freedom
+    /// and the variance the state set (a GARCH-t innovation). 0.0, which
+    /// every preset carries, is the normal day that stood: no draw, no
+    /// state. `E[m] = 1`, so the mean variance, the VIX's read of it and
+    /// the index volatility level do not move; what moves is the day's
+    /// tail. The multiplier scales the night's market draw and every tick's
+    /// alike, so the whole day is one t draw, and the day's variance
+    /// `m * v` is held under the state's ceiling (`market_vol_ceiling_multiple`
+    /// baselines), never below `v`. Drawn on `stream::OVERNIGHT` after the
+    /// night's normals (a gamma by Marsaglia and Tsang, so `nu` need not be
+    /// an integer); the snapshot and the state hash carry `m` only between
+    /// an open that drew one and the close. 0 or in [3, 200].
+    ///
+    /// Why. The certification's tail row (`index_tail_dn3_pct`, sessions at
+    /// or below -3 per cent) read 0.52 on R16A's thirteenth grade against
+    /// [0.64, 2.34]; on held-out seeds R16A reads 0.81 on the varying
+    /// rosters (60 seeds) against a tape centre of 1.21 (1990-2025) and
+    /// 1.49 (1928-2025), with half the seeds at zero. The index's own
+    /// one-year excess kurtosis reads a median of 0.9 against the tape's
+    /// 1.46: at a given variance the model's day is Gaussian, so a -3 per
+    /// cent day needs a storm. A GJR-GARCH(1,1) with Student-t
+    /// innovations fitted by maximum likelihood to the S&P 500's daily log
+    /// returns 1990-2025 (^GSPC closes; the same fit with normal
+    /// innovations gives `market_vol_alpha`, `market_vol_beta` and
+    /// `market_vol_gamma` to four places) puts the degrees of freedom at
+    /// 6.9, a profile-likelihood 95 per cent interval of 6.0 to 8.0; the
+    /// normal fit's standardised residuals have an excess kurtosis of 2.05
+    /// and 1.38 per cent of days below -2.5 against a normal's 0.62.
+    ///
+    /// Measured on R16A (sim/r17-d1tail, the certification's varying-roster
+    /// protocol, 720 held-out seeds, 201-230, 501-530, 801-830, 2001-2270
+    /// and each plus 20000): at 7, with `market_day_tail_state_share` 1, the
+    /// one-year index kurtosis went from 0.8 to 1.6 and the share of seeds
+    /// with no -3 per cent session from 0.66 to 0.58, but the tail row only
+    /// from 0.64 to 0.76; at 4, 5 and 6 no higher. On the varying rosters a
+    /// -3 per cent day is near three of the index's sigmas, about where a t
+    /// and a normal of one variance cross. Not recommended on R16A for that
+    /// row; it stays inert.
+    pub market_day_tail_df: f64,
+    /// The share of the day's t scale the market variance state reads: the
+    /// state is fed the day factor times `m^(-(1 - this) / 2)`. 0.0, which
+    /// every preset carries, feeds it the day as if drawn at the state's
+    /// own variance, so a fat-tailed day moves the next day's variance, the
+    /// VIX's target and the return memory no more than a normal one; 1.0
+    /// feeds it the day as it landed, the GARCH-t recursion, where a large
+    /// day raises the next day's variance by its size. Read only with
+    /// `market_day_tail_df` set. In [0, 1].
+    pub market_day_tail_state_share: f64,
 
     /// How far the common factor's shock share moves with the factor's own
     /// variance excursion. 0.0, which every shipped preset carries, is a
@@ -1708,6 +3569,7 @@ pub struct ModelParams {
     /// `vix_level_identity`, where the VIX target is what the index's own
     /// conditional variance implies. Off the identity the target is the
     /// phase table and this multiplier is not applied.
+    /// pt-v21 ships 0.009.
     pub vix_level_sigma: f64,
 
     /// The VIX loop's own gain on the slow VIX level, which the level's
@@ -2264,11 +4126,12 @@ pub struct ModelParams {
     /// 0.0 (a fixed target) to 1.0 (fully proportional to the VIX response,
     /// the squared VIX ratio at the default `market_vol_vix_exponent`). The
     /// target is the baseline times `1 - c + c * response`.
+    /// pt-v21 ships 0.75.
     pub market_vol_vix_coupling: f64,
     /// VIX level at which a coupled target equals the baseline variance.
     pub market_vol_vix_anchor: f64,
-    /// Days of EMA smoothing on the VIX that the market variance target
-    /// reads. 0, which every shipped preset carries, reads each day's print
+    /// Days of EMA smoothing on the VIX that the market variance target reads.
+    /// 0, which every preset through pt-v20 carries, reads each day's print
     /// raw, bit for bit.
     ///
     /// Measured on the driven test with the QE channel switched off, all of
@@ -2276,6 +4139,7 @@ pub struct ModelParams {
     /// VIX churn into the variance target, where real volatility follows
     /// sustained fear. It affects the market factor only. The per-name
     /// GARCH VIX coupling still reads the raw print.
+    /// pt-v21 ships 3.
     pub market_vol_vix_smooth: f64,
     /// Exponent on the market variance target's VIX ratio. 2.0 is the
     /// literal square, bit for bit, and is what every preset through pt-v18
@@ -3081,10 +4945,16 @@ pub struct ModelParams {
     /// The earnings anticipation and the rate sensitivity cost the index
     /// its one-year drift, no setting at a third held the floor of the
     /// level band, and 0.75 restores it. At the 0.0555 earnings yield above
-    /// it is a buyback yield of about 4.2 per cent, over twice the 1.5 to
-    /// 2.0 per cent the value record shows. The model pays no dividends, so
-    /// the term carries the whole of the drift that payouts would; that is
-    /// a reading of the gap, not a measurement behind the value.
+    /// it would be a buyback yield of about 4.2 per cent, but that is the
+    /// median name: the index's delivered yield (the cap-weighted log rate
+    /// of the buyback factor) is 2.0 per cent on held-out seeds, and decays
+    /// from 3.3 in year 2 to 0.8 in year 21. The shipped preset pays no
+    /// dividends (`dividend_payout_share`), so the term carries the whole
+    /// of the drift that payouts would; that is a reading of the gap, not a
+    /// measurement behind the value. Under `dividend_buyback_substitution`
+    /// this is the total payout, and a name's buyback share is it less the
+    /// name's dividend payout.
+    /// pt-v21 ships 0.9.
     pub buyback_payout_share: f64,
     /// How much of the drift the market jump's mean carries is given back,
     /// from 0.0 (none) to 1.0, which subtracts the compensator and makes the
@@ -3346,7 +5216,7 @@ pub struct ModelParams {
     pub volume_idio_persistence: f64,
     /// Gain that makes a name's volume follow its own conditional variance,
     /// so a name trades more when its own volatility is high. 0.0 turns it
-    /// off; pt-v19 onward carry 0.2.
+    /// off; pt-v19 and pt-v20 carry 0.2.
     ///
     /// `volume_variance_gain` couples volume to the MARKET factor's
     /// variance and nothing else, so without this a name whose OWN
@@ -3361,6 +5231,7 @@ pub struct ModelParams {
     /// as unrelated as market-wide noise. This is the return-related
     /// version: at `g` the multiplier is
     /// `1 + g * (garch_variance / sector base - 1)`, clamped.
+    /// pt-v21 ships 0.65.
     pub volume_idio_variance_gain: f64,
     /// Innovation size of the per-name volume state. 0.0 on every shipped
     /// preset. See [`ModelParams::volume_idio_persistence`].
@@ -3579,18 +5450,23 @@ pub struct ModelParams {
     /// 0 the draws still happen, but they happen on a stream no earlier preset
     /// ever touched, so the market, economy and external streams are
     /// bit-identical and every shipped preset reproduces exactly.
+    /// pt-v21 ships 0.005.
     pub jump_intensity_market: f64,
     /// Mean of the market jump in log-return units. Negative by intent,
     /// because real crash jumps are asymmetric. A symmetric jump process
     /// produces fat tails with the wrong skew, which would read as "kurtosis
     /// fixed" on the panel while getting crises backwards.
+    /// pt-v21 ships -0.03.
     pub jump_mean_market: f64,
     /// Standard deviation of the market jump, in log-return units.
+    /// pt-v21 ships 0.01.
     pub jump_sigma_market: f64,
     /// Daily probability that a per-name idiosyncratic jump fires. This is
     /// the earnings-surprise channel, independent across names.
+    /// pt-v21 ships 0.009.
     pub jump_intensity_idio: f64,
     /// Standard deviation of the idiosyncratic jump, in log-return units.
+    /// pt-v21 ships 0.0318.
     pub jump_sigma_idio: f64,
     /// How much of the market jump's log return joins the day's factor
     /// innovation, so the GJR variance update sees a crash day. Every
@@ -3872,6 +5748,35 @@ pub struct ModelParams {
     /// 1.0. An order past the reach is cut off there, as an order past the
     /// ladder is without the tail.
     pub book_depth_reach: f64,
+    /// How much of the maker's ladder the latent depth counts as its own
+    /// front, in [0, 1]. Read only with
+    /// [`ModelParams::book_depth_coefficient`] off zero, and refused off
+    /// zero without it.
+    ///
+    /// 0.0, which every preset through pt-v20 carries: the latent pool sits
+    /// BESIDE the ladder, its `Q`-th share priced on the law as if the ladder
+    /// were not there, so the depth within a distance `d` of the touch is the
+    /// ladder's plus the law's. Near the touch the ladder holds 0.3 to 1% of
+    /// daily volume at its first level and 2.6 to 5% over ten, so an immediate
+    /// order of 3% of daily volume fills mostly from the ladder and the law's
+    /// own front at once, paying the half-spread and little more: on N4
+    /// (sim/r14) a day TWAP at 3% costs 0.83 of such a block against the 0.5 to
+    /// 0.8 of Almgren et al. (2005) and Bacry et al. (2015), because the
+    /// half-spread every share pays is half the block's cost.
+    ///
+    /// 1.0: the latent curve counts every ladder share at a price as good
+    /// or better as already on it, so the depth within `d` is the larger of
+    /// the ladder's and the law's, not their sum. The ladder is the
+    /// displayed front of the latent book (Toth et al. 2011; Bouchaud,
+    /// Bonart, Donier and Gould, Trades, Quotes and Prices, 2018, ch. 19),
+    /// not a second book beside it: the law holds for everything past it,
+    /// and past the ladder the next share is priced where the law puts the
+    /// shares already taken. Between 0 and 1 that fraction of the ladder
+    /// is counted. Read only in the book an agent meets, so no untraded
+    /// statistic moves; a slice smaller than the first level pays exactly
+    /// what it did.
+    /// pt-v21 ships 1.0.
+    pub book_depth_nesting: f64,
     /// Switch for whether agents' orders consume the book they share: 1.0
     /// on, 0.0 off. pt-v20 ships 1.0.
     ///
@@ -3916,6 +5821,53 @@ pub struct ModelParams {
     /// partially when that flow is smaller than the queue ahead of it plus
     /// the order, and at its own price. Cancelling removes it.
     pub book_resting: f64,
+    /// Whether the arrival order of a cohort's orders at the shared book is
+    /// a seeded shuffle, fresh every step. A switch.
+    ///
+    /// 0.0, which every preset through pt-v20 carries: a `World` cohort
+    /// executes in sorted label order on every step, so on a live book
+    /// (`book_shared`) the same label always takes the levels first and stands
+    /// first in the resting queue. The label is then a latency advantage nobody
+    /// chose: on pt-v20's graded arm the later label of two identical
+    /// 10%-of-ADV buyers pays about 23 bp more on 30 of 30 held-out seeds, and
+    /// two identical momentum agents split by about 4 per cent in 20 days.
+    ///
+    /// 1.0: each step's order is the labels sorted by
+    /// [`crate::rng::arrival_priority`], a counter-based function of the
+    /// run's seed, the world's day, the step within the day and the label.
+    /// Each label is first equally often and the order is independent from
+    /// step to step, so a name buys no priority (Nasdaq Rule 4757 ranks
+    /// orders by price and then time, never by identity; agent-based
+    /// toolkits reshuffle the activation order every step, Axtell 2001).
+    /// The priority is pairwise, so removing or freezing an agent never
+    /// reorders the others. It holds no state and takes no draw from any
+    /// stream, so nothing is snapshotted, restored or hashed, and no market
+    /// draw moves. Read only by a cohort (`World` with two or more agents):
+    /// a single agent, `evaluate` and an untraded market never read it.
+    /// Off the live book it orders only `World.rejected`.
+    /// pt-v21 ships 1.0.
+    pub book_arrival_shuffle: f64,
+    /// Whether an agent's resting order that the book has left crossed
+    /// during the session trades at its OWN limit. A switch.
+    ///
+    /// 0.0, which every preset through pt-v20 carries: an order the maker's
+    /// re-quote leaves crossed (a resting ask below the maker's new bid) trades
+    /// against the ladder at the ladder's prices before the tick's flow, so the
+    /// price improvement goes to the resting order.
+    ///
+    /// 1.0: it trades at its own limit, as a continuous book fills a
+    /// standing order at its price and gives any improvement to the order
+    /// that arrives, here the maker's re-quote (Nasdaq Rule 4757, NYSE
+    /// Pillar 7.36-7.37). It is still taker flow, and still pays its
+    /// impact. Without it an agent that pushes the price up with taker buys
+    /// while resting asks at the touch sells those asks at the maker's
+    /// higher bid, more than it paid for the same shares a tick earlier:
+    /// the round-trip guard's wash on a name quoted a cent wide (R16A,
+    /// held-out seeds). The open is unchanged: an order the night's gap
+    /// went through fills at the opening ladder's prices, as an opening
+    /// auction would fill it.
+    /// pt-v21 ships 1.0.
+    pub book_cross_at_limit: f64,
     /// Permanent impact of an agent's fills, linear in size: `gamma` in
     /// `ds = gamma * sigma * (bought - sold) / V`, applied to the name's
     /// mispricing `s` once, on the first tick after the fills. pt-v20
@@ -3933,7 +5885,110 @@ pub struct ModelParams {
     /// across agents, so each agent's share of a name's impact is exact.
     /// Almgren, Thum, Hauptmann and Li (2005) measure `gamma` = 0.314 on the
     /// same form.
+    /// pt-v21 ships 0.15.
     pub fill_impact_coefficient: f64,
+    /// The metaorder memory's `Y`: the square-root law of impact on the TAPE,
+    /// for agents' orders. 0.0, which every preset through pt-v20 carries, is
+    /// off, and the market is the one it was to the bit.
+    ///
+    /// Without it an agent's temporary impact never reaches the print: the
+    /// maker re-quotes a full ladder around the model price every tick, so
+    /// only `fill_impact_coefficient`'s linear `gamma sigma Q/V` moves `s`.
+    /// Measured on pt-v20 (held-out seeds 2001-2008, six names), the peak
+    /// displacement of a half-day order is linear in its size, `0.42
+    /// f^1.04` sigma in the print, and 99% of it is still there at the
+    /// close. The square-root law of impact is concave, `Y sigma (Q/V)^0.5`
+    /// with `Y` about 0.4 to 0.5 (Toth et al., Physical Review X 1, 021006,
+    /// 2011; Zarinelli, Treccani, Farmer and Lillo, Market Microstructure
+    /// and Liquidity 1(2), 2015; Bucci, Benzaquen, Lillo and Bouchaud,
+    /// Physical Review Letters 122, 108302, 2019), and about a third of the
+    /// peak has gone by the close (Bucci et al., "Slow decay of impact in
+    /// equity markets", 2019).
+    ///
+    /// Off zero, each name keeps a decaying memory `M` of agents' net taker
+    /// flow against the house (the maker and the latent depth; a fill
+    /// between two agents is not flow to the market at all with the memory
+    /// on) in fractions of daily volume, and its `s` carries `D = sign(M)
+    /// Y sigma h(|M|)`, with `h(m) = m^delta` (`delta` the latent book's
+    /// [`ModelParams::book_depth_exponent`]) and `sigma` the name's
+    /// [`crate::agent_book::daily_sigma`]. The latent depth continues from
+    /// the memory's point on its own curve, so an order in the direction
+    /// the memory leans walks on from where the last one left the price.
+    /// This is the volume-recovery book of Alfonsi, Fruth and Schied
+    /// (Quantitative Finance 10(2), 2010) with a book linear in distance.
+    /// Needs `book_shared` on and the depth tail, and is at most
+    /// `book_depth_coefficient`, which keeps every fill no better than the
+    /// memory's own price. In [0, book_depth_coefficient].
+    /// pt-v21 ships 0.65.
+    pub impact_memory_coefficient: f64,
+    /// The memory's fast half-life, in OPEN ticks. Required with the
+    /// coefficient on, and read by nothing with it off (like each dial
+    /// below, and like `fair_value_vix_knee` beside its discount, it is
+    /// allowed there, unread). The memory decays only on
+    /// open ticks, so it holds overnight (Bucci et al. 2019 measure the
+    /// decay in volume time). In (0, 39000].
+    /// pt-v21 ships 12.
+    pub impact_memory_half_life: f64,
+    /// The memory's slow half-life, in open ticks. 0.0 is no slow part;
+    /// otherwise at least the fast half-life. The slow part is the
+    /// long-lived remainder of impact, about 0.3 to 0.4 of the peak after
+    /// weeks (Bucci et al. 2019) and 0.15 after 15 days once the trader's
+    /// information is removed (Brokmann et al., Market Microstructure and
+    /// Liquidity 1(2), 2015). In [0, 98280].
+    /// pt-v21 ships 780.
+    pub impact_memory_slow_half_life: f64,
+    /// The slow part's weight `w` in `M = (1 - w) M_fast + w M_slow`.
+    /// Refused off zero without the slow half-life. In [0, 1).
+    /// pt-v21 ships 0.1.
+    pub impact_memory_slow_weight: f64,
+    /// The crossover `m*`, in fractions of daily volume (a size, not a
+    /// participation rate), below which the memory's displacement is
+    /// linear, `m m*^(delta - 1)`, rather than a power: on ANcerno
+    /// metaorders impact is close to a square root for volume fractions
+    /// from about 1e-3 to 1e-1 and about linear below 1e-3 (Zarinelli,
+    /// Treccani, Farmer and Lillo 2015; Bucci, Mastromatteo, Eisler, Lillo,
+    /// Bouchaud and Lehalle 2018; both as reported by Bucci, Benzaquen,
+    /// Lillo and Bouchaud, Physical Review Letters 122, 108302, 2019, whose
+    /// own crossover, about 3e-3, is in the participation rate). The linear
+    /// foot also keeps the power law's infinite marginal impact at zero
+    /// size from rewarding a stream of tiny orders. 0.0 is a pure power
+    /// law. In [0, 0.05].
+    /// pt-v21 ships 0.001.
+    pub impact_memory_crossover: f64,
+    /// Whether an agent's resting order that fills AGAINST the metaorder
+    /// memory's lean refills the memory. A switch.
+    ///
+    /// 0.0, which every preset through pt-v20 carries: only taker flow against
+    /// the house moves the memory. A resting order the market's own flow fills
+    /// does not, and one the maker's re-quote leaves crossed is taker flow
+    /// whose move is capped by what it paid, which at its own limit is about
+    /// nothing.
+    ///
+    /// 1.0: a resting order filled on the side against the lean (an ask
+    /// while agents' flow has displaced the price up, a bid while it has
+    /// displaced it down), by the market's flow or by a crossing during the
+    /// session, takes its size off the memory, uncapped, never past zero.
+    /// A crossed order's shares beyond zero are taker flow as before, and
+    /// every crossed share still pays the linear law. On the lean's own
+    /// side nothing changes: a bid filled under a buy lean adds depth the
+    /// lean did not take.
+    ///
+    /// Why. Without it, a group of agents that buys as a taker and sells
+    /// the same shares back through asks resting at the touch ends flat,
+    /// but the memory has seen only the buys, and a third agent sells a
+    /// holding into the displacement. The round-trip guard's wash
+    /// (`metaorder_curve.py trips`) found it on names quoted a cent wide,
+    /// where the inside ask joins the maker's queue at the touch: +0.51 bp
+    /// on the thirteenth grade and up to +18 bp on held-out seeds (R16A).
+    /// In the volume-recovery book of Obizhaeva and Wang (Journal of
+    /// Financial Markets 16(1), 2013) and Alfonsi, Fruth and Schied (2010)
+    /// the displacement is the consumed depth, and an order resting on the
+    /// consumed side is new depth there; Eisler, Bouchaud and Kockelkoren
+    /// (Quantitative Finance 12(9), 2012) measure a limit order's impact
+    /// with the sign opposite to a market order's on its side. Taker orders
+    /// are unchanged. Read only with `impact_memory_coefficient` on.
+    /// pt-v21 ships 1.0.
+    pub impact_memory_refill: f64,
 
     // ── Crisis gates (economy/daily.rs, market/tick.rs, engine.rs) ──────
     /// How fast VIX reverts toward its target, as the fraction of the gap
@@ -4137,6 +6192,59 @@ pub struct ModelParams {
     /// same measurement, which pt-v19 and pt-v20 ship. See
     /// [`ModelParams::sector_vol_alpha`].
     pub sector_vol_beta: f64,
+    /// The per-NAME idiosyncratic variance state's shock share. A RATIO of
+    /// unconditional mean one, the same form as the sector state
+    /// (`sector_vol_alpha`): the variance of the name's own idiosyncratic
+    /// draw is its GJR variance times `s`, with
+    /// `s' = (1 - a - b) + a u^2 + b s + c (I - lambda)` at the close,
+    /// clamped to [`garch_floor_multiple`, `garch_ceiling_multiple`]. `u` is
+    /// the session's own NOISE (the own-noise part the ticks drew) over its
+    /// expected sd, `kappa^2 max(h, idio_sigma_floor)`, where `kappa^2`
+    /// (`noise_own_scale2`) already carries `s`, so `E[u^2] = 1` whatever
+    /// `s` is. The jump term is `idio_vol_jump_bump` (`c`): `I` is whether
+    /// the name's own jump was realised this session and `lambda` the rate
+    /// it was drawn at. The tick scales the own draw by `sqrt(s)` through
+    /// the per-company volatility multiplier; the overnight own draw and
+    /// the VIX identity's idiosyncratic term read the same `s`. The per-name
+    /// GJR, the market factor and the VIX process are untouched.
+    ///
+    /// Why: the per-name GJR is fed the day's NOISE (market, sector and own
+    /// together), never the name's own jumps or news, so a name's large
+    /// idiosyncratic move has no aftershock. On the forty-name reference
+    /// panel (2015-2025, ten 252-return windows, residual on the
+    /// leave-one-out equal-weight roster) the idiosyncratic `|e|` lag-1
+    /// ACF reads a median 0.088 (se 0.010, every window at least 0.068)
+    /// and the mean `|e|` the day after a top-2.5% day is 1.29x the mean
+    /// (se 0.062, every window at least 1.18); pt-v20 reads 0.029 and 1.05
+    /// on held-out seeds. The panel's own excitation measurement (see
+    /// `jump_idio_excitation`) gives the fast response a half-life of about
+    /// two sessions, which is what this state carries; the per-name long
+    /// lags are already above the tape's, so the missing memory is short.
+    ///
+    /// Any of the three dials non-zero switches the state on. At (0.0, 0.0,
+    /// 0.0), which every preset through pt-v20 carries, no state is read or
+    /// written, the tick receives an empty ratio slice and nothing is
+    /// multiplied: every trajectory and digest is the one it was. The snapshot
+    /// and the state hash carry the state (the ratio, the own jump pending for
+    /// tomorrow's shock and its expected variance) only while it runs. `a >=
+    /// 0`, `b >= 0`, `a + b < 1`. pt-v21 ships 0.25.
+    pub idio_vol_alpha: f64,
+    /// The per-name idiosyncratic variance state's persistence term. See
+    /// [`ModelParams::idio_vol_alpha`].
+    /// pt-v21 ships 0.5.
+    pub idio_vol_beta: f64,
+    /// The per-name idiosyncratic variance state's jump channel: the
+    /// session after the name's own jump is realised, the ratio moves by
+    /// `c (1 - lambda)`, and by `-c lambda` on every other session, `lambda`
+    /// the own-jump probability the name was drawn at. Re-centred on the
+    /// rate, so the ratio's mean stays one. The diffusive shock `u^2` above
+    /// reads the own noise only: fed the jump itself, `u^2` runs to tens on
+    /// a jump session and the ceiling clamp (`garch_ceiling_multiple`) takes
+    /// the excess, which put the ratio's mean at 0.86 on pt-v20 (40 names,
+    /// 110 sessions; 1.00 with the idiosyncratic jumps off). 0.0 is no jump
+    /// channel; `0 <= c <= 4`. Off zero alone it switches the state on.
+    /// pt-v21 ships 1.0.
+    pub idio_vol_jump_bump: f64,
     /// Self-excitation of a name's idiosyncratic jumps: after a jump the
     /// name's arrival rate is `lambda (1 + h)` with `h' = decay h + this`.
     /// 0.0, which every shipped preset carries, is a branch: the rate is
@@ -4832,6 +6940,23 @@ pub struct ModelParams {
     /// shipped). A guard: settable, never searched.
     pub price_breaker_fraction: f64,
     /// Absolute cap on any model price (50,000 shipped). A guard.
+    ///
+    /// A name that reaches it stops moving, and over a century that is not
+    /// harmless: the winners reach it first, they are the index's largest
+    /// weights, and a frozen name adds no variance to the index's read-back,
+    /// so the VIX falls and, through the factor's VIX coupling, every other
+    /// name's volatility with it. Measured on the r14 candidate (N4, 12
+    /// held-out seeds x 100 years, sim/r15-volstate): capped names carried 35
+    /// per cent of the cap weight by years 90-100, the VIX averaged 13.8
+    /// against 20.3 in years 0-10, and name volatility below the cap read
+    /// 0.64x of the first decade. With the cap at 1e9 on the same seeds the
+    /// VIX read 15.9 and the ratio 0.68x; started with its five largest names
+    /// at 45,000, the roster's other 35 names lose a tenth of their index
+    /// volatility over five years (0.153 to 0.138), and lifting the cap
+    /// restores the uncapped run to the bit, since prices are scale-free
+    /// (a roster at 50 times the price runs the same market). A long run
+    /// should set it far above any price it can reach.
+    /// pt-v21 ships 1e9.
     pub price_hard_cap: f64,
 
     // ── Derived, computed once at construction ──────────────────────────
@@ -4914,10 +7039,29 @@ pub const PT_V19: ModelParams = ModelParams::pt_v19();
 /// pt-v19 with a tape that follows the model price, a closing cross, the
 /// stock- and sector-specific part of every shock moved into fair value, a
 /// stationary opening and a smaller stop ladder -- see
-/// [`ModelParams::pt_v20`]. THE DEFAULT since 0.8.5:
+/// [`ModelParams::pt_v20`]. The default from 0.8.5 to 0.9.1.
+pub const PT_V20: ModelParams = ModelParams::pt_v20();
+/// pt-v20 with the economy's cycle, the Fed's stress rules, the curve, the
+/// market's variance, the opening, overnight returns, a name's own variance
+/// and the traded path's impact memory moved; see
+/// [`ModelParams::pt_v21`]. THE DEFAULT since 0.10.0:
 /// `DEFAULT_PRESET_NAME` names it and `Engine::default_model` returns it,
 /// and the test at the bottom of this file asserts the two agree.
-pub const PT_V20: ModelParams = ModelParams::pt_v20();
+pub const PT_V21: ModelParams = ModelParams::pt_v21();
+
+/// pt-v21's `cycle_equity_hazard_opening`, held apart because it is the one
+/// value the vectors graded for pt-v21 differ in: a larger opening hazard
+/// lifts the first year's volatility toward the run's (PH5) and reads the
+/// one-year drift lower. Moving it renames the preset's digest, so
+/// `PT_V21_DIGEST_PREFIX` moves with it, and every known answer of the
+/// default is re-based.
+const PT_V21_OPENING_HAZARD: f64 = 0.011;
+
+/// The first eight hex digits of pt-v21's digest at
+/// `PT_V21_OPENING_HAZARD`: the fingerprint the graded vector had as
+/// overrides on pt-v20 (`custom-2dc32068`). A test pins it.
+#[cfg(test)]
+const PT_V21_DIGEST_PREFIX: &str = "2dc32068";
 
 /// The name of the preset an engine runs when none is named.
 ///
@@ -4933,7 +7077,7 @@ pub const PT_V20: ModelParams = ModelParams::pt_v20();
 /// bottom of this file asserts it resolves to the engine's default
 /// bit-for-bit. A future era that moves the default and forgets this
 /// constant fails the suite instead of mislabelling every manifest.
-pub const DEFAULT_PRESET_NAME: &str = "pt-v20";
+pub const DEFAULT_PRESET_NAME: &str = "pt-v21";
 
 /// Every coefficient `pt-v3` moved, with the exact bits the converged
 /// certificate recorded. Read only by the tests.
@@ -4968,6 +7112,7 @@ impl ModelParams {
     pub const fn pt_v1() -> ModelParams {
         ModelParams {
             market_factor_sigma: tick::MARKET_FACTOR_SIGMA,
+            market_beta_normalise: 0.0,
             sector_factor_sigma: tick::SECTOR_FACTOR_SIGMA,
             sector_loading: 0.5,
             sector_loading_beta_slope: 0.0,
@@ -5010,6 +7155,13 @@ impl ModelParams {
             market_vol_alpha: factor_vol::MARKET_VOL_ALPHA,
             market_vol_beta: factor_vol::MARKET_VOL_BETA,
             market_vol_gamma: 0.0,
+            market_vol_slow_gamma: 0.0,
+            market_vol_leverage: 0.0,
+            market_vol_leverage_half_life: 0.0,
+            market_vol_leverage_down: 0.0,
+            market_vol_leverage_standardise: 0.0,
+            market_day_tail_df: 0.0,
+            market_day_tail_state_share: 0.0,
             market_vol_alpha_excursion: 0.0,
             market_vol_level_persistence: 0.0,
             market_vol_level_sigma: 0.0,
@@ -5115,6 +7267,9 @@ impl ModelParams {
             // and the idiosyncratic-rate switch, all branches at 0.0.
             sector_vol_alpha: 0.0,
             sector_vol_beta: 0.0,
+            idio_vol_alpha: 0.0,
+            idio_vol_beta: 0.0,
+            idio_vol_jump_bump: 0.0,
             jump_idio_excitation: 0.0,
             jump_idio_excitation_decay: 0.0,
             jump_idio_vix_decoupled: 0.0,
@@ -5167,8 +7322,14 @@ impl ModelParams {
             earnings_anticipation_half_life: 0.0,
             rate_pe_sensitivity: crate::fair_value::RATE_PE_SENSITIVITY,
             cycle_publication_lag: 0.0,
+            cycle_publication_lag_draw: 0.0,
             gdp_publication_lag: 0.0,
             unemployment_adjustment_half_life: 0.0,
+            unemployment_natural_pull: 0.0,
+            unemployment_okun_coefficient: 0.0,
+            unemployment_natural_rate: 0.0,
+            oil_inventory_reversion: 0.0,
+            oil_inflation_passthrough: 0.0,
             fear_greed_published_inputs: 0.0,
             macro_publication_repricing: 0.0,
             treasury_10y_noise: 0.03,
@@ -5176,23 +7337,104 @@ impl ModelParams {
             flight_to_quality_gain: 0.02,
             flight_to_quality_day: 0.0,
             corporate_yield_daily: 0.0,
+            cycle_nowcast_accuracy: 0.0,
+            corporate_spread_cycle: 0.0,
+            earnings_anticipation_drift_share: 0.0,
+            earnings_anticipation_drift_half_life: 0.0,
+            fed_growth_cut: 0.0,
+            macro_pins_hold: 0.0,
             fair_value_news_share: 0.0,
             fair_value_market_share: 0.0,
             fair_value_market_linear: 0.0,
             fair_value_market_vol_cap: 0.0,
+            fair_value_market_excess_share: 0.0,
             fair_value_vix_discount: 0.0,
             fair_value_vix_knee: 30.0,
             fair_value_vix_half_life: 0.0,
+            fair_value_vix_release_half_life: 0.0,
+            fair_value_relative_knee: 0.0,
+            fair_value_relative_half_life: 0.0,
+            pinned_vix_feedback: 0.0,
+            pinned_vix_variance_share: 0.0,
+            pinned_vix_calm_knee: 0.0,
+            pinned_vix_calm_share: 0.0,
+            pinned_vix_priced_cap: 0.0,
             buyback_yield_cap: 0.0,
+            buyback_accrual: 0.0,
+            rate_close_remark: 0.0,
+            rate_intraday_live: 0.0,
+            fed_stress_cut: 0.0,
+            fed_stress_vix: 30.0,
+            fed_stress_inflation_gap: 1.0,
+            dividend_payout_share: 0.0,
+            dividend_growth_cutoff: 0.30,
+            dividend_adjustment_speed: 0.4,
+            dividend_yield_ceiling: 2.0,
+            dividend_buyback_substitution: 0.0,
+            overnight_market_share: 0.0,
+            overnight_idio_share: 0.0,
+            overnight_idio_df: 0.0,
+            earnings_surprise_sigma: 0.0,
+            earnings_surprise_df: 0.0,
+            earnings_session_sigma: 0.0,
+            earnings_followthrough_sigma: 0.0,
+            earnings_volume_multiple: 0.0,
+            earnings_cycle_report_share: 0.0,
+            market_vol_cycle_ratio: 0.0,
+            market_vol_cycle_expansion: 0.0,
+            market_vol_cycle_half_life: 0.0,
+            market_vol_cycle_relative: 0.0,
+            market_vol_cycle_relative_calm: 0.0,
+            market_vol_cycle_cap_relative: 0.0,
+            market_vol_cycle_pin_neutral: 0.0,
+            market_vol_cycle_pin_phase: 0.0,
+            market_vol_cycle_trough_release: 0.0,
+            market_vol_cycle_release_half_life: 0.0,
+            market_vol_cycle_recovery_release: 0.0,
+            market_vol_cycle_recovery_scale: 0.0,
+            vix_stress_premium: 0.0,
+            vix_stress_premium_knee: 0.0,
+            vix_stress_premium_cap: 0.0,
+            fed_put_gain: 0.0,
+            fed_put_threshold: 0.0,
+            fed_put_half_life: 0.0,
+            fed_put_emergency_vix: 0.0,
+            treasury_put_pricing: 0.0,
+            treasury_haven_gain: 0.0,
+            fed_stress_hold: 0.0,
+            treasury_path_pricing: 0.0,
+            treasury_path_half_life: 0.0,
+            treasury_policy_damping: 0.0,
+            policy_anticipation: 0.0,
+            policy_anticipation_cut_share: 0.0,
+            corporate_spread_vix_cut: 0.0,
+            corporate_spread_equity_gain: 0.0,
+            corporate_spread_equity_half_life: 0.0,
+            cycle_equity_hazard: 0.0,
+            cycle_equity_hazard_knee: 0.0,
+            cycle_equity_hazard_opening: 0.0,
+            market_prehistory_sessions: 0.0,
+            market_prehistory_valuation: 0.0,
+            fed_put_carry: 0.0,
+            fed_drawdown_hold: 0.0,
             opening_mispricing_sigma: 0.0,
             opening_market_sigma: 0.0,
             book_depth_coefficient: 0.0,
             book_depth_exponent: 0.0,
             book_depth_reach: 0.0,
+            book_depth_nesting: 0.0,
             book_shared: 0.0,
             book_refill_half_life: 0.0,
             book_resting: 0.0,
+            book_arrival_shuffle: 0.0,
+            book_cross_at_limit: 0.0,
             fill_impact_coefficient: 0.0,
+            impact_memory_coefficient: 0.0,
+            impact_memory_half_life: 0.0,
+            impact_memory_slow_half_life: 0.0,
+            impact_memory_slow_weight: 0.0,
+            impact_memory_crossover: 0.0,
+            impact_memory_refill: 0.0,
             mispricing_half_life_days: mispricing::MISPRICING_HALF_LIFE_DAYS,
             mispricing_phi: mispricing::MISPRICING_PHI,
             s_phi_tick: tick::S_PHI_TICK,
@@ -7256,6 +9498,169 @@ impl ModelParams {
         p
     }
 
+    /// pt-v20 with 104 dials moved: the economy's cycle feeding back from
+    /// equity stress, the Fed's stress and growth rules and a curve that
+    /// prices the policy path, payouts as accrued state, a market variance
+    /// that follows the cycle with a leverage term and a VIX stress premium,
+    /// a market that opens on two years of prehistory, a name's own variance
+    /// clustering, overnight and earnings-day returns, a traded path whose
+    /// impact remembers recent volume, unemployment on Okun's law and oil
+    /// that reverts to its inventory level. THE DEFAULT since 0.10.0.
+    ///
+    /// Every dial it moves is a switch or a dial that is inert at 0.0 on
+    /// every earlier preset (or at its default, where that is not zero), so
+    /// pt-v20 and every preset before it replay exactly. The values are the
+    /// graded vector: pt-v20 with these overrides has the fingerprint this
+    /// preset's digest replaces, which the test at the bottom of this file
+    /// pins (`PT_V21_DIGEST_PREFIX`). Each dial's own documentation says what it
+    /// does at the value set here.
+    pub const fn pt_v21() -> ModelParams {
+        let mut p = ModelParams::pt_v20();
+        // The economy's cycle and the earnings it drives. Equity stress
+        // raises the hazard of a turn, in the opening's draw as in the run,
+        // the cycle is nowcast and published with a drawn lag, credit
+        // spreads follow the cycle, fair value leans on the expected
+        // earnings drift, and the aggregate earnings cycle reaches the
+        // phase's level more slowly.
+        p.cycle_equity_hazard = 5.0;
+        p.cycle_equity_hazard_knee = 0.1;
+        p.cycle_equity_hazard_opening = PT_V21_OPENING_HAZARD;
+        p.cycle_nowcast_accuracy = 0.4;
+        p.cycle_publication_lag_draw = 1.0;
+        p.corporate_spread_cycle = 0.75;
+        p.earnings_anticipation_drift_half_life = 252.0;
+        p.earnings_anticipation_drift_share = 0.9;
+        p.earnings_cycle_half_life = 150.0;
+        // Unemployment follows output by Okun's law, and oil reverts toward its
+        // inventory level and passes through to inflation symmetrically.
+        p.unemployment_okun_coefficient = 0.75;
+        p.oil_inventory_reversion = 0.002;
+        p.oil_inflation_passthrough = 1.0;
+        // The Fed and the curve. The bank cuts for weak growth and for stress,
+        // holds a rise through stress and after a drawdown, and carries a put
+        // the curve prices before the meeting; the curve prices the expected
+        // policy path, the 2-year carries less noise of its own, the rate
+        // indices re-mark at the close and mark live in the session, a pinned
+        // field holds through the close, and credit spreads follow equities.
+        p.fed_growth_cut = 2.0;
+        p.fed_stress_cut = 0.1;
+        p.fed_stress_inflation_gap = 2.0;
+        p.fed_stress_hold = 42.0;
+        p.fed_put_gain = 3.0;
+        p.fed_put_half_life = 126.0;
+        p.fed_put_carry = 1.0;
+        p.fed_put_emergency_vix = 50.0;
+        p.fed_drawdown_hold = 0.12;
+        p.rate_close_remark = 1.0;
+        p.rate_intraday_live = 1.0;
+        p.macro_pins_hold = 1.0;
+        p.policy_anticipation = 1.8;
+        p.treasury_put_pricing = 1.0;
+        p.treasury_haven_gain = 0.014;
+        p.treasury_path_pricing = 1.0;
+        p.treasury_path_half_life = 63.0;
+        p.treasury_policy_damping = 0.5;
+        p.treasury_2y_noise = 0.008;
+        p.flight_to_quality_gain = 0.013;
+        p.corporate_spread_vix_cut = 1.0;
+        p.corporate_spread_equity_gain = 1.8;
+        p.corporate_spread_equity_half_life = 126.0;
+        // Payouts. The buyback term is accrued state, dividends are paid,
+        // and a dividend substitutes for buybacks within one total payout.
+        p.buyback_accrual = 1.0;
+        p.buyback_payout_share = 0.9;
+        p.dividend_payout_share = 1.2;
+        p.dividend_buyback_substitution = 1.0;
+        // The market's variance and the VIX. A cycle-dependent market volatility
+        // with a leverage term, a VIX stress premium, a pinned VIX that feeds
+        // back into variance and is priced calm below its knee, a market factor
+        // on a normalised beta, and rarer, larger market jumps.
+        p.market_factor_sigma = 0.007099478;
+        p.market_beta_normalise = 1.0;
+        p.market_vol_gamma = 0.06;
+        p.market_vol_beta = 0.9446;
+        p.market_vol_slow_gamma = 0.05;
+        p.market_vol_vix_coupling = 0.75;
+        p.market_vol_vix_smooth = 3.0;
+        p.market_vol_cycle_ratio = 2.4705882352941178;
+        p.market_vol_cycle_expansion = 0.82;
+        p.market_vol_cycle_half_life = 10.0;
+        p.market_vol_cycle_relative = 0.75;
+        p.market_vol_cycle_cap_relative = 1.0;
+        p.market_vol_cycle_pin_neutral = 1.0;
+        p.market_vol_cycle_pin_phase = 1.0;
+        p.market_vol_cycle_recovery_release = 0.45;
+        p.market_vol_cycle_recovery_scale = 0.1;
+        p.market_vol_leverage = 2.5;
+        p.market_vol_leverage_half_life = 15.0;
+        p.market_vol_leverage_standardise = 1.0;
+        p.vix_level_sigma = 0.009;
+        p.vix_stress_premium = 3.0;
+        p.vix_stress_premium_knee = 0.6;
+        p.vix_stress_premium_cap = 0.35;
+        p.pinned_vix_feedback = 0.8;
+        p.pinned_vix_variance_share = 0.7;
+        p.pinned_vix_calm_knee = 17.6;
+        p.pinned_vix_calm_share = 0.2;
+        p.pinned_vix_priced_cap = 1.0;
+        p.jump_intensity_market = 0.005;
+        p.jump_mean_market = -0.03;
+        p.jump_sigma_market = 0.01;
+        // Fair value and the opening. A floor under the market's permanent share
+        // above the volatility ceiling, a slower give-back of the volatility
+        // discount, a relative-value knee, and a market that opens on two years
+        // of prehistory at its valuation.
+        p.fair_value_market_excess_share = 0.5;
+        p.fair_value_vix_release_half_life = 504.0;
+        p.fair_value_relative_knee = 4.0;
+        p.fair_value_relative_half_life = 63.0;
+        p.market_prehistory_sessions = 504.0;
+        p.market_prehistory_valuation = 1.0;
+        // A name's own variance. Idiosyncratic volatility clusters and jumps
+        // bump it, jumps are rarer and the base sigma lower, and volume reads
+        // the name's own variance.
+        p.idio_sigma_scale = 0.52;
+        p.idio_vol_alpha = 0.25;
+        p.idio_vol_beta = 0.5;
+        p.idio_vol_jump_bump = 1.0;
+        p.jump_intensity_idio = 0.009;
+        p.jump_sigma_idio = 0.0318;
+        p.volume_idio_variance_gain = 0.65;
+        // Overnight and earnings. A share of the market's and each name's
+        // variance arrives overnight with fat tails, and an earnings day carries
+        // a surprise, the session's reaction, a follow-through and its volume.
+        p.overnight_market_share = 0.55;
+        p.overnight_idio_share = 0.1;
+        p.overnight_idio_df = 4.0;
+        p.earnings_surprise_sigma = 3.5;
+        p.earnings_session_sigma = 1.9;
+        p.earnings_followthrough_sigma = 1.1;
+        p.earnings_volume_multiple = 1.2;
+        // The traded path. Impact remembers recent volume on two timescales and
+        // refills, a fill's linear impact is smaller, a cohort's arrival order
+        // at the book is shuffled, the latent depth nests the maker's ladder, a
+        // crossed resting order trades at its own limit, and injected order flow
+        // divides by depth once, linear in a tick's participation up to ten
+        // times the name's minute volume.
+        p.impact_memory_coefficient = 0.65;
+        p.impact_memory_half_life = 12.0;
+        p.impact_memory_slow_half_life = 780.0;
+        p.impact_memory_slow_weight = 0.1;
+        p.impact_memory_crossover = 0.001;
+        p.impact_memory_refill = 1.0;
+        p.fill_impact_coefficient = 0.15;
+        p.book_arrival_shuffle = 1.0;
+        p.book_depth_nesting = 1.0;
+        p.book_cross_at_limit = 1.0;
+        p.order_flow_depth_law = 1.0;
+        p.order_flow_impact_law = 1.0;
+        p.order_flow_coefficient = 800.0;
+        // A guard, as a long run needs: the price cap far above any price
+        // a run reaches.
+        p.price_hard_cap = 1000000000.0;
+        p
+    }
+
     /// Look a shipped preset up by name. `"pt-v1"` remains selectable and
     /// bit-reproducing forever; `"pt-v2"` is the calibrated candidate that
     /// joined the table on 2026-08-22; `"pt-v3"` is
@@ -7289,6 +9694,7 @@ impl ModelParams {
             "pt-v18" => Some(PT_V18),
             "pt-v19" => Some(PT_V19),
             "pt-v20" => Some(PT_V20),
+            "pt-v21" => Some(PT_V21),
             _ => None,
         }
     }
@@ -7297,7 +9703,7 @@ impl ModelParams {
     pub fn preset_names() -> &'static [&'static str] {
         &["pt-v1", "pt-v2", "pt-v3", "pt-v4", "pt-v5", "pt-v6", "pt-v7", "pt-v8", "pt-v9", "pt-v10",
           "pt-v11", "pt-v12", "pt-v13", "pt-v14", "pt-v15",
-          "pt-v16", "pt-v18", "pt-v19", "pt-v20"]
+          "pt-v16", "pt-v18", "pt-v19", "pt-v20", "pt-v21"]
     }
 
     /// Read one parameter by name — the settable surface, the derived bits,
@@ -7310,6 +9716,7 @@ impl ModelParams {
         }
         Some(match name {
             "market_factor_sigma" => self.market_factor_sigma,
+            "market_beta_normalise" => self.market_beta_normalise,
             "sector_factor_sigma" => self.sector_factor_sigma,
             "sector_loading" => self.sector_loading,
             "sector_loading_beta_slope" => self.sector_loading_beta_slope,
@@ -7352,6 +9759,13 @@ impl ModelParams {
             "market_vol_alpha" => self.market_vol_alpha,
             "market_vol_beta" => self.market_vol_beta,
             "market_vol_gamma" => self.market_vol_gamma,
+            "market_vol_slow_gamma" => self.market_vol_slow_gamma,
+            "market_vol_leverage" => self.market_vol_leverage,
+            "market_vol_leverage_half_life" => self.market_vol_leverage_half_life,
+            "market_vol_leverage_down" => self.market_vol_leverage_down,
+            "market_vol_leverage_standardise" => self.market_vol_leverage_standardise,
+            "market_day_tail_df" => self.market_day_tail_df,
+            "market_day_tail_state_share" => self.market_day_tail_state_share,
             "market_vol_alpha_excursion" => self.market_vol_alpha_excursion,
             "market_vol_level_persistence" => self.market_vol_level_persistence,
             "market_vol_level_sigma" => self.market_vol_level_sigma,
@@ -7449,6 +9863,9 @@ impl ModelParams {
             "vix_jump_return_intensity" => self.vix_jump_return_intensity,
             "sector_vol_alpha" => self.sector_vol_alpha,
             "sector_vol_beta" => self.sector_vol_beta,
+            "idio_vol_alpha" => self.idio_vol_alpha,
+            "idio_vol_beta" => self.idio_vol_beta,
+            "idio_vol_jump_bump" => self.idio_vol_jump_bump,
             "jump_idio_excitation" => self.jump_idio_excitation,
             "jump_idio_excitation_decay" => self.jump_idio_excitation_decay,
             "jump_idio_vix_decoupled" => self.jump_idio_vix_decoupled,
@@ -7490,8 +9907,14 @@ impl ModelParams {
             "earnings_anticipation_half_life" => self.earnings_anticipation_half_life,
             "rate_pe_sensitivity" => self.rate_pe_sensitivity,
             "cycle_publication_lag" => self.cycle_publication_lag,
+            "cycle_publication_lag_draw" => self.cycle_publication_lag_draw,
             "gdp_publication_lag" => self.gdp_publication_lag,
             "unemployment_adjustment_half_life" => self.unemployment_adjustment_half_life,
+            "unemployment_natural_pull" => self.unemployment_natural_pull,
+            "unemployment_okun_coefficient" => self.unemployment_okun_coefficient,
+            "unemployment_natural_rate" => self.unemployment_natural_rate,
+            "oil_inventory_reversion" => self.oil_inventory_reversion,
+            "oil_inflation_passthrough" => self.oil_inflation_passthrough,
             "fear_greed_published_inputs" => self.fear_greed_published_inputs,
             "macro_publication_repricing" => self.macro_publication_repricing,
             "treasury_10y_noise" => self.treasury_10y_noise,
@@ -7499,23 +9922,104 @@ impl ModelParams {
             "flight_to_quality_gain" => self.flight_to_quality_gain,
             "flight_to_quality_day" => self.flight_to_quality_day,
             "corporate_yield_daily" => self.corporate_yield_daily,
+            "cycle_nowcast_accuracy" => self.cycle_nowcast_accuracy,
+            "corporate_spread_cycle" => self.corporate_spread_cycle,
+            "earnings_anticipation_drift_share" => self.earnings_anticipation_drift_share,
+            "earnings_anticipation_drift_half_life" => self.earnings_anticipation_drift_half_life,
+            "fed_growth_cut" => self.fed_growth_cut,
+            "macro_pins_hold" => self.macro_pins_hold,
             "fair_value_news_share" => self.fair_value_news_share,
             "fair_value_market_share" => self.fair_value_market_share,
             "fair_value_market_linear" => self.fair_value_market_linear,
             "fair_value_market_vol_cap" => self.fair_value_market_vol_cap,
+            "fair_value_market_excess_share" => self.fair_value_market_excess_share,
             "fair_value_vix_discount" => self.fair_value_vix_discount,
             "fair_value_vix_knee" => self.fair_value_vix_knee,
             "fair_value_vix_half_life" => self.fair_value_vix_half_life,
+            "fair_value_vix_release_half_life" => self.fair_value_vix_release_half_life,
+            "fair_value_relative_knee" => self.fair_value_relative_knee,
+            "fair_value_relative_half_life" => self.fair_value_relative_half_life,
+            "pinned_vix_feedback" => self.pinned_vix_feedback,
+            "pinned_vix_variance_share" => self.pinned_vix_variance_share,
+            "pinned_vix_calm_knee" => self.pinned_vix_calm_knee,
+            "pinned_vix_calm_share" => self.pinned_vix_calm_share,
+            "pinned_vix_priced_cap" => self.pinned_vix_priced_cap,
             "buyback_yield_cap" => self.buyback_yield_cap,
+            "buyback_accrual" => self.buyback_accrual,
+            "rate_close_remark" => self.rate_close_remark,
+            "rate_intraday_live" => self.rate_intraday_live,
+            "fed_stress_cut" => self.fed_stress_cut,
+            "fed_stress_vix" => self.fed_stress_vix,
+            "fed_stress_inflation_gap" => self.fed_stress_inflation_gap,
+            "dividend_payout_share" => self.dividend_payout_share,
+            "dividend_growth_cutoff" => self.dividend_growth_cutoff,
+            "dividend_adjustment_speed" => self.dividend_adjustment_speed,
+            "dividend_yield_ceiling" => self.dividend_yield_ceiling,
+            "dividend_buyback_substitution" => self.dividend_buyback_substitution,
+            "overnight_market_share" => self.overnight_market_share,
+            "overnight_idio_share" => self.overnight_idio_share,
+            "overnight_idio_df" => self.overnight_idio_df,
+            "earnings_surprise_sigma" => self.earnings_surprise_sigma,
+            "earnings_surprise_df" => self.earnings_surprise_df,
+            "earnings_session_sigma" => self.earnings_session_sigma,
+            "earnings_followthrough_sigma" => self.earnings_followthrough_sigma,
+            "earnings_volume_multiple" => self.earnings_volume_multiple,
+            "earnings_cycle_report_share" => self.earnings_cycle_report_share,
+            "market_vol_cycle_ratio" => self.market_vol_cycle_ratio,
+            "market_vol_cycle_expansion" => self.market_vol_cycle_expansion,
+            "market_vol_cycle_half_life" => self.market_vol_cycle_half_life,
+            "market_vol_cycle_relative" => self.market_vol_cycle_relative,
+            "market_vol_cycle_relative_calm" => self.market_vol_cycle_relative_calm,
+            "market_vol_cycle_cap_relative" => self.market_vol_cycle_cap_relative,
+            "market_vol_cycle_pin_neutral" => self.market_vol_cycle_pin_neutral,
+            "market_vol_cycle_pin_phase" => self.market_vol_cycle_pin_phase,
+            "market_vol_cycle_trough_release" => self.market_vol_cycle_trough_release,
+            "market_vol_cycle_release_half_life" => self.market_vol_cycle_release_half_life,
+            "market_vol_cycle_recovery_release" => self.market_vol_cycle_recovery_release,
+            "market_vol_cycle_recovery_scale" => self.market_vol_cycle_recovery_scale,
+            "vix_stress_premium" => self.vix_stress_premium,
+            "vix_stress_premium_knee" => self.vix_stress_premium_knee,
+            "vix_stress_premium_cap" => self.vix_stress_premium_cap,
+            "fed_put_gain" => self.fed_put_gain,
+            "fed_put_threshold" => self.fed_put_threshold,
+            "fed_put_half_life" => self.fed_put_half_life,
+            "fed_put_emergency_vix" => self.fed_put_emergency_vix,
+            "treasury_put_pricing" => self.treasury_put_pricing,
+            "treasury_haven_gain" => self.treasury_haven_gain,
+            "fed_stress_hold" => self.fed_stress_hold,
+            "treasury_path_pricing" => self.treasury_path_pricing,
+            "treasury_path_half_life" => self.treasury_path_half_life,
+            "treasury_policy_damping" => self.treasury_policy_damping,
+            "policy_anticipation" => self.policy_anticipation,
+            "policy_anticipation_cut_share" => self.policy_anticipation_cut_share,
+            "corporate_spread_vix_cut" => self.corporate_spread_vix_cut,
+            "corporate_spread_equity_gain" => self.corporate_spread_equity_gain,
+            "corporate_spread_equity_half_life" => self.corporate_spread_equity_half_life,
+            "cycle_equity_hazard" => self.cycle_equity_hazard,
+            "cycle_equity_hazard_knee" => self.cycle_equity_hazard_knee,
+            "cycle_equity_hazard_opening" => self.cycle_equity_hazard_opening,
+            "market_prehistory_sessions" => self.market_prehistory_sessions,
+            "market_prehistory_valuation" => self.market_prehistory_valuation,
+            "fed_put_carry" => self.fed_put_carry,
+            "fed_drawdown_hold" => self.fed_drawdown_hold,
             "opening_mispricing_sigma" => self.opening_mispricing_sigma,
             "opening_market_sigma" => self.opening_market_sigma,
             "book_depth_coefficient" => self.book_depth_coefficient,
             "book_depth_exponent" => self.book_depth_exponent,
             "book_depth_reach" => self.book_depth_reach,
+            "book_depth_nesting" => self.book_depth_nesting,
             "book_shared" => self.book_shared,
             "book_refill_half_life" => self.book_refill_half_life,
             "book_resting" => self.book_resting,
+            "book_arrival_shuffle" => self.book_arrival_shuffle,
+            "book_cross_at_limit" => self.book_cross_at_limit,
             "fill_impact_coefficient" => self.fill_impact_coefficient,
+            "impact_memory_coefficient" => self.impact_memory_coefficient,
+            "impact_memory_half_life" => self.impact_memory_half_life,
+            "impact_memory_slow_half_life" => self.impact_memory_slow_half_life,
+            "impact_memory_slow_weight" => self.impact_memory_slow_weight,
+            "impact_memory_crossover" => self.impact_memory_crossover,
+            "impact_memory_refill" => self.impact_memory_refill,
             "mispricing_half_life_days" => self.mispricing_half_life_days,
             "mispricing_phi" => self.mispricing_phi,
             "s_phi_tick" => self.s_phi_tick,
@@ -7562,6 +10066,7 @@ impl ModelParams {
         let mut out = self.clone();
         match name {
             "market_factor_sigma" => out.market_factor_sigma = value,
+            "market_beta_normalise" => out.market_beta_normalise = value,
             "sector_factor_sigma" => out.sector_factor_sigma = value,
             "sector_loading" => out.sector_loading = value,
             "sector_loading_beta_slope" => out.sector_loading_beta_slope = value,
@@ -7604,6 +10109,13 @@ impl ModelParams {
             "market_vol_alpha" => out.market_vol_alpha = value,
             "market_vol_beta" => out.market_vol_beta = value,
             "market_vol_gamma" => out.market_vol_gamma = value,
+            "market_vol_slow_gamma" => out.market_vol_slow_gamma = value,
+            "market_vol_leverage" => out.market_vol_leverage = value,
+            "market_vol_leverage_half_life" => out.market_vol_leverage_half_life = value,
+            "market_vol_leverage_down" => out.market_vol_leverage_down = value,
+            "market_vol_leverage_standardise" => out.market_vol_leverage_standardise = value,
+            "market_day_tail_df" => out.market_day_tail_df = value,
+            "market_day_tail_state_share" => out.market_day_tail_state_share = value,
             "market_vol_alpha_excursion" => out.market_vol_alpha_excursion = value,
             "market_vol_level_persistence" => out.market_vol_level_persistence = value,
             "market_vol_level_sigma" => out.market_vol_level_sigma = value,
@@ -7701,6 +10213,9 @@ impl ModelParams {
             "vix_jump_return_intensity" => out.vix_jump_return_intensity = value,
             "sector_vol_alpha" => out.sector_vol_alpha = value,
             "sector_vol_beta" => out.sector_vol_beta = value,
+            "idio_vol_alpha" => out.idio_vol_alpha = value,
+            "idio_vol_beta" => out.idio_vol_beta = value,
+            "idio_vol_jump_bump" => out.idio_vol_jump_bump = value,
             "jump_idio_excitation" => out.jump_idio_excitation = value,
             "jump_idio_excitation_decay" => out.jump_idio_excitation_decay = value,
             "jump_idio_vix_decoupled" => out.jump_idio_vix_decoupled = value,
@@ -7742,8 +10257,14 @@ impl ModelParams {
             "earnings_anticipation_half_life" => out.earnings_anticipation_half_life = value,
             "rate_pe_sensitivity" => out.rate_pe_sensitivity = value,
             "cycle_publication_lag" => out.cycle_publication_lag = value,
+            "cycle_publication_lag_draw" => out.cycle_publication_lag_draw = value,
             "gdp_publication_lag" => out.gdp_publication_lag = value,
             "unemployment_adjustment_half_life" => out.unemployment_adjustment_half_life = value,
+            "unemployment_natural_pull" => out.unemployment_natural_pull = value,
+            "unemployment_okun_coefficient" => out.unemployment_okun_coefficient = value,
+            "unemployment_natural_rate" => out.unemployment_natural_rate = value,
+            "oil_inventory_reversion" => out.oil_inventory_reversion = value,
+            "oil_inflation_passthrough" => out.oil_inflation_passthrough = value,
             "fear_greed_published_inputs" => out.fear_greed_published_inputs = value,
             "macro_publication_repricing" => out.macro_publication_repricing = value,
             "treasury_10y_noise" => out.treasury_10y_noise = value,
@@ -7751,23 +10272,104 @@ impl ModelParams {
             "flight_to_quality_gain" => out.flight_to_quality_gain = value,
             "flight_to_quality_day" => out.flight_to_quality_day = value,
             "corporate_yield_daily" => out.corporate_yield_daily = value,
+            "cycle_nowcast_accuracy" => out.cycle_nowcast_accuracy = value,
+            "corporate_spread_cycle" => out.corporate_spread_cycle = value,
+            "earnings_anticipation_drift_share" => out.earnings_anticipation_drift_share = value,
+            "earnings_anticipation_drift_half_life" => out.earnings_anticipation_drift_half_life = value,
+            "fed_growth_cut" => out.fed_growth_cut = value,
+            "macro_pins_hold" => out.macro_pins_hold = value,
             "fair_value_news_share" => out.fair_value_news_share = value,
             "fair_value_market_share" => out.fair_value_market_share = value,
             "fair_value_market_linear" => out.fair_value_market_linear = value,
             "fair_value_market_vol_cap" => out.fair_value_market_vol_cap = value,
+            "fair_value_market_excess_share" => out.fair_value_market_excess_share = value,
             "fair_value_vix_discount" => out.fair_value_vix_discount = value,
             "fair_value_vix_knee" => out.fair_value_vix_knee = value,
             "fair_value_vix_half_life" => out.fair_value_vix_half_life = value,
+            "fair_value_vix_release_half_life" => out.fair_value_vix_release_half_life = value,
+            "fair_value_relative_knee" => out.fair_value_relative_knee = value,
+            "fair_value_relative_half_life" => out.fair_value_relative_half_life = value,
+            "pinned_vix_feedback" => out.pinned_vix_feedback = value,
+            "pinned_vix_variance_share" => out.pinned_vix_variance_share = value,
+            "pinned_vix_calm_knee" => out.pinned_vix_calm_knee = value,
+            "pinned_vix_calm_share" => out.pinned_vix_calm_share = value,
+            "pinned_vix_priced_cap" => out.pinned_vix_priced_cap = value,
             "buyback_yield_cap" => out.buyback_yield_cap = value,
+            "buyback_accrual" => out.buyback_accrual = value,
+            "rate_close_remark" => out.rate_close_remark = value,
+            "rate_intraday_live" => out.rate_intraday_live = value,
+            "fed_stress_cut" => out.fed_stress_cut = value,
+            "fed_stress_vix" => out.fed_stress_vix = value,
+            "fed_stress_inflation_gap" => out.fed_stress_inflation_gap = value,
+            "dividend_payout_share" => out.dividend_payout_share = value,
+            "dividend_growth_cutoff" => out.dividend_growth_cutoff = value,
+            "dividend_adjustment_speed" => out.dividend_adjustment_speed = value,
+            "dividend_yield_ceiling" => out.dividend_yield_ceiling = value,
+            "dividend_buyback_substitution" => out.dividend_buyback_substitution = value,
+            "overnight_market_share" => out.overnight_market_share = value,
+            "overnight_idio_share" => out.overnight_idio_share = value,
+            "overnight_idio_df" => out.overnight_idio_df = value,
+            "earnings_surprise_sigma" => out.earnings_surprise_sigma = value,
+            "earnings_surprise_df" => out.earnings_surprise_df = value,
+            "earnings_session_sigma" => out.earnings_session_sigma = value,
+            "earnings_followthrough_sigma" => out.earnings_followthrough_sigma = value,
+            "earnings_volume_multiple" => out.earnings_volume_multiple = value,
+            "earnings_cycle_report_share" => out.earnings_cycle_report_share = value,
+            "market_vol_cycle_ratio" => out.market_vol_cycle_ratio = value,
+            "market_vol_cycle_expansion" => out.market_vol_cycle_expansion = value,
+            "market_vol_cycle_half_life" => out.market_vol_cycle_half_life = value,
+            "market_vol_cycle_relative" => out.market_vol_cycle_relative = value,
+            "market_vol_cycle_relative_calm" => out.market_vol_cycle_relative_calm = value,
+            "market_vol_cycle_cap_relative" => out.market_vol_cycle_cap_relative = value,
+            "market_vol_cycle_pin_neutral" => out.market_vol_cycle_pin_neutral = value,
+            "market_vol_cycle_pin_phase" => out.market_vol_cycle_pin_phase = value,
+            "market_vol_cycle_trough_release" => out.market_vol_cycle_trough_release = value,
+            "market_vol_cycle_release_half_life" => out.market_vol_cycle_release_half_life = value,
+            "market_vol_cycle_recovery_release" => out.market_vol_cycle_recovery_release = value,
+            "market_vol_cycle_recovery_scale" => out.market_vol_cycle_recovery_scale = value,
+            "vix_stress_premium" => out.vix_stress_premium = value,
+            "vix_stress_premium_knee" => out.vix_stress_premium_knee = value,
+            "vix_stress_premium_cap" => out.vix_stress_premium_cap = value,
+            "fed_put_gain" => out.fed_put_gain = value,
+            "fed_put_threshold" => out.fed_put_threshold = value,
+            "fed_put_half_life" => out.fed_put_half_life = value,
+            "fed_put_emergency_vix" => out.fed_put_emergency_vix = value,
+            "treasury_put_pricing" => out.treasury_put_pricing = value,
+            "treasury_haven_gain" => out.treasury_haven_gain = value,
+            "fed_stress_hold" => out.fed_stress_hold = value,
+            "treasury_path_pricing" => out.treasury_path_pricing = value,
+            "treasury_path_half_life" => out.treasury_path_half_life = value,
+            "treasury_policy_damping" => out.treasury_policy_damping = value,
+            "policy_anticipation" => out.policy_anticipation = value,
+            "policy_anticipation_cut_share" => out.policy_anticipation_cut_share = value,
+            "corporate_spread_vix_cut" => out.corporate_spread_vix_cut = value,
+            "corporate_spread_equity_gain" => out.corporate_spread_equity_gain = value,
+            "corporate_spread_equity_half_life" => out.corporate_spread_equity_half_life = value,
+            "cycle_equity_hazard" => out.cycle_equity_hazard = value,
+            "cycle_equity_hazard_knee" => out.cycle_equity_hazard_knee = value,
+            "cycle_equity_hazard_opening" => out.cycle_equity_hazard_opening = value,
+            "market_prehistory_sessions" => out.market_prehistory_sessions = value,
+            "market_prehistory_valuation" => out.market_prehistory_valuation = value,
+            "fed_put_carry" => out.fed_put_carry = value,
+            "fed_drawdown_hold" => out.fed_drawdown_hold = value,
             "opening_mispricing_sigma" => out.opening_mispricing_sigma = value,
             "opening_market_sigma" => out.opening_market_sigma = value,
             "book_depth_coefficient" => out.book_depth_coefficient = value,
             "book_depth_exponent" => out.book_depth_exponent = value,
             "book_depth_reach" => out.book_depth_reach = value,
+            "book_depth_nesting" => out.book_depth_nesting = value,
             "book_shared" => out.book_shared = value,
             "book_refill_half_life" => out.book_refill_half_life = value,
             "book_resting" => out.book_resting = value,
+            "book_arrival_shuffle" => out.book_arrival_shuffle = value,
+            "book_cross_at_limit" => out.book_cross_at_limit = value,
             "fill_impact_coefficient" => out.fill_impact_coefficient = value,
+            "impact_memory_coefficient" => out.impact_memory_coefficient = value,
+            "impact_memory_half_life" => out.impact_memory_half_life = value,
+            "impact_memory_slow_half_life" => out.impact_memory_slow_half_life = value,
+            "impact_memory_slow_weight" => out.impact_memory_slow_weight = value,
+            "impact_memory_crossover" => out.impact_memory_crossover = value,
+            "impact_memory_refill" => out.impact_memory_refill = value,
             "momentum_theta" => out.momentum_theta = value,
             "mispricing_cap" => out.mispricing_cap = value,
             "crowd_valuation_gain" => out.crowd_valuation_gain = value,
@@ -7841,13 +10443,21 @@ impl ModelParams {
     /// (either sign), because at zero its branch is the model that existed
     /// before the switch did. So adding one moves no preset's digest, no
     /// custom model's fingerprint, and no state hash or manifest that
-    /// carries one. Off zero it is hashed like any other dial.
+    /// carries one. Off zero it is hashed like any other dial. A dial in
+    /// [`DIGEST_SILENT_AT_DEFAULT`] is left out the same way while it holds
+    /// its (non-zero) default, which its gating switch at zero never reads.
     pub fn digest(&self) -> String {
         #[cfg(test)]
         DIGESTS_TAKEN.with(|n| n.set(n.get() + 1));
         let mut hasher = Sha256::new();
         for (name, value) in self.to_pairs() {
             if value == 0.0 && DIGEST_SILENT_AT_ZERO.contains(&name.as_str()) {
+                continue;
+            }
+            if DIGEST_SILENT_AT_DEFAULT
+                .iter()
+                .any(|(n, d)| *n == name.as_str() && value.to_bits() == d.to_bits())
+            {
                 continue;
             }
             hasher.update(name.as_bytes());
@@ -7929,7 +10539,8 @@ impl ModelParams {
         }
         if y == 0.0 {
             for (name, v) in [("book_depth_exponent", self.book_depth_exponent),
-                              ("book_depth_reach", self.book_depth_reach)] {
+                              ("book_depth_reach", self.book_depth_reach),
+                              ("book_depth_nesting", self.book_depth_nesting)] {
                 if v != 0.0 {
                     return Err(format!(
                         "{name} is {v} but book_depth_coefficient is 0: it shapes \
@@ -7951,6 +10562,14 @@ impl ModelParams {
                  in multiples of daily volume, inside [0, 10]; 0.0 reads as one \
                  day's volume."));
         }
+        let k = self.book_depth_nesting;
+        if !(0.0..=1.0).contains(&k) {
+            return Err(format!(
+                "book_depth_nesting is {k}. It is the share of the maker's ladder \
+                 the latent depth counts as its own front, in [0, 1]: 0.0 puts \
+                 the latent pool beside the ladder, 1.0 makes the depth within \
+                 any distance the larger of the two."));
+        }
         let h = self.book_refill_half_life;
         if !(0.0..=390.0).contains(&h) {
             return Err(format!(
@@ -7969,6 +10588,74 @@ impl ModelParams {
                 "fill_impact_coefficient is {g}. It is gamma in gamma sigma Q/V, \
                  non-negative and of order 0.1 to 1 (Almgren et al. 2005 measure \
                  0.314); 0.0 is the order-imbalance law. Set it inside [0, 5]."));
+        }
+        self.impact_memory_invariants()
+    }
+
+    /// The metaorder memory's dials: ranges, and the companions each needs.
+    /// Part of [`ModelParams::invariants`] through `book_invariants`.
+    fn impact_memory_invariants(&self) -> Result<(), String> {
+        let y = self.impact_memory_coefficient;
+        let (h1, h2, w, m) = (self.impact_memory_half_life, self.impact_memory_slow_half_life,
+                              self.impact_memory_slow_weight, self.impact_memory_crossover);
+        if !(0.0..=10.0).contains(&y) {
+            return Err(format!(
+                "impact_memory_coefficient is {y}. It is the metaorder memory's Y in \
+                 Y sigma (M)^delta, in [0, 10] and at most book_depth_coefficient; 0.0 \
+                 is off."));
+        }
+        // The shape dials are range-checked always and read only with the
+        // coefficient on, so a vector may carry them at the coefficient's
+        // 0.0 (the perturbation table's base does).
+        if !(0.0..=39000.0).contains(&h1) {
+            return Err(format!(
+                "impact_memory_half_life is {h1}. It is a half-life in open ticks, in \
+                 (0, 39000], and required with the memory on."));
+        }
+        if !(h2 == 0.0 || (h2 >= h1 && h2 <= 98280.0)) {
+            return Err(format!(
+                "impact_memory_slow_half_life is {h2}. It is 0.0 (no slow part) or a \
+                 half-life in open ticks from impact_memory_half_life ({h1}) to 98280."));
+        }
+        if !(0.0..1.0).contains(&w) {
+            return Err(format!(
+                "impact_memory_slow_weight is {w}. It is the slow part's weight, in [0, 1)."));
+        }
+        if w != 0.0 && h2 == 0.0 {
+            return Err(format!(
+                "impact_memory_slow_weight is {w} but impact_memory_slow_half_life is 0: \
+                 the weight is read by nothing without the slow part."));
+        }
+        if !(0.0..=0.05).contains(&m) {
+            return Err(format!(
+                "impact_memory_crossover is {m}. It is a fraction of daily volume, in \
+                 [0, 0.05]; 0.0 is a pure power law."));
+        }
+        let r = self.impact_memory_refill;
+        if !(r == 0.0 || r == 1.0) {
+            return Err(format!(
+                "impact_memory_refill is {r}. It is a switch: 0.0 as shipped, 1.0 on."));
+        }
+        if y == 0.0 {
+            return Ok(());
+        }
+        if self.book_shared != 1.0 || !(self.book_depth_coefficient > 0.0) {
+            return Err(format!(
+                "impact_memory_coefficient is {y} but the memory needs book_shared on \
+                 and book_depth_coefficient off zero: it continues the latent depth's \
+                 curve and is fed by the flow the shared book records."));
+        }
+        if y > self.book_depth_coefficient {
+            return Err(format!(
+                "impact_memory_coefficient is {y}, above book_depth_coefficient {}. The \
+                 memory's Y must not exceed the latent book's, or a fill could be priced \
+                 better than the displacement it leaves (Alfonsi, Fruth and Schied 2010).",
+                self.book_depth_coefficient));
+        }
+        if !(h1 > 0.0) {
+            return Err(format!(
+                "impact_memory_coefficient is {y} but impact_memory_half_life is 0: the \
+                 memory needs a half-life, in open ticks, in (0, 39000]."));
         }
         Ok(())
     }
@@ -8095,6 +10782,45 @@ impl ModelParams {
                  number inside [24, 365].",
                 self.macro_calendar_days_per_year));
         }
+        if !(self.cycle_nowcast_accuracy == 0.0
+            || (self.cycle_nowcast_accuracy > 0.2 && self.cycle_nowcast_accuracy <= 1.0))
+        {
+            return Err(format!(
+                "cycle_nowcast_accuracy is {}. It is the probability a session's report names \
+                 the true phase: 0.0 prices the true phase, otherwise in (0.2, 1].",
+                self.cycle_nowcast_accuracy));
+        }
+        if !(self.corporate_spread_cycle >= 0.0 && self.corporate_spread_cycle <= 1.0) {
+            return Err(format!(
+                "corporate_spread_cycle is {}. It is a share, in [0, 1].",
+                self.corporate_spread_cycle));
+        }
+        if !(self.earnings_anticipation_drift_share >= 0.0
+            && self.earnings_anticipation_drift_share <= 1.0)
+        {
+            return Err(format!(
+                "earnings_anticipation_drift_share is {}. It is a share, in [0, 1]; 0 prices the \
+                 anticipated level as it stood.",
+                self.earnings_anticipation_drift_share));
+        }
+        if !(self.earnings_anticipation_drift_half_life >= 0.0
+            && self.earnings_anticipation_drift_half_life <= 5040.0)
+        {
+            return Err(format!(
+                "earnings_anticipation_drift_half_life is {}. It is sessions, in [0, 5040]; 0 is 1260.",
+                self.earnings_anticipation_drift_half_life));
+        }
+        if !(self.fed_growth_cut >= -5.0 && self.fed_growth_cut <= 5.0) {
+            return Err(format!(
+                "fed_growth_cut is {}. It is a growth rate in per cent a year, in [-5, 5]; 0 is off.",
+                self.fed_growth_cut));
+        }
+        if !(self.cycle_publication_lag_draw == 0.0 || self.cycle_publication_lag_draw == 1.0) {
+            return Err(format!(
+                "cycle_publication_lag_draw is {}. It is a switch: 0 (the fixed \
+                 cycle_publication_lag) or 1 (a lag drawn for each turn).",
+                self.cycle_publication_lag_draw));
+        }
         for (name, v) in [("cycle_us_calibration", self.cycle_us_calibration),
                           ("fed_liftoff_rule", self.fed_liftoff_rule),
                           ("market_pe_buybacks", self.market_pe_buybacks),
@@ -8102,9 +10828,12 @@ impl ModelParams {
                           ("closing_auction", self.closing_auction),
                           ("flight_to_quality_day", self.flight_to_quality_day),
                           ("corporate_yield_daily", self.corporate_yield_daily),
+                          ("macro_pins_hold", self.macro_pins_hold),
                           ("macro_publication_repricing", self.macro_publication_repricing),
                           ("book_shared", self.book_shared),
-                          ("book_resting", self.book_resting)] {
+                          ("book_resting", self.book_resting),
+                          ("book_arrival_shuffle", self.book_arrival_shuffle),
+                          ("book_cross_at_limit", self.book_cross_at_limit)] {
             if !(v == 0.0 || v == 1.0) {
                 return Err(format!(
                     "{name} is {v}. It is a switch: 0.0 as shipped, 1.0 on."));
@@ -8140,20 +10869,554 @@ impl ModelParams {
                 "earnings_anticipation_half_life is {}. It is a half-life in sessions, in [0, 5040]; 0 is off.",
                 self.earnings_anticipation_half_life));
         }
+        if !(self.buyback_accrual == 0.0 || self.buyback_accrual == 1.0) {
+            return Err(format!(
+                "buyback_accrual is {}. It is a switch: 0.0 is the term that stood, 1.0 accrues the share count.",
+                self.buyback_accrual));
+        }
+        if !(self.rate_close_remark == 0.0 || self.rate_close_remark == 1.0) {
+            return Err(format!(
+                "rate_close_remark is {}. It is a switch: 0.0 as shipped, 1.0 on.",
+                self.rate_close_remark));
+        }
+        if !(self.rate_intraday_live == 0.0 || self.rate_intraday_live == 1.0) {
+            return Err(format!(
+                "rate_intraday_live is {}. It is a switch: 0.0 as shipped, 1.0 on.",
+                self.rate_intraday_live));
+        }
+        if self.rate_intraday_live != 0.0 && self.rate_close_remark == 0.0 {
+            return Err(
+                "rate_intraday_live is on and rate_close_remark is off. The live mark commits \
+                 nothing, so without the close's re-mark the curve it anticipated would reach \
+                 the rate indices only at the next open: set rate_close_remark to 1.0 too."
+                    .to_string());
+        }
+        if !(self.fed_stress_cut >= 0.0 && self.fed_stress_cut <= 1.0) {
+            return Err(format!(
+                "fed_stress_cut is {}. It is a cut in points per step, in [0, 1]; 0 is off.",
+                self.fed_stress_cut));
+        }
+        if !(self.fed_stress_vix >= 10.0 && self.fed_stress_vix <= 200.0) {
+            return Err(format!(
+                "fed_stress_vix is {}. It is a VIX level, in [10, 200].",
+                self.fed_stress_vix));
+        }
+        if !(self.fed_stress_inflation_gap >= 0.0 && self.fed_stress_inflation_gap <= 10.0) {
+            return Err(format!(
+                "fed_stress_inflation_gap is {}. It is points of inflation over target, in [0, 10].",
+                self.fed_stress_inflation_gap));
+        }
+        for (name, v) in [("overnight_market_share", self.overnight_market_share),
+                          ("overnight_idio_share", self.overnight_idio_share)] {
+            if !(0.0..=0.9).contains(&v) {
+                return Err(format!(
+                    "{name} is {v}. It is the night's share of the day's variance, in \
+                     [0, 0.9]; 0 is no split."));
+            }
+        }
+        if self.overnight_variance_ratio != 0.0
+            && (self.overnight_market_share != 0.0 || self.overnight_idio_share != 0.0)
+        {
+            return Err(format!(
+                "overnight_variance_ratio is {} and a night share is set \
+                 (overnight_market_share {}, overnight_idio_share {}). The ratio ADDS a \
+                 night to the day and the shares SPLIT the day between the night and \
+                 the session; set one or the other.",
+                self.overnight_variance_ratio, self.overnight_market_share,
+                self.overnight_idio_share));
+        }
+        for (name, v) in [("overnight_idio_df", self.overnight_idio_df),
+                          ("earnings_surprise_df", self.earnings_surprise_df)] {
+            if !(v == 0.0 || ((3.0..=30.0).contains(&v) && v == v.floor())) {
+                return Err(format!(
+                    "{name} is {v}. It is a student t's degrees of freedom, an integer \
+                     in [3, 30], or 0 for a normal."));
+            }
+        }
+        for (name, v, hi) in [("earnings_surprise_sigma", self.earnings_surprise_sigma, 20.0),
+                              ("earnings_session_sigma", self.earnings_session_sigma, 20.0),
+                              ("earnings_followthrough_sigma", self.earnings_followthrough_sigma, 20.0),
+                              ("earnings_volume_multiple", self.earnings_volume_multiple, 10.0)] {
+            if !(v >= 0.0 && v <= hi) {
+                return Err(format!(
+                    "{name} is {v}. It is in [0, {hi}]; 0 is off."));
+            }
+        }
+        if !(self.earnings_cycle_report_share >= 0.0 && self.earnings_cycle_report_share <= 1.0) {
+            return Err(format!(
+                "earnings_cycle_report_share is {}. It is a share of the cycle's move, in [0, 1].",
+                self.earnings_cycle_report_share));
+        }
+        if self.earnings_cycle_report_share != 0.0 && self.earnings_surprise_sigma == 0.0 {
+            return Err(format!(
+                "earnings_cycle_report_share is {} and earnings_surprise_sigma is 0.0. The \
+                 share is given back at a name's report, and without the calendar no \
+                 name reports; set the calendar too.",
+                self.earnings_cycle_report_share));
+        }
+        if self.earnings_surprise_sigma != 0.0
+            && self.overnight_market_share == 0.0
+            && self.overnight_idio_share == 0.0
+        {
+            return Err(format!(
+                "earnings_surprise_sigma is {} and no night share is set. The surprise \
+                 is realised at the reaction session's opening print, which only a \
+                 split prices; set overnight_idio_share (or overnight_market_share) too.",
+                self.earnings_surprise_sigma));
+        }
+        if !(self.pinned_vix_feedback >= 0.0 && self.pinned_vix_feedback <= 1.0) {
+            return Err(format!(
+                "pinned_vix_feedback is {}. It is the share of the gap to the pinned VIX's excess \
+                 a VIX pin prices, in [0, 1]: 0 is off, 1 the whole gap.",
+                self.pinned_vix_feedback));
+        }
+        if !(self.pinned_vix_variance_share >= 0.0 && self.pinned_vix_variance_share <= 1.0) {
+            return Err(format!(
+                "pinned_vix_variance_share is {}. It is the most of a session's market-factor variance a pinned VIX's priced move may take, in [0, 1].",
+                self.pinned_vix_variance_share));
+        }
+        if !(self.pinned_vix_calm_knee >= 0.0 && self.pinned_vix_calm_knee <= 200.0) {
+            return Err(format!(
+                "pinned_vix_calm_knee is {}. It is the VIX level from which a pinned VIX is priced below the knee, in [0, 200]; 0 is none.",
+                self.pinned_vix_calm_knee));
+        }
+        if !(self.pinned_vix_calm_share >= 0.0 && self.pinned_vix_calm_share <= 1.0) {
+            return Err(format!(
+                "pinned_vix_calm_share is {}. It is the calm line's slope as a share of the knee's, in [0, 1].",
+                self.pinned_vix_calm_share));
+        }
+        if !(self.pinned_vix_priced_cap >= 0.0 && self.pinned_vix_priced_cap <= 1.0) {
+            return Err(format!(
+                "pinned_vix_priced_cap is {}. It is a switch, in [0, 1].",
+                self.pinned_vix_priced_cap));
+        }
+        if !(self.market_vol_slow_gamma >= 0.0 && self.market_vol_slow_gamma <= 1.0) {
+            return Err(format!(
+                "market_vol_slow_gamma is {}. It is a GJR loading on the slow component's squared shock, in [0, 1].",
+                self.market_vol_slow_gamma));
+        }
+        if self.market_vol_slow_gamma != 0.0
+            && (1.0 - self.market_vol_slow_gain) * self.market_vol_slow_persistence
+                - 0.5 * self.market_vol_slow_gamma < 0.0
+        {
+            return Err(format!(
+                "market_vol_slow_gamma is {}, and the slow component carries only {} of its \
+                 persistence on its own level ((1 - market_vol_slow_gain) * \
+                 market_vol_slow_persistence). The dial gives back half of itself from that \
+                 share, so it may be at most twice it.",
+                self.market_vol_slow_gamma,
+                (1.0 - self.market_vol_slow_gain) * self.market_vol_slow_persistence));
+        }
+        if !(self.market_vol_leverage >= 0.0 && self.market_vol_leverage <= 50.0) {
+            return Err(format!(
+                "market_vol_leverage is {}. It is a gain on log variance per unit of the return memory, in [0, 50]; 0 is off.",
+                self.market_vol_leverage));
+        }
+        if !(self.market_vol_leverage_half_life >= 0.0 && self.market_vol_leverage_half_life <= 2520.0) {
+            return Err(format!(
+                "market_vol_leverage_half_life is {}. It is a half-life in sessions, in [0, 2520].",
+                self.market_vol_leverage_half_life));
+        }
+        if self.market_vol_leverage != 0.0 && self.market_vol_leverage_half_life == 0.0 {
+            return Err(format!(
+                "market_vol_leverage is {} but market_vol_leverage_half_life is 0. The return \
+                 memory needs a half-life in sessions.",
+                self.market_vol_leverage));
+        }
+        if !(self.market_vol_leverage_down >= 0.0 && self.market_vol_leverage_down <= 1.0) {
+            return Err(format!(
+                "market_vol_leverage_down is {}. It is the share of an up day the return memory ignores, in [0, 1].",
+                self.market_vol_leverage_down));
+        }
+        if !(self.market_beta_normalise >= 0.0 && self.market_beta_normalise <= 1.0) {
+            return Err(format!(
+                "market_beta_normalise is {}. It is the power of the roster's cap-weighted beta each name's beta is divided by, in [0, 1].",
+                self.market_beta_normalise));
+        }
+        if !(self.market_vol_leverage_standardise >= 0.0 && self.market_vol_leverage_standardise <= 1.0) {
+            return Err(format!(
+                "market_vol_leverage_standardise is {}. It is the power on the day's own sd the return memory counts a day in, in [0, 1].",
+                self.market_vol_leverage_standardise));
+        }
+        if !(self.market_day_tail_df == 0.0
+            || (self.market_day_tail_df >= 3.0 && self.market_day_tail_df <= 200.0))
+        {
+            return Err(format!(
+                "market_day_tail_df is {}. It is the degrees of freedom of the day's market draw, 0 (a normal day) or in [3, 200].",
+                self.market_day_tail_df));
+        }
+        if !(self.market_day_tail_state_share >= 0.0 && self.market_day_tail_state_share <= 1.0) {
+            return Err(format!(
+                "market_day_tail_state_share is {}. It is the share of the day's t scale the market variance state reads, in [0, 1].",
+                self.market_day_tail_state_share));
+        }
         if !(self.buyback_yield_cap >= 0.0 && self.buyback_yield_cap <= 1.0) {
             return Err(format!(
                 "buyback_yield_cap is {}. It is an annual yield, in [0, 1]; 0 is none.",
                 self.buyback_yield_cap));
+        }
+        if !(self.dividend_payout_share >= 0.0 && self.dividend_payout_share <= 2.0) {
+            return Err(format!(
+                "dividend_payout_share is {}. It is a scale on the sector payout, in [0, 2]; 0 is no dividend.",
+                self.dividend_payout_share));
+        }
+        if !(self.dividend_growth_cutoff >= 0.0 && self.dividend_growth_cutoff <= 10.0) {
+            return Err(format!(
+                "dividend_growth_cutoff is {}. It is a revenue growth rate, in [0, 10].",
+                self.dividend_growth_cutoff));
+        }
+        if !(self.dividend_adjustment_speed > 0.0 && self.dividend_adjustment_speed <= 1.0) {
+            return Err(format!(
+                "dividend_adjustment_speed is {}. It is an annual adjustment speed, in (0, 1].",
+                self.dividend_adjustment_speed));
+        }
+        if !(self.dividend_yield_ceiling >= 1.0 && self.dividend_yield_ceiling <= 100.0) {
+            return Err(format!(
+                "dividend_yield_ceiling is {}. It is a multiple of the target yield, in [1, 100].",
+                self.dividend_yield_ceiling));
+        }
+        if !(self.dividend_buyback_substitution == 0.0 || self.dividend_buyback_substitution == 1.0) {
+            return Err(format!(
+                "dividend_buyback_substitution is {}. It is a switch, 0 or 1.",
+                self.dividend_buyback_substitution));
+        }
+        if !(self.market_vol_cycle_ratio >= 0.0 && self.market_vol_cycle_ratio <= 5.0) {
+            return Err(format!(
+                "market_vol_cycle_ratio is {}. It is the market factor's volatility in a contraction \
+                 or a trough over its volatility in every other phase, in [0, 5]; 0 is off.",
+                self.market_vol_cycle_ratio));
+        }
+        if !(self.market_vol_cycle_expansion >= 0.0 && self.market_vol_cycle_expansion <= 2.0) {
+            return Err(format!(
+                "market_vol_cycle_expansion is {}. It is the market factor's volatility multiplier \
+                 outside a contraction or a trough, in [0, 2]; 0 derives it from the phase shares.",
+                self.market_vol_cycle_expansion));
+        }
+        if !(self.market_vol_cycle_half_life >= 0.0 && self.market_vol_cycle_half_life <= 2520.0) {
+            return Err(format!(
+                "market_vol_cycle_half_life is {}. It is a half-life in sessions, in [0, 2520]; 0 is instant.",
+                self.market_vol_cycle_half_life));
+        }
+        if !(self.market_vol_cycle_relative >= 0.0 && self.market_vol_cycle_relative <= 1.0) {
+            return Err(format!(
+                "market_vol_cycle_relative is {}. It is the power of the cycle multiplier the VIX's \
+                 reading of fear is scaled by, in [0, 1].",
+                self.market_vol_cycle_relative));
+        }
+        if !(self.market_vol_cycle_relative_calm >= 0.0 && self.market_vol_cycle_relative_calm <= 1.0) {
+            return Err(format!(
+                "market_vol_cycle_relative_calm is {}. It is the power of the cycle multiplier the \
+                 VIX's reading of fear is scaled by while the multiplier is under one, in [0, 1].",
+                self.market_vol_cycle_relative_calm));
+        }
+        if !(self.market_vol_cycle_cap_relative >= 0.0 && self.market_vol_cycle_cap_relative <= 1.0) {
+            return Err(format!(
+                "market_vol_cycle_cap_relative is {}. It is the power of the cycle multiplier the \
+                 fair-value volatility cap's ceiling is scaled by in a stormier phase, in [0, 1].",
+                self.market_vol_cycle_cap_relative));
+        }
+        if !(self.market_vol_cycle_pin_neutral == 0.0 || self.market_vol_cycle_pin_neutral == 1.0) {
+            return Err(format!(
+                "market_vol_cycle_pin_neutral is {}. It is a switch, 0 or 1: the cycle \
+                 multiplier is not applied on a session whose VIX a caller pinned.",
+                self.market_vol_cycle_pin_neutral));
+        }
+        if !(self.market_vol_cycle_pin_phase == 0.0 || self.market_vol_cycle_pin_phase == 1.0) {
+            return Err(format!(
+                "market_vol_cycle_pin_phase is {}. It is a switch, 0 or 1: the cycle \
+                 multiplier is not applied on a session whose cycle phase a caller pinned.",
+                self.market_vol_cycle_pin_phase));
+        }
+        if !(self.market_vol_cycle_trough_release >= 0.0 && self.market_vol_cycle_trough_release <= 1.0) {
+            return Err(format!(
+                "market_vol_cycle_trough_release is {}. It is the share of the contraction's \
+                 volatility multiplier (in logs) the trough gives back, in [0, 1].",
+                self.market_vol_cycle_trough_release));
+        }
+        if !(self.market_vol_cycle_release_half_life >= 0.0
+            && self.market_vol_cycle_release_half_life <= 2520.0) {
+            return Err(format!(
+                "market_vol_cycle_release_half_life is {}. It is a half-life in sessions, in \
+                 [0, 2520]; 0 is market_vol_cycle_half_life.",
+                self.market_vol_cycle_release_half_life));
+        }
+        if !(self.market_vol_cycle_recovery_release >= 0.0
+            && self.market_vol_cycle_recovery_release <= 1.0) {
+            return Err(format!(
+                "market_vol_cycle_recovery_release is {}. It is the share of the contraction's \
+                 volatility multiplier (in logs) the index's rally off its low gives back, in \
+                 [0, 1].",
+                self.market_vol_cycle_recovery_release));
+        }
+        if self.market_vol_cycle_recovery_release != 0.0
+            && !(self.market_vol_cycle_recovery_scale > 0.0
+                && self.market_vol_cycle_recovery_scale <= 2.0) {
+            return Err(format!(
+                "market_vol_cycle_recovery_scale is {} with market_vol_cycle_recovery_release \
+                 set. It is the rally off the low, in log points of the index, at which the \
+                 release is complete, in (0, 2].",
+                self.market_vol_cycle_recovery_scale));
+        }
+        if !(self.market_vol_cycle_recovery_scale >= 0.0
+            && self.market_vol_cycle_recovery_scale <= 2.0) {
+            return Err(format!(
+                "market_vol_cycle_recovery_scale is {}. It is a rally in log points of the \
+                 index, in [0, 2].",
+                self.market_vol_cycle_recovery_scale));
+        }
+        if !(self.vix_stress_premium >= 0.0 && self.vix_stress_premium <= 10.0) {
+            return Err(format!(
+                "vix_stress_premium is {}. It is the published VIX premium's gain per \
+                 unit of the anchor memory above the knee, in [0, 10]; 0 is none.",
+                self.vix_stress_premium));
+        }
+        if !(self.vix_stress_premium_knee >= 0.0 && self.vix_stress_premium_knee <= 3.0) {
+            return Err(format!(
+                "vix_stress_premium_knee is {}. It is a log deviation of the anchor \
+                 memory, in [0, 3]; at or above 0 so a pinned session, whose memory \
+                 is 0, publishes the pin.",
+                self.vix_stress_premium_knee));
+        }
+        if !(self.vix_stress_premium_cap >= 0.0 && self.vix_stress_premium_cap <= 1.0) {
+            return Err(format!(
+                "vix_stress_premium_cap is {}. It is the largest log premium of the \
+                 published VIX over the state, in [0, 1].",
+                self.vix_stress_premium_cap));
+        }
+        if self.vix_stress_premium != 0.0 {
+            if self.vix_stress_premium_cap == 0.0 {
+                return Err(format!(
+                    "vix_stress_premium is {} but vix_stress_premium_cap is 0. The \
+                     premium approaches the cap, so it needs one above 0.",
+                    self.vix_stress_premium));
+            }
+            if self.vix_level_identity == 0.0 || self.vix_anchor_memory == 0.0 {
+                return Err(format!(
+                    "vix_stress_premium is {} but vix_level_identity is {} and \
+                     vix_anchor_memory is {}. The premium reads the identity's \
+                     variance read-back at the anchor memory's rate, so it needs \
+                     both. Set them, or vix_stress_premium to 0.0.",
+                    self.vix_stress_premium, self.vix_level_identity,
+                    self.vix_anchor_memory));
+            }
+        }
+        if !(self.fed_put_gain >= 0.0 && self.fed_put_gain <= 10.0) {
+            return Err(format!(
+                "fed_put_gain is {}. It is percentage points of policy-rate cut per \
+                 unit of the index's log fall since the last meeting, in [0, 10]; 0 is off.",
+                self.fed_put_gain));
+        }
+        if !(self.fed_put_threshold >= 0.0 && self.fed_put_threshold <= 0.2) {
+            return Err(format!(
+                "fed_put_threshold is {}. It is the intermeeting log fall the Fed put \
+                 ignores, in [0, 0.2].",
+                self.fed_put_threshold));
+        }
+        if !(self.fed_put_half_life >= 0.0 && self.fed_put_half_life <= 504.0) {
+            return Err(format!(
+                "fed_put_half_life is {}. It is a half-life in sessions, in [0, 504].",
+                self.fed_put_half_life));
+        }
+        if !(self.fed_put_emergency_vix >= 0.0 && self.fed_put_emergency_vix <= 90.0) {
+            return Err(format!(
+                "fed_put_emergency_vix is {}. It is a VIX level, in [0, 90]; 0 is never.",
+                self.fed_put_emergency_vix));
+        }
+        if !(self.treasury_put_pricing >= 0.0 && self.treasury_put_pricing <= 1.0) {
+            return Err(format!(
+                "treasury_put_pricing is {}. It is the share of the Fed put's expected \
+                 cut the curve prices, in [0, 1].",
+                self.treasury_put_pricing));
+        }
+        if !(self.treasury_haven_gain >= 0.0 && self.treasury_haven_gain <= 0.05) {
+            return Err(format!(
+                "treasury_haven_gain is {}. It is percentage points off the 10-year's \
+                 term premium per VIX point above 20, in [0, 0.05]; 0 is none.",
+                self.treasury_haven_gain));
+        }
+        if !(self.fed_stress_hold >= 0.0 && self.fed_stress_hold <= 504.0) {
+            return Err(format!(
+                "fed_stress_hold is {}. It is sessions after a stressed close in which the \
+                 bank does not raise the rate, in [0, 504]; 0 is off.",
+                self.fed_stress_hold));
+        }
+        if !(self.treasury_path_pricing >= 0.0 && self.treasury_path_pricing <= 3.0) {
+            return Err(format!(
+                "treasury_path_pricing is {}. It is the share of the expected policy path \
+                 the curve prices, in [0, 3]; 0 is off.",
+                self.treasury_path_pricing));
+        }
+        if !(self.treasury_path_half_life >= 0.0 && self.treasury_path_half_life <= 504.0) {
+            return Err(format!(
+                "treasury_path_half_life is {}. It is a half-life in sessions, in [0, 504].",
+                self.treasury_path_half_life));
+        }
+        if !(self.treasury_policy_damping >= 0.0 && self.treasury_policy_damping <= 0.9) {
+            return Err(format!(
+                "treasury_policy_damping is {}. It is the share of the policy rate's \
+                 distance from neutral the 10-year leaves out, in [0, 0.9].",
+                self.treasury_policy_damping));
+        }
+        if !(self.policy_anticipation >= 0.0 && self.policy_anticipation <= 3.0) {
+            return Err(format!(
+                "policy_anticipation is {}. It is how much of the next meeting's expected \
+                 change the curve prices before the meeting, in multiples of it, in [0, 3]; \
+                 0 is off.",
+                self.policy_anticipation));
+        }
+        if !(self.policy_anticipation_cut_share >= 0.0 && self.policy_anticipation_cut_share <= 1.0) {
+            return Err(format!(
+                "policy_anticipation_cut_share is {}. It is the share of policy_anticipation \
+                 an expected cut is priced at, in [0, 1]; 0 prices rises only.",
+                self.policy_anticipation_cut_share));
+        }
+        if self.treasury_path_pricing != 0.0 && self.treasury_path_half_life == 0.0 {
+            return Err(format!(
+                "treasury_path_pricing is {} but treasury_path_half_life is 0. The \
+                 market's forecast of the policy path decays at that half-life, so the \
+                 pricing needs one above 0.",
+                self.treasury_path_pricing));
+        }
+        if !(self.corporate_spread_vix_cut >= 0.0 && self.corporate_spread_vix_cut <= 1.0) {
+            return Err(format!(
+                "corporate_spread_vix_cut is {}. It is the share of the VIX slope taken out \
+                 of the corporate spread's formula, in [0, 1]; 0 is the slope as it stands.",
+                self.corporate_spread_vix_cut));
+        }
+        if !(self.corporate_spread_equity_gain >= 0.0 && self.corporate_spread_equity_gain <= 10.0) {
+            return Err(format!(
+                "corporate_spread_equity_gain is {}. It is percentage points of corporate \
+                 spread per unit of the index's log fall below its slow average, in [0, 10]; \
+                 0 is off.",
+                self.corporate_spread_equity_gain));
+        }
+        if !(self.corporate_spread_equity_half_life >= 0.0
+            && self.corporate_spread_equity_half_life <= 1260.0)
+        {
+            return Err(format!(
+                "corporate_spread_equity_half_life is {}. It is a half-life in sessions, \
+                 in [0, 1260].",
+                self.corporate_spread_equity_half_life));
+        }
+        if self.corporate_spread_equity_gain != 0.0 && self.corporate_spread_equity_half_life == 0.0 {
+            return Err(format!(
+                "corporate_spread_equity_gain is {} but corporate_spread_equity_half_life is 0. \
+                 The gain reads the index's fall below its own average at that half-life, \
+                 so it needs one above 0.",
+                self.corporate_spread_equity_gain));
+        }
+        if !(self.cycle_equity_hazard >= 0.0 && self.cycle_equity_hazard <= 20.0) {
+            return Err(format!(
+                "cycle_equity_hazard is {}. It is monthly cycle hazard per unit of the index's \
+                 log fall below its slow average beyond the knee, in [0, 20]; 0 is off.",
+                self.cycle_equity_hazard));
+        }
+        if !(self.cycle_equity_hazard_knee >= 0.0 && self.cycle_equity_hazard_knee <= 1.0) {
+            return Err(format!(
+                "cycle_equity_hazard_knee is {}. It is a log fall of the index below its slow \
+                 average, in [0, 1].",
+                self.cycle_equity_hazard_knee));
+        }
+        if !(self.cycle_equity_hazard_opening >= 0.0 && self.cycle_equity_hazard_opening <= 1.0) {
+            return Err(format!(
+                "cycle_equity_hazard_opening is {}. It is monthly cycle hazard added in an \
+                 expansion and at a peak where the economy runs without a market, in [0, 1].",
+                self.cycle_equity_hazard_opening));
+        }
+        if !(self.market_prehistory_sessions >= 0.0
+            && self.market_prehistory_sessions <= 2520.0
+            && self.market_prehistory_sessions.fract() == 0.0)
+        {
+            return Err(format!(
+                "market_prehistory_sessions is {}. It is the number of sessions the market \
+                 lives before day zero, a whole number in [0, 2520].",
+                self.market_prehistory_sessions));
+        }
+        if !(self.market_prehistory_valuation == 0.0 || self.market_prehistory_valuation == 1.0) {
+            return Err(format!(
+                "market_prehistory_valuation is {}. It is a switch: 0 opens the valuation \
+                 state as it stood, 1 carries it from the market's prehistory.",
+                self.market_prehistory_valuation));
+        }
+        if self.market_prehistory_valuation != 0.0 && self.market_prehistory_sessions == 0.0 {
+            return Err(
+                "market_prehistory_valuation is 1 but market_prehistory_sessions is 0. The \
+                 valuation state is carried from the market's prehistory, so set the \
+                 prehistory's length as well."
+                    .to_string());
+        }
+        if !(self.fed_put_carry >= 0.0 && self.fed_put_carry <= 1.0) {
+            return Err(format!(
+                "fed_put_carry is {}. It is the share of the Fed put's unanswered fall \
+                 carried to the next meeting, in [0, 1]; 0 is none.",
+                self.fed_put_carry));
+        }
+        if !(self.fed_drawdown_hold >= 0.0 && self.fed_drawdown_hold <= 1.0) {
+            return Err(format!(
+                "fed_drawdown_hold is {}. It is the index's log fall from its highest close \
+                 of the last 252 sessions at or above which the bank holds any rise, in \
+                 [0, 1]; 0 is off.",
+                self.fed_drawdown_hold));
+        }
+        if self.cycle_equity_hazard != 0.0 && self.corporate_spread_equity_half_life == 0.0 {
+            return Err(format!(
+                "cycle_equity_hazard is {} but corporate_spread_equity_half_life is 0. \
+                 The hazard reads the index's fall below its own average at that half-life, \
+                 so it needs one above 0.",
+                self.cycle_equity_hazard));
+        }
+        if self.fed_put_gain != 0.0 && self.fed_put_half_life == 0.0 {
+            return Err(format!(
+                "fed_put_gain is {} but fed_put_half_life is 0. The put's stock decays \
+                 at that half-life and the calm meetings give the cut back as it does, \
+                 so a put needs one above 0.",
+                self.fed_put_gain));
         }
         if !(self.fair_value_vix_discount >= 0.0 && self.fair_value_vix_discount <= 1.0) {
             return Err(format!(
                 "fair_value_vix_discount is {}. It is a log discount per log VIX above the knee, in [0, 1].",
                 self.fair_value_vix_discount));
         }
+        if !(self.idio_vol_alpha >= 0.0 && self.idio_vol_beta >= 0.0
+            && self.idio_vol_alpha + self.idio_vol_beta < 1.0)
+        {
+            return Err(format!(
+                "idio_vol_alpha is {} and idio_vol_beta is {}. They are the per-name \
+                 idiosyncratic variance state's shock share and persistence: each at \
+                 least 0 and their sum under 1, or the state has no mean of one to \
+                 revert to.",
+                self.idio_vol_alpha, self.idio_vol_beta));
+        }
+        if !(self.idio_vol_jump_bump >= 0.0 && self.idio_vol_jump_bump <= 4.0) {
+            return Err(format!(
+                "idio_vol_jump_bump is {}. It is the idiosyncratic variance ratio's move \
+                 the session after an own jump, in [0, 4]; 0 is none.",
+                self.idio_vol_jump_bump));
+        }
         if !(self.fair_value_vix_half_life >= 0.0 && self.fair_value_vix_half_life <= 252.0) {
             return Err(format!(
                 "fair_value_vix_half_life is {}. It is a half-life in sessions, in [0, 252]; 0 reads the VIX as it stands.",
                 self.fair_value_vix_half_life));
+        }
+        if !(self.fair_value_vix_release_half_life >= 0.0 && self.fair_value_vix_release_half_life <= 2520.0) {
+            return Err(format!(
+                "fair_value_vix_release_half_life is {}. It is a half-life in sessions, in [0, 2520]; 0 gives the discount back at fair_value_vix_half_life.",
+                self.fair_value_vix_release_half_life));
+        }
+        if !(self.fair_value_relative_knee >= 0.0 && self.fair_value_relative_knee <= 20.0) {
+            return Err(format!(
+                "fair_value_relative_knee is {}. It is a depth in log units below the roster's mean fair-value level, in [0, 20]; 0 is no knee.",
+                self.fair_value_relative_knee));
+        }
+        if !(self.fair_value_relative_half_life >= 0.0 && self.fair_value_relative_half_life <= 25200.0) {
+            return Err(format!(
+                "fair_value_relative_half_life is {}. It is a half-life in sessions, in [0, 25200].",
+                self.fair_value_relative_half_life));
+        }
+        if self.fair_value_relative_knee != 0.0 && self.fair_value_relative_half_life == 0.0 {
+            return Err(format!(
+                "fair_value_relative_knee is {} and fair_value_relative_half_life is 0. The knee pulls at that half-life, so set it (in sessions, above 0).",
+                self.fair_value_relative_knee));
         }
         if !(self.fair_value_vix_knee > 0.0 && self.fair_value_vix_knee <= 200.0) {
             return Err(format!(
@@ -8164,6 +11427,11 @@ impl ModelParams {
             return Err(format!(
                 "fair_value_market_vol_cap is {}. It is a multiple of market_factor_sigma, in [0, 32]; 0 is no ceiling.",
                 self.fair_value_market_vol_cap));
+        }
+        if !(self.fair_value_market_excess_share >= 0.0 && self.fair_value_market_excess_share <= 1.0) {
+            return Err(format!(
+                "fair_value_market_excess_share is {}. It is the share of what the volatility ceiling takes off the market's permanent share that stays permanent, in [0, 1].",
+                self.fair_value_market_excess_share));
         }
         if !(self.fair_value_market_linear >= 0.0 && self.fair_value_market_linear <= 1.0) {
             return Err(format!(
@@ -8204,6 +11472,36 @@ impl ModelParams {
                 "unemployment_adjustment_half_life is {}. It is a half-life in sessions, \
                  in [0, 2520]; 0 is off.",
                 self.unemployment_adjustment_half_life));
+        }
+        if !(self.unemployment_natural_pull >= 0.0 && self.unemployment_natural_pull <= 1.0) {
+            return Err(format!(
+                "unemployment_natural_pull is {}. It is the share of the gap to the natural \
+                 rate closed at a monthly release, in [0, 1]; 0 keeps the shipped 0.06.",
+                self.unemployment_natural_pull));
+        }
+        if !(self.unemployment_okun_coefficient >= 0.0 && self.unemployment_okun_coefficient <= 2.4) {
+            return Err(format!(
+                "unemployment_okun_coefficient is {}. It is points of unemployment a year per \
+                 point of growth below 2 per cent, in [0, 2.4]; 0 is the shipped term.",
+                self.unemployment_okun_coefficient));
+        }
+        if !(self.unemployment_natural_rate >= 0.0 && self.unemployment_natural_rate <= 8.0) {
+            return Err(format!(
+                "unemployment_natural_rate is {}. It is the natural rate with no long-term \
+                 unemployment, percent, in [0, 8]; 0 is the shipped 4.0.",
+                self.unemployment_natural_rate));
+        }
+        if !(self.oil_inventory_reversion >= 0.0 && self.oil_inventory_reversion <= 1.0) {
+            return Err(format!(
+                "oil_inventory_reversion is {}. It is the daily share of inventory's gap to 50 \
+                 closed, in [0, 1]; 0 is off.",
+                self.oil_inventory_reversion));
+        }
+        if !(self.oil_inflation_passthrough >= 0.0 && self.oil_inflation_passthrough <= 3.0) {
+            return Err(format!(
+                "oil_inflation_passthrough is {}. It is the oil pass-through as a multiple of \
+                 the shipped 0.01 a dollar, both sides, in [0, 3]; 0 is the shipped branch.",
+                self.oil_inflation_passthrough));
         }
         if !(self.fear_greed_published_inputs == 0.0 || self.fear_greed_published_inputs == 1.0) {
             return Err(format!(
@@ -8422,6 +11720,7 @@ pub const VIX_STATE_FLOOR: f64 = 10.0;
 ///
 /// `expected` is a plain `fn` rather than a closure so the claim tables can
 /// be `'static`. It reads only fields of the vector handed to it.
+#[non_exhaustive]
 pub struct Claim {
     /// The dial the identity determines.
     pub dial: &'static str,
@@ -8437,6 +11736,7 @@ pub struct Claim {
 
 /// One claim that did not hold, with both sides of it.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct Inconsistency {
     pub dial: &'static str,
     pub identity: &'static str,
@@ -8580,7 +11880,102 @@ fn shipped_digests() -> &'static [(&'static str, String)] {
 /// rebuilds to a different digest and its replay is refused, and every
 /// recorded state hash of a custom model moves. Only a switch whose zero is
 /// a branch belongs here; a dial whose zero is arithmetic does not.
-pub const DIGEST_SILENT_AT_ZERO: &[&str] = &["order_flow_depth_law"];
+pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
+    "book_arrival_shuffle",
+    "book_cross_at_limit",
+    "book_depth_nesting",
+    "buyback_accrual",
+    "corporate_spread_cycle",
+    "corporate_spread_equity_gain",
+    "corporate_spread_equity_half_life",
+    "corporate_spread_vix_cut",
+    "cycle_equity_hazard",
+    "cycle_equity_hazard_knee",
+    "cycle_equity_hazard_opening",
+    "cycle_nowcast_accuracy",
+    "cycle_publication_lag_draw",
+    "dividend_buyback_substitution",
+    "dividend_payout_share",
+    "earnings_anticipation_drift_half_life",
+    "earnings_anticipation_drift_share",
+    "earnings_cycle_report_share",
+    "earnings_followthrough_sigma",
+    "earnings_session_sigma",
+    "earnings_surprise_df",
+    "earnings_surprise_sigma",
+    "earnings_volume_multiple",
+    "fair_value_market_excess_share",
+    "fair_value_relative_half_life",
+    "fair_value_relative_knee",
+    "fair_value_vix_release_half_life",
+    "fed_drawdown_hold",
+    "fed_growth_cut",
+    "fed_put_carry",
+    "fed_put_emergency_vix",
+    "fed_put_gain",
+    "fed_put_half_life",
+    "fed_put_threshold",
+    "fed_stress_cut",
+    "fed_stress_hold",
+    "idio_vol_alpha",
+    "idio_vol_beta",
+    "idio_vol_jump_bump",
+    "impact_memory_coefficient",
+    "impact_memory_crossover",
+    "impact_memory_half_life",
+    "impact_memory_refill",
+    "impact_memory_slow_half_life",
+    "impact_memory_slow_weight",
+    "macro_pins_hold",
+    "market_beta_normalise",
+    "market_day_tail_df",
+    "market_day_tail_state_share",
+    "market_prehistory_sessions",
+    "market_prehistory_valuation",
+    "market_vol_cycle_cap_relative",
+    "market_vol_cycle_expansion",
+    "market_vol_cycle_half_life",
+    "market_vol_cycle_pin_neutral",
+    "market_vol_cycle_pin_phase",
+    "market_vol_cycle_ratio",
+    "market_vol_cycle_recovery_release",
+    "market_vol_cycle_recovery_scale",
+    "market_vol_cycle_relative",
+    "market_vol_cycle_relative_calm",
+    "market_vol_cycle_release_half_life",
+    "market_vol_cycle_trough_release",
+    "market_vol_leverage",
+    "market_vol_leverage_down",
+    "market_vol_leverage_half_life",
+    "market_vol_leverage_standardise",
+    "market_vol_slow_gamma",
+    "order_flow_depth_law",
+    "overnight_idio_df",
+    "overnight_idio_share",
+    "overnight_market_share",
+    "pinned_vix_calm_knee",
+    "pinned_vix_calm_share",
+    "pinned_vix_feedback",
+    "pinned_vix_priced_cap",
+    "pinned_vix_variance_share",
+    "policy_anticipation",
+    "policy_anticipation_cut_share",
+    "rate_close_remark",
+    "rate_intraday_live",
+    "treasury_haven_gain",
+    "treasury_path_half_life",
+    "treasury_path_pricing",
+    "treasury_policy_damping",
+    "treasury_put_pricing",
+    "vix_stress_premium",
+    "vix_stress_premium_cap",
+    "vix_stress_premium_knee",
+    "unemployment_natural_pull",
+    "unemployment_okun_coefficient",
+    "unemployment_natural_rate",
+    "oil_inventory_reversion",
+    "oil_inflation_passthrough",
+];
 
 #[cfg(test)]
 thread_local! {
@@ -8594,6 +11989,22 @@ thread_local! {
 pub(crate) fn digests_taken() -> u64 {
     DIGESTS_TAKEN.with(|n| n.get())
 }
+
+/// Dials left out of [`ModelParams::digest`] while they hold these values,
+/// their defaults, which are not 0.0.
+///
+/// Each is read only while a switch in [`DIGEST_SILENT_AT_ZERO`] is set
+/// (`fed_stress_cut` or `dividend_payout_share`), so at its default with
+/// that switch off it is the model that existed before it, and with the
+/// switch on the default is the value the switch was built and measured
+/// with. Off its default each enters the digest as every other dial does.
+pub const DIGEST_SILENT_AT_DEFAULT: &[(&str, f64)] = &[
+    ("fed_stress_vix", 30.0),
+    ("fed_stress_inflation_gap", 1.0),
+    ("dividend_growth_cutoff", 0.30),
+    ("dividend_adjustment_speed", 0.4),
+    ("dividend_yield_ceiling", 2.0),
+];
 
 /// The settable names, sorted. A function rather than the const above so
 /// the list is derived from `to_pairs`' actual coverage in tests.
@@ -8652,9 +12063,17 @@ pub fn settable_names() -> Vec<&'static str> {
         "jump_sigma_market",
         "jump_vix_coupling",
         "market_factor_sigma",
+        "market_beta_normalise",
         "market_vol_alpha",
         "market_vol_beta",
         "market_vol_gamma",
+        "market_vol_slow_gamma",
+        "market_vol_leverage",
+        "market_vol_leverage_half_life",
+        "market_vol_leverage_down",
+        "market_vol_leverage_standardise",
+        "market_day_tail_df",
+        "market_day_tail_state_share",
         "market_vol_alpha_excursion",
         "market_vol_level_persistence",
         "market_vol_level_sigma",
@@ -8720,8 +12139,14 @@ pub fn settable_names() -> Vec<&'static str> {
         "earnings_anticipation_half_life",
         "rate_pe_sensitivity",
         "cycle_publication_lag",
+        "cycle_publication_lag_draw",
         "gdp_publication_lag",
         "unemployment_adjustment_half_life",
+        "unemployment_natural_pull",
+        "unemployment_okun_coefficient",
+        "unemployment_natural_rate",
+        "oil_inventory_reversion",
+        "oil_inflation_passthrough",
         "fear_greed_published_inputs",
         "macro_publication_repricing",
         "treasury_10y_noise",
@@ -8729,23 +12154,104 @@ pub fn settable_names() -> Vec<&'static str> {
         "flight_to_quality_gain",
         "flight_to_quality_day",
         "corporate_yield_daily",
+        "cycle_nowcast_accuracy",
+        "corporate_spread_cycle",
+        "earnings_anticipation_drift_share",
+        "earnings_anticipation_drift_half_life",
+        "fed_growth_cut",
+        "macro_pins_hold",
         "fair_value_news_share",
         "fair_value_market_share",
         "fair_value_market_linear",
         "fair_value_market_vol_cap",
+        "fair_value_market_excess_share",
         "fair_value_vix_discount",
         "fair_value_vix_knee",
         "fair_value_vix_half_life",
+        "fair_value_vix_release_half_life",
+        "fair_value_relative_knee",
+        "fair_value_relative_half_life",
+        "pinned_vix_feedback",
+        "pinned_vix_variance_share",
+        "pinned_vix_calm_knee",
+        "pinned_vix_calm_share",
+        "pinned_vix_priced_cap",
         "buyback_yield_cap",
+        "buyback_accrual",
+        "rate_close_remark",
+        "rate_intraday_live",
+        "fed_stress_cut",
+        "fed_stress_vix",
+        "fed_stress_inflation_gap",
+        "dividend_payout_share",
+        "dividend_growth_cutoff",
+        "dividend_adjustment_speed",
+        "dividend_yield_ceiling",
+        "dividend_buyback_substitution",
+        "overnight_market_share",
+        "overnight_idio_share",
+        "overnight_idio_df",
+        "earnings_surprise_sigma",
+        "earnings_surprise_df",
+        "earnings_session_sigma",
+        "earnings_followthrough_sigma",
+        "earnings_volume_multiple",
+        "earnings_cycle_report_share",
+        "market_vol_cycle_ratio",
+        "market_vol_cycle_expansion",
+        "market_vol_cycle_half_life",
+        "market_vol_cycle_relative",
+        "market_vol_cycle_relative_calm",
+        "market_vol_cycle_cap_relative",
+        "market_vol_cycle_pin_neutral",
+        "market_vol_cycle_pin_phase",
+        "market_vol_cycle_trough_release",
+        "market_vol_cycle_release_half_life",
+        "market_vol_cycle_recovery_release",
+        "market_vol_cycle_recovery_scale",
+        "vix_stress_premium",
+        "vix_stress_premium_knee",
+        "vix_stress_premium_cap",
+        "fed_put_gain",
+        "fed_put_threshold",
+        "fed_put_half_life",
+        "fed_put_emergency_vix",
+        "treasury_put_pricing",
+        "treasury_haven_gain",
+        "fed_stress_hold",
+        "treasury_path_pricing",
+        "treasury_path_half_life",
+        "treasury_policy_damping",
+        "policy_anticipation",
+        "policy_anticipation_cut_share",
+        "corporate_spread_vix_cut",
+        "corporate_spread_equity_gain",
+        "corporate_spread_equity_half_life",
+        "cycle_equity_hazard",
+        "cycle_equity_hazard_knee",
+        "cycle_equity_hazard_opening",
+        "market_prehistory_sessions",
+        "market_prehistory_valuation",
+        "fed_put_carry",
+        "fed_drawdown_hold",
         "opening_mispricing_sigma",
         "opening_market_sigma",
         "book_depth_coefficient",
         "book_depth_exponent",
         "book_depth_reach",
+        "book_depth_nesting",
         "book_shared",
         "book_refill_half_life",
         "book_resting",
+        "book_arrival_shuffle",
+        "book_cross_at_limit",
         "fill_impact_coefficient",
+        "impact_memory_coefficient",
+        "impact_memory_half_life",
+        "impact_memory_slow_half_life",
+        "impact_memory_slow_weight",
+        "impact_memory_crossover",
+        "impact_memory_refill",
         "news_peer_vix_coupling",
         "news_peer_weight",
         "news_peer_weight_down",
@@ -8784,6 +12290,9 @@ pub fn settable_names() -> Vec<&'static str> {
         "vix_jump_return_intensity",
         "sector_vol_alpha",
         "sector_vol_beta",
+        "idio_vol_alpha",
+        "idio_vol_beta",
+        "idio_vol_jump_bump",
         "jump_idio_excitation",
         "jump_idio_excitation_decay",
         "jump_idio_vix_decoupled",
@@ -9191,7 +12700,13 @@ mod tests {
         assert_eq!(crate::params::PT_V19.fingerprint(), "pt-v19");
         // pt-v20 took the default at 0.8.5, on the same deliberate move.
         assert_eq!(crate::params::PT_V20.fingerprint(), "pt-v20");
-        assert_eq!(DEFAULT_PRESET_NAME, "pt-v20");
+        // pt-v21 took it at 0.10.0. Before it did, the line below asserted
+        // `DEFAULT_PRESET_NAME == "pt-v20"`.
+        assert_eq!(crate::params::PT_V21.fingerprint(), "pt-v21");
+        assert_eq!(DEFAULT_PRESET_NAME, "pt-v21");
+        // pt-v21 is the graded vector: its digest is the one the vector had
+        // as overrides on pt-v20 while it was graded.
+        assert_eq!(&crate::params::PT_V21.digest()[..8], PT_V21_DIGEST_PREFIX);
     }
 
     #[test]
@@ -9258,7 +12773,9 @@ mod tests {
         fn without_silent(p: &ModelParams) -> String {
             let mut hasher = Sha256::new();
             for (name, value) in p.to_pairs() {
-                if DIGEST_SILENT_AT_ZERO.contains(&name.as_str()) {
+                if DIGEST_SILENT_AT_ZERO.contains(&name.as_str())
+                    || DIGEST_SILENT_AT_DEFAULT.iter().any(|(n, _)| *n == name.as_str())
+                {
                     continue;
                 }
                 hasher.update(name.as_bytes());
@@ -9285,6 +12802,28 @@ mod tests {
         // And every name listed is a settable dial.
         for name in DIGEST_SILENT_AT_ZERO {
             assert!(settable_names().contains(name), "{name}");
+        }
+    }
+
+    #[test]
+    fn a_dial_silent_at_its_default_is_left_out_of_the_digest_only_there() {
+        let custom = PT_V19.with_override("book_resting", 1.0).unwrap();
+        for p in [PT_V1, PT_V19, PT_V20, custom] {
+            for (name, default) in DIGEST_SILENT_AT_DEFAULT {
+                // Every shipped preset carries the default, and the surface
+                // still carries the name.
+                assert_eq!(p.get(name).map(f64::to_bits), Some(default.to_bits()), "{name}");
+                let moved = p.with_override(name, default + 1.0).unwrap();
+                assert_ne!(moved.digest(), p.digest(), "{name} off its default");
+                assert!(moved.fingerprint().starts_with("custom-"), "{name}");
+                let back = moved.with_override(name, *default).unwrap();
+                assert_eq!(back.digest(), p.digest(), "{name} back at its default");
+            }
+        }
+        for (name, default) in DIGEST_SILENT_AT_DEFAULT {
+            assert!(settable_names().contains(name), "{name}");
+            assert!(*default != 0.0, "{name}: a dial silent at 0.0 belongs in DIGEST_SILENT_AT_ZERO");
+            assert!(!DIGEST_SILENT_AT_ZERO.contains(name), "{name} is listed twice");
         }
     }
 

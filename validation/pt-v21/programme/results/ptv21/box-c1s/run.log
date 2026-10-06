@@ -1,0 +1,719 @@
++ BUCKET=s3://<bucket>/pretium-calib/out/ptv21c1s
++ BRANCH=rel/0.10-ptv21
++ dnf -y install gcc git tar gzip python3.11 python3.11-devel awscli-2
+Amazon Linux 2023 repository                     88 MB/s |  80 MB     00:00    
+Amazon Linux 2023 Kernel Livepatch repository   986 kB/s |  87 kB     00:00    
+Package tar-2:1.34-1.amzn2023.0.4.aarch64 is already installed.
+Package gzip-1.12-1.amzn2023.0.1.aarch64 is already installed.
+Package awscli-2-2.36.47-4.amzn2023.0.1.noarch is already installed.
+Dependencies resolved.
+================================================================================
+ Package                   Arch    Version                    Repository   Size
+================================================================================
+Installing:
+ gcc                       aarch64 11.5.0-5.amzn2023.0.5      amazonlinux  31 M
+ git                       aarch64 2.50.1-1.amzn2023.0.1      amazonlinux  53 k
+ python3.11                aarch64 3.11.16-1.amzn2023.0.1     amazonlinux  28 k
+ python3.11-devel          aarch64 3.11.16-1.amzn2023.0.1     amazonlinux 235 k
+Installing dependencies:
+ annobin-docs              noarch  12.69-1.amzn2023.0.1       amazonlinux  93 k
+ annobin-plugin-gcc        aarch64 12.69-1.amzn2023.0.1       amazonlinux 973 k
+ cpp                       aarch64 11.5.0-5.amzn2023.0.5      amazonlinux  10 M
+ gc                        aarch64 8.0.4-5.amzn2023.0.2       amazonlinux 102 k
+ gcc-plugin-annobin        aarch64 11.5.0-5.amzn2023.0.5      amazonlinux  37 k
+ git-core                  aarch64 2.50.1-1.amzn2023.0.1      amazonlinux 5.1 M
+ git-core-doc              noarch  2.50.1-1.amzn2023.0.1      amazonlinux 2.8 M
+ glibc-devel               aarch64 2.34-231.amzn2023.0.5      amazonlinux 445 k
+ guile22                   aarch64 2.2.7-2.amzn2023.0.3       amazonlinux 6.4 M
+ kernel6.18-headers        aarch64 1:6.18.51-120.163.amzn2023 amazonlinux 1.5 M
+ libmpc                    aarch64 1.2.1-2.amzn2023.0.2       amazonlinux  63 k
+ libtool-ltdl              aarch64 2.4.7-1.amzn2023.0.3       amazonlinux  38 k
+ libxcrypt-devel           aarch64 4.4.33-7.amzn2023          amazonlinux  32 k
+ make                      aarch64 1:4.3-5.amzn2023.0.2       amazonlinux 530 k
+ mpdecimal                 aarch64 2.5.1-3.amzn2023.0.3       amazonlinux 103 k
+ perl-Error                noarch  1:0.17030-2.amzn2023.0.1   amazonlinux  42 k
+ perl-File-Find            noarch  1.37-477.amzn2023.0.9      amazonlinux  26 k
+ perl-Git                  noarch  2.50.1-1.amzn2023.0.1      amazonlinux  41 k
+ perl-TermReadKey          aarch64 2.38-9.amzn2023.0.3        amazonlinux  36 k
+ perl-lib                  aarch64 0.65-477.amzn2023.0.9      amazonlinux  15 k
+ python3.11-libs           aarch64 3.11.16-1.amzn2023.0.1     amazonlinux 9.7 M
+ python3.11-pip-wheel      noarch  22.3.1-2.amzn2023.0.14     amazonlinux 1.4 M
+ python3.11-setuptools-wheel
+                           noarch  65.5.1-2.amzn2023.0.7      amazonlinux 717 k
+
+Transaction Summary
+================================================================================
+Install  27 Packages
+
+Total download size: 72 M
+Installed size: 269 M
+Downloading Packages:
+(1/27): annobin-docs-12.69-1.amzn2023.0.1.noarc 3.5 MB/s |  93 kB     00:00    
+(2/27): annobin-plugin-gcc-12.69-1.amzn2023.0.1  25 MB/s | 973 kB     00:00    
+(3/27): gc-8.0.4-5.amzn2023.0.2.aarch64.rpm     4.0 MB/s | 102 kB     00:00    
+(4/27): gcc-plugin-annobin-11.5.0-5.amzn2023.0. 1.2 MB/s |  37 kB     00:00    
+(5/27): git-2.50.1-1.amzn2023.0.1.aarch64.rpm   2.0 MB/s |  53 kB     00:00    
+(6/27): cpp-11.5.0-5.amzn2023.0.5.aarch64.rpm    81 MB/s |  10 MB     00:00    
+(7/27): git-core-doc-2.50.1-1.amzn2023.0.1.noar  67 MB/s | 2.8 MB     00:00    
+(8/27): git-core-2.50.1-1.amzn2023.0.1.aarch64.  75 MB/s | 5.1 MB     00:00    
+(9/27): glibc-devel-2.34-231.amzn2023.0.5.aarch  15 MB/s | 445 kB     00:00    
+(10/27): kernel6.18-headers-6.18.51-120.163.amz  39 MB/s | 1.5 MB     00:00    
+(11/27): guile22-2.2.7-2.amzn2023.0.3.aarch64.r  80 MB/s | 6.4 MB     00:00    
+(12/27): libmpc-1.2.1-2.amzn2023.0.2.aarch64.rp 2.4 MB/s |  63 kB     00:00    
+(13/27): libtool-ltdl-2.4.7-1.amzn2023.0.3.aarc 1.7 MB/s |  38 kB     00:00    
+(14/27): libxcrypt-devel-4.4.33-7.amzn2023.aarc 1.1 MB/s |  32 kB     00:00    
+(15/27): make-4.3-5.amzn2023.0.2.aarch64.rpm     21 MB/s | 530 kB     00:00    
+(16/27): mpdecimal-2.5.1-3.amzn2023.0.3.aarch64 3.3 MB/s | 103 kB     00:00    
+(17/27): perl-Error-0.17030-2.amzn2023.0.1.noar 1.5 MB/s |  42 kB     00:00    
+(18/27): perl-File-Find-1.37-477.amzn2023.0.9.n 994 kB/s |  26 kB     00:00    
+(19/27): perl-Git-2.50.1-1.amzn2023.0.1.noarch. 1.5 MB/s |  41 kB     00:00    
+(20/27): gcc-11.5.0-5.amzn2023.0.5.aarch64.rpm   83 MB/s |  31 MB     00:00    
+(21/27): perl-TermReadKey-2.38-9.amzn2023.0.3.a 546 kB/s |  36 kB     00:00    
+(22/27): perl-lib-0.65-477.amzn2023.0.9.aarch64 253 kB/s |  15 kB     00:00    
+(23/27): python3.11-3.11.16-1.amzn2023.0.1.aarc 1.2 MB/s |  28 kB     00:00    
+(24/27): python3.11-devel-3.11.16-1.amzn2023.0. 8.6 MB/s | 235 kB     00:00    
+(25/27): python3.11-pip-wheel-22.3.1-2.amzn2023  54 MB/s | 1.4 MB     00:00    
+(26/27): python3.11-setuptools-wheel-65.5.1-2.a  28 MB/s | 717 kB     00:00    
+(27/27): python3.11-libs-3.11.16-1.amzn2023.0.1  82 MB/s | 9.7 MB     00:00    
+--------------------------------------------------------------------------------
+Total                                           123 MB/s |  72 MB     00:00     
+Running transaction check
+Transaction check succeeded.
+Running transaction test
+Transaction test succeeded.
+Running transaction
+  Preparing        :                                                        1/1 
+  Installing       : libmpc-1.2.1-2.amzn2023.0.2.aarch64                   1/27 
+  Installing       : git-core-2.50.1-1.amzn2023.0.1.aarch64                2/27 
+  Installing       : git-core-doc-2.50.1-1.amzn2023.0.1.noarch             3/27 
+  Installing       : cpp-11.5.0-5.amzn2023.0.5.aarch64                     4/27 
+  Installing       : python3.11-setuptools-wheel-65.5.1-2.amzn2023.0.7.    5/27 
+  Installing       : python3.11-pip-wheel-22.3.1-2.amzn2023.0.14.noarch    6/27 
+  Installing       : perl-lib-0.65-477.amzn2023.0.9.aarch64                7/27 
+  Installing       : perl-TermReadKey-2.38-9.amzn2023.0.3.aarch64          8/27 
+  Installing       : perl-File-Find-1.37-477.amzn2023.0.9.noarch           9/27 
+  Installing       : perl-Error-1:0.17030-2.amzn2023.0.1.noarch           10/27 
+  Installing       : perl-Git-2.50.1-1.amzn2023.0.1.noarch                11/27 
+  Installing       : git-2.50.1-1.amzn2023.0.1.aarch64                    12/27 
+  Installing       : mpdecimal-2.5.1-3.amzn2023.0.3.aarch64               13/27 
+  Installing       : python3.11-3.11.16-1.amzn2023.0.1.aarch64            14/27 
+  Installing       : python3.11-libs-3.11.16-1.amzn2023.0.1.aarch64       15/27 
+  Installing       : libtool-ltdl-2.4.7-1.amzn2023.0.3.aarch64            16/27 
+  Installing       : kernel6.18-headers-1:6.18.51-120.163.amzn2023.aarc   17/27 
+  Installing       : libxcrypt-devel-4.4.33-7.amzn2023.aarch64            18/27 
+  Installing       : glibc-devel-2.34-231.amzn2023.0.5.aarch64            19/27 
+  Installing       : gc-8.0.4-5.amzn2023.0.2.aarch64                      20/27 
+  Installing       : guile22-2.2.7-2.amzn2023.0.3.aarch64                 21/27 
+  Installing       : make-1:4.3-5.amzn2023.0.2.aarch64                    22/27 
+  Installing       : gcc-11.5.0-5.amzn2023.0.5.aarch64                    23/27 
+  Running scriptlet: gcc-11.5.0-5.amzn2023.0.5.aarch64                    23/27 
+  Installing       : annobin-docs-12.69-1.amzn2023.0.1.noarch             24/27 
+  Installing       : annobin-plugin-gcc-12.69-1.amzn2023.0.1.aarch64      25/27 
+  Running scriptlet: annobin-plugin-gcc-12.69-1.amzn2023.0.1.aarch64      25/27 
+  Installing       : gcc-plugin-annobin-11.5.0-5.amzn2023.0.5.aarch64     26/27 
+  Installing       : python3.11-devel-3.11.16-1.amzn2023.0.1.aarch64      27/27 
+  Running scriptlet: python3.11-devel-3.11.16-1.amzn2023.0.1.aarch64      27/27 
+  Verifying        : annobin-docs-12.69-1.amzn2023.0.1.noarch              1/27 
+  Verifying        : annobin-plugin-gcc-12.69-1.amzn2023.0.1.aarch64       2/27 
+  Verifying        : cpp-11.5.0-5.amzn2023.0.5.aarch64                     3/27 
+  Verifying        : gc-8.0.4-5.amzn2023.0.2.aarch64                       4/27 
+  Verifying        : gcc-11.5.0-5.amzn2023.0.5.aarch64                     5/27 
+  Verifying        : gcc-plugin-annobin-11.5.0-5.amzn2023.0.5.aarch64      6/27 
+  Verifying        : git-2.50.1-1.amzn2023.0.1.aarch64                     7/27 
+  Verifying        : git-core-2.50.1-1.amzn2023.0.1.aarch64                8/27 
+  Verifying        : git-core-doc-2.50.1-1.amzn2023.0.1.noarch             9/27 
+  Verifying        : glibc-devel-2.34-231.amzn2023.0.5.aarch64            10/27 
+  Verifying        : guile22-2.2.7-2.amzn2023.0.3.aarch64                 11/27 
+  Verifying        : kernel6.18-headers-1:6.18.51-120.163.amzn2023.aarc   12/27 
+  Verifying        : libmpc-1.2.1-2.amzn2023.0.2.aarch64                  13/27 
+  Verifying        : libtool-ltdl-2.4.7-1.amzn2023.0.3.aarch64            14/27 
+  Verifying        : libxcrypt-devel-4.4.33-7.amzn2023.aarch64            15/27 
+  Verifying        : make-1:4.3-5.amzn2023.0.2.aarch64                    16/27 
+  Verifying        : mpdecimal-2.5.1-3.amzn2023.0.3.aarch64               17/27 
+  Verifying        : perl-Error-1:0.17030-2.amzn2023.0.1.noarch           18/27 
+  Verifying        : perl-File-Find-1.37-477.amzn2023.0.9.noarch          19/27 
+  Verifying        : perl-Git-2.50.1-1.amzn2023.0.1.noarch                20/27 
+  Verifying        : perl-TermReadKey-2.38-9.amzn2023.0.3.aarch64         21/27 
+  Verifying        : perl-lib-0.65-477.amzn2023.0.9.aarch64               22/27 
+  Verifying        : python3.11-3.11.16-1.amzn2023.0.1.aarch64            23/27 
+  Verifying        : python3.11-devel-3.11.16-1.amzn2023.0.1.aarch64      24/27 
+  Verifying        : python3.11-libs-3.11.16-1.amzn2023.0.1.aarch64       25/27 
+  Verifying        : python3.11-pip-wheel-22.3.1-2.amzn2023.0.14.noarch   26/27 
+  Verifying        : python3.11-setuptools-wheel-65.5.1-2.amzn2023.0.7.   27/27 
+
+Installed:
+  annobin-docs-12.69-1.amzn2023.0.1.noarch                                      
+  annobin-plugin-gcc-12.69-1.amzn2023.0.1.aarch64                               
+  cpp-11.5.0-5.amzn2023.0.5.aarch64                                             
+  gc-8.0.4-5.amzn2023.0.2.aarch64                                               
+  gcc-11.5.0-5.amzn2023.0.5.aarch64                                             
+  gcc-plugin-annobin-11.5.0-5.amzn2023.0.5.aarch64                              
+  git-2.50.1-1.amzn2023.0.1.aarch64                                             
+  git-core-2.50.1-1.amzn2023.0.1.aarch64                                        
+  git-core-doc-2.50.1-1.amzn2023.0.1.noarch                                     
+  glibc-devel-2.34-231.amzn2023.0.5.aarch64                                     
+  guile22-2.2.7-2.amzn2023.0.3.aarch64                                          
+  kernel6.18-headers-1:6.18.51-120.163.amzn2023.aarch64                         
+  libmpc-1.2.1-2.amzn2023.0.2.aarch64                                           
+  libtool-ltdl-2.4.7-1.amzn2023.0.3.aarch64                                     
+  libxcrypt-devel-4.4.33-7.amzn2023.aarch64                                     
+  make-1:4.3-5.amzn2023.0.2.aarch64                                             
+  mpdecimal-2.5.1-3.amzn2023.0.3.aarch64                                        
+  perl-Error-1:0.17030-2.amzn2023.0.1.noarch                                    
+  perl-File-Find-1.37-477.amzn2023.0.9.noarch                                   
+  perl-Git-2.50.1-1.amzn2023.0.1.noarch                                         
+  perl-TermReadKey-2.38-9.amzn2023.0.3.aarch64                                  
+  perl-lib-0.65-477.amzn2023.0.9.aarch64                                        
+  python3.11-3.11.16-1.amzn2023.0.1.aarch64                                     
+  python3.11-devel-3.11.16-1.amzn2023.0.1.aarch64                               
+  python3.11-libs-3.11.16-1.amzn2023.0.1.aarch64                                
+  python3.11-pip-wheel-22.3.1-2.amzn2023.0.14.noarch                            
+  python3.11-setuptools-wheel-65.5.1-2.amzn2023.0.7.noarch                      
+
+Complete!
+++ date -u
++ echo 'preflight Mon Oct  5 16:34:50 UTC 2026'
++ aws s3 cp /tmp/PREFLIGHT-S3 s3://<bucket>/pretium-calib/out/ptv21c1s/PREFLIGHT-S3
+Completed 39 Bytes/39 Bytes (925 Bytes/s) with 1 file(s) remainingupload: tmp/PREFLIGHT-S3 to s3://<bucket>/pretium-calib/out/ptv21c1s/PREFLIGHT-S3
++ cat
++ chmod +x /home/ec2-user/stream.sh
++ SCRIPTS_TGZ=in/ptv21c1s-scripts.tgz
++ case "$SCRIPTS_TGZ" in
++ aws s3 cp s3://<bucket>/pretium-calib/in/ptv21c1s-scripts.tgz /home/ec2-user/scripts.tgz
++ setsid nohup /home/ec2-user/stream.sh s3://<bucket>/pretium-calib/out/ptv21c1s
+Completed 256.0 KiB/438.1 KiB (2.8 MiB/s) with 1 file(s) remainingCompleted 438.1 KiB/438.1 KiB (4.8 MiB/s) with 1 file(s) remainingdownload: s3://<bucket>/pretium-calib/in/ptv21c1s-scripts.tgz to home/ec2-user/scripts.tgz
++ chown ec2-user:ec2-user /home/ec2-user/scripts.tgz
++ sha256sum /home/ec2-user/scripts.tgz
++ aws s3 cp /home/ec2-user/scripts.tgz s3://<bucket>/pretium-calib/out/ptv21c1s/scripts-as-run.tgz
+Completed 438.1 KiB/438.1 KiB (37.9 MiB/s) with 1 file(s) remainingupload: home/ec2-user/scripts.tgz to s3://<bucket>/pretium-calib/out/ptv21c1s/scripts-as-run.tgz
++ aws s3 cp /tmp/scripts-sha256.txt s3://<bucket>/pretium-calib/out/ptv21c1s/scripts-sha256.txt
+Completed 93 Bytes/93 Bytes (2.0 KiB/s) with 1 file(s) remainingupload: tmp/scripts-sha256.txt to s3://<bucket>/pretium-calib/out/ptv21c1s/scripts-sha256.txt
++ mkdir -p /home/ec2-user/out
++ chown -R ec2-user:ec2-user /home/ec2-user/out
++ cat
++ sed -i 's|BRANCH_PLACEHOLDER|rel/0.10-ptv21|' /home/ec2-user/run.sh
++ sed -i 's|JOBS_PLACEHOLDER|longrun/ptv21c1s-jobs.sh|' /home/ec2-user/run.sh
++ sed -i 's|PIN_PLACEHOLDER|931ed3d4fe659e4dec765673ee3e280a6b40ab2b|' /home/ec2-user/run.sh
++ chown ec2-user:ec2-user /home/ec2-user/run.sh
++ chmod +x /home/ec2-user/run.sh
++ set +e
++ sudo -u ec2-user bash /home/ec2-user/run.sh
++ cd /home/ec2-user
++ export PATH=/home/ec2-user/.local/bin:/home/ec2-user/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/var/lib/snapd/snap/bin
++ PATH=/home/ec2-user/.local/bin:/home/ec2-user/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/var/lib/snapd/snap/bin
++ curl -sSf https://sh.rustup.rs
++ sh -s -- -y --profile minimal
+info: downloading installer
+info: profile set to minimal
+info: default host tuple is aarch64-unknown-linux-gnu
+info: syncing channel updates for stable-aarch64-unknown-linux-gnu
+info: latest update on 2026-10-01 for version 1.99.0 (b940084d7 2026-09-28)
+info: downloading 3 components
+info: default toolchain set to stable-aarch64-unknown-linux-gnu
+
+  stable-aarch64-unknown-linux-gnu installed - rustc 1.99.0 (b940084d7 2026-09-28)
+
+
+Rust is installed now. Great!
+
+To get started you may need to restart your current shell.
+This would reload your PATH environment variable to include
+Cargo's bin directory ($HOME/.cargo/bin).
+
+To configure your current shell, you need to source the
+corresponding env file under $HOME/.cargo.
+
+Consider running the right command for your shell (note the leading DOT):
+. "$HOME/.cargo/env"           # For sh/ash/dash/pdksh/bash
+source "$HOME/.cargo/env.tcsh" # For tcsh
+cargo:rerun-if-env-changed=CC_aarch64-unknown-linux-gnu
+CC_aarch64-unknown-linux-gnu = None
+cargo:rerun-if-env-changed=CC_aarch64_unknown_linux_gnu
+CC_aarch64_unknown_linux_gnu = None
+cargo:rerun-if-env-changed=HOST_CC
+HOST_CC = None
+cargo:rerun-if-env-changed=CC
+CC = None
+cargo:rerun-if-env-changed=CC_ENABLE_DEBUG_OUTPUT
+cargo:rerun-if-env-changed=CRATE_CC_NO_DEFAULTS
+CRATE_CC_NO_DEFAULTS = None
+cargo:rerun-if-env-changed=CFLAGS
+CFLAGS = None
+cargo:rerun-if-env-changed=HOST_CFLAGS
+HOST_CFLAGS = None
+cargo:rerun-if-env-changed=CFLAGS_aarch64_unknown_linux_gnu
+CFLAGS_aarch64_unknown_linux_gnu = None
+cargo:rerun-if-env-changed=CFLAGS_aarch64-unknown-linux-gnu
+CFLAGS_aarch64-unknown-linux-gnu = None
++ curl -LsSf https://astral.sh/uv/install.sh
++ sh
+downloading uv 0.12.23 aarch64-unknown-linux-gnu
+installing to /home/ec2-user/.local/bin
+  uv
+  uvx
+everything's installed!
++ export PATH=/home/ec2-user/.local/bin:/home/ec2-user/.cargo/bin:/home/ec2-user/.local/bin:/home/ec2-user/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/var/lib/snapd/snap/bin
++ PATH=/home/ec2-user/.local/bin:/home/ec2-user/.cargo/bin:/home/ec2-user/.local/bin:/home/ec2-user/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/var/lib/snapd/snap/bin
++ tar -xzf scripts.tgz -C /home/ec2-user
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
++ export SCR=/home/ec2-user/scripts
++ SCR=/home/ec2-user/scripts
++ export SCRIPTS=/home/ec2-user/scripts
++ SCRIPTS=/home/ec2-user/scripts
++ export OUT=/home/ec2-user/out
++ OUT=/home/ec2-user/out
++ git clone --branch rel/0.10-ptv21 https://github.com/simoncoombes/tradefloor.git src
+Cloning into 'src'...
++ cd src
++ git checkout --detach 931ed3d4fe659e4dec765673ee3e280a6b40ab2b
+HEAD is now at 931ed3d4 LangGraph notebook: the arm-count cell prints a line in a live run too, so every code cell carries output
++ ls '/home/ec2-user/scripts/engine-patches/*.patch'
++ git rev-parse HEAD
++ uv venv --python 3.11 .venv
+Using CPython 3.11.16 interpreter at: /usr/bin/python3.11
+Creating virtual environment at: .venv
+Activate with: source .venv/bin/activate
++ export VIRTUAL_ENV=/home/ec2-user/src/.venv
++ VIRTUAL_ENV=/home/ec2-user/src/.venv
++ export PATH=/home/ec2-user/src/.venv/bin:/home/ec2-user/.local/bin:/home/ec2-user/.cargo/bin:/home/ec2-user/.local/bin:/home/ec2-user/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/var/lib/snapd/snap/bin
++ PATH=/home/ec2-user/src/.venv/bin:/home/ec2-user/.local/bin:/home/ec2-user/.cargo/bin:/home/ec2-user/.local/bin:/home/ec2-user/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/var/lib/snapd/snap/bin
++ uv pip install numpy pyarrow maturin
+Resolved 3 packages in 107ms
+Downloading pyarrow (44.7MiB)
+Downloading numpy (15.2MiB)
+Downloading maturin (9.6MiB)
+ Downloaded maturin
+ Downloaded numpy
+ Downloaded pyarrow
+Prepared 3 packages in 411ms
+Installed 3 packages in 1.16s
+ + maturin==1.15.0
+ + numpy==2.4.6
+ + pyarrow==25.0.1
++ maturin build --release --out dist --features python
+    Updating crates.io index
+     Locking 121 packages to highest compatible versions
+      Adding arrow v53.4.1 (available: v60.0.0)
+      Adding chrono v0.4.39 (available: v0.4.45)
+      Adding generic-array v0.14.7 (available: v0.14.9)
+      Adding pyo3 v0.22.6 (available: v0.29.3)
+      Adding sha2 v0.10.9 (available: v0.11.0)
+ Downloading crates ...
+  Downloaded block-buffer v0.10.4
+  Downloaded android_system_properties v0.1.6
+  Downloaded cfg-if v1.0.5
+  Downloaded windows-link v0.2.1
+  Downloaded atoi v2.0.0
+  Downloaded android-tzdata v0.1.1
+  Downloaded autocfg v1.5.1
+  Downloaded windows-strings v0.5.1
+  Downloaded windows-targets v0.52.6
+  Downloaded const-random v0.1.18
+  Downloaded cpufeatures v0.2.17
+  Downloaded windows-interface v0.59.3
+  Downloaded wasm-bindgen-shared v0.2.129
+  Downloaded windows-result v0.4.1
+  Downloaded windows-implement v0.60.2
+  Downloaded arrow-row v53.4.1
+  Downloaded unindent v0.2.4
+  Downloaded iana-time-zone-haiku v0.1.2
+  Downloaded memoffset v0.9.1
+  Downloaded const-random-macro v0.1.16
+  Downloaded futures-core v0.3.34
+  Downloaded num v0.4.3
+  Downloaded num-iter v0.1.46
+  Downloaded crunchy v0.2.4
+  Downloaded crypto-common v0.1.7
+  Downloaded wasm-bindgen-macro v0.2.129
+  Downloaded itoa v1.0.18
+  Downloaded heck v0.5.0
+  Downloaded futures-task v0.3.34
+  Downloaded pyo3-macros v0.22.6
+  Downloaded arrow-arith v53.4.1
+  Downloaded zmij v1.0.23
+  Downloaded quote v1.0.47
+  Downloaded sha2 v0.10.9
+  Downloaded arrow-schema v53.4.1
+  Downloaded windows-core v0.62.2
+  Downloaded arrow-data v53.4.1
+  Downloaded num-rational v0.4.2
+  Downloaded arrow-select v53.4.1
+  Downloaded target-lexicon v0.12.16
+  Downloaded digest v0.10.7
+  Downloaded shlex v2.0.1
+  Downloaded version_check v0.9.5
+  Downloaded generic-array v0.14.7
+  Downloaded indoc v2.0.7
+  Downloaded lexical-core v1.0.6
+  Downloaded num-integer v0.1.47
+  Downloaded tiny-keccak v2.0.2
+  Downloaded pin-project-lite v0.2.17
+  Downloaded rustversion v1.0.23
+  Downloaded slab v0.4.12
+  Downloaded num-complex v0.4.6
+  Downloaded arrow-ord v53.4.1
+  Downloaded arrow-string v53.4.1
+  Downloaded bitflags v2.13.2
+  Downloaded serde_core v1.0.229
+  Downloaded ahash v0.8.12
+  Downloaded find-msvc-tools v0.1.14
+  Downloaded wit-bindgen v0.57.1
+  Downloaded arrow v53.4.1
+  Downloaded once_cell v1.21.4
+  Downloaded unicode-ident v1.0.26
+  Downloaded core-foundation-sys v0.8.7
+  Downloaded getrandom v0.2.17
+  Downloaded iana-time-zone v0.1.65
+  Downloaded wasi v0.11.1+wasi-snapshot-preview1
+  Downloaded arrow-buffer v53.4.1
+  Downloaded lexical-write-integer v1.0.6
+  Downloaded base64 v0.22.1
+  Downloaded getrandom v0.3.4
+  Downloaded ryu v1.0.23
+  Downloaded log v0.4.34
+  Downloaded proc-macro2 v1.0.107
+  Downloaded pyo3-build-config v0.22.6
+  Downloaded lexical-parse-integer v1.0.6
+  Downloaded arrow-cast v53.4.1
+  Downloaded bytes v1.12.1
+  Downloaded serde_derive v1.0.229
+  Downloaded pyo3-macros-backend v0.22.6
+  Downloaded r-efi v5.3.0
+  Downloaded wasm-bindgen v0.2.129
+  Downloaded half v2.7.1
+  Downloaded num-traits v0.2.19
+  Downloaded bumpalo v3.20.3
+  Downloaded serde v1.0.229
+  Downloaded cc v1.6.0
+  Downloaded pyo3-ffi v0.22.6
+  Downloaded memchr v2.8.3
+  Downloaded lexical-util v1.0.7
+  Downloaded lexical-write-float v1.0.6
+  Downloaded typenum v1.20.1
+  Downloaded js-sys v0.3.106
+  Downloaded hashbrown v0.15.5
+  Downloaded num-bigint v0.4.8
+  Downloaded aho-corasick v1.1.5
+  Downloaded regex v1.13.1
+  Downloaded wasm-bindgen-macro-support v0.2.129
+  Downloaded zerocopy-derive v0.8.59
+  Downloaded libm v0.2.16
+  Downloaded wasip2 v1.0.4+wasi-0.2.12
+  Downloaded lexical-parse-float v1.0.6
+  Downloaded futures-util v0.3.34
+  Downloaded serde_json v1.0.151
+  Downloaded portable-atomic v1.15.0
+  Downloaded chrono v0.4.39
+  Downloaded arrow-array v53.4.1
+  Downloaded syn v3.0.6
+  Downloaded syn v2.0.119
+  Downloaded regex-syntax v0.8.11
+  Downloaded pyo3 v0.22.6
+  Downloaded regex-automata v0.4.18
+  Downloaded libc v0.2.190
+  Downloaded zerocopy v0.8.59
+  Downloaded windows_aarch64_gnullvm v0.52.6
+  Downloaded windows_i686_gnullvm v0.52.6
+  Downloaded windows_x86_64_gnullvm v0.52.6
+  Downloaded windows_aarch64_msvc v0.52.6
+  Downloaded windows_x86_64_gnu v0.52.6
+  Downloaded windows_x86_64_msvc v0.52.6
+  Downloaded windows_i686_gnu v0.52.6
+  Downloaded windows_i686_msvc v0.52.6
+🍹 Building a mixed python/rust project
+🐍 Found CPython 3.11 at /home/ec2-user/src/.venv/bin/python
+🔗 Found pyo3 bindings with abi3-py3.11 support
+   Compiling autocfg v1.5.1
+   Compiling libm v0.2.16
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.26
+   Compiling quote v1.0.47
+   Compiling version_check v0.9.5
+   Compiling libc v0.2.190
+   Compiling cfg-if v1.0.5
+   Compiling target-lexicon v0.12.16
+   Compiling zerocopy v0.8.59
+   Compiling once_cell v1.21.4
+   Compiling getrandom v0.3.4
+   Compiling bytes v1.12.1
+   Compiling bitflags v2.13.2
+   Compiling iana-time-zone v0.1.65
+   Compiling hashbrown v0.15.5
+   Compiling lexical-util v1.0.7
+   Compiling typenum v1.20.1
+   Compiling memchr v2.8.3
+   Compiling regex-syntax v0.8.11
+   Compiling heck v0.5.0
+   Compiling ryu v1.0.23
+   Compiling base64 v0.22.1
+   Compiling unindent v0.2.4
+   Compiling indoc v2.0.7
+   Compiling arrow-schema v53.4.1
+   Compiling ahash v0.8.12
+   Compiling generic-array v0.14.7
+   Compiling num-traits v0.2.19
+   Compiling memoffset v0.9.1
+   Compiling lexical-parse-integer v1.0.6
+   Compiling lexical-write-integer v1.0.6
+   Compiling lexical-parse-float v1.0.6
+   Compiling pyo3-build-config v0.22.6
+   Compiling aho-corasick v1.1.5
+   Compiling lexical-write-float v1.0.6
+   Compiling syn v2.0.119
+   Compiling lexical-core v1.0.6
+   Compiling cpufeatures v0.2.17
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.7
+   Compiling digest v0.10.7
+   Compiling pyo3-macros-backend v0.22.6
+   Compiling pyo3-ffi v0.22.6
+   Compiling pyo3 v0.22.6
+   Compiling sha2 v0.10.9
+   Compiling num-integer v0.1.47
+   Compiling num-complex v0.4.6
+   Compiling chrono v0.4.39
+   Compiling atoi v2.0.0
+   Compiling num-bigint v0.4.8
+   Compiling num-iter v0.1.46
+   Compiling regex-automata v0.4.18
+   Compiling num-rational v0.4.2
+   Compiling num v0.4.3
+   Compiling zerocopy-derive v0.8.59
+   Compiling regex v1.13.1
+   Compiling pyo3-macros v0.22.6
+   Compiling half v2.7.1
+   Compiling arrow-buffer v53.4.1
+   Compiling arrow-data v53.4.1
+   Compiling arrow-array v53.4.1
+   Compiling arrow-select v53.4.1
+   Compiling arrow-row v53.4.1
+   Compiling arrow-arith v53.4.1
+   Compiling arrow-ord v53.4.1
+   Compiling arrow-string v53.4.1
+   Compiling arrow-cast v53.4.1
+   Compiling arrow v53.4.1
+   Compiling tradefloor v0.10.0 (/home/ec2-user/src/rust)
+    Finished `release` profile [optimized] target(s) in 49.88s
+📦 Including files matching "python/tradefloor/py.typed"
+📦 Including files matching "python/tradefloor/_core.pyi"
+📦 Including files matching "python/tradefloor/scenarios/*.yml"
+📦 Including files matching "python/tradefloor/presets/*.json"
+📦 Built wheel for abi3 Python ≥ 3.11 to dist/tradefloor-0.10.0-cp311-abi3-manylinux_2_34_aarch64.whl
++ uv pip install --no-index --find-links dist --force-reinstall tradefloor
+Resolved 1 package in 0.90ms
+Prepared 1 package in 11ms
+Installed 1 package in 108ms
+ + tradefloor==0.10.0
++ python -c 'import numpy, pyarrow, tradefloor; print('\''PREFLIGHT OK'\'', tradefloor.version())'
+PREFLIGHT OK 0.10.0
++ python tests/known_answer.py
++ tee /home/ec2-user/out/known-answer.txt
+tradefloor known-answer test v29
+  package  0.10.0
+  bytes    16920
+  sha256   4ea1d56340a3357db730764c3e24c131c5e0883efa4cd6f7f56c83ea9674033c
+  sim      3a063f0d207bc37b5ade3b23c60f5e358b275507550b7f75f172a8d7cafb075c
+  meta     8804ef0e67ecede070a22d7fb56f6980605e78a9e45c71ca10f15862d270b165
+  bonds    aae52e08c038f68fec696cec15af4ebbda2743edf5dc9b634a3f67f25635c2d1
+  presets  67ddc3a7c2eab9603e84c7c4ff1d24590ae8dfbd0f1eb3a3963e11a0ba0fc2a3
+  highseed cef62229d22349e5fbd41dac6ccaba91555b68a86dd79bde1c0259bd8e3e6a8b
+  traded   64b896ef2b8e806523bc7a2cd71711bf8cf6b24ac8b6cb34bb3dc7b8b3555fba
++ set +e
++ uv pip install pytest pytest-xdist pyyaml
+Resolved 8 packages in 95ms
+Downloading pygments (1.2MiB)
+ Downloaded pygments
+Prepared 8 packages in 64ms
+Installed 8 packages in 364ms
+ + execnet==2.1.2
+ + iniconfig==2.3.0
+ + packaging==26.3
+ + pluggy==1.6.0
+ + pygments==2.21.0
+ + pytest==9.1.1
+ + pytest-xdist==3.8.0
+ + pyyaml==6.0.3
++ FULL_DEPS=1
++ case "$FULL_DEPS" in
++ '[' -n 1 ']'
++ uv pip install pyarrow numpy gymnasium mcp anthropic pydantic openai-agents pydantic-ai-slim langgraph
+Resolved 70 packages in 288ms
+Downloading openai (2.0MiB)
+Downloading cryptography (4.5MiB)
+Downloading zstandard (4.8MiB)
+Downloading pydantic-core (1.9MiB)
+Downloading anthropic (1.6MiB)
+Downloading openai-agents (1.2MiB)
+Downloading pydantic-ai-slim (2.0MiB)
+ Downloaded openai-agents
+ Downloaded pydantic-ai-slim
+ Downloaded pydantic-core
+ Downloaded anthropic
+ Downloaded openai
+ Downloaded cryptography
+ Downloaded zstandard
+Prepared 66 packages in 128ms
+Installed 66 packages in 1.78s
+ + annotated-types==0.8.0
+ + anthropic==1.11.0
+ + anyio==4.15.1
+ + attrs==26.1.0
+ + certifi==2026.7.22
+ + cffi==2.1.1
+ + charset-normalizer==3.5.2
+ + click==8.5.0
+ + cloudpickle==3.1.2
+ + cryptography==50.0.2
+ + distro==1.9.0
+ + docstring-parser==0.18.0
+ + farama-notifications==0.0.6
+ + genai-prices==0.1.9
+ + griffelib==2.3.0
+ + gymnasium==1.4.0
+ + h11==0.16.0
+ + httpcore==1.0.9
+ + httpcore2==2.13.1
+ + httpx==0.28.1
+ + httpx2==2.13.1
+ + idna==3.20
+ + jiter==0.17.0
+ + jsonpatch==1.33
+ + jsonpointer==3.1.1
+ + jsonschema==4.26.0
+ + jsonschema-specifications==2025.9.1
+ + langchain-core==1.6.6
+ + langchain-protocol==0.0.19
+ + langgraph==1.2.12
+ + langgraph-checkpoint==4.2.0
+ + langgraph-prebuilt==1.1.0
+ + langgraph-sdk==0.4.5
+ + langsmith==0.14.4
+ + logfire-api==5.1.1
+ + mcp==2.3.0
+ + mcp-types==2.3.0
+ + openai==3.24.0
+ + openai-agents==0.23.1
+ + opentelemetry-api==1.45.0
+ + orjson==3.12.0
+ + ormsgpack==1.12.2
+ + pycparser==3.0
+ + pydantic==2.13.5
+ + pydantic-ai-slim==2.54.0
+ + pydantic-core==2.46.5
+ + pydantic-graph==2.54.0
+ + pyjwt==2.15.1
+ + python-multipart==0.0.32
+ + referencing==0.37.0
+ + requests==2.34.2
+ + requests-toolbelt==1.0.0
+ + rpds-py==2026.9.1
+ + sniffio==1.3.1
+ + sse-starlette==3.5.0
+ + starlette==1.7.0
+ + tenacity==9.1.4
+ + truststore==0.10.4
+ + typing-extensions==4.16.0
+ + typing-inspection==0.4.4
+ + urllib3==2.8.0
+ + uuid-utils==0.17.1
+ + uvicorn==0.54.0
+ + websockets==16.1.1
+ + xxhash==4.0.1
+ + zstandard==0.25.0
++ python -c 'import pyarrow, numpy, gymnasium, mcp, agents, pydantic_ai, langgraph; print('\''optional surfaces present'\'')'
+optional surfaces present
++ SKIP_GATE_IF_KAT=3a063f0d207bc37b5ade3b23c60f5e358b275507550b7f75f172a8d7cafb075c
++ case "$SKIP_GATE_IF_KAT" in
+++ python tests/known_answer.py
+++ awk '/^  sim /{print $2}'
++ KAT_SIM=3a063f0d207bc37b5ade3b23c60f5e358b275507550b7f75f172a8d7cafb075c
++ echo 'known-answer sim: 3a063f0d207bc37b5ade3b23c60f5e358b275507550b7f75f172a8d7cafb075c'
++ tee /home/ec2-user/out/kat.txt
+known-answer sim: 3a063f0d207bc37b5ade3b23c60f5e358b275507550b7f75f172a8d7cafb075c
++ '[' -n 3a063f0d207bc37b5ade3b23c60f5e358b275507550b7f75f172a8d7cafb075c ']'
++ '[' -z 3a063f0d207bc37b5ade3b23c60f5e358b275507550b7f75f172a8d7cafb075c ']'
++ '[' 3a063f0d207bc37b5ade3b23c60f5e358b275507550b7f75f172a8d7cafb075c '!=' 3a063f0d207bc37b5ade3b23c60f5e358b275507550b7f75f172a8d7cafb075c ']'
++ PYTEST_RC=0
++ CARGO_RC=0
++ echo 'gate skipped: sim digest matches the gated pin 3a063f0d207bc37b5ade3b23c60f5e358b275507550b7f75f172a8d7cafb075c'
++ tee /home/ec2-user/out/gate-pytest.txt
+gate skipped: sim digest matches the gated pin 3a063f0d207bc37b5ade3b23c60f5e358b275507550b7f75f172a8d7cafb075c
++ echo 'pytest=0 cargo=0'
++ set -e
++ export REPO=/home/ec2-user/src
++ REPO=/home/ec2-user/src
++ for kv in WORKERS=60 LONGRUN_SEEDS=30 LONGRUN_YEARS=21 GEN_SEEDS=101-190,401-490,701-790 D1POOL_SEEDS=101-300,331-490
++ case "$kv" in
++ export WORKERS=60
++ WORKERS=60
++ echo 'exported WORKERS=60'
+exported WORKERS=60
++ for kv in WORKERS=60 LONGRUN_SEEDS=30 LONGRUN_YEARS=21 GEN_SEEDS=101-190,401-490,701-790 D1POOL_SEEDS=101-300,331-490
++ case "$kv" in
++ export LONGRUN_SEEDS=30
++ LONGRUN_SEEDS=30
++ echo 'exported LONGRUN_SEEDS=30'
+exported LONGRUN_SEEDS=30
++ for kv in WORKERS=60 LONGRUN_SEEDS=30 LONGRUN_YEARS=21 GEN_SEEDS=101-190,401-490,701-790 D1POOL_SEEDS=101-300,331-490
++ case "$kv" in
++ export LONGRUN_YEARS=21
++ LONGRUN_YEARS=21
++ echo 'exported LONGRUN_YEARS=21'
+exported LONGRUN_YEARS=21
++ for kv in WORKERS=60 LONGRUN_SEEDS=30 LONGRUN_YEARS=21 GEN_SEEDS=101-190,401-490,701-790 D1POOL_SEEDS=101-300,331-490
++ case "$kv" in
++ export GEN_SEEDS=101-190,401-490,701-790
++ GEN_SEEDS=101-190,401-490,701-790
++ echo 'exported GEN_SEEDS=101-190,401-490,701-790'
+exported GEN_SEEDS=101-190,401-490,701-790
++ for kv in WORKERS=60 LONGRUN_SEEDS=30 LONGRUN_YEARS=21 GEN_SEEDS=101-190,401-490,701-790 D1POOL_SEEDS=101-300,331-490
++ case "$kv" in
++ export D1POOL_SEEDS=101-300,331-490
++ D1POOL_SEEDS=101-300,331-490
++ echo 'exported D1POOL_SEEDS=101-300,331-490'
+exported D1POOL_SEEDS=101-300,331-490
+++ tr -cd '\r'
+++ wc -c
++ CR_COUNT=0
++ '[' 0 -gt 0 ']'
++ bash /home/ec2-user/scripts/longrun/ptv21c1s-jobs.sh
++ tee /home/ec2-user/out/jobs.log
+pt-v21 pt-v21 {'cycle_equity_hazard_opening': 0.011, 'order_flow_coefficient': 800.0, 'order_flow_impact_law': 1.0, 'overnight_market_share': 0.55, 'impact_memory_coefficient': 0.65, 'market_factor_sigma': 0.007099478, 'closing_auction': 1.0, 'earnings_cycle_depth': 0.2} {'cycle_publication_lag': 252.0, 'gdp_publication_lag': 21.0, 'macro_publication_repricing': 1.0, 'unemployment_adjustment_half_life': 84.0, 'fear_greed_published_inputs': 1.0} default pt-v21 version 0.10.0
+=== true-phase histories (R4 on the held close): 101-190,401-490,701-790  16:36:11
+gen exited 0
+pt-v21 788 89s pt-v21 [268/270, 364s]
+pt-v21 790 82s pt-v21 [269/270, 367s]
+pt-v21 785 101s pt-v21 [270/270, 369s]
+/home/ec2-user/out/r13gen/pt-v21/ 270 free, 270 names
+=== pooled level rows (D1): 101-300,331-490  16:42:21
+d1pool exited 0
+d1pool pt-v21: 360 seeds, index_tail_dn3 0.983 (888 of 90360)
+d1pool done in 58s
++ '[' 0 -ne 0 ']'
++ '[' 0 -ne 0 ']'
++ STATUS=0
++ set -e
+++ ls /home/ec2-user/out/j-ptv21c1s.json
+++ wc -l
++ JSONS=1
++ '[' 0 -eq 0 ']'
++ echo 'OK exit=0 jsons=1 branch=rel/0.10-ptv21 pin=931ed3d4fe659e4dec765673ee3e280a6b40ab2b'
++ aws s3 cp /var/log/pretium-run.log s3://<bucket>/pretium-calib/out/ptv21c1s/run.log

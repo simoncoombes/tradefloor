@@ -312,10 +312,27 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "book_depth_coefficient": (0.0, 2.0),
     "book_depth_exponent": (0.0, 1.0),
     "book_depth_reach": (0.0, 2.0),
+    "book_depth_nesting": (0.0, 1.0),
     "book_shared": (0.0, 1.0),
     "book_refill_half_life": (0.0, 120.0),
     "book_resting": (0.0, 1.0),
+    # A switch: a cohort's arrival order at the book is a seeded per-step
+    # shuffle rather than label order.
+    "book_arrival_shuffle": (0.0, 1.0),
     "fill_impact_coefficient": (0.0, 1.0),
+    # The metaorder memory (sqrt-impact): read only on an agent's path, like
+    # the book above. Y_M is capped by the book's own Y (0.75 on pt-v20);
+    # the half-lives run from a quarter hour to a season of open ticks.
+    "impact_memory_coefficient": (0.0, 0.75),
+    "impact_memory_half_life": (0.0, 390.0),
+    "impact_memory_slow_half_life": (0.0, 39000.0),
+    "impact_memory_slow_weight": (0.0, 0.5),
+    "impact_memory_crossover": (0.0, 0.01),
+    # Switches (sim/r17-wash): a resting order against the memory's lean
+    # refills it; a resting order crossed during the session trades at its
+    # own limit.
+    "impact_memory_refill": (0.0, 1.0),
+    "book_cross_at_limit": (0.0, 1.0),
     # How much more volatile the crisis epicentre's names are than the other
     # sectors' at the same VIX. The top is 3.0, above the tape's largest
     # episode ratio (2.43, 2008-09) with room for one worse: five episodes is
@@ -371,14 +388,197 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # market's daily sigma spends most of its time (median 0.78, 99th
     # percentile 4.9 on pt-v20).
     "fair_value_market_vol_cap": (0.0, 4.0),
+    # A share of what the ceiling takes off the market's permanent share: 0
+    # is the ceiling as it stood, 1 no ceiling.
+    "fair_value_market_excess_share": (0.0, 1.0),
     # Log discount per log VIX above the knee; 0.3 takes a VIX of 80 to
     # about a quarter off fair value, past any measured feedback.
     "fair_value_vix_discount": (0.0, 0.3),
     # Sessions; 0 reads the VIX as it stands, 63 is a quarter's smoothing.
     "fair_value_vix_half_life": (0.0, 63.0),
+    # Sessions the discount is given back at; 0 is the build's half-life.
+    # 252 is a year's fear premium after the VIX has gone.
+    "fair_value_vix_release_half_life": (0.0, 252.0),
+    # Log units below the roster's mean fair-value level; 0 is no knee, and a
+    # knee under 2 reaches ordinary names within a few years.
+    "fair_value_relative_knee": (0.0, 6.0),
+    # Sessions; read only with the knee set. 504 to 2520 is two to ten years.
+    "fair_value_relative_half_life": (0.0, 2520.0),
+    # Read only on a session a caller pinned a macro field: a switch that
+    # holds a pinned field through the close, the share of a pinned VIX
+    # priced the moment it is published, and the most of the session's
+    # market variance that priced move may take.
+    "macro_pins_hold": (0.0, 1.0),
+    "pinned_vix_feedback": (0.0, 1.0),
+    "pinned_vix_variance_share": (0.0, 1.0),
+    # A pinned VIX's calm line: the VIX level it starts at (0 is none; 25
+    # is well above the real median of 17.6), its slope as a share of the
+    # knee's, and the switch that holds a pin's priced share.
+    "pinned_vix_calm_knee": (0.0, 25.0),
+    "pinned_vix_calm_share": (0.0, 1.0),
+    "pinned_vix_priced_cap": (0.0, 1.0),
     # An annual buyback yield: 0.0 is no ceiling, and 0.3 is past any real
     # name's (real ones run to a few per cent).
     "buyback_yield_cap": (0.0, 0.3),
+    # The market's cycle nowcast: the probability a session's report names
+    # the true phase. 0.0 prices the true phase, the shipped vector; 1.0 is
+    # a report that is always right. The engine refuses (0, 0.2], where a
+    # report carries nothing or points away from the truth, and the survey
+    # records a draw there as the model's refusal: the price of a box that
+    # has to contain the shipped 0.0, as market_vol_level_persistence pays.
+    "cycle_nowcast_accuracy": (0.0, 1.0),
+    # The share of the spread's cycle multiplier replaced by its occupancy
+    # mean: its whole meaning, from the table as it stood to none of it.
+    "corporate_spread_cycle": (0.0, 1.0),
+    # The r13 macro-clock dials. The share of the anticipated level's
+    # expected drift the valuation leaves out: its whole meaning.
+    "earnings_anticipation_drift_share": (0.0, 1.0),
+    # D's half-life in sessions; 0.0 reads 1260, so the box runs from the
+    # shipped 0.0 through a quarter to five years.
+    "earnings_anticipation_drift_half_life": (0.0, 1260.0),
+    # A growth rate in per cent a year; 0.0 is off. The box stops at 3,
+    # where the cut would fire at about trend growth; below zero it waits
+    # for output to fall, the ladder's own timing, so the box leaves it out.
+    "fed_growth_cut": (0.0, 3.0),
+    # A switch: a drawn publication lag for each turn.
+    "cycle_publication_lag_draw": (0.0, 1.0),
+    # A switch: 0.0 is the term that stood, 1.0 accrues the share count.
+    "buyback_accrual": (0.0, 1.0),
+    # The rate indices' close re-mark and live mark (r13): switches, whole
+    # meaning. The engine refuses the live mark without the re-mark, and the
+    # survey records a draw there as the model's refusal.
+    "rate_close_remark": (0.0, 1.0),
+    "rate_intraday_live": (0.0, 1.0),
+    # The central bank's stress cut, points per step: 0.5 is a half-point
+    # step, two steps a point, which is 2001's and 2008's emergency size.
+    "fed_stress_cut": (0.0, 0.5),
+    # A scale on each sector's dividend payout; 0.0 is no dividend, 1.0 is
+    # the sector payouts as measured, and 2.0 doubles them (each name's
+    # payout is capped at the whole of its earnings).
+    "dividend_payout_share": (0.0, 2.0),
+    # A switch: 1 reads buyback_payout_share as the total payout, so a
+    # dividend substitutes for buybacks.
+    "dividend_buyback_substitution": (0.0, 1.0),
+    # The return memory's gain in log variance per unit of memory. At 4 on
+    # a 10-session half-life the index's leverage sum reaches the tape's
+    # and its crash rate is two and a half times it (crash-vol-state
+    # design), so 5 is past anything plausible.
+    "market_vol_leverage": (0.0, 5.0),
+    # Sessions; 126 is half a year (Bouchaud, Matacz and Potters 2001 put
+    # the index kernel near 10 to 20 sessions). 0 is the shipped value, so
+    # the box starts there; a gain drawn with it is recorded infeasible.
+    "market_vol_leverage_half_life": (0.0, 126.0),
+    # A share: 0 counts up and down days alike, 1 counts falls only.
+    "market_vol_leverage_down": (0.0, 1.0),
+    # The power on the day's own sd the memory counts a day in: 0 the
+    # baseline sd (as shipped), 1 the day's z-score.
+    "market_vol_leverage_standardise": (0.0, 1.0),
+    # The power of the roster's cap-weighted beta each name's beta is divided
+    # by at construction: 0 the instrument's beta (as shipped), 1 a roster
+    # whose cap-weighted beta is exactly one.
+    "market_beta_normalise": (0.0, 1.0),
+    # Degrees of freedom of the day's market draw: 0 is a normal day (as
+    # shipped); the S&P 500's GJR-t fit reads 6.9 (6.0 to 8.0), and 3 is
+    # past any measured tail. A draw in (0, 3) is refused by the engine.
+    "market_day_tail_df": (0.0, 30.0),
+    # The share of the day's t scale the variance state reads.
+    "market_day_tail_state_share": (0.0, 1.0),
+    # The cycle's volatility ratio (bear-dynamics): 0 is off, and the real
+    # recession-over-expansion index volatility runs 1.66 to 2.24 (S&P 500
+    # by NBER month), so 3 is past any measured.
+    "market_vol_cycle_ratio": (0.0, 3.0),
+    # The expansion-side multiplier: 0 derives it from the phase shares,
+    # and the design's arms ran 0.70 to 0.80; 1.5 is past any of them.
+    "market_vol_cycle_expansion": (0.0, 1.5),
+    # Sessions; 0 is instant, 126 half a year.
+    "market_vol_cycle_half_life": (0.0, 126.0),
+    # Powers in [0, 1], at or over one and under one.
+    "market_vol_cycle_relative": (0.0, 1.0),
+    "market_vol_cycle_relative_calm": (0.0, 1.0),
+    # The power on the fair-value cap's ceiling, in [0, 1].
+    "market_vol_cycle_cap_relative": (0.0, 1.0),
+    # Switches: the multiplier is not applied on a session whose VIX, or
+    # whose phase, a caller pinned (bearcycle).
+    "market_vol_cycle_pin_neutral": (0.0, 1.0),
+    "market_vol_cycle_pin_phase": (0.0, 1.0),
+    # The trough's share of the contraction's excess given back, in [0, 1],
+    # and the half-life the multiplier falls at, in sessions (0 is the one
+    # half-life).
+    "market_vol_cycle_trough_release": (0.0, 1.0),
+    "market_vol_cycle_release_half_life": (0.0, 126.0),
+    # The share of the contraction's excess the index's rally off its low
+    # gives back, in [0, 1], and the rally, in log points, that completes
+    # it: up to 40 per cent off the low. The box starts at 0, every
+    # preset's value; a scale of 0 drawn with a release is refused and
+    # recorded infeasible.
+    "market_vol_cycle_recovery_release": (0.0, 1.0),
+    "market_vol_cycle_recovery_scale": (0.0, 0.4),
+    # The published VIX's stress premium: a gain per unit of the anchor
+    # memory above the knee. 2 takes a memory 0.2 above the knee to about
+    # the cap; the premium moves only the published quote.
+    "vix_stress_premium": (0.0, 2.0),
+    # A log deviation of the read-back's memory from the anchor's centre;
+    # 1.5 is about 4.5 times the centre, past any calibrated arm's peak.
+    "vix_stress_premium_knee": (0.0, 1.5),
+    # The largest log premium of the quote over the state; 0.5 is 1.65x.
+    "vix_stress_premium_cap": (0.0, 0.5),
+    # The Fed put: pp of cut per unit of intermeeting log fall. 10 cuts a
+    # point on a 10 per cent fall, over three times Cieslak and
+    # Vissing-Jorgensen's 30bp.
+    "fed_put_gain": (0.0, 10.0),
+    # The intermeeting log fall the put ignores; 0.1 is a ten per cent fall.
+    "fed_put_threshold": (0.0, 0.1),
+    # The put stock's half-life in sessions; 252 is a year.
+    "fed_put_half_life": (0.0, 252.0),
+    # The VIX close that calls an intermeeting meeting; 0 is never, and
+    # under about 25 it calls one every 21 sessions in a calm market.
+    "fed_put_emergency_vix": (0.0, 90.0),
+    # The share of the put the curve prices before the meeting.
+    "treasury_put_pricing": (0.0, 1.0),
+    # pp off the 10-year's term premium per VIX point above 20; 0.03 takes
+    # 1.2 points off at a VIX of 60.
+    "treasury_haven_gain": (0.0, 0.03),
+    # Sessions after a stressed close with no rise; 126 is half a year.
+    "fed_stress_hold": (0.0, 126.0),
+    # The share of the market's forecast of the policy path the curve
+    # prices, and that forecast's half-life in sessions.
+    "treasury_path_pricing": (0.0, 2.0),
+    "treasury_path_half_life": (0.0, 252.0),
+    # The share of the policy rate's distance from neutral the 10-year
+    # leaves out.
+    "treasury_policy_damping": (0.0, 0.8),
+    # The next meeting's expected change priced ahead of it; 1 prices the
+    # whole of it by the meeting, 2 the next two as if the second repeated it.
+    "policy_anticipation": (0.0, 3.0),
+    # The share of that an expected cut takes; 0 prices rises only.
+    "policy_anticipation_cut_share": (0.0, 1.0),
+    # The share of the VIX slope out of the corporate spread's formula.
+    "corporate_spread_vix_cut": (0.0, 1.0),
+    # pp of spread (times the cycle multiplier) per unit of the index's log
+    # fall below its slow average; 3 widens 0.9 points on a 30 per cent fall.
+    "corporate_spread_equity_gain": (0.0, 3.0),
+    # The slow average's half-life in sessions; 252 is a year.
+    "corporate_spread_equity_half_life": (0.0, 504.0),
+    # Monthly cycle hazard per unit of the index's log fall below its slow
+    # average past the knee, in an expansion and at a peak; 10 adds 0.5 a
+    # month on a fall 0.05 past the knee, about a transition in two months.
+    "cycle_equity_hazard": (0.0, 10.0),
+    # The log fall under which the hazard adds nothing; the gap reads about
+    # 0.1 at the 20 per cent line of a bear on roster 111.
+    "cycle_equity_hazard_knee": (0.0, 0.2),
+    # The market's average added hazard, a month, where the economy runs
+    # without one (the opening's law and the burn-in); 0.011 at a hazard of
+    # 5 and a knee of 0.1 on R17T.
+    "cycle_equity_hazard_opening": (0.0, 0.05),
+    # Sessions of market lived before day zero on a copy; 252 leaves 0.11 of
+    # the slow variance component's opening gap, 504 leaves 0.012.
+    "market_prehistory_sessions": (0.0, 504.0),
+    # A switch: the valuation state carried from the prehistory, or not.
+    "market_prehistory_valuation": (0.0, 1.0),
+    # The share of the put's unanswered fall carried to the next meeting,
+    # and the leverage gap at which a meeting holds any rise.
+    "fed_put_carry": (0.0, 1.0),
+    "fed_drawdown_hold": (0.0, 0.3),
     # The SHARE of nominal output growth the valuation carries. Bounded by
     # its own meaning, as its neighbour above is: 0.0 is a valuation whose
     # earnings never move, 1.0 holds the earnings share of nominal output
@@ -395,6 +595,23 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # Two levels for the same reason: 0.0 divides by depth twice and 1.0
     # once, and nothing between them is a law anybody measured.
     "order_flow_depth_law": (0.0, 1.0),
+    # Unemployment's anchor (issue #172). The pull is a monthly share of
+    # the gap to the natural rate: 0.0 keeps the shipped 0.06, and past
+    # 0.3 (a half-life under two months) the rate loses the persistence
+    # UNRATE has. Okun's coefficient is annual: 0.0 is the shipped term,
+    # and 1.0 is twice what Ball, Leigh and Loungani (2017) estimate for
+    # the US. The natural rate with no long-term unemployment: 0.0 is the
+    # shipped 4.0, and the box spans the CBO's NROU, 4.4 to 6.2 since 1949.
+    "unemployment_natural_pull": (0.0, 0.3),
+    "unemployment_okun_coefficient": (0.0, 1.0),
+    "unemployment_natural_rate": (0.0, 6.0),
+    # Oil's interior (issues #170 and #171). The inventory reversion is a
+    # daily share: 0.01 is a half-life of 69 sessions, at which inventory
+    # stays inside the dead zone and the channel goes quiet. The
+    # pass-through is a multiple of the shipped 0.01 a dollar above 80,
+    # applied both sides, and 2.0 is twice it.
+    "oil_inventory_reversion": (0.0, 0.01),
+    "oil_inflation_passthrough": (0.0, 2.0),
     # The share of oil demand supply answers on the daily step. Bounded by
     # meaning again: 0.0 is the hardcoded zero the reference writes, 1.0 is
     # the value that makes the inventory random walk driftless, and past 1.0
@@ -445,13 +662,40 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # era declares, and 1.0 returns the whole of earnings every year. Past
     # that a company returns more than it earns, which is a claim about
     # leverage this model does not carry, so the box is the closed unit
-    # interval and its top is where the earnings run out.
-    "buyback_payout_share": (0.0, 1.0),
+    # interval and its top is where the earnings run out -- except under
+    # `dividend_buyback_substitution`, where this is the TOTAL payout
+    # (dividends and buybacks, about 0.8 of earnings on the S&P 500 over
+    # 2001-2025) and a name's buyback share is it less the name's own
+    # dividend payout, so the box reaches 1.5.
+    "buyback_payout_share": (0.0, 1.5),
     # The overnight move's variance as a fraction of a session's. 0.0 is no
     # overnight process, which is every earlier preset; 1.0 is a night as
     # large as a session, above anything the real panel reads; past it the
     # night would carry more than the day, which no window has shown.
     "overnight_variance_ratio": (0.0, 1.0),
+    # The night's SHARE of the day's variance, split rather than added:
+    # 0.0 is no night; the real forty read 0.46 of the index's variance and
+    # a median 0.31 of a name's own overnight, and past 0.9 the session
+    # would carry almost nothing of the day.
+    "overnight_market_share": (0.0, 0.9),
+    "overnight_idio_share": (0.0, 0.9),
+    # Student-t degrees of freedom: 0.0 is a normal night, 3 the fattest
+    # with a variance; the box is the integers the validation takes.
+    "overnight_idio_df": (0.0, 30.0),
+    # The earnings surprise in own-sigma units: 0.0 is no calendar and 6 is
+    # past the real reaction day's 3.5 sd.
+    "earnings_surprise_sigma": (0.0, 6.0),
+    "earnings_surprise_df": (0.0, 30.0),
+    # The reaction session's own discovery and the next session's, in the
+    # same units, both well under the surprise the real days carry.
+    "earnings_session_sigma": (0.0, 4.0),
+    "earnings_followthrough_sigma": (0.0, 4.0),
+    # A volume multiple: 0.0 and 1.0 are none, and 4 is well past the real
+    # reaction session's 2.16.
+    "earnings_volume_multiple": (0.0, 4.0),
+    # A SHARE of the cycle's move held for the report: 0.0 is none and 1.0
+    # holds the whole of it, past which a name would unlearn the cycle.
+    "earnings_cycle_report_share": (0.0, 1.0),
     # How much of the jump's own drift is given back. 0.0 is the
     # uncompensated process, 1.0 is the martingale, and past 1.0 the
     # compensator exceeds the drift and the jump pushes the other way.
@@ -494,6 +738,14 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "sector_vol_beta": (0.0, 0.98),
     "jump_idio_excitation": (0.0, 4.0),
     "jump_idio_excitation_decay": (0.0, 0.9),
+    # The per-name idiosyncratic variance state: a shock share up to 0.3 and
+    # a persistence up to 0.9, the box the vol-clustering grid searched
+    # (half-lives of a session to a few weeks). `ModelParams::invariants`
+    # refuses a sum of 1 or more, so the box's top corner (alpha + beta past
+    # 1) is refused as the epicentre's gap above is.
+    "idio_vol_alpha": (0.0, 0.3),
+    "idio_vol_beta": (0.0, 0.9),
+    "idio_vol_jump_bump": (0.0, 3.0),
     "jump_idio_vix_decoupled": (0.0, 1.0),
     # Flow composition: lean per VIX point above threshold. At 0.001 and
     # the covid peak (40 points above), the daily common shock is 0.04 --
@@ -686,6 +938,14 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
 #: header. Both known-good values (ramp 6.0, cap 0.98) are asserted inside
 #: these ranges at plan time.
 EXPLICIT_RANGES: dict[str, tuple[float, float]] = {
+    # The dividend's companions, read only with `dividend_payout_share`
+    # set. The ceiling is a multiple of the target yield and 1.0 is its
+    # floor (a cut whenever the yield rises at all); the cutoff a revenue
+    # growth rate; the speed an annual Lintner speed, of which S&P 500 fits
+    # on earnings give 0.1 to 0.4.
+    "dividend_yield_ceiling": (1.0, 4.0),
+    "dividend_growth_cutoff": (0.1, 1.0),
+    "dividend_adjustment_speed": (0.1, 1.0),
     # The stop and squeeze ladders' scale: 1.0 on every preset through
     # pt-v19, 0.1 on pt-v20 (measured against the daily Lo-MacKinlay book).
     # The whole unit range, off to full.
@@ -843,7 +1103,7 @@ def decay_slope(panel_medians: dict[str, float], days: int) -> float | None:
 #: it in (the "swap": alpha down, alpha + gamma/2 preserved).
 REPARAMETERISED = ("garch_alpha", "garch_beta", "garch_gamma",
                    "market_vol_alpha", "market_vol_beta",
-                   "market_vol_gamma")
+                   "market_vol_gamma", "market_vol_slow_gamma")
 
 #: The replacement axes. Ships (pt-v3): garch persistence 0.8364 with
 #: alpha fraction 0.0711 and gamma/2 fraction 0.1095; market-vol
@@ -871,7 +1131,25 @@ TRANSFORMED_AXES = (
     # non-alpha budget in the leverage term (beta exactly zero), which is
     # a boundary worth sampling rather than an arbitrary cap.
     atlas.Axis("market_vol_gamma_frac", 0.0, 1.0),
+    # The slow component's GJR loading as a share of the most it may take:
+    # it gives back half of itself from the slow carried share
+    # `(1 - gain) * persistence`, so it may be at most twice that, and at
+    # most 1.0 (its own range). A raw box cannot be sampled against the
+    # slow gain and persistence the survey draws beside it -- a third of a
+    # 64-vector plan fell outside -- and the share can (crash-vol-state).
+    atlas.Axis("market_vol_slow_gamma_frac", 0.0, 1.0),
 )
+
+
+def _slow_gamma_ceiling(params: dict[str, float]) -> float:
+    """The most `market_vol_slow_gamma` may be at these slow dials: twice
+    the slow carried share, and never past 1.0. Dials the vector does not
+    carry read the base preset's values."""
+    base = tradefloor.ModelParams.from_preset(BASE_PRESET).to_dict()
+    gain = float(params.get("market_vol_slow_gain", base["market_vol_slow_gain"]))
+    pers = float(params.get("market_vol_slow_persistence",
+                            base["market_vol_slow_persistence"]))
+    return max(0.0, min(1.0, 2.0 * (1.0 - gain) * pers))
 
 
 def vector_to_params(vector: dict[str, float]) -> dict[str, float]:
@@ -905,6 +1183,8 @@ def vector_to_params(vector: dict[str, float]) -> dict[str, float]:
     p["market_vol_alpha"] = ms * mp
     p["market_vol_gamma"] = 2.0 * mg * rest
     p["market_vol_beta"] = (1.0 - mg) * rest
+    sgf = p.pop("market_vol_slow_gamma_frac")
+    p["market_vol_slow_gamma"] = sgf * _slow_gamma_ceiling(p)
     return p
 
 
@@ -929,6 +1209,9 @@ def params_to_vector(params: dict[str, float]) -> dict[str, float]:
     # wrong -- 0.0 is the reading that round-trips.
     rest = mpers - ma
     v["market_vol_gamma_frac"] = (mg / 2.0) / rest if rest > 0.0 else 0.0
+    ceiling = _slow_gamma_ceiling(params)
+    sg = float(params["market_vol_slow_gamma"])
+    v["market_vol_slow_gamma_frac"] = sg / ceiling if ceiling > 0.0 else 0.0
     return v
 
 

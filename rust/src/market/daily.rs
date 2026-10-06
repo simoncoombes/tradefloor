@@ -55,6 +55,7 @@ const VOLUME_SCALE_MEAN: f64 = 1.4;
 /// TS-tape parity gates replay recorded reference runs, where bit-fidelity
 /// to the reference -- including its EMA -- is the property under test.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[non_exhaustive]
 pub enum AvgVolumePolicy {
     /// Hold the calibrated level. The shipped default.
     ///
@@ -116,6 +117,7 @@ pub fn reset_daily_prices(companies: &mut [TickCompany]) {
 
 /// What the close needs beyond the company's own state.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct CloseInputs {
     /// The day's accumulated `randomNoise` from the factor attribution.
     ///
@@ -141,6 +143,24 @@ pub struct CloseInputs {
     /// How the close treats `avg_volume`. [`AvgVolumePolicy::Hold`] unless
     /// you are replaying a reference tape.
     pub avg_volume: AvgVolumePolicy,
+}
+
+impl CloseInputs {
+    /// A close under `AvgVolumePolicy::Hold`, the shipped default.
+    pub fn new(
+        daily_innovation: Option<f64>,
+        sector_base_daily_variance: f64,
+        vix: f64,
+        vix_anchor: f64,
+    ) -> Self {
+        CloseInputs {
+            daily_innovation,
+            sector_base_daily_variance,
+            vix,
+            vix_anchor,
+            avg_volume: AvgVolumePolicy::Hold,
+        }
+    }
 }
 
 /// Close-of-day bookkeeping for one company.
@@ -301,6 +321,8 @@ mod tests {
             mispricing_s_prev_close: Some(0.04),
             mispricing_momentum: Some(0.0),
             fair_value_offset: None,
+            buyback_log_shares: None,
+            dividend: None,
             maker_inventory: Some(0.0),
             garch_variance: 0.015 * 0.015,
             garch_cascade: [0.015 * 0.015; crate::market::garch::CASCADE_MAX],

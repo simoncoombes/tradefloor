@@ -170,7 +170,10 @@ BASELINE = "pt-v1"
 #: design programme's candidate LMN-Q25A375. Fifteen of those dials left
 #: OUT_OF_SCOPE and three left POST_BASELINE for entries below, and
 #: `market_vol_vix_excursion` went the other way, back to pt-v1's 0.0.
-REQUIRED_PRESETS = ("pt-v16", "pt-v18", "pt-v19", "pt-v20")
+#:
+#: pt-v21, the default from 0.10.0, joined on 2026-10-05 with an entry for
+#: each of the dials it moves off pt-v1.
+REQUIRED_PRESETS = ("pt-v16", "pt-v18", "pt-v19", "pt-v20", "pt-v21")
 
 KINDS = ("derived", "measured", "undetermined")
 
@@ -212,11 +215,6 @@ MEASURED_ERROR_FIELDS = ("residual", "standard_error")
 #: `macro_calendar_days_per_year` and `macro_compound_days_per_year` left
 #: when pt-v19's fifth composition moved all three off pt-v1.
 POST_BASELINE = {
-    "earnings_cycle_half_life":
-        "added for pt-v20 (2026-09-24) with the aggregate earnings cycle: "
-        "how fast earnings reach the phase's level. Unread while "
-        "`earnings_cycle_depth` is 0.0, as it ships through pt-v19; LIVE on "
-        "pt-v20, which ships the default 60 sessions unsearched",
     "earnings_cycle_sigma":
         "added for pt-v20 (2026-09-24) with the aggregate earnings cycle: "
         "the level's own daily noise. Unread while `earnings_cycle_depth` "
@@ -316,11 +314,6 @@ POST_BASELINE = {
         "0.3, read at market/factors.rs:408",
     "news_sector_weight":
         "0.5, read at market/factors.rs:406",
-    "order_flow_coefficient":
-        "50.0, the impact coefficient before the informed fraction at "
-        "market/factors.rs:421",
-    "price_hard_cap":
-        "50000.0, applied at market/tick.rs:1054",
     "usd_crisis_vix_threshold":
         "25.5, the safe-haven gate at economy/daily.rs:983. A SEPARATE "
         "dial from `crisis_vix_threshold`, which the required presets move "
@@ -371,6 +364,55 @@ RETURNED_TO_BASELINE = {
 #: where it sits. Move the partner and this entry becomes false -- which is
 #: why each one names the partner rather than saying "inert".
 OUT_OF_SCOPE = {
+    # The thirteenth registration's bond timing (r13), inert on every
+    # preset. When pt-v20 takes them they leave this table: the two switches
+    # derived, the cut and its start and gap fitted to FRED's target rate
+    # after VIX closes over 30 (1990-2025).
+    "fed_stress_vix":
+        "inert while `fed_stress_cut` is 0.0, as every preset ships it: the "
+        "stress branch that reads it does not run",
+    # CASH DIVIDENDS (0.8.5 realism work, sim/real-dividends). Inert on
+    # every shipped preset; a candidate for a new registration, with the
+    # graded arm as the fallback.
+    "dividend_growth_cutoff":
+        "unread while `dividend_payout_share` is 0.0: the revenue growth at "
+        "or above which a profitable name pays no dividend. 0.30 is CHOSEN "
+        "so that the roster's fast growers are the non-payers, as growth "
+        "names are on the tape",
+    "dividend_adjustment_speed":
+        "unread while `dividend_payout_share` is 0.0: the annual Lintner "
+        "speed of the declared amount toward its target. 0.4 is CALIBRATED "
+        "to the dividend-growth row, not measured: it puts the sd of the "
+        "index's annual dividend growth at 5.2 per cent against a real 7.1 "
+        "(Shiller D, 1990-2023), with cuts in 14 per cent of years against "
+        "a real 9 (dvgrid1, held-out seeds); 0.25 gives 4.0, near the "
+        "band's floor. No real fit supplies it: Lintner fits of the S&P "
+        "500's dividend on its earnings (Shiller, 1946-2023 and 1990-2023) "
+        "give 0.11 to 0.13 a year (R2 0.25 to 0.30), and on its price the "
+        "speed is about 0 (R2 0.00 to 0.01). The rule reads the price "
+        "because the model's earnings are hidden state, and prices are far "
+        "smoother than S&P earnings (EPS growth sd 42 to 50 per cent a year "
+        "over 1990-2023), so a faster speed on the smoother input is what "
+        "gives dividends their real variability",
+    "dividend_yield_ceiling":
+        "unread while `dividend_payout_share` is 0.0: a forced cut once a "
+        "name's yield on its declaring close is this many times its target. "
+        "A GUARD: without it a collapsed name paid 20 to 46 per cent a year "
+        "(offline design, held-out seeds)",
+    "earnings_surprise_df":
+        "unread while `earnings_surprise_sigma` is 0.0; 0.0 is a normal "
+        "surprise",
+    "earnings_cycle_report_share":
+        "inert at 0.0 as shipped: `Engine::carries_earnings_withheld` is "
+        "false and `advance_macro_day` takes no share of the cycle's move "
+        "out of any fair-value level. Refused without the calendar, since "
+        "the share is given back at a name's report",
+    "fed_put_threshold":
+        "unread while `fed_put_gain` is 0.0 (0.8.5 realism work, "
+        "bond-hedge-fed)",
+    "policy_anticipation_cut_share":
+        "unread while `policy_anticipation` is 0.0; at 0.0 only an expected "
+        "rise is priced, at 1.0 a cut as a rise (sim/r17-c10c)",
     "market_beta_down_asym_lag_recentre":
         "inert at 0.0 as shipped: the recentring offset is not scaled on a "
         "lagged session, and the lagged tilt's mean (about -8 per cent a "
@@ -419,6 +461,33 @@ OUT_OF_SCOPE = {
         "since 2026-09-20",
     "jump_idio_excitation_decay":
         "unread while `jump_idio_excitation` is 0.0 (engine.rs:963)",
+    # The per-name idiosyncratic variance state (0.8.5, realism work
+    # vol-clustering). Inert on every preset; a value is for a registration.
+    "market_vol_leverage_down":
+        "unread while `market_vol_leverage` is 0.0",
+    "market_day_tail_df":
+        "inert at 0.0 as shipped: `Engine::draw_market_day_scale` returns "
+        "before any draw, the day's multiplier stays exactly 1.0 and "
+        "`market_sigma_today` skips the product, so the session's market "
+        "sigma is the bits it was and the snapshot and state hash omit it. "
+        "Off zero each session's market variance is multiplied by "
+        "(nu - 2) / chi-square(nu), a Student-t day at the state's variance. "
+        "Target: the certification's tail row, index_tail_dn3_pct, 0.52 on "
+        "R16A's thirteenth grade against [0.64, 2.34] and 0.81 on 60 "
+        "held-out varying-roster seeds, and the index's one-year excess "
+        "kurtosis, 0.9 against the tape's 1.46; the S&P 500's GJR-t fit "
+        "1990-2025 reads nu = 6.9 (0.8.5 fourteenth-registration work, "
+        "sim/r17-d1tail)",
+    "market_day_tail_state_share":
+        "unread while `market_day_tail_df` is 0.0; at 0.0 the variance "
+        "state reads the day as if drawn at its own variance (0.8.5 "
+        "fourteenth-registration work, sim/r17-d1tail)",
+    "market_vol_cycle_relative_calm":
+        "unread while `market_vol_cycle_ratio` is 0.0",
+    "market_vol_cycle_trough_release":
+        "unread while `market_vol_cycle_ratio` is 0.0",
+    "market_vol_cycle_release_half_life":
+        "unread while `market_vol_cycle_ratio` is 0.0",
     "jump_market_variance_share":
         "inert at 0.0: engine.rs branches on `!= 0.0` after the jumps "
         "mechanism's generated body, so nothing is added to the market "
@@ -578,16 +647,14 @@ OUT_OF_SCOPE = {
         "registered in the project's unpublished design notes would give "
         "it a value, and until that box reports the 0.0 is the absence of "
         "a measurement rather than the result of one",
-    "market_vol_vix_smooth":
-        "inert at 0.0: market/factor_vol.rs:536 branches on `== 0.0` and "
-        "reads the raw print",
-    "order_flow_impact_law":
-        "inert at 0.0: `order_imbalance_with` in market/factors.rs "
-        "branches on `== 0.0` and takes the shipped law",
-    "order_flow_depth_law":
-        "inert at 0.0: `calculate_live_factors` in market/factors.rs "
-        "branches on `== 0.0` and divides by depth twice, as the shipped "
-        "law does; at 0.0 it is also left out of the model's digest",
+    "unemployment_natural_pull":
+        "inert at 0.0: `update_economy_daily` in economy/daily.rs branches "
+        "on `== 0.0` and pulls toward the natural rate at the literal 0.06; "
+        "at 0.0 it is also left out of the model's digest",
+    "unemployment_natural_rate":
+        "inert at 0.0: `update_economy_daily` in economy/daily.rs branches "
+        "on `== 0.0` and adds the long-term term to the literal 4.0; at 0.0 "
+        "it is also left out of the model's digest",
     "overnight_variance_ratio":
         "inert at 0.0: the overnight move is this ratio of a session's "
         "variance (engine.rs:1856), and nothing moved a price between "
@@ -682,7 +749,8 @@ OUT_OF_SCOPE = {
 DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     "vix_ceiling": {
         "kind": "derived",
-        "presets": {"pt-v19": 181.3295, "pt-v20": 181.3295},
+        "presets": {"pt-v19": 181.3295, "pt-v20": 181.3295,
+                    "pt-v21": 181.3295},
         "identity": "a VIX already at C must come off it on a session at "
                     "the top of the graded range: `C - implied(C) >= F(C)`, "
                     "where `implied(C)` is the settled read-back the map "
@@ -886,7 +954,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "vix_level_persistence": {
         "kind": "derived",
-        "presets": {"pt-v19": 0.9979, "pt-v20": 0.9979},
+        "presets": {"pt-v19": 0.9979, "pt-v20": 0.9979, "pt-v21": 0.9979},
         "identity": "the year-to-year persistence of the tape's VIX regime, "
                     "as a daily AR(1): the lag-one autocorrelation of the 35 "
                     "yearly medians of log VIX (1990-2024) is 0.590, and "
@@ -907,7 +975,12 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "vix_level_sigma": {
         "kind": "derived",
-        "presets": {"pt-v19": 0.0181, "pt-v20": 0.0181},
+        "presets": {"pt-v19": 0.0181, "pt-v20": 0.0181, "pt-v21": 0.009},
+        "pt_v21": "pt-v21 halves the VIX's slow level (0.0181 to 0.009) so the "
+                  "leverage memory replaces return-blind volatility of "
+                  "volatility instead of adding to it (docs/MODEL.md). The "
+                  "identity above gives pt-v20's value; pt-v21's is a "
+                  "recomposition graded with its vector",
         "identity": "the era spread the level must add to what the loop "
                     "makes on its own: sigma = sqrt((V* - V0) / A) * "
                     "sqrt(1 - 0.9979^2) = 0.0181, the innovation of a daily "
@@ -940,7 +1013,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "garch_vix_exponent": {
         "kind": "undetermined",
-        "presets": {"pt-v16": 2.0, "pt-v18": 2.0, "pt-v19": 2.0, "pt-v20": 2.0},
+        "presets": {"pt-v16": 2.0, "pt-v18": 2.0, "pt-v19": 2.0, "pt-v20": 2.0, "pt-v21": 2.0},
         "what_would_determine_it": "a box on the PAIR this dial belongs "
                                    "to, because the shipped 2.0 is the "
                                    "market factor's exponent borrowed for "
@@ -992,7 +1065,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
 
     "jump_idio_vix_decoupled": {
         "kind": "undetermined",
-        "presets": {"pt-v16": 0.0, "pt-v18": 0.0, "pt-v19": 0.0, "pt-v20": 0.0},
+        "presets": {"pt-v16": 0.0, "pt-v18": 0.0, "pt-v19": 0.0, "pt-v20": 0.0, "pt-v21": 0.0},
         "what_would_determine_it": "a derivation of how the idiosyncratic "
                                    "jump arrival rate should couple to the "
                                    "VIX. The 2026-09-20 factorial's idio "
@@ -1070,7 +1143,14 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                                      "corr(gamma, beta) -0.21, "
                                      "corr(alpha, beta) -0.48",
         },
-        "presets": {"pt-v19": 0.1556, "pt-v20": 0.1556},
+        "presets": {"pt-v19": 0.1556, "pt-v20": 0.1556, "pt-v21": 0.06},
+        "pt_v21": "pt-v21's 0.06 moves the fast component's shock loading into "
+                  "its carry at unchanged persistence (this 0.1556 to 0.06, "
+                  "`market_vol_beta` 0.8946 to 0.9446, so alpha + beta + "
+                  "gamma/2 stays 0.979), so the leverage memory can replace "
+                  "return-blind volatility of volatility (docs/MODEL.md). A "
+                  "recomposition, not a re-fit: the standard error above is "
+                  "the GJR fit's bar for 0.1556",
         "identity": "the tape's leverage response, at a LIKELIHOOD RATIO "
                     "of 2 * 152.5 = 305 on one degree of freedom. Same "
                     "tape, same window, same estimator:\n"
@@ -1122,7 +1202,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # describes anything that ships, so it is kept in `superseded` and
         # the entry records what 4.0 is: a ladder reading, not a derivation.
         "kind": "undetermined",
-        "presets": {"pt-v19": 4.0, "pt-v20": 4.0},
+        "presets": {"pt-v19": 4.0, "pt-v20": 4.0, "pt-v21": 4.0},
         "what_would_determine_it": (
             "the anchor form's own identity against the tape's crisis lever, "
             "the analogue of the excursion form's `e = 2 s / (2 - s)` below. "
@@ -1153,7 +1233,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "vix_level_loop_gain": {
         "kind": "derived",
-        "presets": {"pt-v19": 1.79, "pt-v20": 1.79},
+        "presets": {"pt-v19": 1.79, "pt-v20": 1.79, "pt-v21": 1.79},
         "identity": "the running loop's transmission of the level into the "
                     "VIX at the derived spread. The transmission rises with "
                     "the spread, so the gain is the self-consistent solution "
@@ -1184,7 +1264,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "crisis_epicentre_extra": {
         "kind": "derived",
-        "presets": {"pt-v19": 1.93, "pt-v20": 1.93},
+        "presets": {"pt-v19": 1.93, "pt-v20": 1.93, "pt-v21": 1.93},
         "identity": "the median of the tape's three epicentre episodes: the "
                     "epicentre sector's episode volatility over the median "
                     "sector's, per-sector volatility being the median over the "
@@ -1277,7 +1357,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                         "target would put it, and nothing checks the two "
                         "against each other",
         "presets": {"pt-v16": 0.28035004, "pt-v18": 0.28035004,
-                    "pt-v19": 0.0066, "pt-v20": 0.0066},
+                    "pt-v19": 0.0066, "pt-v20": 0.0066, "pt-v21": 0.0066},
         "identity": "GJR(1,1) by Gaussian QMLE on the tape's index over "
                     "the whole span: omega 0.0202, alpha 0.0066 "
                     "(sandwich se 0.0082), gamma 0.1556 (0.0236), beta "
@@ -1353,7 +1433,14 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                         "is the reason this is recorded rather than "
                         "adopted",
         "presets": {"pt-v16": 0.69244622, "pt-v18": 0.69244622,
-                    "pt-v19": 0.8946, "pt-v20": 0.8946},
+                    "pt-v19": 0.8946, "pt-v20": 0.8946, "pt-v21": 0.9446},
+        "pt_v21": "pt-v21's 0.9446 moves the fast component's shock loading "
+                  "into its carry at unchanged persistence (`market_vol_gamma` "
+                  "0.1556 to 0.06, this 0.8946 to 0.9446, so alpha + beta + "
+                  "gamma/2 stays 0.979), so the leverage memory can replace "
+                  "return-blind volatility of volatility (docs/MODEL.md). A "
+                  "recomposition, not a re-fit: the standard error above is "
+                  "the GJR fit's bar for 0.8946",
         "identity": "the same fit as `market_vol_alpha`: beta = 0.8946, "
                     "sandwich se 0.0181, corr(beta, omega) -0.91. The "
                     "GJR persistence `alpha + gamma/2 + beta` is 0.9790; "
@@ -1378,7 +1465,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "crash_amplifier_conditional_sigma": {
         "kind": "derived",
-        "presets": {"pt-v19": 1.0, "pt-v20": 1.0},
+        "presets": {"pt-v19": 1.0, "pt-v20": 1.0, "pt-v21": 1.0},
         "identity": "the VIX loop's stability condition. Under "
                     "`vix_level_identity` the deterministic map is "
                     "`v -> implied(v)`, the state lives on "
@@ -1468,7 +1555,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "crisis_blend_gain": {
         "kind": "derived",
-        "presets": {"pt-v16": 0.8275881, "pt-v18": 0.8275881, "pt-v19": 0.0, "pt-v20": 0.0},
+        "presets": {"pt-v16": 0.8275881, "pt-v18": 0.8275881, "pt-v19": 0.0, "pt-v20": 0.0,
+                    "pt-v21": 0.0},
         "identity": "zero, the identity: the tape supports no loading lift. "
                     "Three measured facts, none needing the model. (1) The "
                     "tape's VIX has no crisis attractor: its conditional "
@@ -1538,7 +1626,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "vix_target_shock_cap": {
         "kind": "derived",
-        "presets": {"pt-v16": 45.0, "pt-v18": 45.0, "pt-v19": 158.8524, "pt-v20": 158.8524},
+        "presets": {"pt-v16": 45.0, "pt-v18": 45.0, "pt-v19": 158.8524, "pt-v20": 158.8524,
+                    "pt-v21": 158.8524},
         "identity": "the SUPREMUM of the return spike over the domain the "
                     "update admits, which is the image of `vix_return_clamp` "
                     "evaluated at the VIX floor: `vix_return_gain * clamp ** "
@@ -1649,7 +1738,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "oil_supply_response": {
         "kind": "derived",
-        "presets": {"pt-v18": 1.0, "pt-v19": 1.0, "pt-v20": 1.0},
+        "presets": {"pt-v18": 1.0, "pt-v19": 1.0, "pt-v20": 1.0,
+                    "pt-v21": 1.0},
         "identity": "the value at which supply equals demand in expectation, "
                     "so inventory_change is the noise term alone and "
                     "inventory is driftless",
@@ -1671,7 +1761,17 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # undetermined is not a demotion of the source; it is the schema
         # refusing to call a point estimate a measurement.
         "kind": "undetermined",
-        "presets": {"pt-v18": 1.0 / 3.0, "pt-v19": 1.0 / 3.0, "pt-v20": 0.75},
+        "presets": {"pt-v18": 1.0 / 3.0, "pt-v19": 1.0 / 3.0, "pt-v20": 0.75,
+                    "pt-v21": 0.9},
+        "pt_v21": "pt-v21's 0.9 is the TOTAL payout: pt-v21 pays dividends "
+                  "(`dividend_payout_share`) and sets "
+                  "`dividend_buyback_substitution`, so a name's buyback share "
+                  "is this less its dividend payout. Chosen in the project's "
+                  "screens with the dividend dials and graded with pt-v21's "
+                  "vector "
+                  "(validation/pt-v21/programme/ptv21-registration-18.md); "
+                  "like pt-v20's value it is a calibration, not a measurement "
+                  "of buybacks",
         "what_would_determine_it": "the dispersion of net buyback yield "
                                    "across the US large-cap filing record "
                                    "the value is taken from. The point "
@@ -1694,9 +1794,12 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                   "ptv20e7 then passed its 33 rows at 0.75, and the graded "
                   "arm keeps it (box ptv20vr9, B8 the long-run return 7.2 "
                   "against 6.25 plus or minus 2). At the model's median "
-                  "earnings yield of 0.0555 it is a buyback yield of about "
-                  "4.2 per cent, over twice the 1.5 to 2.0 per cent of the "
-                  "value record; the model pays no dividends "
+                  "earnings yield of 0.0555 it would be a buyback yield of "
+                  "about 4.2 per cent, but the index's delivered yield (the "
+                  "cap-weighted log rate of the buyback factor) is 2.0 per "
+                  "cent on held-out seeds, decaying from 3.3 in year 2 to "
+                  "0.8 in year 21; the shipped preset pays no dividends "
+                  "(`dividend_payout_share`) "
                   "(validation/pt-v20/programme/ptv20-registration.md, "
                   "tenth and eleventh registrations and 'The graded arm')",
     },
@@ -1712,7 +1815,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # derived on a model whose sector volatility does not run, so
         # whether any value is needed is itself open.
         "kind": "undetermined",
-        "presets": {"pt-v16": 0.008583053614, "pt-v18": 0.008583053614, "pt-v19": 0.008583053614, "pt-v20": 0.008583053614},
+        "presets": {"pt-v16": 0.008583053614, "pt-v18": 0.008583053614, "pt-v19": 0.008583053614, "pt-v20": 0.008583053614,
+                    "pt-v21": 0.008583053614},
         "what_would_determine_it": "the same inversion run against the "
                                    "SHIPPED value, or the shipped value "
                                    "replaced by the derived one. A residual "
@@ -1736,7 +1840,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # thing that would derive it is currently proved not to exist.
         "kind": "undetermined",
         "presets": {"pt-v16": 0.18318536187800277,
-                    "pt-v18": 0.18318536187800277},
+                    "pt-v18": 0.18318536187800277,
+                    "pt-v21": 0.18318536187800277},
         "what_would_determine_it": "a mechanism change that lets a "
                                    "STATIONARY asymmetry reach the real "
                                    "leverage effect of -0.042. Today the "
@@ -1760,7 +1865,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # argument for reading the record and the table against each other
         # rather than either alone.
         "kind": "derived",
-        "presets": {"pt-v19": 0.7905, "pt-v20": 0.7905},
+        "presets": {"pt-v19": 0.7905, "pt-v20": 0.7905, "pt-v21": 0.7905},
         "identity": "`beta = rho - alpha - gamma / 2`: the GJR first-moment "
                     "persistence identity solved for beta at the SHIPPED "
                     "alpha and gamma, with rho the tape's own per-name "
@@ -1863,7 +1968,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # not be the response ratio, and nobody has measured the shipped
         # one.
         "kind": "undetermined",
-        "presets": {"pt-v16": 17.0, "pt-v18": 17.0, "pt-v19": 0.049, "pt-v20": 0.049},
+        "presets": {"pt-v16": 17.0, "pt-v18": 17.0, "pt-v19": 0.049, "pt-v20": 0.049,
+                    "pt-v21": 0.049},
         "what_would_determine_it": "the shipped pair's RESPONSE ratio at 2 "
                                    "per cent, measured the way the tape's "
                                    "0.848 was, and a value for this dial "
@@ -1879,7 +1985,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "market_vol_slow_gain": {
         "kind": "undetermined",
-        "presets": {"pt-v16": 0.05, "pt-v18": 0.05, "pt-v19": 0.05, "pt-v20": 0.05},
+        "presets": {"pt-v16": 0.05, "pt-v18": 0.05, "pt-v19": 0.05, "pt-v20": 0.05,
+                    "pt-v21": 0.05},
         "what_would_determine_it": "a measured slow-component gain. ws-b "
                                    "withdrew this dial as undetermined "
                                    "rather than deriving it; 0.05 is a "
@@ -1893,7 +2000,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # this table could not see. Found by the same audit as `garch_beta`
         # above and added on the same day.
         "kind": "derived",
-        "presets": {"pt-v19": 0.9913, "pt-v20": 0.9913},
+        "presets": {"pt-v19": 0.9913, "pt-v20": 0.9913, "pt-v21": 0.9913},
         "identity": "the SLOW POLE of the tape's own variance impulse "
                     "response, read off a two-component fit and carried "
                     "into the mixture as its persistence. One exponential "
@@ -1993,7 +2100,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # this quantity reads 1.076 pooled over one history and 1.252 per
         # calendar year, and the panel's own statistic is a per-window one.
         "kind": "measured",
-        "presets": {"pt-v16": 0.252, "pt-v18": 0.252, "pt-v19": 0.252, "pt-v20": 0.252},
+        "presets": {"pt-v16": 0.252, "pt-v18": 0.252, "pt-v19": 0.252, "pt-v20": 0.252, "pt-v21": 0.252},
         "source": "^GSPC and ^VIX adjusted closes, 1990-01-03 to "
                   "2025-07-30, 8,959 aligned sessions with a return; "
                   "per-calendar-year estimator over 35 years",
@@ -2061,7 +2168,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
             "note": "the level-blind form is REFUSED at F = 118, so the "
                     "level exponent is not an optional refinement of it",
         },
-        "presets": {"pt-v19": 1.4483, "pt-v20": 1.4483},
+        "presets": {"pt-v19": 1.4483, "pt-v20": 1.4483, "pt-v21": 1.4483},
         "identity": "the down-side response is `gain * |r|^p * V^-g` with "
                     "`g = p - 1`, the one-parameter-fewer standardised "
                     "form; the free fit's g of 0.49 +/- 0.12 contains "
@@ -2096,7 +2203,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     # ======================================================================
     "vix_return_level_exponent": {
         "kind": "derived",
-        "presets": {"pt-v19": 0.4483, "pt-v20": 0.4483},
+        "presets": {"pt-v19": 0.4483, "pt-v20": 0.4483, "pt-v21": 0.4483},
         "identity": "`p - 1` where p is `vix_return_exponent` 1.4483. The "
                     "engine runs the standardised form of the down-side "
                     "law, in which the level exponent is not free: fixing "
@@ -2124,12 +2231,12 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
             "note": "CONCAVE in the move, against the down side's convex "
                     "1.4483: the two sides are not one law with a sign",
         },
-        "presets": {"pt-v19": 0.5433, "pt-v20": 0.5433},
+        "presets": {"pt-v19": 0.5433, "pt-v20": 0.5433, "pt-v21": 0.5433},
         "identity": "the up-side response is `gain * |r|^p_up * V^-g_up`",
     },
     "vix_return_level_exponent_up": {
         "kind": "derived",
-        "presets": {"pt-v19": -1.0, "pt-v20": -1.0},
+        "presets": {"pt-v19": -1.0, "pt-v20": -1.0, "pt-v21": -1.0},
         "identity": "the RATIO form in the level: an up-side response "
                     "proportional to the VIX is `V^-g_up` with g_up = -1. "
                     "The free fit reads -0.85 +/- 0.12, which is 1.2 "
@@ -2160,7 +2267,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                     "VIX's own innovation is the variance forecast's, "
                     "which is why the tape's residual persists",
         },
-        "presets": {"pt-v19": 0.0175, "pt-v20": 0.0175},
+        "presets": {"pt-v19": 0.0175, "pt-v20": 0.0175, "pt-v21": 0.0175},
         "identity": "the residual a level-aware law leaves, which a "
                     "level-blind law books as innovation and which the "
                     "`vix_dlog_innovation_sd` row reads",
@@ -2186,14 +2293,14 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                     "caps the VIX fourth moment below it. The dial is not "
                     "what is short",
         },
-        "presets": {"pt-v19": 1.700, "pt-v20": 1.7},
+        "presets": {"pt-v19": 1.700, "pt-v20": 1.7, "pt-v21": 1.7},
         "identity": "the jump size in LEVEL units, which is what makes the "
                     "response scale-free; 0.0 selects the points of "
                     "`vix_jump_scale` instead",
     },
     "vix_jump_return_intensity": {
         "kind": "derived",
-        "presets": {"pt-v19": 6.199, "pt-v20": 6.199},
+        "presets": {"pt-v19": 6.199, "pt-v20": 6.199, "pt-v21": 6.199},
         "identity": "the derived 2.24 arrivals a year spread over the "
                     "down-return distribution as `max(0, -r)`: a rate per "
                     "year per percentage point of down move, which "
@@ -2229,7 +2336,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                     "same state was measured on vixdyn8 and is worse at "
                     "504 by 2.68 against a paired error bar of 1.60",
         },
-        "presets": {"pt-v19": 0.067, "pt-v20": 0.067},
+        "presets": {"pt-v19": 0.067, "pt-v20": 0.067, "pt-v21": 0.067},
         "identity": "the shock share of the sector variance state",
     },
     "sector_vol_beta": {
@@ -2247,7 +2354,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
             "estimate": 0.904,
             "standard_error": 0.069,
         },
-        "presets": {"pt-v19": 0.837, "pt-v20": 0.837},
+        "presets": {"pt-v19": 0.837, "pt-v20": 0.837, "pt-v21": 0.837},
         "identity": "the carry-over of the sector variance state. The "
                     "state is a ratio with fixed point 1.0, so beta alone "
                     "with alpha at 0.0 leaves it there forever, which is "
@@ -2268,7 +2375,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # that both halves of the opening ship together without fixing the
         # length.
         "kind": "undetermined",
-        "presets": {"pt-v18": 755.0, "pt-v19": 755.0, "pt-v20": 755.0},
+        "presets": {"pt-v18": 755.0, "pt-v19": 755.0, "pt-v20": 755.0,
+                    "pt-v21": 755.0},
         "what_would_determine_it": "the burn-in table re-run across the "
                                    "certified seed cohort, reporting the "
                                    "dispersion of the day each field "
@@ -2289,7 +2397,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # 2026-09-05. So the sentence that would BE the derivation is about
         # a value the default does not use.
         "kind": "undetermined",
-        "presets": {"pt-v16": 0.025, "pt-v18": 0.025, "pt-v19": 0.025, "pt-v20": 0.025},
+        "presets": {"pt-v16": 0.025, "pt-v18": 0.025, "pt-v19": 0.025, "pt-v20": 0.025,
+                    "pt-v21": 0.025},
         "what_would_determine_it": "a daily-scale measurement of what 0.025 "
                                    "does. The recorded argument for this "
                                    "dial says a per-tick tilt is CLT-washed "
@@ -2313,7 +2422,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     # an entry that records only the identity overstates it.
     "market_beta_down_asym_lag": {
         "kind": "measured",
-        "presets": {"pt-v18": 0.375, "pt-v19": 0.46, "pt-v20": 0.46},
+        "presets": {"pt-v18": 0.375, "pt-v19": 0.46, "pt-v20": 0.46,
+                    "pt-v21": 0.46},
         "source": "the certified panel plus index drift, the fear gauge and "
                   "the VIX's own persistence, scored by `loss.rule_table` at "
                   "nineteen rows, on thirty seeds over roster 40 @ seed 111 "
@@ -2410,7 +2520,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # and the readings are in `ruling` below. The gap is in the
         # ARGUMENT, not in the choice.
         "kind": "undetermined",
-        "presets": {"pt-v16": 0.06, "pt-v18": 0.10, "pt-v19": 0.27, "pt-v20": 0.27},
+        "presets": {"pt-v16": 0.06, "pt-v18": 0.10, "pt-v19": 0.27, "pt-v20": 0.27,
+                    "pt-v21": 0.27},
         "what_would_determine_it": "a JOINT re-solve of the three "
                                    "constraints of the VIX-dynamics derivation "
                                    "with the read-back constant c_d "
@@ -2514,7 +2625,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # on a curve is the defect in the module note's first paragraph with
         # the paragraph already written.
         "kind": "undetermined",
-        "presets": {"pt-v16": 17.0, "pt-v18": 17.0, "pt-v19": 8.83, "pt-v20": 8.83},
+        "presets": {"pt-v16": 17.0, "pt-v18": 17.0, "pt-v19": 8.83, "pt-v20": 8.83,
+                    "pt-v21": 8.83},
         "what_would_determine_it": "the same joint re-solve "
                                    "`vix_mean_reversion` names -- this dial "
                                    "is the other unknown in it. A tape "
@@ -2573,7 +2685,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     # such.
     "vix_level_identity": {
         "kind": "measured",
-        "presets": {"pt-v19": 1.0, "pt-v20": 1.0},
+        "presets": {"pt-v19": 1.0, "pt-v20": 1.0, "pt-v21": 1.0},
         "source": "the nineteen-row scoring rule over ONE HUNDRED AND TWENTY "
                   "seeds (101-220) on roster 40 @ seed 111 at both certified "
                   "horizons, pt-v18 as the paired control in the same run; "
@@ -2715,7 +2827,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # because at read time the two are indistinguishable, which is the
         # sentence this module opens with.
         "kind": "measured",
-        "presets": {"pt-v16": 0.58821442, "pt-v18": 0.58821442, "pt-v19": 0.60, "pt-v20": 0.6},
+        "presets": {"pt-v16": 0.58821442, "pt-v18": 0.58821442, "pt-v19": 0.60, "pt-v20": 0.6,
+                    "pt-v21": 0.6},
         "source": "MEASURED ON THE COMPOSED BASE. transmit1 varied the "
                   "level and the loading in ONE box for the first time: two "
                   "ladders over `sector_loading` 0.55, 0.60, 0.65 and 0.70, "
@@ -2852,7 +2965,13 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "volume_idio_variance_gain": {
         "kind": "measured",
-        "presets": {"pt-v19": 0.20, "pt-v20": 0.2},
+        "presets": {"pt-v19": 0.20, "pt-v20": 0.2, "pt-v21": 0.65},
+        "pt_v21": "pt-v21's 0.65 reads the name's own clustering variance "
+                  "(`idio_vol_alpha`, `idio_vol_beta`), which pt-v20 does not "
+                  "run, so the measurement above at 0.2 does not carry over. "
+                  "Chosen in the project's screens and graded with pt-v21's "
+                  "vector "
+                  "(validation/pt-v21/programme/ptv21-registration-18.md)",
         "source": "`volume_change_acf1` traced to a per-name "
                   "volume-variance channel every earlier "
                   "preset ships at 0.0 -- a name's volume following its OWN "
@@ -2931,7 +3050,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "market_beta_down_asym_recentre": {
         "kind": "derived",
-        "presets": {"pt-v18": 1.0, "pt-v19": 1.0, "pt-v20": 1.0},
+        "presets": {"pt-v18": 1.0, "pt-v19": 1.0, "pt-v20": 1.0,
+                    "pt-v21": 1.0},
         "identity": "`E[f 1{f<0}] = -s / sqrt(2 pi)` for `f ~ N(0, s^2)`. "
                     "Scaling one side of a zero-mean draw moves its mean, so "
                     "the tilt adds `a * beta * -s / sqrt(2 pi)` to every name "
@@ -2988,7 +3108,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "oil_opec_symmetry": {
         "kind": "derived",
-        "presets": {"pt-v18": 1.0, "pt-v19": 1.0, "pt-v20": 1.0},
+        "presets": {"pt-v18": 1.0, "pt-v19": 1.0, "pt-v20": 1.0,
+                    "pt-v21": 1.0},
         "identity": "at 1.0 both branches of the OPEC rule use one "
                     "probability and one magnitude range, so the expected "
                     "impact is equal and opposite either side of the 80 "
@@ -3035,7 +3156,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "oil_seasonality_target": {
         "kind": "derived",
-        "presets": {"pt-v18": 1.0, "pt-v19": 1.0, "pt-v20": 1.0},
+        "presets": {"pt-v18": 1.0, "pt-v19": 1.0, "pt-v20": 1.0,
+                    "pt-v21": 1.0},
         "identity": "the amplitude is SPLIT, `1 + g*a` on the reversion "
                     "target against `1 + (1-g)*a` on the price level, so the "
                     "total is conserved at every `g` and the level carries "
@@ -3079,7 +3201,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "cycle_hazard_per_month": {
         "kind": "derived",
-        "presets": {"pt-v18": 1.0, "pt-v19": 1.0, "pt-v20": 1.0},
+        "presets": {"pt-v18": 1.0, "pt-v19": 1.0, "pt-v20": 1.0,
+                    "pt-v21": 1.0},
         "identity": "`weibull_hazard` returns `(shape/scale) * "
                     "pow(months/scale, shape-1)` and every scale in "
                     "`cycle_hazard_params` is in MONTHS -- 36 for an "
@@ -3146,7 +3269,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "jump_mean_compensated": {
         "kind": "derived",
-        "presets": {"pt-v18": 1.0, "pt-v19": 1.0, "pt-v20": 1.0},
+        "presets": {"pt-v18": 1.0, "pt-v19": 1.0, "pt-v20": 1.0,
+                    "pt-v21": 1.0},
         "identity": "a jump arriving with probability `lambda` and mean `m` "
                     "contributes `lambda * m` to the expected return every "
                     "day whether it fires or not. Subtracting `lambda * m` is "
@@ -3191,7 +3315,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "earnings_nominal_growth": {
         "kind": "derived",
-        "presets": {"pt-v18": 1.0, "pt-v19": 1.0, "pt-v20": 1.0},
+        "presets": {"pt-v18": 1.0, "pt-v19": 1.0, "pt-v20": 1.0,
+                    "pt-v21": 1.0},
         "identity": "price is `fair_value * exp(s)` with `s` a stationary "
                     "AR(2) around zero and `eps` fixed when an instrument is "
                     "built, so the only time variation in fair value is the "
@@ -3261,7 +3386,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "neutral_discount_rate": {
         "kind": "derived",
-        "presets": {"pt-v18": 0.0482, "pt-v19": 0.0482, "pt-v20": 0.0482},
+        "presets": {"pt-v18": 0.0482, "pt-v19": 0.0482, "pt-v20": 0.0482,
+                    "pt-v21": 0.0482},
         "identity": "`compute_target_pe` compresses the multiple by "
                     "`(discount - neutral) * RATE_PE_SENSITIVITY * duration` "
                     "(fair_value.rs:189), so a name is valued exactly on its "
@@ -3333,7 +3459,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # because the neighbouring entries are would be exactly the
         # inherited authority this module exists to refuse.
         "kind": "undetermined",
-        "presets": {"pt-v18": 1.0, "pt-v19": 1.0, "pt-v20": 1.0},
+        "presets": {"pt-v18": 1.0, "pt-v19": 1.0, "pt-v20": 1.0,
+                    "pt-v21": 1.0},
         "what_would_determine_it": "the ladder's expected contribution "
                                    "measured at 1.0 over the returns this "
                                    "engine actually produces. The drift "
@@ -3389,7 +3516,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     # are `derived` and say so.
     "vix_anchor_weight": {
         "kind": "derived",
-        "presets": {"pt-v19": 0.375, "pt-v20": 0.375},
+        "presets": {"pt-v19": 0.375, "pt-v20": 0.375, "pt-v21": 0.375},
         "identity": "theta = (1 - a) k: the VIX's elasticity to realised "
                     "volatility is the anchor weight's complement times the "
                     "loop's transmission, the slow equilibrium of the memory "
@@ -3415,7 +3542,8 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "vix_anchor_memory": {
         "kind": "undetermined",
-        "presets": {"pt-v19": 0.05555555555555555, "pt-v20": 0.05555555555555555},
+        "presets": {"pt-v19": 0.05555555555555555, "pt-v20": 0.05555555555555555,
+                    "pt-v21": 0.05555555555555555},
         "what_would_determine_it": "a tape reading of how long a deviation "
             "of the VIX from the level realised variance implies persists "
             "before it is pulled back. FITTED: 1/18 was read off a ladder "
@@ -3426,7 +3554,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "vix_anchor_centre": {
         "kind": "derived",
-        "presets": {"pt-v19": 0.1515, "pt-v20": 0.1515},
+        "presets": {"pt-v19": 0.1515, "pt-v20": 0.1515, "pt-v21": 0.1515},
         "identity": "c = ln(1.252 / 1.076): the anchor pulls to `L * anchor "
                     "* exp(-c)`, the VIX's MEAN level (the pooled premium on "
                     "the pooled variance) rather than the per-window premium "
@@ -3444,7 +3572,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "vix_anchor_weight_level": {
         "kind": "derived",
-        "presets": {"pt-v19": 1.0, "pt-v20": 1.0},
+        "presets": {"pt-v19": 1.0, "pt-v20": 1.0, "pt-v21": 1.0},
         "identity": "eta in `1 - a(x) = (1 - a) (K / clamp(x, K, r K))^eta`: "
                     "the log-slope of the held read-back's gain g(x) between "
                     "VIX 18.5 and 30, so the loop's local gain `(1 - a(x)) "
@@ -3461,7 +3589,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "vix_anchor_weight_level_knee": {
         "kind": "derived",
-        "presets": {"pt-v19": 0.3888, "pt-v20": 0.3888},
+        "presets": {"pt-v19": 0.3888, "pt-v20": 0.3888, "pt-v21": 0.3888},
         "identity": "k' = k + ln((1 - a') / (1 - a)) / eta: the crisis side "
                     "of the weight, (1 - a)(K / x)^eta, held while the base "
                     "weight moves from 0.45 to a' = 0.375: 0.2609 + "
@@ -3479,7 +3607,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "vix_anchor_weight_level_cap": {
         "kind": "derived",
-        "presets": {"pt-v19": 2.2159, "pt-v20": 2.2159},
+        "presets": {"pt-v19": 2.2159, "pt-v20": 2.2159, "pt-v21": 2.2159},
         "identity": "r' = r (1 - a') / (1 - a): the cap held at the same VIX "
                     "as the knee moves, 1.95 * 0.625 / 0.55 = 2.2159",
         "terms": {"r 1.95": "36 / 18.5, where the held map's gain reaches 95 "
@@ -3492,7 +3620,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "market_vol_vix_exponent_below": {
         "kind": "undetermined",
-        "presets": {"pt-v19": 2.5, "pt-v20": 2.5},
+        "presets": {"pt-v19": 2.5, "pt-v20": 2.5, "pt-v21": 2.5},
         "what_would_determine_it": "a single tape target where today there "
             "is a window. CHOSEN, not derived: below the anchor the tape's "
             "shared variance scales as VIX^2.25 [1.95, 2.57] and its calm "
@@ -3505,7 +3633,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "market_beta_down_asym_lag_live": {
         "kind": "undetermined",
-        "presets": {"pt-v19": 1.0, "pt-v20": 1.0},
+        "presets": {"pt-v19": 1.0, "pt-v20": 1.0, "pt-v21": 1.0},
         "what_would_determine_it": "the diagnostic registered in the "
             "correlation-asymmetry repair (the project's unpublished design "
             "notes), which would rule on the form and is unrun. A FORM "
@@ -3518,7 +3646,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "macro_compound_days_per_year": {
         "kind": "derived",
-        "presets": {"pt-v19": 252.0, "pt-v20": 252.0},
+        "presets": {"pt-v19": 252.0, "pt-v20": 252.0, "pt-v21": 252.0},
         "identity": "the economy steps once per trading session, so a year "
                     "of compounding is 252 steps; at 365 a trading year "
                     "received 252/365 of its annual GDP and CPI growth",
@@ -3531,7 +3659,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "macro_calendar_days_per_year": {
         "kind": "derived",
-        "presets": {"pt-v19": 252.0, "pt-v20": 252.0},
+        "presets": {"pt-v19": 252.0, "pt-v20": 252.0, "pt-v21": 252.0},
         "identity": "the session calendar: a 21-step month, a 63-step "
                     "quarter and every calendar-day span scaled by 252 / 365 "
                     "and rounded, because the economy steps once per session",
@@ -3543,7 +3671,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "cycle_us_calibration": {
         "kind": "derived",
-        "presets": {"pt-v19": 1.0, "pt-v20": 1.0},
+        "presets": {"pt-v19": 1.0, "pt-v20": 1.0, "pt-v21": 1.0},
         "identity": "a switch whose identity is the value: 1.0 reads the "
                     "phase table derived from NBER recession dates and BEA "
                     "real GDP, 1990-2025, with the Weibull scales solved "
@@ -3562,7 +3690,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "fed_liftoff_rule": {
         "kind": "derived",
-        "presets": {"pt-v19": 1.0, "pt-v20": 1.0},
+        "presets": {"pt-v19": 1.0, "pt-v20": 1.0, "pt-v21": 1.0},
         "identity": "a switch whose identity is the value: the ladder's own "
                     "cut branch mirrored (its 50 bp trigger and 25 bp steps), "
                     "so the rate lifts off zero on its Taylor rule instead "
@@ -3575,7 +3703,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "market_pe_buybacks": {
         "kind": "derived",
-        "presets": {"pt-v19": 1.0, "pt-v20": 1.0},
+        "presets": {"pt-v19": 1.0, "pt-v20": 1.0, "pt-v21": 1.0},
         "identity": "a switch whose identity is the value: market_pe divides "
                     "by the same buyback-scaled earnings the valuation "
                     "already applies, so the multiple no longer rises by the "
@@ -3588,7 +3716,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "cycle_stationary_opening": {
         "kind": "derived",
-        "presets": {"pt-v19": 1.0, "pt-v20": 1.0},
+        "presets": {"pt-v19": 1.0, "pt-v20": 1.0, "pt-v21": 1.0},
         "identity": "a switch whose identity is the value: 1.0 draws day "
                     "zero's phase AND age from the cycle's own stationary "
                     "law, `P(i, a) = S_i(a + 1) / sum_j E[T_j]`, every term "
@@ -3607,7 +3735,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "news_absorption_half_life": {
         "kind": "derived",
-        "presets": {"pt-v19": 0.6, "pt-v20": 0.6},
+        "presets": {"pt-v19": 0.6, "pt-v20": 0.6, "pt-v21": 0.6},
         "identity": "h solving A(1) = the share of an earnings move priced "
                     "one minute after the release, with A(n) = (1 - d)(1 - "
                     "2^(-n/h)) / (1 - 2^(-390/h)) + d (1 - 2^(-n/h_d)) / (1 "
@@ -3629,7 +3757,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "news_absorption_drift_share": {
         "kind": "derived",
-        "presets": {"pt-v19": 0.12, "pt-v20": 0.12},
+        "presets": {"pt-v19": 0.12, "pt-v20": 0.12, "pt-v21": 0.12},
         "identity": "d = 1 - 1.58 / 1.80 = 0.122: the share of the move "
                     "that arrives after five minutes",
         "terms": {"1.58, 1.80": "per cent earned by five minutes and by the "
@@ -3641,7 +3769,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "news_absorption_drift_half_life": {
         "kind": "undetermined",
-        "presets": {"pt-v19": 42.0, "pt-v20": 42.0},
+        "presets": {"pt-v19": 42.0, "pt-v20": 42.0, "pt-v21": 42.0},
         "what_would_determine_it": "an intraday event study that resolves "
             "the timescale of the drift after five minutes. CHOSEN: 42 ticks "
             "is a 60-minute mean life (60 ln 2 = 41.6), which lands 92 per "
@@ -3652,7 +3780,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "news_quote_revision": {
         "kind": "derived",
-        "presets": {"pt-v19": 1.0, "pt-v20": 1.0},
+        "presets": {"pt-v19": 1.0, "pt-v20": 1.0, "pt-v21": 1.0},
         "identity": "a switch whose identity is the value: the maker "
                     "re-quotes by the tick's news term, so the traded tape "
                     "carries the absorption profile. With it the tape holds "
@@ -3675,7 +3803,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     # validation/pt-v20/programme/results/ptv20/desk.py.
     "quote_model_weight": {
         "kind": "derived",
-        "presets": {"pt-v20": 1.0},
+        "presets": {"pt-v20": 1.0, "pt-v21": 1.0},
         "identity": "a weight whose identity is the value: at 1.0 the "
                     "maker's book is centred on the efficient price (the "
                     "model price) every tick, which is what quotes that "
@@ -3694,7 +3822,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "closing_auction": {
         "kind": "derived",
-        "presets": {"pt-v20": 1.0},
+        "presets": {"pt-v20": 1.0, "pt-v21": 1.0},
         "identity": "a switch whose identity is the value: a closing cross "
                     "clears at the efficient price, so the session's close "
                     "is the model price and the close-to-close return "
@@ -3713,7 +3841,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "fair_value_news_share": {
         "kind": "derived",
-        "presets": {"pt-v20": 1.0},
+        "presets": {"pt-v20": 1.0, "pt-v21": 1.0},
         "identity": "every stock- and sector-specific shock -- the "
                     "idiosyncratic and sector noise draws, the company's "
                     "own, peer and sector news, its own jump -- is news "
@@ -3736,7 +3864,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "opening_mispricing_sigma": {
         "kind": "measured",
-        "presets": {"pt-v20": 0.016},
+        "presets": {"pt-v20": 0.016, "pt-v21": 0.016},
         "source": "two desk runs of the shipped vector, in the project's "
                   "unpublished design notes",
         "date": "2026-09-24",
@@ -3753,7 +3881,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "fair_value_market_share": {
         "kind": "undetermined",
-        "presets": {"pt-v20": 1.0},
+        "presets": {"pt-v20": 1.0, "pt-v21": 1.0},
         "what_would_determine_it": "a tape estimate of the permanent share "
             "of a market-wide shock, with its error: the long-horizon "
             "variance ratio V1 reads it only jointly with the volatility "
@@ -3772,7 +3900,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "opening_market_sigma": {
         "kind": "undetermined",
-        "presets": {"pt-v20": 0.001},
+        "presets": {"pt-v20": 0.001, "pt-v21": 0.001},
         "what_would_determine_it": "the estimator that set 0.1 (below), "
             "re-run on the graded arm's vector: the sd over sessions "
             "250-2660 of the cap-weighted s, certified roster, untraded. "
@@ -3802,7 +3930,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     # of them; tools/calibration/impact_curve.py measures what they buy.
     "book_depth_coefficient": {
         "kind": "measured",
-        "presets": {"pt-v20": 0.75},
+        "presets": {"pt-v20": 0.75, "pt-v21": 0.75},
         "source": "tools/calibration/impact_curve.py (feature/order-book-depth; "
                   "pt-v20's run is recorded in the project's unpublished "
                   "design notes)",
@@ -3819,7 +3947,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "book_depth_exponent": {
         "kind": "derived",
-        "presets": {"pt-v20": 0.5},
+        "presets": {"pt-v20": 0.5, "pt-v21": 0.5},
         "identity": "the square-root law's exponent: latent depth growing "
                     "linearly with distance gives a cost in sqrt(Q/V)",
         "terms": {"0.495": "fitted exponent of the average cost, pt-v20"},
@@ -3829,7 +3957,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "book_depth_reach": {
         "kind": "derived",
-        "presets": {"pt-v20": 1.0},
+        "presets": {"pt-v20": 1.0, "pt-v21": 1.0},
         "identity": "the latent book reaches a whole day's volume, so an order "
                     "up to 100 per cent of V walks it rather than being cut off",
         "terms": {"1.0": "one day's volume"},
@@ -3838,7 +3966,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "book_shared": {
         "kind": "derived",
-        "presets": {"pt-v20": 1.0},
+        "presets": {"pt-v20": 1.0, "pt-v21": 1.0},
         "identity": "a switch whose identity is the value: agents consume one "
                     "book, so one agent's fill is liquidity the next does not get",
         "terms": {"1.0": "on"},
@@ -3847,7 +3975,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "book_resting": {
         "kind": "derived",
-        "presets": {"pt-v20": 1.0},
+        "presets": {"pt-v20": 1.0, "pt-v21": 1.0},
         "identity": "a switch whose identity is the value: an agent's limit "
                     "order rests in the book with queue priority",
         "terms": {"1.0": "on"},
@@ -3859,7 +3987,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         # resilience range and the refill arm then measured what it gives,
         # which is a consequence of the value rather than an estimate of it.
         "kind": "derived",
-        "presets": {"pt-v20": 27.0},
+        "presets": {"pt-v20": 27.0, "pt-v21": 27.0},
         "identity": "a refill half-life inside the resilience the literature "
                     "reports for large-cap US equities, minutes to an hour; "
                     "27 one-minute ticks. The refill arm of "
@@ -3873,7 +4001,15 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "fill_impact_coefficient": {
         "kind": "derived",
-        "presets": {"pt-v20": 0.314},
+        "presets": {"pt-v20": 0.314, "pt-v21": 0.15},
+        "pt_v21": "pt-v21's 0.15 sits beside the metaorder memory "
+                  "(`impact_memory_coefficient` 0.65). Almgren et al.'s 0.314 "
+                  "is a permanent term fitted beside its own temporary term, "
+                  "and on pt-v21 the memory carries the temporary part, so the "
+                  "linear gamma is smaller: with it a day's TWAP at 10% of "
+                  "volume costs 0.82 of a block's cost (0.83 at 3%; "
+                  "docs/MODEL.md). Chosen with the memory, not derived; graded "
+                  "with pt-v21's vector",
         "identity": "Almgren, Thum, Hauptmann and Li (Risk 18(7), 2005)'s "
                     "permanent impact gamma: 0.314 sigma X / V, the linear "
                     "permanent law, attributed per agent",
@@ -3893,7 +4029,14 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         "kind": "measured",
         "presets": {"pt-v16": 0.007593024924589399,
                     "pt-v18": 0.007593024924589399,
-                    "pt-v19": 0.007593024924589399, "pt-v20": 0.006454071},
+                    "pt-v19": 0.007593024924589399, "pt-v20": 0.006454071,
+                    "pt-v21": 0.007099478},
+        "pt_v21": "pt-v21's 0.007099478 holds the index's volatility level "
+                  "once the variance carries the cycle multiplier, the "
+                  "leverage memory and the stress premium; chosen in the "
+                  "project's screens and graded with pt-v21's vector "
+                  "(validation/pt-v21/programme/ptv21-registration-18.md). The "
+                  "grid above is pt-v20's",
         "source": "validation/pt-v20/programme/ptv20-registration.md, the "
                   "co-tune grid; the grid's result is in the project's "
                   "unpublished design notes",
@@ -3912,7 +4055,14 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     "jump_intensity_market": {
         "kind": "measured",
         "presets": {"pt-v16": 0.0565753337, "pt-v18": 0.0565753337,
-                    "pt-v19": 0.0565753337, "pt-v20": 0.02828766685},
+                    "pt-v19": 0.0565753337, "pt-v20": 0.02828766685,
+                    "pt-v21": 0.005},
+        "pt_v21": "pt-v21's 0.005 a day is the rarer, larger market jump (with "
+                  "`jump_mean_market` -0.03 and `jump_sigma_market` 0.01), "
+                  "chosen in the project's screens and graded with pt-v21's "
+                  "vector "
+                  "(validation/pt-v21/programme/ptv21-registration-18.md). The "
+                  "grid above is pt-v20's",
         "source": "validation/pt-v20/programme/ptv20-registration.md, the "
                   "co-tune grid; the grid's result is in the project's "
                   "unpublished design notes",
@@ -3927,7 +4077,15 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "treasury_2y_noise": {
         "kind": "measured",
-        "presets": {"pt-v20": 0.022},
+        "presets": {"pt-v20": 0.022, "pt-v21": 0.008},
+        "pt_v21": "pt-v21's 0.008: with the curve pricing the expected policy "
+                  "path (`treasury_path_pricing`, `policy_anticipation`) the "
+                  "2-year's formula moves on its own between meetings, so it "
+                  "needs less noise of its own. Chosen in the project's "
+                  "screens; row R1 reads 5.55 bp against the tape's 5.23 and "
+                  "passes "
+                  "(validation/pt-v21/programme/results/ptv21/criteria-c1-reg18.txt). "
+                  "The measurement above is pt-v20's",
         "source": "the tape's Treasury yields (FRED) and the desk curve "
                   "runs, in the project's unpublished design notes",
         "date": "2026-09-24",
@@ -3940,7 +4098,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "treasury_10y_noise": {
         "kind": "measured",
-        "presets": {"pt-v20": 0.038},
+        "presets": {"pt-v20": 0.038, "pt-v21": 0.038},
         "source": "the tape (FRED DGS10) and the grading boxes "
                   "ptv20vr4-vr9, recorded in the project's unpublished "
                   "design notes",
@@ -3965,7 +4123,15 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "flight_to_quality_gain": {
         "kind": "measured",
-        "presets": {"pt-v20": 0.008},
+        "presets": {"pt-v20": 0.008, "pt-v21": 0.013},
+        "pt_v21": "pt-v21's 0.013 sits beside `treasury_haven_gain` 0.014 and "
+                  "the curve's policy-path pricing, chosen in the project's "
+                  "screens and graded with pt-v21's vector: row R3, the "
+                  "stock-Treasury daily correlation, reads -0.319 against the "
+                  "tape's -0.161 and passes "
+                  "(validation/pt-v21/programme/results/ptv21/criteria-c1-reg18.txt). "
+                  "The fit above is pt-v20's; no fit of this value alone is "
+                  "recorded",
         "source": "the tape's yields and the desk curve runs, in the "
                   "project's unpublished design notes",
         "date": "2026-09-24",
@@ -3979,7 +4145,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "flight_to_quality_day": {
         "kind": "derived",
-        "presets": {"pt-v20": 1.0},
+        "presets": {"pt-v20": 1.0, "pt-v21": 1.0},
         "identity": "a switch whose identity is the value: the yield the "
                     "step writes after the close is that session's close, so "
                     "the move it answers is that session's return. The "
@@ -3993,7 +4159,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "corporate_yield_daily": {
         "kind": "derived",
-        "presets": {"pt-v20": 1.0},
+        "presets": {"pt-v20": 1.0, "pt-v21": 1.0},
         "identity": "a switch whose identity is the value: the meeting "
                     "formula's own terms (the 10-year plus a spread of 2 bp a "
                     "VIX point times the cycle multiplier) applied to each "
@@ -4007,7 +4173,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "earnings_cycle_depth": {
         "kind": "measured",
-        "presets": {"pt-v20": 0.2},
+        "presets": {"pt-v20": 0.2, "pt-v21": 0.2},
         "source": "the grading boxes ptv20vr3b, vr4 and vr9 (the "
                   "project's unpublished design notes); the twelfth registration and "
                   "'The graded arm' in "
@@ -4039,7 +4205,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "earnings_cycle_upside": {
         "kind": "derived",
-        "presets": {"pt-v20": 0.09},
+        "presets": {"pt-v20": 0.09, "pt-v21": 0.09},
         "identity": "upside = q / (1 - q), where q is the share of the cycle "
                     "spent in contraction and trough, so the pull toward "
                     "-depth there and +depth * upside elsewhere averages to "
@@ -4053,9 +4219,17 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
         "source": "rust/src/economy/state.rs, us_phase_characteristics",
     },
     "earnings_cycle_half_life": {
+        # In scope from pt-v21, which moves it off pt-v1's 60; pt-v20 ships
+        # pt-v1's value, so it is not listed. It sat in POST_BASELINE until then.
         "kind": "undetermined",
-        "presets": {"pt-v16": 60.0, "pt-v18": 60.0, "pt-v19": 60.0,
-                    "pt-v20": 60.0},
+        "presets": {"pt-v21": 150.0},
+        "pt_v21": "pt-v21's 150 sessions was chosen in the project's screens "
+                  "beside the earnings anticipation's drift "
+                  "(`earnings_anticipation_drift_share` 0.9, half-life 252) "
+                  "and graded with pt-v21's vector "
+                  "(validation/pt-v21/programme/ptv21-registration-18.md). The "
+                  "lag of earnings behind the turning points that would "
+                  "determine it is still unmeasured",
         "what_would_determine_it": "the lag of S&P earnings behind the NBER "
                                    "turning points in Shiller's monthly "
                                    "series, read as the half-life of a pull "
@@ -4069,7 +4243,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     "earnings_cycle_sigma": {
         "kind": "undetermined",
         "presets": {"pt-v16": 0.0, "pt-v18": 0.0, "pt-v19": 0.0,
-                    "pt-v20": 0.0},
+                    "pt-v20": 0.0, "pt-v21": 0.0},
         "what_would_determine_it": "the within-phase sd of twelve-month "
                                    "earnings growth in Shiller's series "
                                    "once the phase means are taken out. "
@@ -4079,7 +4253,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "cascade_gain": {
         "kind": "measured",
-        "presets": {"pt-v20": 0.1},
+        "presets": {"pt-v20": 0.1, "pt-v21": 0.1},
         "source": "two desk runs in the project's unpublished design notes",
         "date": "2026-09-24",
         "script": "validation/pt-v20/programme/results/ptv20/desk.py, row "
@@ -4107,7 +4281,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     # these were written.
     "cycle_publication_lag": {
         "kind": "undetermined",
-        "presets": {"pt-v20": 252.0},
+        "presets": {"pt-v20": 252.0, "pt-v21": 252.0},
         "what_would_determine_it": "the NBER's announcement delays over the "
             "post-war turns, as a distribution the one lag stands for; it "
             "announced the December 2007 peak on 1 December 2008 and the "
@@ -4121,7 +4295,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "gdp_publication_lag": {
         "kind": "undetermined",
-        "presets": {"pt-v20": 21.0},
+        "presets": {"pt-v20": 21.0, "pt-v21": 21.0},
         "what_would_determine_it": "the BEA's release calendar read as "
             "sessions after each quarter's end. CHOSEN "
             "(2026-09-25): a quarterly figure, the quarter's mean, released "
@@ -4135,7 +4309,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "unemployment_adjustment_half_life": {
         "kind": "undetermined",
-        "presets": {"pt-v20": 84.0},
+        "presets": {"pt-v20": 84.0, "pt-v21": 84.0},
         "what_would_determine_it": "a fit of the partial adjustment's "
             "half-life to FRED UNRATE's monthly path over the NBER "
             "recessions, with its error. FITTED to two recessions, "
@@ -4150,7 +4324,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "fear_greed_published_inputs": {
         "kind": "derived",
-        "presets": {"pt-v20": 1.0},
+        "presets": {"pt-v20": 1.0, "pt-v21": 1.0},
         "identity": "a switch whose identity is the value: the real index is "
                     "built from market data and knows no recession dating, "
                     "so what it may read of the economy is what has been "
@@ -4169,7 +4343,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "macro_publication_repricing": {
         "kind": "derived",
-        "presets": {"pt-v20": 1.0},
+        "presets": {"pt-v20": 1.0, "pt-v21": 1.0},
         "identity": "a switch whose identity is the value: a decision "
                     "readable after the close is priced when it is "
                     "published, as event studies find the S&P 500's whole "
@@ -4188,7 +4362,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "earnings_anticipation_half_life": {
         "kind": "undetermined",
-        "presets": {"pt-v20": 126.0},
+        "presets": {"pt-v20": 126.0, "pt-v21": 126.0},
         "what_would_determine_it": "a tape estimate of the horizon over "
             "which the market prices the earnings cycle's expected path. "
             "FITTED on grids ptv20e6 to e8 over 0, 42, 63, 84, 126, 168, "
@@ -4203,7 +4377,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "rate_pe_sensitivity": {
         "kind": "undetermined",
-        "presets": {"pt-v20": 3.0},
+        "presets": {"pt-v20": 3.0, "pt-v21": 3.0},
         "what_would_determine_it": "a regression of the market P/E on the "
             "corporate yield with its error. The one reading is 2022: the "
             "S&P 500's trailing P/E fell 4.9 to 5.5 per cent per 100 bp of "
@@ -4223,7 +4397,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "fair_value_market_linear": {
         "kind": "derived",
-        "presets": {"pt-v20": 1.0},
+        "presets": {"pt-v20": 1.0, "pt-v21": 1.0},
         "identity": "a switch whose identity is the value: the plain loading "
                     "on the market draw, beta F, has zero mean in every "
                     "regime and is news about value, so it is the part made "
@@ -4244,7 +4418,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "fair_value_market_vol_cap": {
         "kind": "undetermined",
-        "presets": {"pt-v20": 1.5},
+        "presets": {"pt-v20": 1.5, "pt-v21": 1.5},
         "what_would_determine_it": "the market volatility above which real "
             "index shocks stop being permanent, from a regime-switching "
             "estimate of the variance ratio with its error. The form follows "
@@ -4259,7 +4433,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "fair_value_vix_discount": {
         "kind": "undetermined",
-        "presets": {"pt-v20": 0.35},
+        "presets": {"pt-v20": 0.35, "pt-v21": 0.35},
         "what_would_determine_it": "a tape estimate of the volatility "
             "feedback's elasticity, the price response to expected "
             "volatility above the knee (French, Schwert and Stambaugh 1987; "
@@ -4272,7 +4446,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "fair_value_vix_knee": {
         "kind": "undetermined",
-        "presets": {"pt-v20": 40.0},
+        "presets": {"pt-v20": 40.0, "pt-v21": 40.0},
         "what_would_determine_it": "the VIX level at which the feedback "
             "starts, from the same estimate. FITTED: at a knee of 30 or 35 "
             "every smoothed arm tried put the sessions under -5 per cent past twice "
@@ -4281,7 +4455,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "fair_value_vix_half_life": {
         "kind": "undetermined",
-        "presets": {"pt-v20": 5.0},
+        "presets": {"pt-v20": 5.0, "pt-v21": 5.0},
         "what_would_determine_it": "how fast the market prices a change "
             "in the volatility regime, from a tape estimate. FITTED: read "
             "unsmoothed, the discount's whole daily change landed with the "
@@ -4293,7 +4467,7 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
     },
     "buyback_yield_cap": {
         "kind": "undetermined",
-        "presets": {"pt-v20": 0.15},
+        "presets": {"pt-v20": 0.15, "pt-v21": 0.15},
         "what_would_determine_it": "nothing on the tape: a GUARD, not a "
             "claim about markets. The buyback term compounds the yield at "
             "today's price over every elapsed year, so a name near the "
@@ -4306,6 +4480,2364 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
             "priced under 5 times earnings",
     },
 
+    # pt-v21, the default from 0.10.0. Each dial below was out of scope
+    # (inert at its pt-v1 value on every earlier preset) until pt-v21
+    # moved it; `inert_through_pt_v20` keeps the reason it was.
+    "book_arrival_shuffle": {
+        "kind": "derived",
+        "presets": {"pt-v21": 1.0},
+        "identity": "a switch whose identity is the value: each step's "
+                    "arrival order at the shared book is a seeded shuffle, so "
+                    "no label buys priority: exchanges rank orders by price "
+                    "and then time, never by identity (Nasdaq Rule 4757), and "
+                    "agent-based toolkits reshuffle the activation order "
+                    "every step (Axtell 2001)",
+        "terms": {"1.0": "on, as pt-v21 ships it"},
+        "source": "rust/src/params.rs, `ModelParams::book_arrival_shuffle`; "
+                  "graded with pt-v21's vector in "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: `World.run` "
+                                "executes a cohort in sorted label order, so "
+                                "on a live book the same label takes the "
+                                "levels and the queue first on every step. "
+                                "Read only by a cohort of two or more agents; "
+                                "a single agent, `evaluate` and an untraded "
+                                "market never read it (0.8.5, arrival-order "
+                                "work: the later of two identical 10%-of-ADV "
+                                "buyers paid about 23 bp more on 30 of 30 "
+                                "held-out seeds on pt-v20)",
+    },
+    "book_cross_at_limit": {
+        "kind": "derived",
+        "presets": {"pt-v21": 1.0},
+        "identity": "a switch whose identity is the value: a resting order "
+                    "the book leaves crossed trades at its own limit, as a "
+                    "continuous book fills a standing order at its price and "
+                    "gives any improvement to the arriving order (Nasdaq Rule "
+                    "4757, NYSE Pillar 7.36-7.37)",
+        "terms": {"1.0": "on, as pt-v21 ships it"},
+        "source": "rust/src/params.rs, `ModelParams::book_cross_at_limit`; "
+                  "graded with pt-v21's vector in "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: a resting order the "
+                                "book leaves crossed during the session "
+                                "trades at the ladder's prices, as it stood. "
+                                "Read only when an agent's resting order is "
+                                "crossed: at 1.0 it trades at its own limit "
+                                "and the improvement is the arriving "
+                                "re-quote's (price-time priority, Nasdaq Rule "
+                                "4757). Target: row G-rt's wash, where "
+                                "resting asks at the touch sold at the "
+                                "maker's higher bid after the group's own "
+                                "taker buys lifted it, +19 bp on the two wash "
+                                "legs alone on a held-out trip seed (R16A; "
+                                "0.8.5 fourteenth-round work, sim/r17-wash)",
+    },
+    "book_depth_nesting": {
+        "kind": "derived",
+        "presets": {"pt-v21": 1.0},
+        "identity": "1.0 is the identity: the maker's ladder is the displayed "
+                    "front of the latent book (Toth et al. 2011; Bouchaud, "
+                    "Bonart, Donier and Gould 2018, ch. 19), so the depth "
+                    "within a distance of the touch is the larger of the "
+                    "ladder's and the law's, not their sum; 1.0 counts the "
+                    "whole ladder",
+        "terms": {"1.0": "on, as pt-v21 ships it"},
+        "source": "rust/src/params.rs, `ModelParams::book_depth_nesting`; "
+                  "graded with pt-v21's vector in "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: "
+                                "`append_latent_depth` places the latent pool "
+                                "beside the maker's ladder exactly as before, "
+                                "and the dial is read nowhere else. Read only "
+                                "in the book an agent meets, so no untraded "
+                                "statistic moves. At 1.0 the latent curve "
+                                "counts the ladder's shares as its own front "
+                                "(the ladder is the displayed part of the "
+                                "latent book, Toth et al. 2011), so a block "
+                                "of 3 to 10 per cent of daily volume pays the "
+                                "law past the ladder rather than the ladder's "
+                                "and the law's depth summed; for a new "
+                                "registration (0.8.5 realism work, "
+                                "sim/r15-impact3: row Q9, a day TWAP over a "
+                                "block at 3 per cent of daily volume, 0.83 on "
+                                "N4 against a band of 0.5 to 0.8). At 1.0 on "
+                                "N4 (boxes r15imp1 and r15imp2, held-out "
+                                "seeds 2501-2530 x 12 names): Q9 0.676, Q8 "
+                                "0.641, Q1-Q7 unmoved, C9 0.456 / 0.469, best "
+                                "round trip -0.91 bp, all 40 registered rows "
+                                "pass",
+    },
+    "buyback_accrual": {
+        "kind": "derived",
+        "presets": {"pt-v21": 1.0},
+        "identity": "a switch whose identity is the value: the buyback term "
+                    "is accrued state, a running log share-count reduction "
+                    "fixed within a session, so fair value's elasticity to "
+                    "today's price is zero and relabelling the calendar "
+                    "origin moves no price",
+        "terms": {"1.0": "on, as pt-v21 ships it"},
+        "source": "rust/src/params.rs, `ModelParams::buyback_accrual`; graded "
+                  "with pt-v21's vector in "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: "
+                                "`market::tick::buyback_factor` returns "
+                                "`buyback_scale`, the term that stood, and "
+                                "the close accrues nothing. At 1.0 each name "
+                                "carries a log share-count reduction the "
+                                "close adds `min(payout * E * exp(L) / P, "
+                                "cap) / 252` to, and fair value reads exp(L), "
+                                "so it no longer moves against today's price "
+                                "with a gain that grows with the elapsed "
+                                "years (d ln FV / d ln P -0.29 by year 10 and "
+                                "-0.49 by year 40 on pt-v20; a period-2 "
+                                "oscillation from about year 30 of a 100-year "
+                                "run) and relabelling the calendar origin no "
+                                "longer moves prices. Snapshotted and hashed "
+                                "only while it and `buyback_payout_share` are "
+                                "both set (0.8.5, thirteenth registration "
+                                "work: the long-run audit, boxes "
+                                "r13bb2-r13bb3)",
+    },
+    "corporate_spread_cycle": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 0.75},
+        "what_would_determine_it": "pt-v21 ships 0.75. Off zero the spread "
+                                   "prices a blend toward the multiplier's "
+                                   "occupancy mean and the daily move carries "
+                                   "the formula's whole change (0.8.5, r13 "
+                                   "audit: the first meeting after a turn "
+                                   "re-anchored the spread by 111 bp on "
+                                   "average). The value was chosen in the "
+                                   "project's screens against the registered "
+                                   "rows and graded with pt-v21's whole "
+                                   "vector (grade 18 and the by-name "
+                                   "certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, `ModelParams::corporate_spread_cycle`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 while `cycle_nowcast_accuracy` "
+                                "is also 0.0, as every preset ships them: the "
+                                "meeting and the daily VIX term read the true "
+                                "phase's multiplier as they did "
+                                "(`PolicyOptions::spread_multiplier` and "
+                                "`YieldDials::spread_multiplier` are None). "
+                                "Off zero the spread prices a blend toward "
+                                "the multiplier's occupancy mean and the "
+                                "daily move carries the formula's whole "
+                                "change (0.8.5, r13 audit: the first meeting "
+                                "after a turn re-anchored the spread by 111 "
+                                "bp on average)",
+    },
+    "corporate_spread_equity_gain": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 1.8},
+        "what_would_determine_it": "pt-v21 ships 1.8. Target: the monthly "
+                                   "stock-IG correlation, +0.47 for SPY and "
+                                   "LQD 2015-2025, against 0.15 on the r14 "
+                                   "screen's N4 arm (0.8.5 realism work, "
+                                   "bondcorr). The value was chosen in the "
+                                   "project's screens against the registered "
+                                   "rows and graded with pt-v21's whole "
+                                   "vector (grade 18 and the by-name "
+                                   "certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, "
+                  "`ModelParams::corporate_spread_equity_gain`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: no leverage gap is "
+                                "written and the spread reads the VIX alone. "
+                                "Off zero the spread's base gains the gain "
+                                "times the index's log fall below its own "
+                                "slow average (a structural credit model's "
+                                "leverage), times the cycle multiplier, at "
+                                "the close, the meeting and the live mark. "
+                                "Target: the monthly stock-IG correlation, "
+                                "+0.47 for SPY and LQD 2015-2025, against "
+                                "0.15 on the r14 screen's N4 arm (0.8.5 "
+                                "realism work, bondcorr)",
+    },
+    "corporate_spread_equity_half_life": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 126.0},
+        "what_would_determine_it": "set with `corporate_spread_equity_gain`, "
+                                   "whose entry gives the target; pt-v21 "
+                                   "ships 126, chosen in the project's "
+                                   "screens against the registered rows and "
+                                   "graded with pt-v21's whole vector (grade "
+                                   "18 and the by-name certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, "
+                  "`ModelParams::corporate_spread_equity_half_life`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "unread while `corporate_spread_equity_gain` "
+                                "is 0.0 (0.8.5 realism work, bondcorr)",
+    },
+    "corporate_spread_vix_cut": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 1.0},
+        "what_would_determine_it": "pt-v21 ships 1. Target: the stock-IG "
+                                   "correlation, +0.27 daily and +0.47 "
+                                   "monthly for SPY and LQD 2015-2025, and "
+                                   "the Baa spread's daily change sd, 3.1 bp "
+                                   "on FRED BAA10Y 1990-2026; the spread's "
+                                   "VIX-borne move reverses as the VIX "
+                                   "reverts, so the daily reading runs high "
+                                   "and the monthly low (0.8.5 realism work, "
+                                   "bondcorr). The value was chosen in the "
+                                   "project's screens against the registered "
+                                   "rows and graded with pt-v21's whole "
+                                   "vector (grade 18 and the by-name "
+                                   "certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, "
+                  "`ModelParams::corporate_spread_vix_cut`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: the corporate "
+                                "spread is the meeting formula's 2 bp a VIX "
+                                "point times the cycle multiplier, which the "
+                                "close's daily move tracks. Off zero the "
+                                "slope is cut by this share at the meeting, "
+                                "the close and a pinned VIX's credit leg. "
+                                "Target: the stock-IG correlation, +0.27 "
+                                "daily and +0.47 monthly for SPY and LQD "
+                                "2015-2025, and the Baa spread's daily change "
+                                "sd, 3.1 bp on FRED BAA10Y 1990-2026; the "
+                                "spread's VIX-borne move reverses as the VIX "
+                                "reverts, so the daily reading runs high and "
+                                "the monthly low (0.8.5 realism work, "
+                                "bondcorr)",
+    },
+    "cycle_equity_hazard": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 5.0},
+        "what_would_determine_it": "pt-v21 ships 5. Target: B12, the share of "
+                                   "20 per cent bears with a true contraction "
+                                   "between the peak and the trough plus 63 "
+                                   "sessions, 0.48 on R17T over 180 held-out "
+                                   "histories against 7 of 11 post-war S&P "
+                                   "500 bears (0.64), band [0.45, 0.85] "
+                                   "(0.8.5 fourteenth-registration work, "
+                                   "sim/r17-b12). The value was chosen in the "
+                                   "project's screens against the registered "
+                                   "rows and graded with pt-v21's whole "
+                                   "vector (grade 18 and the by-name "
+                                   "certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, `ModelParams::cycle_equity_hazard`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: "
+                                "`adjust_transition_probability` "
+                                "(economy/cycle.rs) branches on `== 0.0` "
+                                "before reading the gap, so the cycle's "
+                                "ladder is the one that stood, and the gap is "
+                                "not run unless "
+                                "`corporate_spread_equity_gain` runs it. Off "
+                                "zero, in an expansion and at a peak, the "
+                                "monthly hazard gains the dial times the "
+                                "index's log fall below its slow average past "
+                                "`cycle_equity_hazard_knee`. Target: B12, the "
+                                "share of 20 per cent bears with a true "
+                                "contraction between the peak and the trough "
+                                "plus 63 sessions, 0.48 on R17T over 180 "
+                                "held-out histories against 7 of 11 post-war "
+                                "S&P 500 bears (0.64), band [0.45, 0.85] "
+                                "(0.8.5 fourteenth-registration work, "
+                                "sim/r17-b12)",
+    },
+    "cycle_equity_hazard_knee": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 0.1},
+        "what_would_determine_it": "set with `cycle_equity_hazard`, whose "
+                                   "entry gives the target; pt-v21 ships 0.1, "
+                                   "chosen in the project's screens against "
+                                   "the registered rows and graded with "
+                                   "pt-v21's whole vector (grade 18 and the "
+                                   "by-name certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, "
+                  "`ModelParams::cycle_equity_hazard_knee`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "unread while `cycle_equity_hazard` is 0.0 "
+                                "(0.8.5 fourteenth-registration work, "
+                                "sim/r17-b12)",
+    },
+    "cycle_equity_hazard_opening": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 0.011},
+        "what_would_determine_it": "pt-v21 ships 0.011. Target: PH5's "
+                                   "volatility clause, year 0 against years "
+                                   "1-7, which the extra recessions of "
+                                   "`cycle_equity_hazard` push apart (0.8.5 "
+                                   "fourteenth-registration work, "
+                                   "sim/r17-b12). The value was chosen in the "
+                                   "project's screens against the registered "
+                                   "rows and graded with pt-v21's whole "
+                                   "vector (grade 18 and the by-name "
+                                   "certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, "
+                  "`ModelParams::cycle_equity_hazard_opening`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: the engine reads it "
+                                "only while the economy runs alone before day "
+                                "zero (the stationary opening's law and the "
+                                "macro burn-in), and the ladder and the "
+                                "hazard-only law branch on `== 0.0`, so the "
+                                "opening is the one that stood. Off zero it "
+                                "adds monthly hazard in an expansion and at a "
+                                "peak there, as the stand-in for the market's "
+                                "average contribution under "
+                                "`cycle_equity_hazard`, which has no index to "
+                                "read before day zero. Target: PH5's "
+                                "volatility clause, year 0 against years 1-7, "
+                                "which the extra recessions of "
+                                "`cycle_equity_hazard` push apart (0.8.5 "
+                                "fourteenth-registration work, sim/r17-b12)",
+    },
+    "cycle_nowcast_accuracy": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 0.4},
+        "what_would_determine_it": "pt-v21 ships 0.4. Off zero the market "
+                                   "prices a filtered belief over the phase "
+                                   "in place of the true phase (0.8.5, r13 "
+                                   "audit: the true phase re-marked the index "
+                                   "by about 4 per cent at every turn's "
+                                   "close). The value was chosen in the "
+                                   "project's screens against the registered "
+                                   "rows and graded with pt-v21's whole "
+                                   "vector (grade 18 and the by-name "
+                                   "certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, `ModelParams::cycle_nowcast_accuracy`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: "
+                                "`Engine::refresh_earnings_anticipation` "
+                                "reads the true phase's `g`, "
+                                "`update_cycle_nowcast` is never called, "
+                                "stream::CYCLE_NOWCAST is never drawn, and "
+                                "the belief is neither snapshotted nor "
+                                "hashed. Off zero the market prices a "
+                                "filtered belief over the phase in place of "
+                                "the true phase (0.8.5, r13 audit: the true "
+                                "phase re-marked the index by about 4 per "
+                                "cent at every turn's close)",
+    },
+    "cycle_publication_lag_draw": {
+        "kind": "derived",
+        "presets": {"pt-v21": 1.0},
+        "identity": "a switch whose identity is the value: each turn draws "
+                    "its own publication lag, as the NBER announced peaks 4 "
+                    "to 12 months after them, 1980-2020, so the published "
+                    "phase is not the true phase shifted by a fixed clock",
+        "terms": {"1.0": "on, as pt-v21 ships it"},
+        "source": "rust/src/params.rs, "
+                  "`ModelParams::cycle_publication_lag_draw`; graded with "
+                  "pt-v21's vector in "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: "
+                                "`Engine::published_cycle_phase` and "
+                                "`record_cycle_phase` read the fixed "
+                                "`cycle_publication_lag` as they did, and the "
+                                "schedule is neither kept, snapshotted nor "
+                                "hashed. At 1.0 each turn draws its own lag, "
+                                "statelessly off the root seed (0.8.5, r13 "
+                                "macro-clock audit: a fixed 252-session lag "
+                                "made the published phase the true phase "
+                                "shifted, a clock)",
+    },
+    "dividend_buyback_substitution": {
+        "kind": "derived",
+        "presets": {"pt-v21": 1.0},
+        "identity": "a switch whose identity is the value: a dividend "
+                    "substitutes for buybacks within one total payout "
+                    "(Grullon and Michaely 2002), so `buyback_payout_share` "
+                    "reads as the total payout",
+        "terms": {"1.0": "on, as pt-v21 ships it"},
+        "source": "rust/src/params.rs, "
+                  "`ModelParams::dividend_buyback_substitution`; graded with "
+                  "pt-v21's vector in "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "unread while `dividend_payout_share` is 0.0: "
+                                "at 1 a name's buyback share is "
+                                "`buyback_payout_share` less its dividend "
+                                "payout, so the former reads as the total "
+                                "payout (Grullon and Michaely 2002, JF "
+                                "57(4)); without it dividends on top of "
+                                "buybacks gave a D/P-quintile total-return "
+                                "spread of +4.1 to +4.4 points a year against "
+                                "a real +0.9 (Ken French D/P portfolios, "
+                                "1927-2025)",
+    },
+    "dividend_payout_share": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 1.2},
+        "what_would_determine_it": "pt-v21 ships 1.2. Off zero it scales "
+                                   "`Sector::dividend_payout` (payers' yield "
+                                   "times the anchor P/E, measured on the "
+                                   "forty-name tape 2015-2025 and Damodaran's "
+                                   "sector yields, January 2026). US large "
+                                   "caps paid 1.8 per cent a year in "
+                                   "dividends and 0.80 of earnings in "
+                                   "dividends and buybacks together over "
+                                   "2001-2025 (Damodaran, S&P 500 implied "
+                                   "premium file); without dividends pt-v20's "
+                                   "equity premium over bills is 4.3 points a "
+                                   "year on held-out seeds against a real 6.6 "
+                                   "(Ken French Mkt-RF, log, 1926-2025). The "
+                                   "value was chosen in the project's screens "
+                                   "against the registered rows and graded "
+                                   "with pt-v21's whole vector (grade 18 and "
+                                   "the by-name certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, `ModelParams::dividend_payout_share`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: "
+                                "`Engine::apply_dividends` returns before "
+                                "touching anything, no name carries a "
+                                "`DividendState`, and "
+                                "`market::dividends::with_accrual` returns "
+                                "fair value bit for bit. Off zero it scales "
+                                "`Sector::dividend_payout` (payers' yield "
+                                "times the anchor P/E, measured on the "
+                                "forty-name tape 2015-2025 and Damodaran's "
+                                "sector yields, January 2026). US large caps "
+                                "paid 1.8 per cent a year in dividends and "
+                                "0.80 of earnings in dividends and buybacks "
+                                "together over 2001-2025 (Damodaran, S&P 500 "
+                                "implied premium file); without dividends "
+                                "pt-v20's equity premium over bills is 4.3 "
+                                "points a year on held-out seeds against a "
+                                "real 6.6 (Ken French Mkt-RF, log, 1926-2025)",
+    },
+    "earnings_anticipation_drift_half_life": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 252.0},
+        "what_would_determine_it": "set with "
+                                   "`earnings_anticipation_drift_share`, "
+                                   "whose entry gives the target; pt-v21 "
+                                   "ships 252, chosen in the project's "
+                                   "screens against the registered rows and "
+                                   "graded with pt-v21's whole vector (grade "
+                                   "18 and the by-name certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, "
+                  "`ModelParams::earnings_anticipation_drift_half_life`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "unread while "
+                                "`earnings_anticipation_drift_share` is 0.0, "
+                                "as every preset ships it (0.8.5, r13 "
+                                "macro-clock)",
+    },
+    "earnings_anticipation_drift_share": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 0.9},
+        "what_would_determine_it": "pt-v21 ships 0.9. Off zero the valuation "
+                                   "leaves out that share of the anticipated "
+                                   "level's expected drift `rho (A - e)`, "
+                                   "accumulated in `D` (0.8.5, r13 "
+                                   "macro-clock audit: the drift made the "
+                                   "published phase a timing signal, 2x in "
+                                   "peak or contraction beating holding in "
+                                   "0.97 of 90 histories). The value was "
+                                   "chosen in the project's screens against "
+                                   "the registered rows and graded with "
+                                   "pt-v21's whole vector (grade 18 and the "
+                                   "by-name certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, "
+                  "`ModelParams::earnings_anticipation_drift_share`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: "
+                                "`Engine::refresh_earnings_anticipation` "
+                                "writes `A - e` as it did, "
+                                "`advance_anticipation_drift` returns without "
+                                "reading anything, and `D` is neither "
+                                "snapshotted nor hashed. Off zero the "
+                                "valuation leaves out that share of the "
+                                "anticipated level's expected drift `rho (A - "
+                                "e)`, accumulated in `D` (0.8.5, r13 "
+                                "macro-clock audit: the drift made the "
+                                "published phase a timing signal, 2x in peak "
+                                "or contraction beating holding in 0.97 of 90 "
+                                "histories)",
+    },
+    "earnings_followthrough_sigma": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 1.1},
+        "what_would_determine_it": "set with `earnings_surprise_sigma`, whose "
+                                   "entry gives the target; pt-v21 ships 1.1, "
+                                   "chosen in the project's screens against "
+                                   "the registered rows and graded with "
+                                   "pt-v21's whole vector (grade 18 and the "
+                                   "by-name certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, "
+                  "`ModelParams::earnings_followthrough_sigma`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "unread while `earnings_surprise_sigma` is "
+                                "0.0 (no reaction session exists)",
+    },
+    "earnings_session_sigma": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 1.9},
+        "what_would_determine_it": "set with `earnings_surprise_sigma`, whose "
+                                   "entry gives the target; pt-v21 ships 1.9, "
+                                   "chosen in the project's screens against "
+                                   "the registered rows and graded with "
+                                   "pt-v21's whole vector (grade 18 and the "
+                                   "by-name certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, `ModelParams::earnings_session_sigma`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "unread while `earnings_surprise_sigma` is "
+                                "0.0 (no reaction session exists)",
+    },
+    "earnings_surprise_sigma": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 3.5},
+        "what_would_determine_it": "pt-v21 ships 3.5, chosen in the project's "
+                                   "screens against the registered rows and "
+                                   "graded with pt-v21's whole vector (grade "
+                                   "18 and the by-name certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, "
+                  "`ModelParams::earnings_surprise_sigma`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: the calendar's "
+                                "master switch. `Engine::carries_earnings` is "
+                                "false, no report is priced, "
+                                "`earnings_calendar()` lists nothing, and the "
+                                "key is neither snapshotted nor hashed. "
+                                "Refused without a night share, since the "
+                                "opening print that realises the surprise is "
+                                "the split's",
+    },
+    "earnings_volume_multiple": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 1.2},
+        "what_would_determine_it": "set with `earnings_surprise_sigma`, whose "
+                                   "entry gives the target; pt-v21 ships 1.2, "
+                                   "chosen in the project's screens against "
+                                   "the registered rows and graded with "
+                                   "pt-v21's whole vector (grade 18 and the "
+                                   "by-name certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, "
+                  "`ModelParams::earnings_volume_multiple`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "unread while `earnings_surprise_sigma` is "
+                                "0.0: `Engine::earnings_volume_column` is "
+                                "empty and the tick reads no multiple; 0.0 "
+                                "and 1.0 are both no multiple",
+    },
+    "fair_value_market_excess_share": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 0.5},
+        "what_would_determine_it": "pt-v21 ships 0.5. Target: the index's "
+                                   "path after a VIX spike, +1.96/+4.81/+7.61 "
+                                   "per cent at 21/63/126 sessions over the "
+                                   "drift on the r15 screen's R15F against "
+                                   "-1.44/-0.50/+2.75 on the S&P 500 "
+                                   "1990-2025, and the C10 rules that lever "
+                                   "up after a spike (0.8.5 "
+                                   "thirteenth-registration work, "
+                                   "sim/r16-spike). The value was chosen in "
+                                   "the project's screens against the "
+                                   "registered rows and graded with pt-v21's "
+                                   "whole vector (grade 18 and the by-name "
+                                   "certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, "
+                  "`ModelParams::fair_value_market_excess_share`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: "
+                                "`market::tick::market_permanent_share` "
+                                "branches on `== 0.0` and returns the "
+                                "ceiling's share as it stood. Off zero it "
+                                "puts back that share of what "
+                                "`fair_value_market_vol_cap` takes off the "
+                                "market's permanent share above the ceiling, "
+                                "so a fear regime's market moves are not "
+                                "almost wholly transient. Target: the index's "
+                                "path after a VIX spike, +1.96/+4.81/+7.61 "
+                                "per cent at 21/63/126 sessions over the "
+                                "drift on the r15 screen's R15F against "
+                                "-1.44/-0.50/+2.75 on the S&P 500 1990-2025, "
+                                "and the C10 rules that lever up after a "
+                                "spike (0.8.5 thirteenth-registration work, "
+                                "sim/r16-spike)",
+    },
+    "fair_value_relative_half_life": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 63.0},
+        "what_would_determine_it": "set with `fair_value_relative_knee`, "
+                                   "whose entry gives the target; pt-v21 "
+                                   "ships 63, chosen in the project's screens "
+                                   "against the registered rows and graded "
+                                   "with pt-v21's whole vector (grade 18 and "
+                                   "the by-name certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, "
+                  "`ModelParams::fair_value_relative_half_life`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "unread while `fair_value_relative_knee` is "
+                                "0.0; with the knee set it is the pull's "
+                                "half-life in sessions and must be positive "
+                                "(0.8.5 fourteenth-registration work, "
+                                "sim/r17-floor)",
+    },
+    "fair_value_relative_knee": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 4.0},
+        "what_would_determine_it": "pt-v21 ships 4. Target: H1-100y's floor "
+                                   "clause (0 floor share per decade; the "
+                                   "thirteenth grade had one name at the "
+                                   "floor for 277 sessions in decade 60-70), "
+                                   "with no crossing on a 21-year history so "
+                                   "no other row moves (0.8.5 "
+                                   "fourteenth-registration work, "
+                                   "sim/r17-floor). The value was chosen in "
+                                   "the project's screens against the "
+                                   "registered rows and graded with pt-v21's "
+                                   "whole vector (grade 18 and the by-name "
+                                   "certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, "
+                  "`ModelParams::fair_value_relative_knee`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: the close branches "
+                                "on `== 0.0` and pulls nothing. Off zero, a "
+                                "name whose fair-value level `v` sits more "
+                                "than this many log units below the roster's "
+                                "equal-weighted mean is pulled back toward "
+                                "the knee at `fair_value_relative_half_life`, "
+                                "so a name cannot walk to the 0.01 price "
+                                "floor over a century and sit there. Target: "
+                                "H1-100y's floor clause (0 floor share per "
+                                "decade; the thirteenth grade had one name at "
+                                "the floor for 277 sessions in decade 60-70), "
+                                "with no crossing on a 21-year history so no "
+                                "other row moves (0.8.5 "
+                                "fourteenth-registration work, sim/r17-floor)",
+    },
+    "fair_value_vix_release_half_life": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 504.0},
+        "what_would_determine_it": "pt-v21 ships 504. Target: the discount's "
+                                   "give-back after a VIX spike, +2.5/+3.8 "
+                                   "per cent at 63/126 sessions on the r15 "
+                                   "screen's R15F (desk decomposition) "
+                                   "against the S&P 500's whole excess of "
+                                   "-0.5/+2.75 after the same events "
+                                   "1990-2025, and the audit's xfb lever rule "
+                                   "(0.8.5 thirteenth-registration work, "
+                                   "sim/r16-spike). The value was chosen in "
+                                   "the project's screens against the "
+                                   "registered rows and graded with pt-v21's "
+                                   "whole vector (grade 18 and the by-name "
+                                   "certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, "
+                  "`ModelParams::fair_value_vix_release_half_life`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: the close branches "
+                                "on `== 0.0` and pulls the volatility "
+                                "feedback's exposure at "
+                                "`fair_value_vix_half_life` both ways, as it "
+                                "stood. Off zero, a fall toward a lower "
+                                "target is pulled at this half-life, so the "
+                                "discount outlasts the VIX's own fall. "
+                                "Target: the discount's give-back after a VIX "
+                                "spike, +2.5/+3.8 per cent at 63/126 sessions "
+                                "on the r15 screen's R15F (desk "
+                                "decomposition) against the S&P 500's whole "
+                                "excess of -0.5/+2.75 after the same events "
+                                "1990-2025, and the audit's xfb lever rule "
+                                "(0.8.5 thirteenth-registration work, "
+                                "sim/r16-spike)",
+    },
+    "fed_drawdown_hold": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 0.12},
+        "what_would_determine_it": "pt-v21 ships 0.12. Target: F-bear, as "
+                                   "0.43 to 0.47 of R19V's held-out 20 per "
+                                   "cent bears saw a rise between peak and "
+                                   "trough (0.8.5 fifteenth-round work, "
+                                   "sim/r20-fedbear). The value was chosen in "
+                                   "the project's screens against the "
+                                   "registered rows and graded with pt-v21's "
+                                   "whole vector (grade 18 and the by-name "
+                                   "certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, `ModelParams::fed_drawdown_hold`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: only the stress "
+                                "hold's VIX clock holds a rise. Off zero a "
+                                "meeting also holds any rise, and the put "
+                                "gives nothing back, while credit's leverage "
+                                "gap (the index's log fall below its slow "
+                                "average) is at or over the dial, with "
+                                "inflation under target plus "
+                                "`fed_stress_inflation_gap`. Target: F-bear, "
+                                "as 0.43 to 0.47 of R19V's held-out 20 per "
+                                "cent bears saw a rise between peak and "
+                                "trough (0.8.5 fifteenth-round work, "
+                                "sim/r20-fedbear)",
+    },
+    "fed_growth_cut": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 2.0},
+        "what_would_determine_it": "pt-v21 ships 2. Off zero the bank cuts 25 "
+                                   "bp when true growth is under the dial "
+                                   "(0.8.5, r13 macro-clock audit: the first "
+                                   "cut came a median 105 sessions after a "
+                                   "contraction began, at the trough). The "
+                                   "value was chosen in the project's screens "
+                                   "against the registered rows and graded "
+                                   "with pt-v21's whole vector (grade 18 and "
+                                   "the by-name certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, `ModelParams::fed_growth_cut`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: the risk-management "
+                                "branch of `update_central_bank_with` is "
+                                "guarded on the dial being non-zero, so the "
+                                "ladder is the one that stood. Off zero the "
+                                "bank cuts 25 bp when true growth is under "
+                                "the dial (0.8.5, r13 macro-clock audit: the "
+                                "first cut came a median 105 sessions after a "
+                                "contraction began, at the trough)",
+    },
+    "fed_put_carry": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 1.0},
+        "what_would_determine_it": "pt-v21 ships 1. Target: F-bear, whose "
+                                   "median policy change from peak to trough "
+                                   "sat on the -0.50 atom on R19V's held-out "
+                                   "histories (0.8.5 fifteenth-round work, "
+                                   "sim/r20-fedbear). The value was chosen in "
+                                   "the project's screens against the "
+                                   "registered rows and graded with pt-v21's "
+                                   "whole vector (grade 18 and the by-name "
+                                   "certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, `ModelParams::fed_put_carry`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: the meeting "
+                                "restarts the Fed put's clock at zero, and it "
+                                "is read only with `fed_put_gain` set. Off "
+                                "zero the clock restarts at that share of the "
+                                "intermeeting fall the meeting's cut did not "
+                                "answer, so a bear that falls under the put's "
+                                "quarter-point rounding between each pair of "
+                                "meetings is still answered. Target: F-bear, "
+                                "whose median policy change from peak to "
+                                "trough sat on the -0.50 atom on R19V's "
+                                "held-out histories (0.8.5 fifteenth-round "
+                                "work, sim/r20-fedbear)",
+    },
+    "fed_put_emergency_vix": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 50.0},
+        "what_would_determine_it": "set with `fed_put_gain`, whose entry "
+                                   "gives the target; pt-v21 ships 50, chosen "
+                                   "in the project's screens against the "
+                                   "registered rows and graded with pt-v21's "
+                                   "whole vector (grade 18 and the by-name "
+                                   "certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, `ModelParams::fed_put_emergency_vix`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "unread while `fed_put_gain` is 0.0 (0.8.5 "
+                                "realism work, bond-hedge-fed)",
+    },
+    "fed_put_gain": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 3.0},
+        "what_would_determine_it": "pt-v21 ships 3. Target: the policy rate's "
+                                   "change over the 63 sessions after a VIX "
+                                   "close at or above 30 (rate at least 0.5, "
+                                   "CPI inflation under 4), -0.41pp on the "
+                                   "S&P 500 and VIX tape with FRED DFF "
+                                   "1990-2025 (calendar-year bootstrap SE "
+                                   "0.14), against pt-v20's -0.03 on held-out "
+                                   "seeds; no FOMC target change at a VIX of "
+                                   "30 or more with CPI inflation under 4 was "
+                                   "a hike (0 of 9, FRED DFEDTAR and "
+                                   "DFEDTARU; 0 of 14 at any inflation) "
+                                   "against 52 per cent on pt-v20 on the same "
+                                   "filter (0.8.5 realism work, "
+                                   "bond-hedge-fed). The value was chosen in "
+                                   "the project's screens against the "
+                                   "registered rows and graded with pt-v21's "
+                                   "whole vector (grade 18 and the by-name "
+                                   "certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, `ModelParams::fed_put_gain`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: the close writes no "
+                                "intermeeting return, the ladder decides "
+                                "every meeting and the curve reads the policy "
+                                "rate as it stands. Off zero the bank cuts at "
+                                "a meeting by the gain times the index's log "
+                                "fall since the last one (inflation under 4), "
+                                "holds any hike at a VIX of 30 or more, and "
+                                "gives the cut back at calm meetings as the "
+                                "put's stock decays. Target: the policy "
+                                "rate's change over the 63 sessions after a "
+                                "VIX close at or above 30 (rate at least 0.5, "
+                                "CPI inflation under 4), -0.41pp on the S&P "
+                                "500 and VIX tape with FRED DFF 1990-2025 "
+                                "(calendar-year bootstrap SE 0.14), against "
+                                "pt-v20's -0.03 on held-out seeds; no FOMC "
+                                "target change at a VIX of 30 or more with "
+                                "CPI inflation under 4 was a hike (0 of 9, "
+                                "FRED DFEDTAR and DFEDTARU; 0 of 14 at any "
+                                "inflation) against 52 per cent on pt-v20 on "
+                                "the same filter (0.8.5 realism work, "
+                                "bond-hedge-fed)",
+    },
+    "fed_put_half_life": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 126.0},
+        "what_would_determine_it": "set with `fed_put_gain`, whose entry "
+                                   "gives the target; pt-v21 ships 126, "
+                                   "chosen in the project's screens against "
+                                   "the registered rows and graded with "
+                                   "pt-v21's whole vector (grade 18 and the "
+                                   "by-name certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, `ModelParams::fed_put_half_life`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "unread while `fed_put_gain` is 0.0 (0.8.5 "
+                                "realism work, bond-hedge-fed)",
+    },
+    "fed_stress_cut": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 0.1},
+        "what_would_determine_it": "pt-v21 ships 0.1. Off zero a meeting "
+                                   "after a VIX at or over `fed_stress_vix` "
+                                   "cuts (0.8.5, r13 audit: P(cut within 42 "
+                                   "sessions | VIX 30-40) 0.29 with P(hike) "
+                                   "0.25, against 0.53 and 0.01 on FRED's "
+                                   "target rate 1990-2025). The value was "
+                                   "chosen in the project's screens against "
+                                   "the registered rows and graded with "
+                                   "pt-v21's whole vector (grade 18 and the "
+                                   "by-name certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, `ModelParams::fed_stress_cut`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: "
+                                "`update_central_bank_with` skips the stress "
+                                "branch and `Engine::advance_day_with` never "
+                                "updates the stress level, which is neither "
+                                "snapshotted nor hashed. Off zero a meeting "
+                                "after a VIX at or over `fed_stress_vix` cuts "
+                                "(0.8.5, r13 audit: P(cut within 42 sessions "
+                                "| VIX 30-40) 0.29 with P(hike) 0.25, against "
+                                "0.53 and 0.01 on FRED's target rate "
+                                "1990-2025)",
+    },
+    "fed_stress_hold": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 42.0},
+        "what_would_determine_it": "pt-v21 ships 42. Target: P(a hike within "
+                                   "42 sessions | VIX 30+) 0.07 on FRED "
+                                   "DFEDTAR/DFEDTARU against VIXCLS 1990-2025 "
+                                   "(about 0.01 with CPI under 4), against "
+                                   "0.19 on r14's N4 arm (sim/r15-postcut). "
+                                   "The value was chosen in the project's "
+                                   "screens against the registered rows and "
+                                   "graded with pt-v21's whole vector (grade "
+                                   "18 and the by-name certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, `ModelParams::fed_stress_hold`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: the bank may raise "
+                                "the rate at any meeting the ladder asks. Off "
+                                "zero no rise, and no put give-back, for that "
+                                "many sessions after a close with the "
+                                "published VIX at or over `fed_stress_vix`, "
+                                "while inflation is under target plus "
+                                "`fed_stress_inflation_gap`. Target: P(a hike "
+                                "within 42 sessions | VIX 30+) 0.07 on FRED "
+                                "DFEDTAR/DFEDTARU against VIXCLS 1990-2025 "
+                                "(about 0.01 with CPI under 4), against 0.19 "
+                                "on r14's N4 arm (sim/r15-postcut)",
+    },
+    "fed_stress_inflation_gap": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 2.0},
+        "what_would_determine_it": "set with `fed_stress_cut`, whose entry "
+                                   "gives the target; pt-v21 ships 2, chosen "
+                                   "in the project's screens against the "
+                                   "registered rows and graded with pt-v21's "
+                                   "whole vector (grade 18 and the by-name "
+                                   "certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, "
+                  "`ModelParams::fed_stress_inflation_gap`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert while `fed_stress_cut` is 0.0, as "
+                                "every preset ships it: the stress branch "
+                                "that reads it does not run",
+    },
+    "idio_vol_alpha": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 0.25},
+        "what_would_determine_it": "pt-v21 ships 0.25, chosen in the "
+                                   "project's screens against the registered "
+                                   "rows and graded with pt-v21's whole "
+                                   "vector (grade 18 and the by-name "
+                                   "certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, `ModelParams::idio_vol_alpha`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 with `idio_vol_beta` and "
+                                "`idio_vol_jump_bump` 0.0: "
+                                "`Engine::idio_state_on` is false, no state "
+                                "is read or written, the tick receives an "
+                                "empty ratio slice and the snapshot and state "
+                                "hash omit the state. The reference panel's "
+                                "idiosyncratic |e| lag-1 ACF (0.088) and "
+                                "aftershock (1.29) are the targets a "
+                                "registration would fit it to",
+    },
+    "idio_vol_beta": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 0.5},
+        "what_would_determine_it": "pt-v21 ships 0.5, chosen in the project's "
+                                   "screens against the registered rows and "
+                                   "graded with pt-v21's whole vector (grade "
+                                   "18 and the by-name certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, `ModelParams::idio_vol_beta`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 with `idio_vol_alpha` and "
+                                "`idio_vol_jump_bump` 0.0 (see that entry); "
+                                "off zero with both of those still 0.0 the "
+                                "state runs but the ratio stays at exactly "
+                                "one, so nothing moves. With "
+                                "`idio_vol_jump_bump` on, beta carries each "
+                                "jump's bump into later sessions",
+    },
+    "idio_vol_jump_bump": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 1.0},
+        "what_would_determine_it": "pt-v21 ships 1, chosen in the project's "
+                                   "screens against the registered rows and "
+                                   "graded with pt-v21's whole vector (grade "
+                                   "18 and the by-name certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, `ModelParams::idio_vol_jump_bump`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 with `idio_vol_alpha` and "
+                                "`idio_vol_beta` 0.0 (see that entry); off "
+                                "zero it moves the ratio the session after an "
+                                "own jump, re-centred on the jump rate so the "
+                                "ratio's mean stays one",
+    },
+    "impact_memory_coefficient": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 0.65},
+        "what_would_determine_it": "pt-v21 ships 0.65, chosen in the "
+                                   "project's screens against the registered "
+                                   "rows and graded with pt-v21's whole "
+                                   "vector (grade 18 and the by-name "
+                                   "certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, "
+                  "`ModelParams::impact_memory_coefficient`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: "
+                                "`Engine::plan_memory` is never called and "
+                                "the latent depth is not shifted, so an "
+                                "agent's temporary impact stays off the tape "
+                                "and only `fill_impact_coefficient`'s linear "
+                                "gamma reaches `s`. The square-root law of "
+                                "impact on the tape, fitted on held-out seeds "
+                                "against the metaorder rows Q1-Q9 "
+                                "(`tools/calibration/metaorder_curve.py`; "
+                                "0.8.5 realism work, sqrt-impact); for a new "
+                                "registration. After the house-flow fix, "
+                                "confirmed on seeds 2401-2430 x 12 names (box "
+                                "sqfix2): 0.65 with half-life 12, slow "
+                                "half-life 780, slow weight 0.1, crossover "
+                                "0.001 and fill_impact_coefficient 0.15, "
+                                "where Q1-Q7 pass, a day TWAP costs 0.82 of a "
+                                "block at 10% and 0.83 at 3% (Q8, Q9 read 0.8 "
+                                "as their ceiling), C9 is unchanged and no "
+                                "round trip, wash included, pays",
+    },
+    "impact_memory_crossover": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 0.001},
+        "what_would_determine_it": "set with `impact_memory_coefficient`, "
+                                   "whose entry gives the target; pt-v21 "
+                                   "ships 0.001, chosen in the project's "
+                                   "screens against the registered rows and "
+                                   "graded with pt-v21's whole vector (grade "
+                                   "18 and the by-name certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, "
+                  "`ModelParams::impact_memory_crossover`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "unread while `impact_memory_coefficient` is "
+                                "0.0 as shipped, so inert: the linear regime "
+                                "below m* of daily volume (Bucci, Benzaquen, "
+                                "Lillo and Bouchaud, PRL 122, 108302, 2019)",
+    },
+    "impact_memory_half_life": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 12.0},
+        "what_would_determine_it": "set with `impact_memory_coefficient`, "
+                                   "whose entry gives the target; pt-v21 "
+                                   "ships 12, chosen in the project's screens "
+                                   "against the registered rows and graded "
+                                   "with pt-v21's whole vector (grade 18 and "
+                                   "the by-name certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, "
+                  "`ModelParams::impact_memory_half_life`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "unread while `impact_memory_coefficient` is "
+                                "0.0 as shipped, so inert: the memory's fast "
+                                "half-life in open ticks",
+    },
+    "impact_memory_refill": {
+        "kind": "derived",
+        "presets": {"pt-v21": 1.0},
+        "identity": "a switch whose identity is the value: a resting order "
+                    "filled against the metaorder memory's lean is new depth "
+                    "on the side the lean consumed and takes its size off the "
+                    "memory, never past zero (Obizhaeva and Wang 2013; "
+                    "Alfonsi, Fruth and Schied 2010)",
+        "terms": {"1.0": "on, as pt-v21 ships it"},
+        "source": "rust/src/params.rs, `ModelParams::impact_memory_refill`; "
+                  "graded with pt-v21's vector in "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: "
+                                "`Engine::refill_memory` is never called, so "
+                                "only taker flow against the house moves the "
+                                "metaorder memory, and it is unread while "
+                                "`impact_memory_coefficient` is 0.0. Read "
+                                "only when an agent's RESTING order fills "
+                                "against the memory's lean (by the market's "
+                                "flow, or crossed during the session): at 1.0 "
+                                "it takes its size off the memory, never past "
+                                "zero, as new depth on the side the lean "
+                                "consumed (Obizhaeva and Wang 2013; Alfonsi, "
+                                "Fruth and Schied 2010). Target: row G-rt's "
+                                "wash on names quoted a cent wide, +0.51 bp "
+                                "on the thirteenth grade (R16A, trip seed "
+                                "15532, name 19) and up to +18 bp on held-out "
+                                "trip seeds (0.8.5 fourteenth-round work, "
+                                "sim/r17-wash)",
+    },
+    "impact_memory_slow_half_life": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 780.0},
+        "what_would_determine_it": "set with `impact_memory_coefficient`, "
+                                   "whose entry gives the target; pt-v21 "
+                                   "ships 780, chosen in the project's "
+                                   "screens against the registered rows and "
+                                   "graded with pt-v21's whole vector (grade "
+                                   "18 and the by-name certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, "
+                  "`ModelParams::impact_memory_slow_half_life`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "unread while `impact_memory_coefficient` is "
+                                "0.0 as shipped, so inert: the memory's slow "
+                                "half-life in open ticks, 0.0 none",
+    },
+    "impact_memory_slow_weight": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 0.1},
+        "what_would_determine_it": "set with `impact_memory_coefficient`, "
+                                   "whose entry gives the target; pt-v21 "
+                                   "ships 0.1, chosen in the project's "
+                                   "screens against the registered rows and "
+                                   "graded with pt-v21's whole vector (grade "
+                                   "18 and the by-name certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, "
+                  "`ModelParams::impact_memory_slow_weight`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "unread while `impact_memory_coefficient` is "
+                                "0.0 as shipped, so inert, and refused off "
+                                "zero without `impact_memory_slow_half_life`: "
+                                "the slow part's weight",
+    },
+    "macro_pins_hold": {
+        "kind": "derived",
+        "presets": {"pt-v21": 1.0},
+        "identity": "a switch whose identity is the value: a field a caller "
+                    "pins holds at its pinned value through that night's "
+                    "close, so a held field is never moved by the close's own "
+                    "step and written back the next morning",
+        "terms": {"1.0": "on, as pt-v21 ships it"},
+        "source": "rust/src/params.rs, `ModelParams::macro_pins_hold`; graded "
+                  "with pt-v21's vector in "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: "
+                                "`Engine::mark_macro_pins_today` keeps no "
+                                "mark beyond the VIX and corporate ones "
+                                "`corporate_yield_daily` reads, so "
+                                "`advance_day_with` clones nothing and "
+                                "restores nothing, `PolicyOptions::hold_rate` "
+                                "is false and `YieldDials` pins neither "
+                                "treasury. Read only on a session a caller "
+                                "pinned a macro field (0.8.5, r13 "
+                                "scenario-frontrun: a held contraction "
+                                "flipped to trough at the close 2-3 times a "
+                                "seed under recession.yml, and a permanent "
+                                "10-year moved 0.66-1.03 pp close to close)",
+    },
+    "market_beta_normalise": {
+        "kind": "derived",
+        "presets": {"pt-v21": 1.0},
+        "identity": "1.0 is the identity: the roster's cap-weighted beta is "
+                    "one, as a real index's constituents' betas measured "
+                    "against it average one by definition, so the market "
+                    "factor is the systematic part of the roster's own index",
+        "terms": {"1.0": "on, as pt-v21 ships it"},
+        "source": "rust/src/params.rs, `ModelParams::market_beta_normalise`; "
+                  "graded with pt-v21's vector in "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: "
+                                "`Engine::with_params_from_opening` branches "
+                                "on `== 0.0` before any sum, so every name "
+                                "keeps the instrument's beta bit for bit. Off "
+                                "zero each public name's beta is divided by "
+                                "B^d at construction, B the roster's "
+                                "cap-weighted beta at the opening caps, so at "
+                                "1.0 the market factor is the systematic part "
+                                "of the roster's own index. Target: the "
+                                "certification's tail row, "
+                                "index_tail_dn3_pct, 0.62 and 0.67 on R17A "
+                                "over 360 held-out varying-roster seeds per "
+                                "set against [0.64, 2.34], while roster 111 "
+                                "(cap-weighted beta 1.06, a random roster's "
+                                "median 0.97) reads the tape's -3 per cent "
+                                "rate on the long run (0.8.5 "
+                                "fourteenth-registration work, sim/r17-tails)",
+    },
+    "market_prehistory_sessions": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 504.0},
+        "what_would_determine_it": "pt-v21 ships 504. Target: PH5's "
+                                   "volatility clause, whose year 0 read "
+                                   "about 0.004 hotter than years 1-7 over "
+                                   "1350 held-out histories because a run "
+                                   "opening in an expansion started at the "
+                                   "phase-free baseline (0.8.5 "
+                                   "fourteenth-registration work, "
+                                   "sim/r18-opening). The value was chosen in "
+                                   "the project's screens against the "
+                                   "registered rows and graded with pt-v21's "
+                                   "whole vector (grade 18 and the by-name "
+                                   "certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, "
+                  "`ModelParams::market_prehistory_sessions`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: the constructor "
+                                "branches on `> 0.0`, so no copy is made or "
+                                "run and every volatility state opens at the "
+                                "constructor's baseline, as it stood. Off "
+                                "zero, a copy of the opening engine lives the "
+                                "last this many sessions of the macro burn-in "
+                                "on the economy's recorded phases, on "
+                                "generators of its own, and the run opens "
+                                "with the copy's volatility state (factor "
+                                "variance and its return memory, the VIX and "
+                                "its slow level, the anchor's and stress "
+                                "premium's memories, the cycle's volatility "
+                                "multiplier, each sector's and name's "
+                                "variance). Target: PH5's volatility clause, "
+                                "whose year 0 read about 0.004 hotter than "
+                                "years 1-7 over 1350 held-out histories "
+                                "because a run opening in an expansion "
+                                "started at the phase-free baseline (0.8.5 "
+                                "fourteenth-registration work, "
+                                "sim/r18-opening)",
+    },
+    "market_prehistory_valuation": {
+        "kind": "derived",
+        "presets": {"pt-v21": 1.0},
+        "identity": "a switch whose identity is the value: the run opens with "
+                    "the valuation state the market's prehistory left, beside "
+                    "its volatility state, booked into the fair-value levels "
+                    "so no opening price moves",
+        "terms": {"1.0": "on, as pt-v21 ships it"},
+        "source": "rust/src/params.rs, "
+                  "`ModelParams::market_prehistory_valuation`; graded with "
+                  "pt-v21's vector in "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: the constructor "
+                                "branches on `!= 0.0`, so nothing but the "
+                                "volatility state is carried from the "
+                                "market's prehistory and every valuation "
+                                "state opens as it stood. Off zero (a switch, "
+                                "and only with `market_prehistory_sessions` "
+                                "set) the run opens with the copy's "
+                                "mispricing per name, VIX feedback exposure, "
+                                "anticipation drift, earnings cycle, credit's "
+                                "leverage gap and the Fed put's owed cut, "
+                                "with the corporate yield and the curve moved "
+                                "by what the gap and the owed cut change, all "
+                                "booked into the names' fair-value levels by "
+                                "the opening's split so no opening price "
+                                "moves. Target: PH5's return clause, whose "
+                                "year 0 read 1.95 points below year 1 over "
+                                "1350 held-out histories because those states "
+                                "opened where a market that never traded "
+                                "leaves them (0.8.5 fourteenth-registration "
+                                "work, sim/r18-valopen)",
+    },
+    "market_vol_cycle_cap_relative": {
+        "kind": "derived",
+        "presets": {"pt-v21": 1.0},
+        "identity": "1.0 is the identity: at 1 the fair-value cap's ceiling "
+                    "scales with the cycle multiplier, so only volatility "
+                    "above the phase's own normal counts as turbulence",
+        "terms": {"1.0": "on, as pt-v21 ships it"},
+        "source": "rust/src/params.rs, "
+                  "`ModelParams::market_vol_cycle_cap_relative`; graded with "
+                  "pt-v21's vector in "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "unread while `market_vol_cycle_ratio` is 0.0",
+    },
+    "market_vol_cycle_expansion": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 0.82},
+        "what_would_determine_it": "set with `market_vol_cycle_ratio`, whose "
+                                   "entry gives the target; pt-v21 ships "
+                                   "0.82, chosen in the project's screens "
+                                   "against the registered rows and graded "
+                                   "with pt-v21's whole vector (grade 18 and "
+                                   "the by-name certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, "
+                  "`ModelParams::market_vol_cycle_expansion`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "unread while `market_vol_cycle_ratio` is 0.0",
+    },
+    "market_vol_cycle_half_life": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 10.0},
+        "what_would_determine_it": "set with `market_vol_cycle_ratio`, whose "
+                                   "entry gives the target; pt-v21 ships 10, "
+                                   "chosen in the project's screens against "
+                                   "the registered rows and graded with "
+                                   "pt-v21's whole vector (grade 18 and the "
+                                   "by-name certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, "
+                  "`ModelParams::market_vol_cycle_half_life`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "unread while `market_vol_cycle_ratio` is 0.0",
+    },
+    "market_vol_cycle_pin_neutral": {
+        "kind": "derived",
+        "presets": {"pt-v21": 1.0},
+        "identity": "a switch whose identity is the value: a session whose "
+                    "VIX a caller pinned already carries the regime the pin "
+                    "states, so the cycle multiplier is not applied on top of "
+                    "it",
+        "terms": {"1.0": "on, as pt-v21 ships it"},
+        "source": "rust/src/params.rs, "
+                  "`ModelParams::market_vol_cycle_pin_neutral`; graded with "
+                  "pt-v21's vector in "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "unread while `market_vol_cycle_ratio` is 0.0",
+    },
+    "market_vol_cycle_pin_phase": {
+        "kind": "derived",
+        "presets": {"pt-v21": 1.0},
+        "identity": "a switch whose identity is the value: a session whose "
+                    "cycle phase a caller pinned brings its own transmission, "
+                    "so the cycle multiplier is not applied on top of it",
+        "terms": {"1.0": "on, as pt-v21 ships it"},
+        "source": "rust/src/params.rs, "
+                  "`ModelParams::market_vol_cycle_pin_phase`; graded with "
+                  "pt-v21's vector in "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "unread while `market_vol_cycle_ratio` is 0.0",
+    },
+    "market_vol_cycle_ratio": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 2.4705882352941178},
+        "what_would_determine_it": "pt-v21 ships 2.47059, chosen in the "
+                                   "project's screens against the registered "
+                                   "rows and graded with pt-v21's whole "
+                                   "vector (grade 18 and the by-name "
+                                   "certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, `ModelParams::market_vol_cycle_ratio`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: "
+                                "`Engine::close_market` branches on `== 0.0` "
+                                "before the cycle multiplier, which is never "
+                                "stepped, and the snapshot and state hash "
+                                "omit it. The business cycle in the market "
+                                "factor's volatility (0.8.5 realism work, "
+                                "bear-dynamics design: index volatility in a "
+                                "true contraction over the rest reads 1.27 on "
+                                "held-out pt-v20 histories against the S&P "
+                                "500's 1.66 to 2.24 by NBER recession month)",
+    },
+    "market_vol_cycle_recovery_release": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 0.45},
+        "what_would_determine_it": "pt-v21 ships 0.45. Target: VC4f (ACF1 of "
+                                   "log monthly realised vol) without C10c's "
+                                   "published contraction-and-trough lever "
+                                   "(0.8.5 fifteenth-round work, "
+                                   "sim/r20-mktrelease). The value was chosen "
+                                   "in the project's screens against the "
+                                   "registered rows and graded with pt-v21's "
+                                   "whole vector (grade 18 and the by-name "
+                                   "certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, "
+                  "`ModelParams::market_vol_cycle_recovery_release`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped, and unread while "
+                                "`market_vol_cycle_ratio` is 0.0: a "
+                                "contraction and a trough keep their "
+                                "multiplier. Off zero the index's rally off "
+                                "its low over the last 252 sessions gives "
+                                "back that share of the excess, so the storm "
+                                "eases as the market climbs and not on the "
+                                "cycle's phase, which a rule reading the "
+                                "published phase can time. Target: VC4f (ACF1 "
+                                "of log monthly realised vol) without C10c's "
+                                "published contraction-and-trough lever "
+                                "(0.8.5 fifteenth-round work, "
+                                "sim/r20-mktrelease)",
+    },
+    "market_vol_cycle_recovery_scale": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 0.1},
+        "what_would_determine_it": "set with "
+                                   "`market_vol_cycle_recovery_release`, "
+                                   "whose entry gives the target; pt-v21 "
+                                   "ships 0.1, chosen in the project's "
+                                   "screens against the registered rows and "
+                                   "graded with pt-v21's whole vector (grade "
+                                   "18 and the by-name certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, "
+                  "`ModelParams::market_vol_cycle_recovery_scale`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "unread while "
+                                "`market_vol_cycle_recovery_release` is 0.0",
+    },
+    "market_vol_cycle_relative": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 0.75},
+        "what_would_determine_it": "set with `market_vol_cycle_ratio`, whose "
+                                   "entry gives the target; pt-v21 ships "
+                                   "0.75, chosen in the project's screens "
+                                   "against the registered rows and graded "
+                                   "with pt-v21's whole vector (grade 18 and "
+                                   "the by-name certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, "
+                  "`ModelParams::market_vol_cycle_relative`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "unread while `market_vol_cycle_ratio` is 0.0",
+    },
+    "market_vol_leverage": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 2.5},
+        "what_would_determine_it": "pt-v21 ships 2.5, chosen in the project's "
+                                   "screens against the registered rows and "
+                                   "graded with pt-v21's whole vector (grade "
+                                   "18 and the by-name certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, `ModelParams::market_vol_leverage`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: "
+                                "`MarketVarianceState::close_day_scaled` "
+                                "branches on `!= 0.0` before its "
+                                "return-memory path, the memory is never "
+                                "written, and the snapshot and state hash "
+                                "omit it. A return memory on the market "
+                                "factor's variance (0.8.5 realism work, "
+                                "crash-vol-state design, stage 2)",
+    },
+    "market_vol_leverage_half_life": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 15.0},
+        "what_would_determine_it": "set with `market_vol_leverage`, whose "
+                                   "entry gives the target; pt-v21 ships 15, "
+                                   "chosen in the project's screens against "
+                                   "the registered rows and graded with "
+                                   "pt-v21's whole vector (grade 18 and the "
+                                   "by-name certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, "
+                  "`ModelParams::market_vol_leverage_half_life`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "unread while `market_vol_leverage` is 0.0",
+    },
+    "market_vol_leverage_standardise": {
+        "kind": "derived",
+        "presets": {"pt-v21": 1.0},
+        "identity": "1.0 is the identity: the return memory counts a day in "
+                    "its own z-score, so the multiplier's mean is one in a "
+                    "storm as in a calm and a fall raises the next session's "
+                    "variance by its surprise, not its size (docs/MODEL.md)",
+        "terms": {"1.0": "on, as pt-v21 ships it"},
+        "source": "rust/src/params.rs, "
+                  "`ModelParams::market_vol_leverage_standardise`; graded "
+                  "with pt-v21's vector in "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "unread while `market_vol_leverage` is 0.0; "
+                                "at 0.0 the return memory counts a day in the "
+                                "baseline sd, the form that stood (0.8.5 "
+                                "thirteenth-registration work, "
+                                "sim/r15-volstate)",
+    },
+    "market_vol_slow_gamma": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 0.05},
+        "what_would_determine_it": "pt-v21 ships 0.05, chosen in the "
+                                   "project's screens against the registered "
+                                   "rows and graded with pt-v21's whole "
+                                   "vector (grade 18 and the by-name "
+                                   "certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, `ModelParams::market_vol_slow_gamma`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: "
+                                "`market::factor_vol::slow_step` branches on "
+                                "`== 0.0` and makes the symmetric call the "
+                                "close always made. GJR asymmetry on the slow "
+                                "variance component, persistence kept (0.8.5 "
+                                "realism work, crash-vol-state design: the "
+                                "index leverage sum reads -0.53 against the "
+                                "tape's -1.35 on held-out pt-v20 histories)",
+    },
+    "market_vol_vix_smooth": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 3.0},
+        "what_would_determine_it": "pt-v21 ships 3, chosen in the project's "
+                                   "screens against the registered rows and "
+                                   "graded with pt-v21's whole vector (grade "
+                                   "18 and the by-name certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, `ModelParams::market_vol_vix_smooth`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0: market/factor_vol.rs:536 "
+                                "branches on `== 0.0` and reads the raw print",
+    },
+    "oil_inflation_passthrough": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 1.0},
+        "what_would_determine_it": "pt-v21 ships 1, chosen in the project's "
+                                   "screens against the registered rows and "
+                                   "graded with pt-v21's whole vector (grade "
+                                   "18 and the by-name certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, "
+                  "`ModelParams::oil_inflation_passthrough`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0: `update_economy_daily` in "
+                                "economy/daily.rs branches on `!= 0.0` and "
+                                "otherwise takes the shipped three-way "
+                                "branch; at 0.0 it is also left out of the "
+                                "model's digest",
+    },
+    "oil_inventory_reversion": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 0.002},
+        "what_would_determine_it": "pt-v21 ships 0.002, chosen in the "
+                                   "project's screens against the registered "
+                                   "rows and graded with pt-v21's whole "
+                                   "vector (grade 18 and the by-name "
+                                   "certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, "
+                  "`ModelParams::oil_inventory_reversion`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0: `update_economy_daily` in "
+                                "economy/daily.rs branches on `== 0.0` and "
+                                "integrates inventory as the shipped step "
+                                "does; at 0.0 it is also left out of the "
+                                "model's digest",
+    },
+    "order_flow_depth_law": {
+        "kind": "derived",
+        "presets": {"pt-v21": 1.0},
+        "identity": "a switch whose identity is the value: injected flow "
+                    "divides by a name's depth once: Cont, Kukanov and "
+                    "Stoikov (2014) find price change linear in order-flow "
+                    "imbalance over depth, so at equal participation the move "
+                    "does not depend on depth",
+        "terms": {"1.0": "on, as pt-v21 ships it"},
+        "source": "rust/src/params.rs, `ModelParams::order_flow_depth_law`; "
+                  "graded with pt-v21's vector in "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0: `calculate_live_factors` in "
+                                "market/factors.rs branches on `== 0.0` and "
+                                "divides by depth twice, as the shipped law "
+                                "does; at 0.0 it is also left out of the "
+                                "model's digest",
+    },
+    "order_flow_impact_law": {
+        "kind": "derived",
+        "presets": {"pt-v21": 1.0},
+        "identity": "a switch whose identity is the value: the impact "
+                    "multiplier is linear in a tick's participation up to a "
+                    "knee at ten times the name's minute volume and a square "
+                    "root above it, in place of the clamped linear law",
+        "terms": {"1.0": "on, as pt-v21 ships it"},
+        "source": "rust/src/params.rs, `ModelParams::order_flow_impact_law`; "
+                  "graded with pt-v21's vector in "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0: `order_imbalance_with` in "
+                                "market/factors.rs branches on `== 0.0` and "
+                                "takes the shipped law",
+    },
+    "overnight_idio_df": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 4.0},
+        "what_would_determine_it": "pt-v21 ships 4, chosen in the project's "
+                                   "screens against the registered rows and "
+                                   "graded with pt-v21's whole vector (grade "
+                                   "18 and the by-name certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, `ModelParams::overnight_idio_df`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "unread while neither night share is set: the "
+                                "chi-square draws (`Site::OvernightIdioChi2`) "
+                                "are taken only under a split with this dial "
+                                "off zero, and 0.0 is a normal night",
+    },
+    "overnight_idio_share": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 0.1},
+        "what_would_determine_it": "pt-v21 ships 0.1, chosen in the project's "
+                                   "screens against the registered rows and "
+                                   "graded with pt-v21's whole vector (grade "
+                                   "18 and the by-name certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, `ModelParams::overnight_idio_share`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: the same gate as "
+                                "`overnight_market_share`, and `market::tick` "
+                                "branches on `== 0.0` for the session's "
+                                "sector and own draws. The real forty's "
+                                "median idiosyncratic night share is 0.31 "
+                                "(0.8.5, earnings-gaps)",
+    },
+    "overnight_market_share": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 0.55},
+        "what_would_determine_it": "pt-v21 ships 0.55, chosen in the "
+                                   "project's screens against the registered "
+                                   "rows and graded with pt-v21's whole "
+                                   "vector (grade 18 and the by-name "
+                                   "certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, `ModelParams::overnight_market_share`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: "
+                                "`Engine::night_split_on` is false and "
+                                "`apply_overnight` takes the shipped branch, "
+                                "and `market::tick` branches on `== 0.0` and "
+                                "draws the session's market factor at the "
+                                "whole day's scale. Splits the day's market "
+                                "variance between the night and the session "
+                                "rather than adding to it (0.8.5, "
+                                "earnings-gaps: real forty-name index night "
+                                "share 0.461)",
+    },
+    "pinned_vix_calm_knee": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 17.6},
+        "what_would_determine_it": "pt-v21 ships 17.6. Target: the real "
+                                   "median VIX 17.6 (1990-2025). The value "
+                                   "was chosen in the project's screens "
+                                   "against the registered rows and graded "
+                                   "with pt-v21's whole vector (grade 18 and "
+                                   "the by-name certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, `ModelParams::pinned_vix_calm_knee`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: "
+                                "`market::tick::pinned_vix_excess` returns "
+                                "the knee's excess bit for bit. Read only "
+                                "with `pinned_vix_calm_share` and "
+                                "`pinned_vix_feedback` on and a VIX pinned "
+                                "that session (0.8.5, r17 sf1: SF1, a forced "
+                                "VIX priced the day it is published, read "
+                                "0.82 on held-out seeds and 0.33 on the "
+                                "thirteenth grade's, because a x2.5 pin from "
+                                "a VIX under 16 stayed under the knee of 40 "
+                                "and moved no price, 11 of 30 held-out seeds "
+                                "and 15 of 30 on 20201-20230). Target: the "
+                                "real median VIX 17.6 (1990-2025)",
+    },
+    "pinned_vix_calm_share": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 0.2},
+        "what_would_determine_it": "pt-v21 ships 0.2. Target: the S&P 500's "
+                                   "same-day log return on a one-day VIX "
+                                   "spike from under 20, -0.05 per log point "
+                                   "(1990-2025). The value was chosen in the "
+                                   "project's screens against the registered "
+                                   "rows and graded with pt-v21's whole "
+                                   "vector (grade 18 and the by-name "
+                                   "certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, `ModelParams::pinned_vix_calm_share`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: "
+                                "`market::tick::pinned_vix_excess` returns "
+                                "the knee's excess bit for bit. Read only "
+                                "with `pinned_vix_calm_knee` and "
+                                "`pinned_vix_feedback` on and a VIX pinned "
+                                "that session (0.8.5, r17 sf1). Target: the "
+                                "S&P 500's same-day log return on a one-day "
+                                "VIX spike from under 20, -0.05 per log point "
+                                "(1990-2025)",
+    },
+    "pinned_vix_feedback": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 0.8},
+        "what_would_determine_it": "pt-v21 ships 0.8, chosen in the project's "
+                                   "screens against the registered rows and "
+                                   "graded with pt-v21's whole vector (grade "
+                                   "18 and the by-name certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, `ModelParams::pinned_vix_feedback`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: "
+                                "`Engine::price_pinned_vix` returns at once "
+                                "and the close pulls `vix_feedback` on every "
+                                "session. Read only with "
+                                "`fair_value_vix_discount` and "
+                                "`fair_value_vix_half_life` both set and a "
+                                "VIX pinned that session (0.8.5, r13 "
+                                "scenario-frontrun: a VIX held at x3.5 for 25 "
+                                "sessions moved the paired index 0.00 on the "
+                                "morning it was published and -21.7 per cent "
+                                "over the next 24 sessions, which an agent "
+                                "reading the VIX front-ran). A share since "
+                                "r15: 1.0 is the switch as it stood",
+    },
+    "pinned_vix_priced_cap": {
+        "kind": "derived",
+        "presets": {"pt-v21": 1.0},
+        "identity": "a switch whose identity is the value: a held pin prices "
+                    "once: the feedback's exposure is capped at the share of "
+                    "its target the pin prices on the day it lands, so a VIX "
+                    "held at one level does not keep stepping toward its "
+                    "target",
+        "terms": {"1.0": "on, as pt-v21 ships it"},
+        "source": "rust/src/params.rs, `ModelParams::pinned_vix_priced_cap`; "
+                  "graded with pt-v21's vector in "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: "
+                                "`Engine::price_pinned_vix` takes the "
+                                "share-of-the-gap step as it stood. Read only "
+                                "with `pinned_vix_feedback` on and a VIX "
+                                "pinned that session (0.8.5, r17 sf1: at "
+                                "`pinned_vix_feedback` 0.8 a held pin closed "
+                                "the last fifth of the gap over the next four "
+                                "sessions, which capped SF1 near 0.8 and was "
+                                "a fall an agent reading the VIX could sell "
+                                "ahead of)",
+    },
+    "pinned_vix_variance_share": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 0.7},
+        "what_would_determine_it": "pt-v21 ships 0.7, chosen in the project's "
+                                   "screens against the registered rows and "
+                                   "graded with pt-v21's whole vector (grade "
+                                   "18 and the by-name certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, "
+                  "`ModelParams::pinned_vix_variance_share`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: no pin records a "
+                                "priced move, so `Engine::market_sigma_today` "
+                                "is the state's sigma bit for bit. Read only "
+                                "with `pinned_vix_feedback` on and a VIX "
+                                "pinned that session (0.8.5, r15 scenario: "
+                                "with the pinned VIX priced when published, "
+                                "the 2008 replay's worst month read 131.8 "
+                                "against the real 84.3 on seed 201, because "
+                                "the session drew the market factor at its "
+                                "full variance on top of the priced move)",
+    },
+    "policy_anticipation": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 1.8},
+        "what_would_determine_it": "pt-v21 ships 1.8. Target: the index's "
+                                   "drift after a published hike (C10c's "
+                                   "out_federal_funds_rate_up21 levered 2x, "
+                                   "ahead in 0.68 of R16A's 90 exam histories "
+                                   "against 2/3) and the curve around real "
+                                   "hikes (FRED DGS2 +0.46 over the 63 "
+                                   "sessions before, +0.01 on the day, "
+                                   "1990-2025). Measured at 2 on R16A with "
+                                   "the haven at 0.010 (boxes c10c1-c10c3, "
+                                   "held-out sets A and B): that rule ahead "
+                                   "in 0.41 and 0.44 of histories against "
+                                   "0.62 and 0.64, the index's hike-day "
+                                   "excess -0.04 per cent against -1.08 "
+                                   "(0.8.5 thirteenth-registration work, "
+                                   "sim/r17-c10c). The value was chosen in "
+                                   "the project's screens against the "
+                                   "registered rows and graded with pt-v21's "
+                                   "whole vector (grade 18 and the by-name "
+                                   "certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, `ModelParams::policy_anticipation`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: the close branches "
+                                "on `== 0.0` and the curve learns a decision "
+                                "the day it is published. Off zero, each "
+                                "close runs the meeting on the published "
+                                "economy with a silent draw source (no stream "
+                                "is touched) and the curve prices this share "
+                                "of its change, times the share of the "
+                                "meeting interval elapsed, so a decision the "
+                                "market saw coming moves the 10-year, the "
+                                "2-year and the corporate yield before the "
+                                "meeting and not after it. Target: the "
+                                "index's drift after a published hike (C10c's "
+                                "out_federal_funds_rate_up21 levered 2x, "
+                                "ahead in 0.68 of R16A's 90 exam histories "
+                                "against 2/3) and the curve around real hikes "
+                                "(FRED DGS2 +0.46 over the 63 sessions "
+                                "before, +0.01 on the day, 1990-2025). "
+                                "Measured at 2 on R16A with the haven at "
+                                "0.010 (boxes c10c1-c10c3, held-out sets A "
+                                "and B): that rule ahead in 0.41 and 0.44 of "
+                                "histories against 0.62 and 0.64, the index's "
+                                "hike-day excess -0.04 per cent against -1.08 "
+                                "(0.8.5 thirteenth-registration work, "
+                                "sim/r17-c10c)",
+    },
+    "rate_close_remark": {
+        "kind": "derived",
+        "presets": {"pt-v21": 1.0},
+        "identity": "a switch whose identity is the value: the rate indices "
+                    "re-mark to the curve the close publishes at that close, "
+                    "beside the equities' re-mark, so each close's curve is "
+                    "priced the same session",
+        "terms": {"1.0": "on, as pt-v21 ships it"},
+        "source": "rust/src/params.rs, `ModelParams::rate_close_remark`; "
+                  "graded with pt-v21's vector in "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: "
+                                "`Engine::advance_macro_day` and the pin path "
+                                "do not call `RateBook::remark_now`, so the "
+                                "rate indices take each close's curve at the "
+                                "next open (`RateBook::open`), and nothing is "
+                                "booked to their `repriced` column; an engine "
+                                "without rate instruments has nothing to "
+                                "re-mark at any value. Off zero they reprice "
+                                "to the published curve at the close (0.8.5, "
+                                "r13 audit: IGCORP's close-to-close return "
+                                "matched the previous close's curve move to "
+                                "0.000 bp and missed the same close's by 35 "
+                                "bp)",
+    },
+    "rate_intraday_live": {
+        "kind": "derived",
+        "presets": {"pt-v21": 1.0},
+        "identity": "a switch whose identity is the value: the rate indices "
+                    "mark intraday to the curve the session so far implies "
+                    "for tonight's close, so the close's move is not readable "
+                    "from the session",
+        "terms": {"1.0": "on, as pt-v21 ships it"},
+        "source": "rust/src/params.rs, `ModelParams::rate_intraday_live`; "
+                  "graded with pt-v21's vector in "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: `Engine::tick` "
+                                "passes no live curve to "
+                                "`RateBook::tick_live`, `refresh_rate_live` "
+                                "never runs, and nothing is snapshotted or "
+                                "hashed; requires `rate_close_remark`. Off "
+                                "zero the rate indices print around the "
+                                "published curve plus E[tonight's curve | the "
+                                "session] - E[tonight's curve | the open] "
+                                "(0.8.5, r13 audit: with the close re-mark "
+                                "alone a sign-timing agent on IGCORP still "
+                                "earned 13 per cent a year)",
+    },
+    "treasury_haven_gain": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 0.014},
+        "what_would_determine_it": "pt-v21 ships 0.014. Target: the 10-year's "
+                                   "change over 63-session windows with the "
+                                   "index down more than 10 per cent and CPI "
+                                   "inflation under 4, -0.62pp on FRED DGS10 "
+                                   "against the tape 1990-2025 (SE 0.11), "
+                                   "against pt-v20's 0.00 on held-out seeds. "
+                                   "Fitted with `flight_to_quality_gain`, "
+                                   "which also makes the monthly stock-bond "
+                                   "correlation more negative at low "
+                                   "inflation (0.8.5 realism work, "
+                                   "bond-hedge-fed). The value was chosen in "
+                                   "the project's screens against the "
+                                   "registered rows and graded with pt-v21's "
+                                   "whole vector (grade 18 and the by-name "
+                                   "certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, `ModelParams::treasury_haven_gain`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: the 10-year's term "
+                                "premium does not read the VIX. Off zero it "
+                                "falls by the gain per VIX point above 20 "
+                                "while inflation is under 4, daily and at a "
+                                "meeting. Target: the 10-year's change over "
+                                "63-session windows with the index down more "
+                                "than 10 per cent and CPI inflation under 4, "
+                                "-0.62pp on FRED DGS10 against the tape "
+                                "1990-2025 (SE 0.11), against pt-v20's 0.00 "
+                                "on held-out seeds. Fitted with "
+                                "`flight_to_quality_gain`, which also makes "
+                                "the monthly stock-bond correlation more "
+                                "negative at low inflation (0.8.5 realism "
+                                "work, bond-hedge-fed)",
+    },
+    "treasury_path_half_life": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 63.0},
+        "what_would_determine_it": "set with `treasury_path_pricing`, whose "
+                                   "entry gives the target; pt-v21 ships 63, "
+                                   "chosen in the project's screens against "
+                                   "the registered rows and graded with "
+                                   "pt-v21's whole vector (grade 18 and the "
+                                   "by-name certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, "
+                  "`ModelParams::treasury_path_half_life`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "unread while `treasury_path_pricing` is 0.0 "
+                                "(sim/r15-postcut)",
+    },
+    "treasury_path_pricing": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 1.0},
+        "what_would_determine_it": "pt-v21 ships 1. Target: no drift in the "
+                                   "corporate yield or the index after a "
+                                   "published cut (r14's N4 arm: the "
+                                   "corporate yield falls a further 0.18pp by "
+                                   "63 sessions after a cut and the index "
+                                   "outruns its mean by 0.46 per cent) "
+                                   "(sim/r15-postcut). The value was chosen "
+                                   "in the project's screens against the "
+                                   "registered rows and graded with pt-v21's "
+                                   "whole vector (grade 18 and the by-name "
+                                   "certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, `ModelParams::treasury_path_pricing`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: the 10-year's "
+                                "anchor and the 2-year read the policy rate "
+                                "as it stands. Off zero they read the rate "
+                                "plus this share of the market's forecast of "
+                                "its further change, each past change decayed "
+                                "at `treasury_path_half_life`, and a "
+                                "meeting's 10-year surprise carries the "
+                                "forecast's move. Target: no drift in the "
+                                "corporate yield or the index after a "
+                                "published cut (r14's N4 arm: the corporate "
+                                "yield falls a further 0.18pp by 63 sessions "
+                                "after a cut and the index outruns its mean "
+                                "by 0.46 per cent) (sim/r15-postcut)",
+    },
+    "treasury_policy_damping": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 0.5},
+        "what_would_determine_it": "pt-v21 ships 0.5. Off zero its anchor and "
+                                   "a meeting's target read the priced rate "
+                                   "pulled toward a neutral 2.5 by this "
+                                   "share, and a meeting's surprise moves it "
+                                   "by the rest; paired with "
+                                   "`treasury_path_pricing` so a decision "
+                                   "moves the 10-year on the day by what it "
+                                   "did before while the forecast takes out "
+                                   "the drift after (sim/r15-postcut). The "
+                                   "value was chosen in the project's screens "
+                                   "against the registered rows and graded "
+                                   "with pt-v21's whole vector (grade 18 and "
+                                   "the by-name certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, "
+                  "`ModelParams::treasury_policy_damping`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: the 10-year reads "
+                                "the policy rate one for one. Off zero its "
+                                "anchor and a meeting's target read the "
+                                "priced rate pulled toward a neutral 2.5 by "
+                                "this share, and a meeting's surprise moves "
+                                "it by the rest; paired with "
+                                "`treasury_path_pricing` so a decision moves "
+                                "the 10-year on the day by what it did before "
+                                "while the forecast takes out the drift after "
+                                "(sim/r15-postcut)",
+    },
+    "treasury_put_pricing": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 1.0},
+        "what_would_determine_it": "set with `fed_put_gain`, whose entry "
+                                   "gives the target; pt-v21 ships 1, chosen "
+                                   "in the project's screens against the "
+                                   "registered rows and graded with pt-v21's "
+                                   "whole vector (grade 18 and the by-name "
+                                   "certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, `ModelParams::treasury_put_pricing`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "unread while `fed_put_gain` is 0.0 (0.8.5 "
+                                "realism work, bond-hedge-fed)",
+    },
+    "unemployment_okun_coefficient": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 0.75},
+        "what_would_determine_it": "pt-v21 ships 0.75, chosen in the "
+                                   "project's screens against the registered "
+                                   "rows and graded with pt-v21's whole "
+                                   "vector (grade 18 and the by-name "
+                                   "certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, "
+                  "`ModelParams::unemployment_okun_coefficient`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0: `update_economy_daily` and "
+                                "`unemployment_drive_with` in "
+                                "economy/daily.rs branch on `== 0.0` and take "
+                                "the shipped monthly 0.20 and recovery term; "
+                                "at 0.0 it is also left out of the model's "
+                                "digest",
+    },
+    "vix_stress_premium": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 3.0},
+        "what_would_determine_it": "pt-v21 ships 3. Target: the median VIX "
+                                   "over trailing 21-session realised "
+                                   "volatility on sessions with it at 40 or "
+                                   "more, 0.831 on the S&P 500 and ^VIX tape "
+                                   "1990-2025 (calendar-year bootstrap SE "
+                                   "0.045) against pt-v20's 0.668 on held-out "
+                                   "seeds (0.8.5 realism work, vix-peaks). "
+                                   "The value was chosen in the project's "
+                                   "screens against the registered rows and "
+                                   "graded with pt-v21's whole vector (grade "
+                                   "18 and the by-name certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, `ModelParams::vix_stress_premium`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "inert at 0.0 as shipped: "
+                                "`Engine::published_vix` returns the VIX "
+                                "state untouched and the close writes no "
+                                "memory. Off zero it scales the PUBLISHED VIX "
+                                "only (macro_fields, macro_state, the macro "
+                                "table, the wasm getter) by a premium on the "
+                                "variance read-back's memory above "
+                                "`vix_stress_premium_knee`, capped by "
+                                "`vix_stress_premium_cap`; no internal reader "
+                                "moves. Target: the median VIX over trailing "
+                                "21-session realised volatility on sessions "
+                                "with it at 40 or more, 0.831 on the S&P 500 "
+                                "and ^VIX tape 1990-2025 (calendar-year "
+                                "bootstrap SE 0.045) against pt-v20's 0.668 "
+                                "on held-out seeds (0.8.5 realism work, "
+                                "vix-peaks)",
+    },
+    "vix_stress_premium_cap": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 0.35},
+        "what_would_determine_it": "set with `vix_stress_premium`, whose "
+                                   "entry gives the target; pt-v21 ships "
+                                   "0.35, chosen in the project's screens "
+                                   "against the registered rows and graded "
+                                   "with pt-v21's whole vector (grade 18 and "
+                                   "the by-name certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, `ModelParams::vix_stress_premium_cap`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "unread while `vix_stress_premium` is 0.0 "
+                                "(0.8.5 realism work, vix-peaks)",
+    },
+    "vix_stress_premium_knee": {
+        "kind": "undetermined",
+        "presets": {"pt-v21": 0.6},
+        "what_would_determine_it": "set with `vix_stress_premium`, whose "
+                                   "entry gives the target; pt-v21 ships 0.6, "
+                                   "chosen in the project's screens against "
+                                   "the registered rows and graded with "
+                                   "pt-v21's whole vector (grade 18 and the "
+                                   "by-name certification, "
+                                   "validation/pt-v21/programme/ptv21-registration-18.md). "
+                                   "No estimate with an error bar is recorded "
+                                   "for this value, so a fit of the dial on "
+                                   "held-out histories, with a standard "
+                                   "error, would determine it",
+        "source": "rust/src/params.rs, "
+                  "`ModelParams::vix_stress_premium_knee`; "
+                  "validation/pt-v21/programme/ptv21-registration-18.md",
+        "date": "2026-10-05",
+        "inert_through_pt_v20": "unread while `vix_stress_premium` is 0.0 "
+                                "(0.8.5 realism work, vix-peaks)",
+    },
 }
 
 #: Dials in scope that carry NO entry.

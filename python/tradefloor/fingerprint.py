@@ -1,12 +1,11 @@
 """A fixed battery of worlds, and a hash of what an agent orders on it.
 
-Two ways to ask "did this agent change" already exist and both answer a
-different question. :func:`tradefloor.rank` scores agents against many
-seeds and says which one is better. :func:`tradefloor.counterfactual.compare`
-forks one running world and says where two arms of ONE run came apart. This
-module answers a third, narrower question: run the SAME fixed set of
-worlds against an agent twice -- at two prompts, in two frameworks, on two
-platforms -- and say whether it ordered the same things both times.
+:func:`tradefloor.rank` scores agents against many seeds and says which
+one is better. :func:`tradefloor.counterfactual.compare` forks one running
+world and says where two arms of one run came apart. This module runs the
+same fixed set of worlds against an agent twice (at two prompts, in two
+frameworks, or on two platforms) and says whether it ordered the same
+things both times.
 
 ```python
 battery = tf.fingerprint.battery()
@@ -18,51 +17,50 @@ print(before.compare(after, floor=None).differing)
 ## What a fingerprint is a hash OF
 
 Every cell in the battery is run as a plain, single-arm
-:class:`~tradefloor.counterfactual.World`. At every step the agent's own
-:meth:`decision` publish changes -- the same publish
-:func:`tradefloor.counterfactual.compare` already reads to find where two
-arms diverged -- the decision is canonicalised with
-:func:`tradefloor.counterfactual._shape`: sorted by symbol, side and
-quantity, and blind to everything else. :attr:`Fingerprint.digest` is
+:class:`~tradefloor.counterfactual.World`. At every step where the agent's
+own :meth:`decision` publish changes (the same publish
+:func:`tradefloor.counterfactual.compare` reads to find where two arms
+diverged), the decision is canonicalised with
+:func:`tradefloor.counterfactual._shape`, which sorts it by symbol, side
+and quantity and ignores everything else. :attr:`Fingerprint.digest` is
 sha256 over that list, in cell then step order. It does not see a price, a
-fill, a rationale or a rendered prompt, and the FinRobot fixture test in
-`tests/test_fingerprint.py` demonstrates this by construction: the
-extraction reads `trace[i]["decision"]` alone, so mutating every other
-column of a copied trace before re-extracting produces the identical list.
+fill, a rationale or a rendered prompt. The FinRobot fixture test in
+`tests/test_fingerprint.py` shows this: the extraction reads
+`trace[i]["decision"]` alone, so mutating every other column of a copied
+trace before re-extracting produces the identical list.
 
-`agent.decision()` is not optional here the way it is for
-:class:`~tradefloor.counterfactual.World` in general. It has to publish the
-`{"actions": [...], "rationale": ...}` shape every
+`agent.decision()` is optional for
+:class:`~tradefloor.counterfactual.World` in general, but required here. It
+has to publish the `{"actions": [...], "rationale": ...}` shape every
 :class:`~tradefloor.integrations.common.FrameworkAdapter` already produces,
 because that is what :func:`~tradefloor.counterfactual._shape` reads.
-:func:`fingerprint` raises naming the cell and step the first time a
-publish does not fit, rather than hashing a fallback that would make two
-unrelated agents with no `decision()` compare identical.
+:func:`fingerprint` raises, naming the cell and step, the first time a
+publish does not fit. Hashing a fallback instead would make two unrelated
+agents with no `decision()` compare identical.
 
 ## What it cannot say
 
-It cannot say which agent is BETTER, only whether they ordered the same
-things: ranking is :func:`tradefloor.rank`. A sampled agent -- one call
-into an LLM -- moves on its own between two identical asks, and
-:meth:`Fingerprint.compare` never hides that: given no ``floor`` it reports
-every difference and says plainly that none of them is separated from the
-agent's own noise; given a
-:class:`~tradefloor.counterfactual.Resample` floor, measured at one
-decision point on the SAME agent, it reports how many of the differing
+It cannot say which agent is better, only whether they ordered the same
+things. Use :func:`tradefloor.rank` to rank them. A sampled agent (one
+that calls an LLM) changes its answer between two identical asks.
+:meth:`Fingerprint.compare` given no ``floor`` reports every difference
+and says that none of them is separated from the agent's own noise. Given
+a :class:`~tradefloor.counterfactual.Resample` floor, measured at one
+decision point on the same agent, it reports how many of the differing
 decisions are larger, in net or gross shares, than the agent's own
 within-arm spread at that point. A `Resample` needs `reask()`, which only
-a live, callable agent has -- a replayed transcript cannot answer a
+a live, callable agent has. A replayed transcript cannot answer a
 question it was not asked, so a floor over one is not offered here.
 
 ## The battery
 
 :data:`BATTERY_VERSION` names the cell set :func:`battery` returns by
-default, which is version 2 from 0.8.5. A version is immutable:
+default, which is version 2 from 0.8.5. A version never changes.
 `battery(1)` and `battery(2)` build the same cells, byte for byte, on
 every call and on every future release, because a fingerprint is only
-comparable to another taken against the SAME worlds. Extending the
-battery -- another cell, a different roster size, a longer run -- is a new
-version, never an edit to an old one. A fingerprint records its version,
+comparable to another taken against the same worlds. Another cell, a
+different roster size or a longer run makes a new version. A fingerprint
+records its version,
 and :meth:`Fingerprint.compare` refuses two versions, so a version 1
 fingerprint taken before 0.8.5 is compared against `battery(1)` and not
 against the default.
@@ -87,7 +85,7 @@ running when a cell stops: ``liquidity_crisis``'s earnings recovery runs
 to day 175, and ``recession``'s contraction to day 364. The
 ``curve_shock`` cell's roster carries the three rate indices
 (``Universe.random(6, seed=..., bonds=True)``), because that scenario is
-a stress for a bond book; every other cell is six equities.
+a stress for a bond book. Every other cell is six equities.
 
 Version 1 has six cells of 60 days, one for each scenario that shipped
 when it was fixed. ``curve_shock``, packaged later, is not in version 1
@@ -106,29 +104,28 @@ steps against 360, so an LLM agent asked once a day makes 840 calls
 instead of 360.
 
 A :class:`Cell` is one un-forked :meth:`~tradefloor.counterfactual.World.run`
-and cannot express a checkpoint-fork-intervene experiment -- two arms
-sharing a history, one of them changed. That is a real gap, not a
-hypothetical one: the FinRobot fixture this package tests against
-(`tests/fixtures/finrobot/rate-shock.json`) is recorded exactly that
-shape, so no cell built here can replay it, and
+and cannot express a checkpoint-fork-intervene experiment, where two arms
+share a history and one of them is changed. The FinRobot fixture this
+package tests against (`tests/fixtures/finrobot/rate-shock.json`) is
+recorded in exactly that shape, so no cell built here can replay it, and
 `tests/test_fingerprint.py` reproduces that world by hand instead of
 going through :func:`battery`.
 
 :attr:`Battery.renderer_key` names P6's own default rendering, a
-:class:`~tradefloor.render.TextRenderer` at every default --
-`TextRenderer().key()`, computed rather than typed, so this file cannot go
-stale the way a retyped copy would. It is the battery's OWN reference
-convention, not a claim about what any given agent rendered with: three of
-the four shipped adapters default to
-:class:`~tradefloor.render.JSONRenderer` instead (`LangGraphAdapter`,
-`PydanticAIAdapter`, `OpenAIAgentsAdapter`; only `FinRobotAdapter` defaults
-to text), and the battery does not touch an agent's own `renderer`.
-:func:`fingerprint` reads what actually happened from the agent's OWN
+:class:`~tradefloor.render.TextRenderer` at every default. It is
+`TextRenderer().key()`, computed at run time so it cannot go stale the way
+a retyped copy would. It is the battery's own reference convention and
+says nothing about what a given agent rendered with. Three of the four
+shipped adapters default to :class:`~tradefloor.render.JSONRenderer`
+instead (`LangGraphAdapter`, `PydanticAIAdapter`, `OpenAIAgentsAdapter`;
+only `FinRobotAdapter` defaults to text), and the battery does not touch
+an agent's own `renderer`. :func:`fingerprint` reads what actually
+happened from the agent's own
 :meth:`~tradefloor.integrations.common.FrameworkAdapter.provenance`, when
-it has one, and says so in :attr:`Fingerprint.caveats` -- naming the
-mismatch when the agent's renderer is not the battery's reference, and
-naming the gap when the agent exposes no provenance at all, rather than
-asserting either silently.
+it has one, and records it in :attr:`Fingerprint.caveats`. The caveat
+names the mismatch when the agent's renderer is not the battery's
+reference, and names the gap when the agent exposes no provenance at
+all.
 
 ## Commit-reveal
 
@@ -159,7 +156,7 @@ from a record kept with the reveal.
 
 Draw sealed seeds from the whole range, ``secrets.randbits(64)`` for each
 cell. A seed is any integer from 0 to ``2**64 - 1``, and a hidden seed is
-only as hidden as the range it was drawn from: below ``2**32`` there are
+only as hidden as the range it was drawn from. Below ``2**32`` there are
 2**32 markets per roster, few enough to find by simulating every one
 against a market's first prices, and a sealed battery drawn there can be
 opened without the reveal. Across 64 bits that search is 2**32 times
@@ -206,11 +203,11 @@ class Cell(NamedTuple):
 
     ``seed`` is the simulation seed :class:`~tradefloor.counterfactual.World`
     runs on. ``roster_seed`` builds the cell's roster with
-    :func:`tradefloor.Universe.random` -- independent of ``seed``, the
-    library's own convention for keeping "which market" and "which
-    companies" separately citable. ``scenario`` is a name
+    :func:`tradefloor.Universe.random`, independent of ``seed``, which is
+    how the library keeps "which market" and "which companies" separately
+    citable. ``scenario`` is a name
     :meth:`~tradefloor.Scenario.load` accepts. ``days`` is how long the
-    cell runs; ``steps`` is
+    cell runs, and ``steps`` is
     :attr:`~tradefloor.counterfactual.World.steps_per_day`. ``bonds``
     adds the three rate indices to the roster
     (``Universe.random(..., bonds=True)``); it is False on every version 1
@@ -299,16 +296,15 @@ def _build(version: int) -> Battery:
 
 
 def battery(version: int = BATTERY_VERSION) -> Battery:
-    """The named battery version. Immutable: every call returns an equal one.
+    """The named battery version, equal on every call.
 
     ``renderer_key`` is computed from a fresh
-    :class:`~tradefloor.render.TextRenderer` on every call rather than
-    stored as a literal, so it cannot drift from what P6 actually
-    considers its default. See the module docstring for what the battery
-    pins and what depending on P6 means here.
+    :class:`~tradefloor.render.TextRenderer` on every call, so it cannot
+    drift from what P6 considers its default. See the module docstring for
+    what the battery pins and what depending on P6 means here.
 
-    ``version`` is a whole number. ``battery(True)`` is refused rather than
-    read as version 1, which is what Python's ``True == 1`` would give.
+    ``version`` is a whole number. ``battery(True)`` is refused, where
+    Python's ``True == 1`` would otherwise read it as version 1.
     """
     if isinstance(version, bool) or not isinstance(version, numbers.Integral):
         from ._checks import describe
@@ -426,26 +422,23 @@ def fingerprint(agent: Any,
                 battery: Battery | None = None) -> "Fingerprint":
     """Run ``agent`` on every cell of ``battery`` and hash what it ordered.
 
-    ``battery`` left at ``None`` (its default) builds
-    :func:`battery`'s own default version fresh, inside this call rather
-    than once at import time -- a default built at import time would be
-    a single shared object no later change to :func:`battery` could ever
-    reach, silently, and the one that matters here is
-    :attr:`Battery.renderer_key`, which :func:`battery` documents as
-    computed live specifically so it cannot drift.
+    ``battery`` left at ``None`` (its default) builds :func:`battery`'s
+    default version fresh inside this call. A default built at import
+    time would be one shared object that no later change to
+    :func:`battery` could reach, and :attr:`Battery.renderer_key` in
+    particular is computed live so it cannot drift.
 
-    ``agent`` gets an independent copy per cell -- ``agent.fork()`` when
-    the agent has one, the same
+    ``agent`` gets an independent copy per cell, from ``agent.fork()``
+    when the agent has one and otherwise from the same
     :func:`copy.deepcopy` fallback
-    :class:`~tradefloor.counterfactual.World` itself uses otherwise -- so
-    that one cell's price history and decision record cannot leak into
-    the next. Each cell runs `on_refusal="skip"`: one bad response costs
-    that step, named in :attr:`Fingerprint.caveats`, not the rest of the
-    battery.
+    :class:`~tradefloor.counterfactual.World` uses, so one cell's price
+    history and decision record cannot leak into the next. Each cell runs
+    `on_refusal="skip"`, so one bad response costs only that step, which
+    is named in :attr:`Fingerprint.caveats`.
 
     Raises :class:`~tradefloor.ValidationError` before running anything if
-    ``agent`` has no callable `decision()` -- see the module docstring for
-    why a fingerprint needs one.
+    ``agent`` has no callable `decision()`. The module docstring says why
+    a fingerprint needs one.
     """
     if not callable(getattr(agent, "decision", None)):
         raise ValidationError(
@@ -508,15 +501,15 @@ def fingerprint(agent: Any,
 class Fingerprint:
     """What one agent ordered across one battery, as a digest and a record.
 
-    ``digest`` is sha256 over :attr:`decisions`, cell then step order --
-    see :func:`_digest`. ``decisions`` is the canonical list itself, one
+    ``digest`` is sha256 over :attr:`decisions`, in cell then step order
+    (see :func:`_digest`). ``decisions`` is the canonical list itself, one
     entry per genuine decision: ``{"cell": int, "step": int, "shape":
     [[symbol, side, quantity], ...]}``. ``battery`` is the battery
-    VERSION, an int, not the :class:`Battery` object -- two fingerprints
-    from the same version are comparable by :meth:`compare` because their
-    cells are known to match without carrying the cells themselves.
-    ``renderer_key`` and ``caveats`` are documented on :func:`fingerprint`,
-    which computes them; this class only carries what it is given.
+    version, an int. Two fingerprints from the same version are comparable
+    by :meth:`compare` because their cells are known to match, so the
+    cells themselves are not carried. ``renderer_key`` and ``caveats`` are
+    documented on :func:`fingerprint`, which computes them. This class
+    only carries what it is given.
     """
 
     __slots__ = ("digest", "decisions", "battery", "renderer_key", "caveats")
@@ -541,10 +534,9 @@ class Fingerprint:
     def to_json(self) -> str:
         """This fingerprint, complete, as indented JSON.
 
-        Every field :meth:`from_json` needs to rebuild an equal
-        :class:`Fingerprint`, including :attr:`caveats` -- a caveat is a
-        fact about the run that produced this fingerprint, not something
-        a reader should have to recompute to see.
+        Holds every field :meth:`from_json` needs to rebuild an equal
+        :class:`Fingerprint`, including :attr:`caveats`, because a caveat is
+        a fact about the run that a reader should not have to recompute.
         """
         return json.dumps({
             "digest": self.digest,
@@ -558,9 +550,8 @@ class Fingerprint:
     def from_json(cls, text: str) -> "Fingerprint":
         """The inverse of :meth:`to_json`.
 
-        Not part of the fingerprint's original grammar. It exists because a
-        digest published without a way to read it back is not a citable
-        one.
+        It was added after the original format so that a published digest
+        can be read back and cited.
         """
         payload = json.loads(text)
         return cls(digest=payload["digest"], decisions=payload["decisions"],
@@ -572,26 +563,25 @@ class Fingerprint:
                 floor: Resample | None) -> "FingerprintComparison":
         """Cell by cell, where ``self`` and ``other`` ordered different things.
 
-        Both fingerprints must carry the same :attr:`battery` version --
-        different versions are different worlds, and a per-cell alignment
+        Both fingerprints must carry the same :attr:`battery` version.
+        Different versions are different worlds, and a per-cell alignment
         between them would compare runs that were never the same
-        experiment. Within a cell, decisions are aligned by ORDINAL
-        position (first decision against first decision, and so on), not
-        by step: two agents at different decision cadences still align
+        experiment. Within a cell, decisions are aligned by ordinal
+        position (first decision against first decision, and so on) and
+        not by step. Two agents at different decision cadences still align
         this way, and a cell where one side made more decisions than the
         other reports every position past the shorter side's end as
         differing.
 
         ``floor`` is a
-        :class:`~tradefloor.counterfactual.Resample` measured on ONE of
-        the two agents at one decision point -- pass ``None`` where none
-        was measured. Given one, a differing decision EXCEEDS it when the
+        :class:`~tradefloor.counterfactual.Resample` measured on one of
+        the two agents at one decision point. Pass ``None`` when none was
+        measured. Given one, a differing decision exceeds it when the
         gap between the two sides' :func:`~tradefloor.counterfactual._net`
         or :func:`~tradefloor.counterfactual._gross` is larger than that
-        agent's own within-arm stdev in the same measure; this is a
-        single floor applied uniformly across the whole battery, a coarse
-        instrument the module docstring already says not to expect more
-        of than that.
+        agent's own within-arm stdev in the same measure. The same floor
+        applies across the whole battery, so treat it as a coarse
+        check.
         """
         if self.battery != other.battery:
             raise ValidationError(
@@ -669,10 +659,10 @@ class Fingerprint:
 class FingerprintComparison:
     """The result of :meth:`Fingerprint.compare`. See that method.
 
-    Named apart from :class:`tradefloor.counterfactual.Comparison`, which
-    already owns the name ``Comparison`` at package level and answers a
-    different question -- where one forked run came apart, not whether
-    two independent battery runs ordered the same things.
+    It has its own name because :class:`tradefloor.counterfactual.Comparison`
+    already uses ``Comparison`` at package level. That class says where one
+    forked run came apart. This one says whether two independent battery
+    runs ordered the same things.
     """
 
     __slots__ = ("battery", "cells", "differing", "total", "floor_given",
@@ -718,7 +708,7 @@ def commit(seeds: Sequence[int], salt: bytes) -> str:
 
     Each seed must be an integer from 0 to ``2**64 - 1``. They are checked
     here, so a list the engine would refuse cannot be committed to. Draw
-    them with ``secrets.randbits(64)``; the module docstring says why the
+    them with ``secrets.randbits(64)``. The module docstring says why the
     full range matters.
 
     ```python

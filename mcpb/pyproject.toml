@@ -1,6 +1,6 @@
 [project]
 name = "tradefloor-mcpb"
-version = "0.9.1"
+version = "0.10.0"
 description = "The tradefloor MCP server, as an MCP bundle"
 requires-python = ">=3.11"
-dependencies = ["tradefloor[mcp]==0.9.1"]
+dependencies = ["tradefloor[mcp]==0.10.0"]

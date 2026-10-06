@@ -377,7 +377,7 @@ def test_the_shipped_record_reports_its_structural_certificate_beside_the_bar_th
     the line a reader sees; the reading is pinned so it cannot change in
     silence; the published table agrees with it; and beside it sit the two
     things that do gate -- the long-run criteria, which pass, and every
-    ruled band in on all four protocols. The record is pt-v20's since 0.8.5.
+    ruled band in on all four protocols. The record is pt-v21's since 0.10.0.
     """
     rec = record(envelope.PRESET)
     for field in envelope.STRUCTURE_BAR_PANELS:
@@ -391,23 +391,19 @@ def test_the_shipped_record_reports_its_structural_certificate_beside_the_bar_th
     assert "structure bar" in line and "PASS" in line
 
     # The reading the release carries, REPORTED, and asserted so it cannot
-    # change in silence. RE-PINNED on pt-v20's graded arm (box ptv20g6):
-    # PASS on both panels, k 15 at 252 and k 15 held out (cut 21), median
-    # 0.930223 against the tape's 0.929939; the same k and 0.932337 before
-    # the arm (box ptv20g3). pt-v19's fifth composition of 2026-09-23
-    # read PASS on both at k 18 and k 17, median 0.933726. The
-    # fourth composition read PASS at 19 and REFUSED above at 23 held out;
-    # the second 20 and 21 (at the cut), the 2026-09-20 record 25 and 22,
-    # the 2026-09-14 one 21 and 28. The fifth composition's 504-session
-    # certification row is refused below (k 10), which the record box
-    # reports beside the verdict and which the ruling does not gate.
+    # change in silence. RE-PINNED at 0.10.0 on pt-v21 (box ptv21c1):
+    # REFUSED above on both panels, k 25 at 252 and k 25 held out (cut 21),
+    # median 0.955667 against the tape's 0.929939. The ruling reports it and
+    # does not gate on it. pt-v20's graded arm (box ptv20g6) read PASS on
+    # both at k 15 and k 15, median 0.930223; pt-v19's fifth composition
+    # PASS at k 18 and k 17, median 0.933726.
     row = rec["structure_252"]["rows"][VIX_AR1_ROW]
-    assert rec["structure_252"]["passed"] == [VIX_AR1_ROW]
-    assert (row["k"], row["cut"], row["side"]) == (15, 21, None)  # pt-v19: 18
+    assert rec["structure_252"]["refused"] == [VIX_AR1_ROW]
+    assert (row["k"], row["cut"], row["side"]) == (25, 21, "above")  # pt-v20: 15
     assert rec["structure_252"]["at_the_cut"] == []
     row = rec["structure_heldout_seeds"]["rows"][VIX_AR1_ROW]
-    assert rec["structure_heldout_seeds"]["passed"] == [VIX_AR1_ROW]
-    assert (row["k"], row["cut"], row["side"]) == (15, 21, None)  # pt-v19: 17
+    assert rec["structure_heldout_seeds"]["refused"] == [VIX_AR1_ROW]
+    assert (row["k"], row["cut"], row["side"]) == (25, 21, "above")  # pt-v20: 15
     assert rec["structure_heldout_seeds"]["at_the_cut"] == []
 
     # The published table agrees with the record it is written from.

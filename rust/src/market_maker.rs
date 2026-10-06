@@ -38,6 +38,7 @@ use crate::mathx::clamp;
 pub const MARKET_MAKER_ID: &str = "mm";
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct MakerQuote {
     pub bid_price: f64,
     pub ask_price: f64,
@@ -46,6 +47,7 @@ pub struct MakerQuote {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct MakerInventory {
     /// Net shares held. Positive = long, negative = short.
     pub position: f64,
@@ -53,7 +55,14 @@ pub struct MakerInventory {
     pub limit: f64,
 }
 
+impl MakerInventory {
+    pub const fn new(position: f64, limit: f64) -> Self {
+        MakerInventory { position, limit }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct QuoteParams {
     /// Fair value from the factor model.
     pub fair_value: f64,
@@ -91,12 +100,14 @@ impl Default for QuoteParams {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct LadderLevel {
     pub price: f64,
     pub size: f64,
 }
 
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct LadderParams {
     pub quote: QuoteParams,
     /// Number of price levels to quote per side.
@@ -114,6 +125,12 @@ pub struct LadderParams {
     /// legacy display book used 0.5, preserved so quoted depth keeps the
     /// shape it has always had.
     pub level_step: f64,
+}
+
+impl LadderParams {
+    pub fn new(quote: QuoteParams, levels: f64, level_step: f64) -> Self {
+        LadderParams { quote, levels, level_step }
+    }
 }
 
 /// Exchanges quote in cents; keeping prices on the tick grid avoids drift.
@@ -195,12 +212,25 @@ pub fn apply_fill_to_inventory(
 /// progressively worse prices — impact becomes a property of resting
 /// liquidity rather than a coefficient.
 pub fn quote_ladder(params: &LadderParams) -> (Vec<LadderLevel>, Vec<LadderLevel>) {
+    let mut bids = Vec::new();
+    let mut asks = Vec::new();
+    quote_ladder_into(params, &mut bids, &mut asks);
+    (bids, asks)
+}
+
+/// [`quote_ladder`] into two buffers the caller owns, cleared first, so a
+/// caller quoting on every tick can reuse them. The levels are the same.
+pub(crate) fn quote_ladder_into(
+    params: &LadderParams,
+    bids: &mut Vec<LadderLevel>,
+    asks: &mut Vec<LadderLevel>,
+) {
+    bids.clear();
+    asks.clear();
     let top = compute_quote(&params.quote);
     let half_spread = (top.ask_price - top.bid_price) / 2.0;
     let step = mathx::max(0.01, half_spread * 2.0 * params.level_step);
 
-    let mut bids = Vec::new();
-    let mut asks = Vec::new();
     // `Math.max(1, levels)`, then a `<` comparison per iteration. NaN makes
     // the comparison false immediately, giving zero levels — a `for` over an
     // integer range could not express that. An infinite `levels` loops
@@ -236,7 +266,6 @@ pub fn quote_ladder(params: &LadderParams) -> (Vec<LadderLevel>, Vec<LadderLevel
         });
         i += 1;
     }
-    (bids, asks)
 }
 
 #[cfg(test)]

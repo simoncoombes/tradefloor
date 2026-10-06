@@ -21,7 +21,7 @@ differently, or what caused a move. tradefloor can, because it computed every
 price. You can fork a running market, change one thing in one branch (a rate
 rise, a liquidity crisis, a different agent), and measure where the two
 branches came apart. `engine.truth()` splits each move in the gap between a
-price and the model's fair value into eleven factors, and
+price and the model's fair value into twelve factors, and
 `engine.explain(ticker, day)` breaks down the move in the traded price, two
 records no historical dataset carries.
 
@@ -72,8 +72,10 @@ A Python agent is any object with `act(obs)` that returns orders: a number
 of shares for a market order, `tf.Limit(quantity, price)` or `tf.Cancel()`.
 It sees a read-only view of the market and its own portfolio, and
 `obs.history` holds a daily bar per name. A bar's close is the day's last
-print. On pt-v20 the close then re-marks every name, so the next day starts
-15 bp away at the median on a 20-name roster.
+print. On pt-v21 the close then re-marks every name and the next session
+opens after an overnight move, so the next day starts away from that print:
+the close sits 11 bp from it at the median on a 20-name roster, and the open
+25 bp from the close.
 [docs/AGENTS.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/AGENTS.md)
 covers what the view holds, how trades are charged, the framework adapters
 (OpenAI Agents SDK, PydanticAI, LangGraph, FinRobot) and how scoring works.
@@ -101,14 +103,14 @@ The walkthrough is
 
 | | |
 |---|---|
-| `engine.truth()` | why each price moved: eleven factors that sum to the mispricing's move, to 1e-16 |
+| `engine.truth()` | why each price moved: twelve factors that sum to the mispricing's move, to 1e-16 |
 | `engine.prints()` | how each trade price came about: the shock, and the order book depth that absorbed it |
 | counterfactual TCA | your trading cost, from the same seed run with your orders and without them |
 | `tf.rank` | many seeds, paired sign tests |
 | `RunManifest` | what a reader needs to replay a run, checked by `reproduce()` |
 | `World` / `compare` | fork a running experiment, change one variable, and measure where the two came apart |
 | scenarios | seven packaged shocks, and a file format for your own |
-| MCP server | thirteen read-only tools for a coding agent, scenarios included |
+| MCP server | nineteen tools for a coding agent, thirteen of them read-only, with scenarios, any shipped preset, a shipped population of background traders, and market sessions you step, fork and rewind |
 | more | a Gymnasium environment, Arrow output, checkpoints, SEC EDGAR data, simulated rate indices, a browser build |
 
 ## Drive it from an agent
@@ -122,7 +124,9 @@ claude mcp add tradefloor -- tradefloor-mcp
 
 `tradefloor-mcp` speaks MCP over stdio, and `tradefloor mcp` starts the same
 server. Strategies, universes and scenarios are data, so a tool argument
-cannot reach code. Each result carries its own caveats. See
+cannot reach code. Each result carries its own caveats. A session keeps one
+market in the server between calls, so an agent can place orders a step at a
+time, fork the market to try two actions, and rewind. See
 [the MCP page](https://docs.tradefloor.dev/mcp-local.html).
 
 ## Scenarios
@@ -181,7 +185,7 @@ with a digest per preset. A run with agent orders in it replays exactly on the
 same release. Across releases the promise is narrower. 0.8.5 changed how an
 agent's fills reach the market, on every preset, so a traded run recorded
 before 0.8.5 matches up to its first trade and differs after it. The default
-preset is `pt-v20`, and any earlier one can be named:
+preset is `pt-v21`, and any earlier one can be named:
 
 ```python
 eng = tf.Engine(seed=42, universe=u, model="pt-v10")
@@ -204,47 +208,49 @@ says which release to pin for a long study.
 tradefloor checks its market against real ones with three named sets of
 statistics, listed in
 [docs/STATISTICS.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/STATISTICS.md).
-On the default preset, `pt-v20`, all 19 statistics of the one-year table
-(volatility, fat tails, how much stocks move together, how far the VIX jumps
-after a fall) are inside the range real markets show over a year. All 14
-graded statistics of the two-year panel are inside their two-year ranges.
-The long-run criteria are 40 rows over 21 years for pt-v20, covering crash
-depth, how long fear lasts, bear markets per decade, the 2008 and 2020
-replays, the rate indices and the cost of size in the book.
-pt-v20 meets all 40.
+On pt-v21, the default from 0.10.0, 18 of the 19 statistics of the
+one-year table (volatility, fat tails, how much stocks move together, how far
+the VIX jumps after a fall) are inside the range real markets show over a
+year, on the ruled bands. The one row out is the tail rate, a gap: the
+index falls 3% or more on 0.598% of days on the 30 certification seeds,
+against a range of 0.64 to 2.34, and on 0.98% pooled over 360 seeds. All 14 graded statistics of the two-year panel are inside their
+two-year ranges. The long-run criteria are 40 rows over 21 years, covering
+crash depth, how long fear lasts, bear markets per decade, the 2008 and 2020
+replays, the rate indices and the cost of size in the book. pt-v21 meets all
+40, read on 270 histories.
 
 Read those claims narrowly:
 
-- The 19 of 19 is a verdict on figures pooled over 30 seeds. One seed's year
-  often misses some of its 14 shape statistics. On seeds 101 to 116, all 14
-  were in range on 5 of the 16, and one seed had 8 of 14. If you run one
+- The one-year count is a verdict on figures pooled over 30 seeds. One seed's
+  year often misses some of its 14 shape statistics. On seeds 101 to 116, all
+  14 were in range on 8 of the 16, and one seed had 11 of 14. If you run one
   market per condition, read `tf.envelope.intervals()` for each statistic's
   spread across seeds.
 - A shape statistic's range is the median of 35 real one-year windows plus
   or minus 2.1 trimmed standard deviations, so passing one is weak evidence.
-  Volatility clustering is one case. `abs_return_acf1` reads 0.028, below
-  every real 2015 to 2025 window (the lowest is 0.039), and it passes
+  Volatility clustering is one case. `abs_return_acf5` reads 0.020, below
+  every real 2015 to 2025 window (the lowest is 0.034), and it passes
   because its range reaches lower than those windows do.
-- The one-year table helped choose most of pt-v20's coefficients, so the
+- The VIX is stickier than real: its day-to-day persistence reads 0.956
+  against the tape's 0.930, and the sign test that grades it refuses it.
+- The one-year table helped choose many of the coefficients pt-v21 keeps, so the
   held-out checks are the fresh seeds and the fresh set of companies the
   panel is repeated on.
 - One year is the certified horizon. Two years is graded on the two-year
-  panel, and longer runs only by the long-run criteria. Every run on a
-  roster opens at nearly the same VIX (17.66 on the certified roster), so
-  the one-year figures describe years that start calm.
-- A driven scenario moves prices at a quarter to a half of the real size, in
-  the right direction. Use a scenario to detect a response, and do not read
-  its size as a forecast.
-- Volatility memory is weaker than real at every lag, about a quarter of
-  real at lag 1. Nothing below the 65-minute step is calibrated.
-- An order sliced over a day costs far less than published studies find:
-  0.04 of a daily standard deviation for 10% of a day's volume in 36
-  slices, against 0.15 to 0.3. A schedule optimiser will overstate the value
-  of trading slowly.
-- Your fills pay for the book depth they take, but that temporary impact
-  barely reaches the printed prices. The lasting part is linear and fades,
-  and no other trader adapts to you, so no liquidity spiral or predatory
-  trading can arise.
+  panel, and longer runs only by the long-run criteria.
+- A driven scenario moves prices at about half to four-fifths of the real
+  size, in the right direction. Use a scenario to detect a response, and do
+  not read its size as a forecast.
+- Volatility memory reads 0.095 at lag 1 against a real 0.107 and fades
+  much faster after it: at lag 20 it is under a twentieth of real. Nothing below the 65-minute
+  step is calibrated.
+- An order sliced over a day costs a median 0.13 of a daily standard
+  deviation for 10% of a day's volume in 36 slices, at the low end of the
+  0.15 to 0.3 published studies find.
+- By default no other trader reacts to you, so no liquidity spiral or
+  predatory trading can arise. Populated mode adds background traders that
+  trade your signals and front-run predictable flow, but they charge a
+  predictable programme about 2.4% more, far below what real markets show.
 
 `tf.envelope.check(horizon_days=...)` refuses a question that falls outside
 a measured limit.
@@ -254,7 +260,7 @@ has every number behind these claims and the full table of limits.
 ## Before you publish a result
 
 - An agent scored on naming the factor behind each day's move gets an
-  `explanation_accuracy`. On pt-v20 a constant answer scores 0.95 to 1.0, so
+  `explanation_accuracy`. On pt-v21 a constant answer scores 0.70 to 0.95, so
   quote `explanation_edge`, the accuracy minus that baseline, and never the
   accuracy alone.
 - Agents in one `tf.evaluate` or `tf.rank` call run one after another in one
@@ -288,13 +294,13 @@ The twelve numbered [`examples/`](https://github.com/simoncoombes/tradefloor/tre
 | [`00-a-year-in-one-market`](https://github.com/simoncoombes/tradefloor/blob/main/examples/00-a-year-in-one-market.ipynb) | Start here: one company, one year, two crises, one chart |
 | [`01-first-simulation`](https://github.com/simoncoombes/tradefloor/blob/main/examples/01-first-simulation.ipynb) | Universe, engine, order book, determinism |
 | [`02-evaluating-a-strategy`](https://github.com/simoncoombes/tradefloor/blob/main/examples/02-evaluating-a-strategy.ipynb) | Specs, baselines, ranking across seeds |
-| [`03-why-did-the-price-move`](https://github.com/simoncoombes/tradefloor/blob/main/examples/03-why-did-the-price-move.ipynb) | The eleven factors that sum to the mispricing's move |
+| [`03-why-did-the-price-move`](https://github.com/simoncoombes/tradefloor/blob/main/examples/03-why-did-the-price-move.ipynb) | The twelve factors that sum to the mispricing's move |
 | [`04-how-realistic-is-this`](https://github.com/simoncoombes/tradefloor/blob/main/examples/04-how-realistic-is-this.ipynb) | The realism panel and the limits |
 | [`05-training-an-agent`](https://github.com/simoncoombes/tradefloor/blob/main/examples/05-training-an-agent.ipynb) | The Gymnasium environment, and what size costs |
 | [`06-execution-and-impact`](https://github.com/simoncoombes/tradefloor/blob/main/examples/06-execution-and-impact.ipynb) | TCA and the counterfactual run |
 | [`07-research-workflow.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/07-research-workflow.py) | A whole study in one file. It takes about forty seconds of CPU and needs `tradefloor[arrow]` |
 | [`08-claude-agent.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/08-claude-agent.py) | An LLM agent trading the market through the harness |
-| [`09-a-pandemic-shaped-market`](https://github.com/simoncoombes/tradefloor/blob/main/examples/09-a-pandemic-shaped-market.ipynb) | A real 2020-21 macro path, and which fields transmit. Pinned to `pt-v12`, whose QE channel carries the valuation path, with the same path on the default, `pt-v20`, at the end |
+| [`09-a-pandemic-shaped-market`](https://github.com/simoncoombes/tradefloor/blob/main/examples/09-a-pandemic-shaped-market.ipynb) | A real 2020-21 macro path, and which fields transmit. Pinned to `pt-v12`, whose QE channel carries the valuation path, with the same path on the default, `pt-v21`, at the end |
 | [`10-forking-a-market`](https://github.com/simoncoombes/tradefloor/blob/main/examples/10-forking-a-market.py) | Fork a market, raise the rate in one branch, and compare the futures |
 | [`11-scenario-fork.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/11-scenario-fork.py) | A scenario file applied to one branch of a fork, and what it cost |
 
@@ -354,10 +360,10 @@ several presets, and results depend on the preset.
 @software{tradefloor,
   author  = {Coombes, Simon},
   title   = {tradefloor: a deterministic market simulator with a limit order book},
-  version = {0.9.1},
+  version = {0.10.0},
   year    = {2026},
   url     = {https://github.com/simoncoombes/tradefloor},
-  note    = {Model preset pt-v20}
+  note    = {Model preset pt-v21}
 }
 ```
 
@@ -365,8 +371,8 @@ several presets, and results depend on the preset.
 carries the same details, and GitHub's "Cite this repository" button reads
 it.
 
-In the text, say which model you used, for example: "tradefloor 0.9.1,
-preset pt-v20, specified in its docs/MODEL.md".
+In the text, say which model you used, for example: "tradefloor 0.10.0,
+preset pt-v21, specified in its docs/MODEL.md".
 [docs/REPRODUCIBILITY.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/REPRODUCIBILITY.md)
 says how to publish a result so a reader can rerun it, and how to show a
 score was not tuned to its seeds.

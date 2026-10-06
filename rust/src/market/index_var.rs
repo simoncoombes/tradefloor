@@ -309,6 +309,7 @@ const TICKS_PER_SESSION: usize = 390;
 /// `Engine::advance_day_with` builds the day's index return from — and
 /// `sector` indexes the engine's own `sector_keys` order.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct NameVariance {
     pub weight: f64,
     pub beta: f64,
@@ -316,6 +317,18 @@ pub struct NameVariance {
     /// The name's GARCH variance state, BEFORE the tick's floor.
     pub garch_variance: f64,
     pub market_cap: f64,
+}
+
+impl NameVariance {
+    pub fn new(
+        weight: f64,
+        beta: f64,
+        sector: usize,
+        garch_variance: f64,
+        market_cap: f64,
+    ) -> Self {
+        NameVariance { weight, beta, sector, garch_variance, market_cap }
+    }
 }
 
 /// The session mean of the intraday multiplier SQUARED — `K` in the
@@ -334,13 +347,20 @@ pub struct NameVariance {
 /// engine realises. Derived, not chosen — there is no constant here to
 /// disagree with.
 pub fn intraday_variance_factor() -> f64 {
-    let mut total = 0.0;
-    for i in 0..TICKS_PER_SESSION {
-        let t = i as f64 / TICKS_PER_SESSION as f64;
-        let m = crate::market::hours::intraday_vol(t);
-        total += m * m;
-    }
-    total / TICKS_PER_SESSION as f64
+    // A constant of the build: computed once, by the same loop in the same
+    // order, so every call returns the f64 the loop gives. The rate indices'
+    // live mark (`rate_intraday_live`) reads the index variance nine times a
+    // refresh, and the 390 `pow`s were most of its cost.
+    static FACTOR: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+    *FACTOR.get_or_init(|| {
+        let mut total = 0.0;
+        for i in 0..TICKS_PER_SESSION {
+            let t = i as f64 / TICKS_PER_SESSION as f64;
+            let m = crate::market::hours::intraday_vol(t);
+            total += m * m;
+        }
+        total / TICKS_PER_SESSION as f64
+    })
 }
 
 /// `1 / sqrt(2 pi)`, the standard normal's density at zero. A literal
@@ -610,6 +630,7 @@ fn jump_intensities(p: &ModelParams, rate_scale: f64) -> (f64, f64) {
 /// the jump rate at three different couplings, and the sum alone cannot
 /// say which. Nothing in the engine reads it back.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct IndexVarianceTerms {
     /// `beta_w^2 * v_f`, the market factor's block before `K`.
     pub factor_raw: f64,
@@ -830,7 +851,7 @@ pub fn index_conditional_variance_terms(
     // replaced.
     let sigmas = vec![sector_sigma; sector_count];
     index_conditional_variance_terms_with_states(
-        p, names, sector_count, factor_variance, &sigmas, &[], jump_rate_scale,
+        p, names, sector_count, factor_variance, &sigmas, &[], &[], jump_rate_scale,
         crisis_spike, prev_day_down, k)
 }
 
@@ -844,6 +865,11 @@ pub fn index_conditional_variance_terms(
 /// 0.72, and a read-back that priced the stateless forms while the tick
 /// ran the stateful ones would be the same defect this module was written
 /// to close.
+///
+/// `idio_ratios` is the per-name idiosyncratic variance state
+/// (`ModelParams::idio_vol_alpha`), in `names`' order, a RATIO that
+/// multiplies the variance of the name's own draw; empty means none, and
+/// the idiosyncratic term is then summed exactly as before.
 #[allow(clippy::too_many_arguments)]
 pub fn index_conditional_variance_terms_with_states(
     p: &ModelParams,
@@ -852,6 +878,7 @@ pub fn index_conditional_variance_terms_with_states(
     factor_variance: f64,
     sector_sigmas: &[f64],
     jump_excitations: &[f64],
+    idio_ratios: &[f64],
     jump_rate_scale: f64,
     crisis_spike: f64,
     prev_day_down: bool,
@@ -877,7 +904,10 @@ pub fn index_conditional_variance_terms_with_states(
         beta_w += name.weight * name.beta;
         weight_sq += name.weight * name.weight;
         let idio = idio_sigma_daily(p, name);
-        idio_var += name.weight * name.weight * idio * idio;
+        match idio_ratios.get(index) {
+            Some(r) => idio_var += name.weight * name.weight * idio * idio * r,
+            None => idio_var += name.weight * name.weight * idio * idio,
+        }
         if name.sector < sector_count {
             let loaded = name.weight * crate::market::factors::sector_loading_for(p, name.beta);
             sector_loaded[name.sector] += loaded;

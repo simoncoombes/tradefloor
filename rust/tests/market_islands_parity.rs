@@ -192,10 +192,12 @@ fn session_boundaries_match_exactly() {
 
     for case in doc["sessions"].as_array().expect("sessions") {
         let i = &case["in"];
-        let time = GameTime {
-            hour: i["hour"].as_i64().unwrap(),
-            minute: i["minute"].as_i64().unwrap(),
-            day_of_week: i["dayOfWeek"].as_i64().unwrap(),
+        let time = {
+            GameTime::new(
+                i["hour"].as_i64().unwrap(),
+                i["minute"].as_i64().unwrap(),
+                i["dayOfWeek"].as_i64().unwrap(),
+            )
         };
         let got = get_market_status(time);
         let want = case["out"].as_str().unwrap();
@@ -317,10 +319,10 @@ fn index_arithmetic_matches_bit_for_bit() {
             serde_json::from_value(i["marketCaps"].clone()).expect("marketCaps");
         let companies: Vec<IndexConstituent> = caps
             .iter()
-            .map(|c| IndexConstituent {
-                id: c.id.clone(),
-                market_cap: bits(&c.cap),
-                is_bankrupt: c.bankrupt,
+            .map(|c| {
+                let mut index_constituent = IndexConstituent::new(c.id.clone(), bits(&c.cap));
+                index_constituent.is_bankrupt = c.bankrupt;
+                index_constituent
             })
             .collect();
         let component_ids: Vec<String> =

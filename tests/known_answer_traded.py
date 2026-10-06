@@ -30,10 +30,11 @@ this by comparing the scorecards with an unwrapped run.
 and `known_answer.py` prints the combined digest as its seventh line, which
 puts this run in the five-target determinism workflow.
 
-Re-basing. The run uses pt-v20 by name, as it stands on the branch, so the
-row moves when pt-v20 moves. The baseline records pt-v20's row from
+Re-basing. The run uses the default preset by name, pt-v21 since 0.10.0
+(pt-v20 before it), as it stands on the branch, so the row moves when that
+preset moves. The baseline records its row from
 `known_answer_presets.json` as `presetRow`, and the test fails with that
-reason when the two disagree. A change to pt-v20, to a reference agent or
+reason when the two disagree. A change to the preset, to a reference agent or
 to what `evaluate` scores moves this digest on purpose. Then bump
 `TRADED_KAT_VERSION`, run ``python tests/known_answer_traded.py --write`` on
 the changed tree, which rewrites the digests and `presetRow`, and add a
@@ -62,14 +63,17 @@ from tradefloor.baselines import reference_agents
 HERE = Path(__file__).resolve().parent
 
 #: Bumped only if this harness changes: the roster, the agents, the
-#: horizon or what is hashed. A change to the preset, an agent or the
-#: scoring re-bases the baseline without bumping it (see the module text).
-TRADED_KAT_VERSION = 1
+#: horizon, the preset it names or what is hashed. A change to the preset's
+#: own values, an agent or the scoring re-bases the baseline without bumping
+#: it (see the module text). 2 at 0.10.0, when the run moved from pt-v20 to
+#: pt-v21 with the default, so the traded path the default ships (its
+#: impact memory and order-flow laws) is in the cross-target comparison.
+TRADED_KAT_VERSION = 2
 
 SEED = 20260930
 #: Seeds the random baseline only (see `reference_agents`).
 AGENT_SEED = 5
-PRESET = "pt-v20"
+PRESET = "pt-v21"
 DAYS = 10
 STEPS_PER_DAY = 6
 TICKS_PER_STEP = 65
@@ -90,6 +94,14 @@ SCORECARD_FIELDS = (
     "equity_curve", "max_drawdown_pct", "ruined", "leverage_refusals",
     "explanation_baseline", "history_days", "margin_interest",
 )
+
+#: The scorecard fields hashed by value after the others, and only where
+#: they are not zero: the dividends a card received are 0.0 on every model
+#: without dividends (`dividend_payout_share`), which is every preset, so
+#: the digest of a run on one is the one it was before the field existed.
+#: `population_fingerprint` likewise: "" on every isolated run, which is
+#: every run this script makes.
+SCORECARD_NONZERO = ("dividends", "population_fingerprint")
 
 #: The scorecard fields hashed as a count of their lines.
 SCORECARD_COUNTED = ("errors", "partial_fills")
@@ -328,6 +340,11 @@ def part_buffers(scores: dict, recorders: dict) -> dict:
             if field == "explanations":
                 value = [list(pair) for pair in value]
             _value(scorecard, value)
+        for field in SCORECARD_NONZERO:
+            value = getattr(card, field)
+            if value:
+                _text(scorecard, field)
+                _value(scorecard, value)
         for field in SCORECARD_COUNTED:
             _text(scorecard, field)
             _int(scorecard, len(getattr(card, field)))

@@ -1,16 +1,16 @@
-"""A strategy as data: declarative, versioned, hashable.
+"""A strategy written as data that is declarative, versioned and hashable.
 
-Everything else in a run serialises, hashes and round-trips: the seed, the
-universe fingerprint, the model preset, the scenario, the order log. The
-strategy did not. ``evaluate`` takes any object with an ``act`` method, so the
-moment a result depends on an agent it depends on a Python callable that
-cannot be written into a methods section. A reader could re-run your seed and
-get your market, then had no way to get your strategy.
+Everything else in a run (the seed, the universe fingerprint, the model
+preset, the scenario, the order log) serialises, hashes and round-trips.
+The strategy did not. ``evaluate`` takes any object with an ``act`` method,
+so a result that depends on an agent depends on a Python callable that
+cannot be written into a methods section. A reader could re-run your seed
+and get your market, but had no way to get your strategy.
 
-This module closes that gap for the strategies that are already data. The
-shipped baselines share one grammar (a signal, a concentration (``top_k``),
-an exposure (``gross``) and a participation cap) and a
-:class:`StrategySpec` writes that grammar down:
+This module covers the strategies that are already data. The shipped
+baselines share one grammar (a signal, a concentration (``top_k``), an
+exposure (``gross``) and a participation cap) and a :class:`StrategySpec`
+writes it down:
 
 ```python
 spec = tf.StrategySpec.momentum(lookback_days=1.0, top_k=5)
@@ -18,65 +18,64 @@ scores = tf.evaluate({"momentum": spec}, seed=7, universe=u)
 scores["momentum"].strategy_fingerprint    # cite this
 ```
 
-Three properties, each load-bearing:
+A spec has three properties:
 
 - **It round-trips.** ``StrategySpec.from_json(s.to_json()) == s``, and
-  ``s.build().spec == s``. Without both directions this would be
-  documentation rather than a specification.
+  ``s.build().spec == s``. Without both directions it would only document
+  the strategy.
 - **It hashes.** :attr:`StrategySpec.fingerprint` is a sha256 over the
   canonical form, so a result can carry its strategy's identity next to its
-  seed and universe fingerprint. The canonical form is what makes the hash
-  mean something. See the property's docstring.
+  seed and universe fingerprint. The property's docstring defines the
+  canonical form, which is what lets equal strategies hash equal.
 - **It is versioned on semantics.** ``spec_version`` pins what the words
   mean, exactly as the model preset pins the coefficients. If ``momentum``
-  ever changes what it ranks, that is ``spec_version: 2``, because a spec whose
-  meaning drifts while its version holds would look reproducible while not
-  being, which is worse than no spec at all.
+  ever changes what it ranks, that is ``spec_version: 2``. A spec whose
+  meaning changed under the same version would look reproducible and not
+  be, which is worse than having no spec.
 
 ## What it deliberately cannot express
 
-Stated plainly, because the limit is the design rather than an omission:
-path dependence (stop losses, drawdown limits, anything reading its own P&L
+These limits are part of the design. A spec cannot express path
+dependence (stop losses, drawdown limits, anything reading its own P&L
 history), conditional logic ("momentum in calm markets, reversion in
-stress"), custom signals, and anything reading engine internals except
+stress"), custom signals, or anything reading engine internals except
 ``oracle``, the one privileged signal, which declares itself as such.
 
-The escape hatch stays open: write a Python agent, as now. The cost is that
-the result is not citable as a spec, and the methods section has to cite
-code at a commit instead. That is an honest trade, and stating it is what
-stops this grammar from sprawling into a programming language.
+For any of those, write a Python agent. The result is then not citable as
+a spec, and the methods section has to cite code at a commit instead.
+Keeping that limit is what stops this grammar from growing into a
+programming language.
 
 ## The decisions the design left open, decided here
 
 **Cadence is in the spec.** Trading frequency moves results more than any
 signal parameter. The measured rebalance table in ``baselines`` swings the
-same one-day signal from +88.7% to -13.2%, so a strategy whose identity
-excluded it would not be identified: two runs of the same fingerprint could
-disagree in sign. But the thing the spec pins is the strategy's own decision
-rule, not the harness's step granularity. ``cadence: "daily"`` re-decides
-once per day whatever ``steps_per_day`` the harness runs; ``cadence:
-"step"``, the default and what every shipped baseline does, delegates to
-the harness explicitly, and a methods section quoting such a spec must quote
+same one-day signal from +88.7% to -13.2%, so if a strategy's identity
+left cadence out, two runs of the same fingerprint could disagree in sign.
+The spec pins the strategy's own decision rule. It does not pin the
+harness's step granularity. ``cadence: "daily"`` re-decides once per day
+whatever ``steps_per_day`` the harness runs; ``cadence: "step"``, the
+default and what every shipped baseline does, delegates to the harness
+explicitly, and a methods section quoting such a spec must quote
 ``steps_per_day`` beside ``days`` and the seed. ``steps_per_day`` itself
 stays a harness parameter, because it also sets how often every agent is
-observed, which is experimental apparatus rather than strategy.
+observed, which makes it part of the experiment's setup.
 
 **``evaluate`` accepts specs directly.** A spec in the agents mapping is
-built fresh inside every call, which also closes a real trap: agents are
-stateful, and a reused instance carries one market's history into the next
-with no visible symptom. It is also what an MCP server needs, since a tool
-cannot accept a callable, and what stops callers inventing their own
-serialisation on the way to one.
+built fresh inside every call. That matters because agents are stateful,
+and a reused instance carries one market's history into the next with no
+visible symptom. An MCP server needs this too, since a tool cannot accept
+a callable, and it stops callers inventing their own serialisation to get
+one.
 
 **Blend weights are normalised, canonically.** Selection ranks the blended
 score and takes the top k, so the agent is invariant under any positive
 scaling of the weight vector: weights of 1.2/0.8 and 0.6/0.4 build
-bit-identical agents. Taking weights as given would therefore let two
-textually different specs name the same strategy under different
-fingerprints: identity finer than the thing identified, which defeats
-comparability from the opposite direction to semantic drift. Weights are
-divided by the sum of their absolute values at construction; signs and
-ratios. Everything behaviourally meaningful survives, including the
+bit-identical agents. Taking weights as given would let two textually
+different specs name the same strategy under different fingerprints, so
+results for one strategy could not be compared. Weights are divided by the
+sum of their absolute values at construction. That keeps their signs and
+ratios, and so everything that changes behaviour, including the
 net-short-signal tilt a negative weight expresses.
 """
 
@@ -297,14 +296,14 @@ def _contains_random(signal: Mapping[str, Any]) -> bool:
 
 
 class StrategySpec:
-    """A declarative strategy: buildable, serialisable, hashable.
+    """A declarative strategy that can be built, serialised and hashed.
 
-    Immutable once constructed, for the same reason ``ModelParams`` would be:
-    a fingerprint of a mutable object is a lie waiting to be told. Construct
+    Immutable once constructed, as ``ModelParams`` would be, because the
+    fingerprint of a mutable object can stop describing it. Construct
     through the named constructors (:meth:`hold`, :meth:`random`,
     :meth:`momentum`, :meth:`mean_reversion`, :meth:`oracle`, :meth:`blend`)
-    or pass the parts directly; either way the spec is canonicalised and
-    validated here, at construction, where a mistake is visible.
+    or pass the parts directly. Either way the spec is canonicalised and
+    validated at construction, where a mistake is visible.
 
     Defaults mirror the shipped baselines field for field, so
     ``StrategySpec.momentum()`` names exactly the agent ``Momentum()`` is.
@@ -410,9 +409,9 @@ class StrategySpec:
         """Equal weight across the roster, bought once and left alone.
 
         ``gross`` is what :class:`tradefloor.baselines.BuyAndHold` calls
-        ``leverage``: an equal-weight long-only book at weight ``gross/n`` IS
-        a gross exposure of ``gross``, and the spec uses one word for one
-        dimension across every kind.
+        ``leverage``. An equal-weight long-only book at weight ``gross/n``
+        has a gross exposure of ``gross``, and the spec uses the one word
+        for it across every kind.
         """
         return cls({"kind": "hold"}, portfolio={"gross": gross},
                    execution={"max_participation": max_participation})
@@ -421,13 +420,12 @@ class StrategySpec:
     def random(cls, *, seed: int = 0, gross: float = 0.5,
                max_participation: float = 0.02,
                cadence: str = "step") -> "StrategySpec":
-        """Uniformly random target weights: the noise floor.
+        """Uniformly random target weights, the noise floor.
 
         ``seed`` seeds the strategy's own draws, on its own stream, exactly
-        as :class:`tradefloor.baselines.RandomTrader` does. It is deliberately
-        separate from the market seed and it is recorded in the spec, because
-        a noise floor that cannot be reproduced is not a floor. Any integer
-        from 0 to ``2**64 - 1``.
+        as :class:`tradefloor.baselines.RandomTrader` does. It is separate
+        from the market seed and is recorded in the spec, so the noise floor
+        can be reproduced. Any integer from 0 to ``2**64 - 1``.
         """
         return cls({"kind": "random"}, portfolio={"gross": gross},
                    execution={"max_participation": max_participation,
@@ -440,11 +438,10 @@ class StrategySpec:
                  cadence: str = "step") -> "StrategySpec":
         """Long the recent winners, short the recent losers.
 
-        The lookback is in DAYS, only. The shipped class also accepts a
-        lookback in steps, but a step is a harness artifact: the same number
-        means a different horizon under a different ``steps_per_day``, and a
-        spec that changed meaning with harness configuration would not
-        specify anything.
+        The lookback is in DAYS only. The shipped class also accepts a
+        lookback in steps, but the same number of steps means a different
+        horizon under a different ``steps_per_day``, so a spec in steps
+        would change meaning with the harness configuration.
         """
         return cls({"kind": "momentum", "lookback_days": lookback_days},
                    portfolio={"top_k": top_k, "gross": gross},
@@ -466,15 +463,15 @@ class StrategySpec:
     def oracle(cls, *, top_k: int = 5, gross: float = 1.0,
                max_participation: float = 0.02,
                cadence: str = "step") -> "StrategySpec":
-        """Trades the true mispricing. Privileged, and says so.
+        """Trades the true mispricing, and is marked as privileged.
 
         A spec naming ``oracle`` declares access to state no real trader
-        has, and a reviewer needs to see that. Leaving it out
-        of the grammar would push the one strategy most in need of
-        disclosure into the uncitable escape hatch. Its ``top_k`` moves the
-        denominator of every capture ratio the library quotes, so a ratio
-        published without the oracle's spec fingerprint beside it is not a
-        number anyone can compare. On pt-v20 the library quotes none
+        has, and a reviewer needs to see that. Leaving it out of the
+        grammar would make the one strategy most in need of disclosure a
+        Python agent, which cannot be cited as a spec. Its ``top_k`` moves
+        the denominator of every capture ratio the library quotes, so a
+        ratio published without the oracle's spec fingerprint beside it
+        cannot be compared with any other. On pt-v20 the library quotes none
         (``baselines.ORACLE_NOT_A_CEILING``). See
         :class:`tradefloor.baselines.Oracle` for the measurements.
         """
@@ -500,7 +497,7 @@ class StrategySpec:
         ], top_k=10)
         ```
 
-        Weights are on the signal, not the portfolio: the components' ranks
+        Weights are on the signal, not the portfolio. The components' ranks
         are combined FIRST and ``top_k`` selects from the blended ranking,
         which is a different strategy from selecting top-k from each and
         merging. Weights are normalised to unit absolute mass at
@@ -524,10 +521,10 @@ class StrategySpec:
     def to_json(self, **kwargs: Any) -> str:
         """Serialise the canonical form.
 
-        What is written is the CANONICAL spec, with defaults materialised,
-        weights normalised and components merged and sorted, not the keystrokes
-        that built it. A reader of the JSON sees every parameter the strategy
-        ran under, including the ones the author never typed.
+        It writes the canonical spec, with defaults materialised, weights
+        normalised and components merged and sorted, whatever the call that
+        built it looked like. A reader of the JSON sees every parameter the
+        strategy ran under, including the ones the author never typed.
         """
         kwargs.setdefault("indent", 2)
         if kwargs.get("indent") is None:
@@ -538,10 +535,10 @@ class StrategySpec:
     def from_json(cls, text: str) -> "StrategySpec":
         """Rebuild a spec from :meth:`to_json` output.
 
-        A newer ``spec_version`` is refused rather than read on a best-effort
-        basis: a field this version does not understand would silently take a
-        default, and the resulting strategy would be one nobody specified,
-        while claiming, via its fingerprint, to be exactly what was written.
+        A newer ``spec_version`` is refused. Read on a best-effort basis, a
+        field this version does not understand would silently take a
+        default, and the result would be a strategy nobody specified that
+        carries the fingerprint of the one that was written.
         """
         payload = json.loads(text)
         if not isinstance(payload, dict) or "signal" not in payload:
@@ -570,17 +567,17 @@ class StrategySpec:
     def fingerprint(self) -> str:
         """sha256 over the canonical serialisation.
 
-        The hash is over CONTENT, not keystrokes: sorted keys, no
+        The hash is over the canonical content, with sorted keys, no
         whitespace, defaults materialised, blend weights normalised and
         components merged and sorted. Whitespace, key order, writing a
         default explicitly, scaling every weight by two, or listing
-        components in a different order all leave it unchanged, which is a
+        components in a different order all leave it unchanged. A
         fingerprint that moved with formatting would be worse than none,
         because it would look stable while identifying nothing.
 
-        ``spec_version`` is inside the hash deliberately. The same JSON
-        under a later version means something different, so it must
-        fingerprint differently.
+        ``spec_version`` is inside the hash because the same JSON under a
+        later version means something different, so it must fingerprint
+        differently.
         """
         cached = self._fingerprint
         if cached is None:
@@ -593,12 +590,11 @@ class StrategySpec:
     # -- building ---------------------------------------------------------
 
     def build(self) -> Any:
-        """Construct the agent this spec names. Fresh state every call.
+        """Construct the agent this spec names, with fresh state every call.
 
         For a single ranked or held signal at step cadence this returns the
-        shipped baseline class itself, because the spec claims to name those agents,
-        and returning the genuine article makes the claim true by
-        construction rather than by parallel implementation. Blends and
+        shipped baseline class itself, so the spec names those agents and
+        not a second implementation of them. Blends and
         daily cadence return the grammar's own agents. Every returned agent
         carries this spec as ``.spec``, which is the second half of the
         round-trip.

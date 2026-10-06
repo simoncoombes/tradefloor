@@ -39,7 +39,6 @@ Limit stable
 Macro stable
 MarketView advanced
 MatchResult advanced
-MispricingState deprecated
 ModelParams stable
 News advanced
 NewsImpact advanced
@@ -47,6 +46,7 @@ Node advanced
 Observation stable
 OrderBook advanced
 OrderError stable
+Population advanced
 Portfolio stable
 PortfolioView advanced
 Position advanced
@@ -76,7 +76,6 @@ World stable
 __version__ stable
 agree advanced
 annotations internal
-apply_mispricing deprecated
 atlas advanced
 baselines stable
 battery stable
@@ -85,14 +84,10 @@ boundary advanced
 branch stable
 capture_ratio stable
 capture_withheld advanced
-characteristic_root_moduli deprecated
-check_rate deprecated
 checkpoint advanced
 commit stable
 compare stable
 counterfactual stable
-crisis_epicentre_solve deprecated
-crowd_adjusted_root_moduli deprecated
 edgar advanced
 envelope stable
 evaluate stable
@@ -105,7 +100,6 @@ fingerprint stable
 flip advanced
 flow_impact advanced
 harness advanced
-impulse_response deprecated
 interventions advanced
 invariance advanced
 json internal
@@ -117,6 +111,7 @@ market_status advanced
 model_preset stable
 noise advanced
 oracle_is_ceiling advanced
+population advanced
 portfolio advanced
 preset_names stable
 preset_record stable
@@ -135,11 +130,8 @@ run_scenario stable
 sandbox advanced
 scenario advanced
 sealed_battery stable
-sector_daily_sigma deprecated
 sectors advanced
 spec advanced
-stationary_sigma deprecated
-step_mispricing_daily deprecated
 sweep advanced
 tca stable
 universe_util internal

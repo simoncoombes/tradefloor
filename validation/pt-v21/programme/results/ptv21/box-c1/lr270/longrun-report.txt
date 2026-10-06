@@ -1,0 +1,115 @@
+LONGRUN REPORT  2026-10-05 12:21:24
+tape: S&P 500 / VIX 1990-01-02..2025-07-31, 35.6 years; standard errors by block bootstrap over its 36 calendar years (B=200)
+arm pt-v20     base pt-v20 dials {}; 270 seeds x 21 years (first year discarded in pooled rows); engine 931ed3d4fe659e4dec765673
+arm pt-v21     base pt-v21 dials {}; 270 seeds x 21 years (first year discarded in pooled rows); engine 931ed3d4fe659e4dec765673
+cell: model value ±its seed-bootstrap SE (B=100), then z = (model - tape) / tape SE; ! |z|>=2, !! |z|>=3.
+half-life rows: z is taken on the per-session reversion fraction behind the half-life, which stays finite where the half-life does not.
+
+                                                         tape [SE]                     pt-v20                    pt-v21
+INDEX
+   index annual volatility, %                           18.1 [1.5]           19.1±0.2  +0.6            18.0±0.2  -0.1  
+   index annual return, % (model: median seed)           8.4 [2.8]            6.6±0.2  -0.6             6.4±0.2  -0.7  
+DRAWDOWNS (from the running peak)
+   10% drawdowns per decade                            3.65 [1.03]          4.60±0.10  +0.9           4.24±0.09  +0.6  
+     median depth                                      0.19 [0.04]          0.18±0.00  -0.3           0.16±0.00  -0.7  
+     sessions peak to trough                               62 [59]               96±3  +0.6                79±2  +0.3  
+     sessions trough to recovery                           86 [61]              102±4  +0.3               103±3  +0.3  
+   20% bear markets per decade                         1.12 [0.46]          1.96±0.05  +1.8           1.51±0.04  +0.8  
+     median depth                                      0.42 [0.08]          0.29±0.00  -1.6           0.30±0.01  -1.5  
+     deepest                                           0.57 [0.11]          0.81±0.02  +2.2!          0.90±0.04  +3.0!!
+     sessions peak to trough                             275 [243]              207±8  -0.3               167±6  -0.4  
+     sessions trough to recovery                         670 [314]              214±8  -1.5              296±12  -1.2  
+     peak VIX in the fall                              63.0 [13.4]           38.6±0.7  -1.8            47.2±0.7  -1.2  
+     worst month's volatility, %                       63.9 [16.9]           35.6±0.7  -1.7            38.0±0.9  -1.5  
+TAIL SESSIONS
+   sessions under -3% per decade                        30.1 [8.1]           39.5±1.5  +1.2            31.5±1.1  +0.2  
+   sessions under -5% per decade                         6.2 [3.2]            8.9±0.4  +0.8             6.9±0.4  +0.2  
+   sessions under -7% per decade                       1.97 [1.31]          2.46±0.18  +0.4           2.03±0.17  +0.0  
+   worst session, %                                    -12.0 [1.8]          -17.5±0.3  -3.0!!         -18.9±0.9  -3.8!!
+VIX LEVELS (share of sessions)
+   VIX < 15                                          0.326 [0.058]        0.385±0.010  +1.0         0.372±0.006  +0.8  
+   VIX 15-20                                         0.297 [0.038]        0.316±0.004  +0.5         0.350±0.003  +1.4  
+   VIX 20-25                                         0.200 [0.029]        0.164±0.004  -1.2         0.161±0.002  -1.3  
+   VIX 25-30                                         0.095 [0.019]        0.076±0.003  -1.0         0.064±0.001  -1.7  
+   VIX 30-40                                         0.059 [0.013]        0.048±0.002  -0.9         0.039±0.001  -1.5  
+   VIX 40-60                                         0.019 [0.008]        0.011±0.001  -1.0         0.012±0.001  -0.9  
+   VIX 60+                                         0.0042 [0.0031]      0.0006±0.0001  -1.2       0.0013±0.0001  -1.0  
+   VIX > 30                                          0.082 [0.019]        0.059±0.003  -1.2         0.052±0.002  -1.5  
+   VIX > 40                                          0.023 [0.010]        0.011±0.001  -1.2         0.013±0.001  -1.1  
+   highest VIX per decade (median)                     48.0 [14.8]           45.9±0.7  -0.1            54.2±0.8  +0.4  
+VIX FEAR SPELLS (spells within 10 sessions merged)
+   spells above 30 per decade                           11.5 [2.2]            8.1±0.3  -1.5             9.3±0.2  -1.0  
+     mean length, sessions                                  22 [5]               25±1  +0.7                19±0  -0.7  
+   spells above 40 per decade                            3.9 [1.2]            3.1±0.2  -0.7             3.3±0.1  -0.5  
+     mean length, sessions                                  19 [5]               14±1  -0.9                14±0  -1.0  
+VIX HALF-LIFE BY LEVEL (sessions; distance from trailing 1-year median)
+   VIX < 15                                             10.2 [3.1]           13.1±0.2  -2.3!           15.1±0.1  -3.4!!
+   VIX 15-20                                              14.0 [-]                  -  -0.1                   -  -0.0  
+   VIX 20-25                                            4.2 [20.0]           24.1±1.8  -1.0            20.3±0.6  -1.0  
+   VIX 25-30                                           17.7 [19.0]           17.6±0.8  +0.0            18.1±0.4  -0.1  
+   VIX 30-40                                           26.1 [11.1]           12.2±0.3  +4.4!!          18.8±0.5  +1.5  
+   VIX 40-60                                           33.1 [16.7]            9.4±0.3  +3.5!!          16.8±0.6  +1.4  
+   VIX 60+                                                18.4 [-]              7.0±0.5                  12.1±0.8      
+SAME-DAY FEAR (mean VIX change, points)
+   on index -0.5..-1.5% sessions                       0.93 [0.05]          0.95±0.00  +0.5           1.08±0.00  +2.9! 
+   on index < -3% sessions                             6.44 [0.44]          5.24±0.04  -2.7!          5.88±0.04  -1.3  
+RETURN BY YEAR SINCE START, % (tape: mean calendar year)
+   year 1 (burn, from the calm opening)                  9.8 [2.7]            7.4±1.1  -0.9             5.9±0.9  -1.5  
+   year 2                                                9.8 [2.7]            7.4±1.2  -0.9             7.7±0.7  -0.8  
+   year 3                                                9.8 [2.7]           10.2±1.1  +0.2             7.7±0.9  -0.8  
+   year 4                                                9.8 [2.7]           11.2±1.0  +0.5             6.9±0.8  -1.1  
+   year 5                                                9.8 [2.7]            7.0±1.1  -1.0             7.4±0.9  -0.9  
+   year 6                                                9.8 [2.7]            9.5±1.2  -0.1             7.5±0.9  -0.9  
+   year 7                                                9.8 [2.7]           11.4±1.1  +0.6            10.1±0.8  +0.1  
+   year 8                                                9.8 [2.7]            7.8±1.0  -0.8             7.1±0.9  -1.0  
+   year 9                                                9.8 [2.7]            8.4±1.1  -0.5             6.5±1.0  -1.2  
+   year 10                                               9.8 [2.7]            6.7±1.0  -1.2             6.7±1.1  -1.2  
+   year 11                                               9.8 [2.7]            6.2±0.8  -1.3             6.7±0.9  -1.2  
+   year 12                                               9.8 [2.7]            6.8±1.0  -1.1             6.7±1.2  -1.2  
+   year 13                                               9.8 [2.7]            7.5±1.0  -0.9             6.7±0.9  -1.2  
+   year 14                                               9.8 [2.7]            5.6±1.2  -1.5             6.7±1.1  -1.2  
+   year 15                                               9.8 [2.7]            8.4±1.2  -0.5             8.2±1.0  -0.6  
+   year 16                                               9.8 [2.7]            5.7±0.9  -1.5             7.3±1.1  -0.9  
+   year 17                                               9.8 [2.7]            6.9±1.0  -1.1             7.1±1.0  -1.0  
+   year 18                                               9.8 [2.7]            8.6±1.0  -0.5             8.7±0.8  -0.4  
+   year 19                                               9.8 [2.7]            8.9±1.1  -0.3             7.9±0.9  -0.7  
+   year 20                                               9.8 [2.7]            6.8±1.0  -1.1             6.7±0.9  -1.2  
+   year 21                                               9.8 [2.7]            7.2±1.1  -1.0             9.2±0.9  -0.2  
+SESSIONS UNDER -3% BY YEAR SINCE START, % of sessions (tape: all full years)
+   year 1 (burn, from the calm opening)                1.18 [0.33]          1.90±0.18  +2.2!          1.26±0.13  +0.3  
+   year 2                                              1.18 [0.33]          1.68±0.14  +1.5           1.02±0.11  -0.5  
+   year 3                                              1.18 [0.33]          2.04±0.19  +2.7!          1.12±0.13  -0.2  
+   year 4                                              1.18 [0.33]          1.69±0.18  +1.6           1.25±0.16  +0.2  
+   year 5                                              1.18 [0.33]          1.57±0.17  +1.2           1.09±0.10  -0.3  
+   year 6                                              1.18 [0.33]          1.79±0.18  +1.9           1.27±0.17  +0.3  
+   year 7                                              1.18 [0.33]          1.85±0.22  +2.1!          1.15±0.17  -0.1  
+   year 8                                              1.18 [0.33]          2.00±0.24  +2.5!          1.16±0.12  -0.1  
+   year 9                                              1.18 [0.33]          1.61±0.17  +1.3           1.18±0.12  +0.0  
+   year 10                                             1.18 [0.33]          1.53±0.15  +1.1           1.22±0.13  +0.1  
+   year 11                                             1.18 [0.33]          1.64±0.18  +1.4           1.36±0.16  +0.6  
+   year 12                                             1.18 [0.33]          1.79±0.16  +1.9           1.50±0.13  +1.0  
+   year 13                                             1.18 [0.33]          1.49±0.16  +0.9           1.31±0.15  +0.4  
+   year 14                                             1.18 [0.33]          1.71±0.17  +1.6           1.47±0.18  +0.9  
+   year 15                                             1.18 [0.33]          1.57±0.15  +1.2           1.39±0.16  +0.6  
+   year 16                                             1.18 [0.33]          1.36±0.13  +0.6           1.29±0.15  +0.3  
+   year 17                                             1.18 [0.33]          1.49±0.17  +0.9           1.31±0.15  +0.4  
+   year 18                                             1.18 [0.33]          1.21±0.15  +0.1           1.26±0.15  +0.2  
+   year 19                                             1.18 [0.33]          1.01±0.10  -0.5           1.24±0.14  +0.2  
+   year 20                                             1.18 [0.33]          1.02±0.11  -0.5           1.25±0.15  +0.2  
+   year 21                                             1.18 [0.33]          1.28±0.16  +0.3           1.19±0.13  +0.0  
+
+REPLAY gfc 2007-06-01..2009-12-31, the real VIX imposed after a 252-session burn; model median [10th, 90th pct] over seeds, (z) = (median - real) / seed SD
+   maximum drawdown               real   0.568  pt-v20 0.464 [0.337, 0.593] (-1.0)  pt-v21 0.473 [0.300, 0.670] (-0.7)
+   worst month's volatility, %    real  84.256  pt-v20 89.035 [76.964, 103.686] (+0.4)  pt-v21 93.011 [73.252, 113.354] (+0.6)
+   calm volatility, %             real  13.716  pt-v20 13.169 [9.147, 21.864] (-0.1)  pt-v21 12.796 [9.293, 22.242] (-0.1)
+   stock correlation, calm        real   0.441  pt-v20 0.311 [0.184, 0.531] (-1.0)  pt-v21 0.288 [0.161, 0.525] (-1.1)
+   stock correlation, peak        real   0.748  pt-v20 0.786 [0.743, 0.834] (+1.1)  pt-v21 0.825 [0.767, 0.870] (+1.9)
+   VIX tracking error, points     real       -  pt-v20 2.137 [1.787, 2.682]  pt-v21 0.000 [0.000, 0.000]
+
+REPLAY covid 2020-01-02..2021-06-30, the real VIX imposed after a 252-session burn; model median [10th, 90th pct] over seeds, (z) = (median - real) / seed SD
+   maximum drawdown               real   0.339  pt-v20 0.369 [0.252, 0.515] (+0.3)  pt-v21 0.352 [0.226, 0.562] (+0.1)
+   worst month's volatility, %    real  94.501  pt-v20 75.230 [58.398, 96.418] (-1.3)  pt-v21 74.397 [56.217, 99.503] (-1.2)
+   calm volatility, %             real  12.769  pt-v20 12.628 [8.417, 22.713] (-0.0)  pt-v21 12.790 [8.720, 23.719] (+0.0)
+   stock correlation, calm        real   0.300  pt-v20 0.315 [0.170, 0.566] (+0.1)  pt-v21 0.267 [0.134, 0.531] (-0.2)
+   stock correlation, peak        real   0.872  pt-v20 0.785 [0.709, 0.841] (-1.7)  pt-v21 0.803 [0.751, 0.873] (-1.5)
+   VIX tracking error, points     real       -  pt-v20 1.971 [1.594, 2.479]  pt-v21 0.000 [0.000, 0.000]

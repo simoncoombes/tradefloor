@@ -2,8 +2,8 @@
 where its behaviour is discontinuous across the shipped scenarios.
 
 :func:`tradefloor.compare` says whether one intervention changed what an
-agent did. This module asks the next question: how far does a lever have
-to move before the decision changes. It bisects one intervention target
+agent did. This module measures how far a lever has to move before the
+decision changes. It bisects one intervention target
 between two values, one fresh fork and one day per probe, and closes on the
 narrowest bracket whose two ends draw different decisions.
 
@@ -45,7 +45,7 @@ stochastic part of the experiment. Before a flip is reported,
 gap between the two arms' mean ``net`` answers (buys minus sells, in
 actions) exceeds one within-arm standard deviation, the ``separation``
 that function computes. Two arms that answered identically every time
-have a floor of zero, and a non-zero gap stands on it.
+have a floor of zero, and any non-zero gap clears it.
 
 Three things stop a candidate short of that test, each with its own
 status. Two arms whose inputs were byte-identical never report a flip
@@ -196,13 +196,13 @@ _FIELD_OF: dict[str, str | None] = {}
 def macro_field_of(target: Target) -> str | None:
     """The engine macro field this target writes, or None for a column.
 
-    Derived rather than listed. The registry in `interventions.py` keeps
-    the field name inside each target's read and write closures, and a
-    second table here naming the same fields would be one more thing the
-    registry could drift away from. So the target is written once on a
-    scratch engine, and the one key of ``Engine.macro_fields`` that moved
-    is the field. ``market.liquidity`` moves none, and is driven through a
-    scenario instead. The answer is cached per process.
+    The registry in `interventions.py` keeps the field name inside each
+    target's read and write closures, so the field is derived here instead of
+    listed in a second table that could drift from the registry. The target is
+    written once on a scratch engine, and the one key of
+    ``Engine.macro_fields`` that moved is the field. ``market.liquidity``
+    moves none, and is driven through a scenario instead. The answer is cached
+    per process.
 
     The fields compared are the TRUE ones
     (:func:`tradefloor.interventions.true_macro_fields`), which is what a
@@ -1224,8 +1224,8 @@ class BoundaryMap:
     def table(self) -> Any:
         """One row per search, as a ``pyarrow.Table`` with :data:`COLUMNS`.
 
-        ``pyarrow`` is imported here and only here; the library depends on
-        nothing.
+        ``pyarrow`` is imported here and nowhere else, because the library
+        has no dependencies.
         """
         import pyarrow as pa
 

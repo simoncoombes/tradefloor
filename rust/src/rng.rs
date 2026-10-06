@@ -146,6 +146,7 @@ use crate::mathx;
 /// 1.033. Read both as no measurable cost rather than as a number.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(u8)]
+#[non_exhaustive]
 pub enum DrawKind {
     Uniform = 0,
     Normal = 1,
@@ -166,6 +167,7 @@ impl DrawKind {
 /// as a failure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u8)]
+#[non_exhaustive]
 pub enum Site {
     Unset = 0,
     /// The market factor's one normal per tick (market/tick.rs).
@@ -214,6 +216,20 @@ pub enum Site {
     /// draw per episode, not per session, and none at all when the scenario
     /// has pinned the epicentre.
     CrisisEpicentreU = 22,
+    /// The market's cycle nowcast: one uniform per session at the close, on
+    /// [`stream::CYCLE_NOWCAST`], only while `cycle_nowcast_accuracy` is set.
+    CycleNowcastU = 23,
+    /// The night's student-t scale for the idiosyncratic draw: `nu` normals
+    /// per company (the tag is the company index), squared and summed into
+    /// a chi-square, on [`stream::OVERNIGHT`] after the three sites above.
+    /// Taken only while `overnight_idio_df` is set on a model with a night
+    /// share, so every other model's overnight schedule is the one it was.
+    OvernightIdioChi2 = 24,
+    /// The day's market t scale (`market_day_tail_df`): the gamma draw
+    /// behind one chi-square per session, normals and uniforms by
+    /// Marsaglia and Tsang (a variable count), on [`stream::OVERNIGHT`]
+    /// after every other overnight site. Taken only while the dial is set.
+    MarketDayTailChi2 = 25,
 }
 
 impl Site {
@@ -242,12 +258,16 @@ impl Site {
             Site::OvernightIdioZ => "overnight_idio_z",
             Site::MarketVolLevelZ => "market_vol_level_z",
             Site::CrisisEpicentreU => "crisis_epicentre_u",
+            Site::CycleNowcastU => "cycle_nowcast_u",
+            Site::OvernightIdioChi2 => "overnight_idio_chi2",
+            Site::MarketDayTailChi2 => "market_day_tail_chi2",
         }
     }
 }
 
 /// One recorded draw.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct DrawRecord {
     pub kind: DrawKind,
     pub index: u64,
@@ -263,11 +283,13 @@ const _: () = assert!(std::mem::size_of::<DrawRecord>() == 32);
 
 /// The per-generator table of substitutions and the optional log.
 #[derive(Debug, Clone, Default)]
+#[non_exhaustive]
 pub struct DrawOverlay {
     pub table: std::collections::BTreeMap<(DrawKind, u64), f64>,
 }
 
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct DrawLog {
     pub from_day: i64,
     pub to_day: i64,
@@ -506,6 +528,41 @@ pub mod stream {
     /// for bit.
     pub const OPENING: u32 = 10;
 
+    /// The market's cycle nowcast: the one uniform a session that names the
+    /// phase the market's news reports (`cycle_nowcast_accuracy`). Outside
+    /// [`COUNT`] like [`OPENING`], so no array indexed by stream id grows and
+    /// every engine with the dial at 0.0 is the engine it was; its generator
+    /// is carried in the snapshot and the state hash only while the dial is
+    /// set. Conditional, for [`CRISIS_EPICENTRE`]'s reason: nothing else reads
+    /// this stream.
+    pub const CYCLE_NOWCAST: u32 = 11;
+
+    /// The arrival order of a cohort's orders at the shared book, under
+    /// `book_arrival_shuffle`. Not a generator at all: the id only keys
+    /// [`super::arrival_priority`], a counter-based function of the seed,
+    /// the day, the step and the label, so there is no position to
+    /// snapshot, restore or mark and it sits outside [`COUNT`] as
+    /// [`OPENING`] does. No stream's draws move at any setting. It is 12,
+    /// not the 11 sim/real-arrival-order chose, because [`CYCLE_NOWCAST`]
+    /// took 11 in sim/r13.
+    pub const ARRIVAL: u32 = 12;
+
+    /// The earnings calendar's key: two raw outputs, taken once when the
+    /// engine is built, form the 64-bit key every earnings draw is derived
+    /// from ([`GameRng::keyed`](crate::rng::GameRng::keyed)). A ONE-SHOT stream like [`OPENING`], outside
+    /// [`COUNT`]: nothing holds a position on it, and every other stream is
+    /// untouched at every setting.
+    ///
+    /// The calendar's draws are KEYED rather than streamed: the name's
+    /// offset into the quarter, each quarter's jitter and each report's
+    /// surprise are functions of (key, company id, quarter, slot), so the
+    /// dates ahead can be listed without drawing anything, a report's draws
+    /// do not depend on how many names reported before it, and a roster
+    /// change does not reshuffle any other name's calendar. It is 13, not
+    /// the 11 sim/real-earnings-gaps chose, because [`CYCLE_NOWCAST`] took 11
+    /// in sim/r13 and [`ARRIVAL`] 12.
+    pub const EARNINGS: u32 = 13;
+
     /// How many streams there are. Every array indexed by stream id, the
     /// snapshot's generator and count vectors, the day mark's positions
     /// and the loops that enable, clear or stamp every stream are sized
@@ -536,6 +593,9 @@ pub mod stream {
     pub const SEED64_SURGERY_SEQUENCE_BASE: u32 = 1024;
     /// The tag in a wide root's per-stream key, ASCII "SD64".
     pub const SEED64_TAG: u32 = 0x5344_3634;
+    /// The sequence of every keyed generator ([`GameRng::keyed`](crate::rng::GameRng::keyed)): clear of
+    /// the stream, surgery and wide-root sequences above.
+    pub const KEYED_SEQUENCE: u32 = 1280;
 }
 
 /// The SplitMix64 output finalizer. Integer-only, exact on every platform.
@@ -548,6 +608,41 @@ fn splitmix64_mix(input: u64) -> u64 {
     z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
     z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
     z ^ (z >> 31)
+}
+
+/// The tag in the business cycle's publication draws, ASCII "PUBL"
+/// (`cycle_publication_lag_draw`).
+pub const PUBLICATION_TAG: u32 = 0x5055_424C;
+
+/// The key of a root seed's publication draws (`cycle_publication_lag_draw`):
+/// `splitmix64_mix(root ^ (PUBLICATION_TAG << 32 | 0xFFFF_FFFF))`. A
+/// bijection on `u64` for a fixed tag, and its input is never the input of a
+/// draw below (whose low half is a turn index, never all ones in practice).
+/// The engine keeps the key rather than the root.
+/// The tag of the market's prehistory (`market_prehistory_sessions`), ASCII
+/// "PREH": the surgery seed its stream generators are derived under, and the
+/// word its counter keys are mixed with.
+pub const PREHISTORY_TAG: u64 = 0x5052_4548;
+
+/// A counter key of the market's prehistory (the earnings calendar's, the
+/// cycle publication's): the run's own key mixed with [`PREHISTORY_TAG`], so
+/// the sessions played before day zero draw no reaction or publication
+/// uniform the run's own sessions draw.
+pub fn prehistory_key(key: u64) -> u64 {
+    splitmix64_mix(key ^ (PREHISTORY_TAG << 32 | PREHISTORY_TAG))
+}
+
+pub fn publication_key(root_seed: u64) -> u64 {
+    splitmix64_mix(root_seed ^ (((PUBLICATION_TAG as u64) << 32) | 0xFFFF_FFFF))
+}
+
+/// The `k`-th publication uniform in [0, 1) of a key:
+/// `splitmix64_mix(key ^ splitmix64_mix(PUBLICATION_TAG << 32 | k)) >> 11`
+/// times `2^-53`. Stateless and integer-only up to the one exact scaling:
+/// it takes nothing from any stream, so drawing it moves no other draw.
+pub fn publication_uniform(key: u64, k: u64) -> f64 {
+    let z = splitmix64_mix(key ^ splitmix64_mix(((PUBLICATION_TAG as u64) << 32) | (k & 0xFFFF_FFFF)));
+    (z >> 11) as f64 * (1.0 / (1u64 << 53) as f64)
 }
 
 /// The input the stream derivation mixes, for a root seed of either width.
@@ -566,6 +661,37 @@ fn stream_mix(root_seed: u64, stream_id: u32) -> u64 {
     } else {
         root_seed ^ splitmix64_mix(((stream::SEED64_TAG as u64) << 32) | stream_id as u64)
     }
+}
+
+/// FNV-1a over bytes, 64-bit. Integer-only; keys a label for
+/// [`arrival_priority`].
+fn fnv1a64(bytes: &[u8]) -> u64 {
+    let mut h: u64 = 0xCBF2_9CE4_8422_2325;
+    for &b in bytes {
+        h = (h ^ b as u64).wrapping_mul(0x0000_0100_0000_01B3);
+    }
+    h
+}
+
+/// A label's priority at the book on one step, under
+/// `book_arrival_shuffle`: the step's arrival order is the labels sorted by
+/// `(priority, label)`, lowest first.
+///
+/// ```text
+/// base = splitmix64_mix(stream_mix(seed, ARRIVAL))
+/// key  = splitmix64_mix(splitmix64_mix(base ^ day) ^ step_of_day)
+/// prio = splitmix64_mix(key ^ fnv1a64(utf8(label)))
+/// ```
+///
+/// Counter-based, so it consumes no draw and holds no state. Each label's
+/// priority depends on nothing but its own name, so the relative order of
+/// two labels is the same whichever other labels are present: removing,
+/// freezing or adding an agent never reorders the rest. `stream_mix` is the
+/// stream derivation's own, so a seed at or above `2^32` keys it whole.
+pub fn arrival_priority(seed: u64, day: u64, step_of_day: u64, label: &str) -> u64 {
+    let base = splitmix64_mix(stream_mix(seed, stream::ARRIVAL));
+    let key = splitmix64_mix(splitmix64_mix(base ^ day) ^ step_of_day);
+    splitmix64_mix(key ^ fnv1a64(label.as_bytes()))
 }
 
 /// The draw interface the engine modules consume.
@@ -629,6 +755,7 @@ pub fn to_uint32(value: f64) -> u32 {
 /// the cached Box-Muller spare, and would restore a generator that agreed on
 /// uniforms and disagreed on normals.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct RngState {
     pub state: u64,
     pub increment: u64,
@@ -638,6 +765,76 @@ pub struct RngState {
     /// generator's addresses start from zero at the restore.
     pub uniforms: u64,
     pub normals: u64,
+}
+
+impl RngState {
+    /// The state as [`RNG_STREAM_WIDTH`](crate::RNG_STREAM_WIDTH) numbers,
+    /// for a host that saves it in a flat array: the LCG state and
+    /// increment as the raw bits of an `f64` (`f64::from_bits`), the spare
+    /// (NaN when there is none), then the uniform and normal draw counts.
+    ///
+    /// The first two words are bit patterns, not quantities, and some of
+    /// them are NaNs. Store and copy them as bits. JavaScript may rewrite a
+    /// NaN's bits when one passes through a number, and JSON has no NaN, so
+    /// a host that crosses either should move the words as bytes.
+    /// A rewritten NaN comes back with an even increment, and
+    /// [`RngState::from_words`] refuses one.
+    pub fn to_words(&self) -> [f64; crate::widths::RNG_STREAM_WIDTH] {
+        [
+            f64::from_bits(self.state),
+            f64::from_bits(self.increment),
+            self.spare.unwrap_or(f64::NAN),
+            self.uniforms as f64,
+            self.normals as f64,
+        ]
+    }
+
+    /// Read back what [`RngState::to_words`] wrote. Refuses a slice of the
+    /// wrong length, an even increment (every PCG increment is odd), an
+    /// infinite spare, and a draw count that is not a whole number from 0
+    /// to 2^53.
+    pub fn from_words(words: &[f64]) -> Result<Self, String> {
+        const W: usize = crate::widths::RNG_STREAM_WIDTH;
+        let words: &[f64; W] = words.try_into().map_err(|_| {
+            format!(
+                "an RNG stream state is {W} numbers (state, increment, spare, \
+                 uniforms, normals), got {}",
+                words.len()
+            )
+        })?;
+        let increment = words[1].to_bits();
+        if increment & 1 == 0 {
+            return Err(format!(
+                "the increment word holds the bits {increment:#018x}, which is \
+                 even. Every PCG increment is odd, so the word was changed on \
+                 the way: a NaN whose bits were rewritten is the usual cause."
+            ));
+        }
+        let spare = if words[2].is_nan() {
+            None
+        } else if words[2].is_finite() {
+            Some(words[2])
+        } else {
+            return Err(format!(
+                "the spare word is {}; a spare is finite, or NaN for none.",
+                words[2]
+            ));
+        };
+        let count = |name: &str, v: f64| -> Result<u64, String> {
+            if v.is_finite() && v >= 0.0 && v.fract() == 0.0 && v <= 9_007_199_254_740_992.0 {
+                Ok(v as u64)
+            } else {
+                Err(format!("the {name} word holds {v}; a draw count is a whole number from 0."))
+            }
+        };
+        Ok(RngState {
+            state: words[0].to_bits(),
+            increment,
+            spare,
+            uniforms: count("uniforms", words[3])?,
+            normals: count("normals", words[4])?,
+        })
+    }
 }
 
 /// PCG-XSH-RR with 64-bit state and 32-bit output.
@@ -906,6 +1103,31 @@ impl GameRng {
         }
     }
 
+    /// The earnings calendar's key for `root_seed`: the first two raw
+    /// outputs of the one-shot [`stream::EARNINGS`], high word first.
+    pub fn earnings_key(root_seed: u64) -> u64 {
+        let mut g = Self::substream(root_seed, stream::EARNINGS);
+        let hi = g.pcg.next_u32() as u64;
+        let lo = g.pcg.next_u32() as u64;
+        (hi << 32) | lo
+    }
+
+    /// A KEYED generator: a fresh generator for one (key, a, b), where the
+    /// earnings calendar passes its key, a company id's hash and a
+    /// (quarter, slot) word. Integer-only, like every derivation here:
+    ///
+    /// ```text
+    /// seed  = splitmix64_mix(key ^ splitmix64_mix(a ^ splitmix64_mix(b)))
+    /// keyed = GameRng::new(seed, KEYED_SEQUENCE)            // = 1280
+    /// ```
+    ///
+    /// No position, no log and no overlay: nothing holds it beyond the one
+    /// report it prices, so there is nothing to snapshot but the key.
+    pub fn keyed(key: u64, a: u64, b: u64) -> Self {
+        let seed = splitmix64_mix(key ^ splitmix64_mix(a ^ splitmix64_mix(b)));
+        Self::new(seed, stream::KEYED_SEQUENCE)
+    }
+
     /// A surgery generator: the source of a re-randomised window of one
     /// stream, per the surgery derivation contract.
     ///
@@ -1093,6 +1315,26 @@ impl GameRng {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The publication draws (`cycle_publication_lag_draw`): the documented
+    /// formula, in [0, 1), reproducible, distinct over turns and seeds.
+    #[test]
+    fn publication_draws_are_the_documented_stateless_formula() {
+        let key = publication_key(7);
+        assert_eq!(key, splitmix64_mix(7 ^ ((0x5055_424Cu64 << 32) | 0xFFFF_FFFF)));
+        for k in 0..2000u64 {
+            let u = publication_uniform(key, k);
+            assert!((0.0..1.0).contains(&u), "{u}");
+            let z = splitmix64_mix(key ^ splitmix64_mix((0x5055_424Cu64 << 32) | k));
+            assert_eq!(u, (z >> 11) as f64 / (1u64 << 53) as f64);
+            assert_eq!(u, publication_uniform(key, k));
+        }
+        assert_ne!(publication_uniform(key, 0), publication_uniform(key, 1));
+        assert_ne!(publication_key(7), publication_key(8));
+        assert_ne!(publication_key(7), publication_key(7 | (1 << 40)));
+        let mean: f64 = (0..10_000u64).map(|k| publication_uniform(key, k)).sum::<f64>() / 10_000.0;
+        assert!((mean - 0.5).abs() < 0.01, "{mean}");
+    }
 
     /// The state after construction is not something the reference implementation exposes,
     /// so this pins the internal sequence instead: the first outputs must be
@@ -1618,6 +1860,20 @@ mod seed64_tests {
             assert!(!narrow.contains(&GameRng::surgery(WIDE, id, 1).snapshot().increment));
             assert!(!narrow.contains(&GameRng::surgery(42, id, 1 << 40).snapshot().increment));
         }
+    }
+
+    /// The arrival priority is the documented formula, pinned by golden
+    /// values that `tests/test_arrival_order.py` computes independently in
+    /// Python.
+    #[test]
+    fn arrival_priority_is_the_documented_formula() {
+        assert_eq!(arrival_priority(201, 0, 0, "a"), 0x09f6_9160_e6ea_96dc);
+        assert_eq!(arrival_priority(201, 3, 1, "b"), 0x3bc1_d0a9_9543_6b68);
+        assert_eq!(arrival_priority((1 << 40) + 7, 5, 2, "claude"), 0x32c6_8be7_c13f_fe3b);
+        // order(201, 3, 1, [a, b]) is [b, a].
+        assert!(arrival_priority(201, 3, 1, "b") < arrival_priority(201, 3, 1, "a"));
+        assert_eq!(fnv1a64(b""), 0xCBF2_9CE4_8422_2325);
+        assert_eq!(fnv1a64(b"a"), 0xAF63_DC4C_8601_EC8C);
     }
 
     /// The raw generator takes the seed whole: below `2^32` it is the

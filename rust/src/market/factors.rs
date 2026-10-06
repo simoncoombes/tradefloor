@@ -61,7 +61,8 @@ pub const OVERNIGHT_COMPONENT_KEY: &str = "overnight";
 pub const JUMP_SLOT: usize = S_COMPONENT_KEYS.len();
 pub const OVERNIGHT_SLOT: usize = JUMP_SLOT + 1;
 pub const FAIR_VALUE_SLOT: usize = OVERNIGHT_SLOT + 1;
-pub const COMPONENT_COUNT: usize = FAIR_VALUE_SLOT + 1;
+pub const DIVIDEND_SLOT: usize = FAIR_VALUE_SLOT + 1;
+pub const COMPONENT_COUNT: usize = DIVIDEND_SLOT + 1;
 
 /// A name's loading on its sector factor, from its beta (§108).
 ///
@@ -412,6 +413,14 @@ pub const S_COMPONENT_KEYS: [&str; 8] = [
 /// so every earlier one keeps its position.
 pub const FAIR_VALUE_COMPONENT_KEY: &str = "fair_value_shift";
 
+/// The ex-date's slot in the ENGINE's attribution, after the fair-value
+/// shift: the change in `s` when a name goes ex at the open and `s` is
+/// re-read against the fair value without the accrued dividend
+/// (`dividend_payout_share`). The price itself drops by the amount; this is
+/// only what that did to the mispricing, so every slot together still sums
+/// to the change in `s`. Exactly zero on every preset.
+pub const DIVIDEND_COMPONENT_KEY: &str = "dividend";
+
 /// The tick's own rows: the eight `S_COMPONENT_KEYS`, then the tick's
 /// fair-value shift at [`TICK_FAIR_VALUE`].
 pub const TICK_COMPONENT_COUNT: usize = S_COMPONENT_KEYS.len() + 1;
@@ -473,7 +482,8 @@ pub const INFORMED_FLOW_FRACTION: f64 = 0.35;
 /// single market draw reaches every name through its beta, and a sector draw
 /// reaches everything in that sector. Without it a 108-name index would have
 /// almost no aggregate volatility, because independent noise cancels.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
+#[non_exhaustive]
 pub struct SharedFactors {
     pub market_factor: f64,
     /// Indexed by the same sector key order the tick draws them in.
@@ -522,7 +532,8 @@ impl SharedFactors {
 }
 
 /// A news event, as the factor model reads it.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
+#[non_exhaustive]
 pub struct NewsEvent {
     pub company_id: Option<String>,
     pub sector: Option<String>,
@@ -599,6 +610,7 @@ pub fn news_absorption_weight(params: &crate::params::ModelParams,
 
 /// The company fields the live factor subset reads.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct FactorCompany {
     pub id: String,
     pub sector: String,
@@ -613,8 +625,28 @@ pub struct FactorCompany {
     pub last_daily_return: Option<f64>,
 }
 
+impl FactorCompany {
+    /// A name with every number zero and every optional figure absent.
+    /// Set the fields the factor model should read on the value.
+    pub fn new(id: impl Into<String>, sector: impl Into<String>) -> Self {
+        FactorCompany {
+            id: id.into(),
+            sector: sector.into(),
+            beta: None,
+            market_cap: 0.0,
+            avg_volume: 0.0,
+            shares_outstanding: 0.0,
+            short_interest: 0.0,
+            float: 0.0,
+            garch_variance: 0.0,
+            last_daily_return: None,
+        }
+    }
+}
+
 /// The four live factors.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct LiveFactors {
     pub company_news: f64,
     /// The part of `company_news` from MARKET-WIDE events (no company, no
@@ -1759,8 +1791,8 @@ mod tests {
             let p = crate::params::ModelParams::preset(name).expect("named");
             // pt-v18 switched the recentring on; pt-v19 is built on pt-v18
             // and pt-v20 on pt-v19, and both inherit it. Every preset before
-            // pt-v18 must read 0.0.
-            if *name == "pt-v18" || *name == "pt-v19" || *name == "pt-v20" {
+            // pt-v18 must read 0.0. pt-v21 (0.10.0) is built on pt-v20.
+            if matches!(*name, "pt-v18" | "pt-v19" | "pt-v20" | "pt-v21") {
                 assert_eq!(p.market_beta_down_asym_recentre, 1.0, "{name}");
                 continue;
             }
@@ -2284,9 +2316,13 @@ mod tests {
         // trajectory. Asserted against the presets themselves rather than
         // argued from the branch, and it will fail the day a preset turns
         // the law on -- which is the day the change stops being free.
+        // pt-v21 turned it on at 0.10.0, so injected order flow costs
+        // differently on the default from then; every preset before it
+        // still runs the clamped linear law.
         for name in crate::params::ModelParams::preset_names() {
             let p = crate::params::ModelParams::preset(name).expect("named");
-            assert_eq!(p.order_flow_impact_law, 0.0, "{name}");
+            let want = if *name == "pt-v21" { 1.0 } else { 0.0 };
+            assert_eq!(p.order_flow_impact_law, want, "{name}");
         }
     }
 
@@ -2702,10 +2738,12 @@ mod tests {
     fn every_shipped_preset_divides_by_depth_twice() {
         // The switch ships at 0.0 everywhere. This fails the day a preset
         // turns it on, which is the day order-flow costs change for every
-        // caller who injects flow.
+        // caller who injects flow. pt-v21 turned it on at 0.10.0; every
+        // preset before it divides twice.
         for name in crate::params::ModelParams::preset_names() {
             let p = crate::params::ModelParams::preset(name).expect("named");
-            assert_eq!(p.order_flow_depth_law, 0.0, "{name}");
+            let want = if *name == "pt-v21" { 1.0 } else { 0.0 };
+            assert_eq!(p.order_flow_depth_law, want, "{name}");
         }
     }
 

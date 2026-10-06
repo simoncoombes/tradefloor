@@ -75,12 +75,14 @@ pub fn bars_schema() -> SchemaRef {
 /// `mispricing_s` isolates the valuation gap. Three quantities that are easy
 /// to conflate, kept apart on purpose.
 ///
-/// **The decomposition.** Eleven columns, in `FACTOR_NAMES` order, giving
+/// **The decomposition.** Twelve columns, in `FACTOR_NAMES` order, giving
 /// every contribution to this tick's change in `s`: the eight
 /// `S_COMPONENT_KEYS`, then the daily jump and the overnight move, which
 /// land outside the tick loop and are booked onto the row where each is
 /// observed, then `fair_value_shift`, minus the part of the shocks that
-/// moved the name's fair value instead of `s` (pt-v20's permanent share). `reversion`, `momentum` and `crowd_lean` are the model's own
+/// moved the name's fair value instead of `s` (pt-v20's permanent share),
+/// then `dividend`, the change in `s` at an ex-date open, booked onto the
+/// day's first row (zero on every model without dividends). `reversion`, `momentum` and `crowd_lean` are the model's own
 /// dynamics; `company_news`, `order_flow_impact`, `short_squeeze_effect`
 /// and `random_noise` are the shocks. They sum to `Δs`.
 ///
@@ -136,6 +138,13 @@ pub fn truth_schema() -> SchemaRef {
     // through pt-v19. With it every component column sums to `Δs`.
     fields.push(Field::new(
         crate::market::factors::FAIR_VALUE_COMPONENT_KEY,
+        DataType::Float64,
+        false,
+    ));
+    // The ex-date's move in `s` (`dividend_payout_share`), booked on the
+    // day's first row like the overnight move. Zero on every preset.
+    fields.push(Field::new(
+        crate::market::factors::DIVIDEND_COMPONENT_KEY,
         DataType::Float64,
         false,
     ));
@@ -351,6 +360,15 @@ pub enum DepthColumns {
 /// whether the arm ran reads the column list, which is the more reliable
 /// answer anyway.
 pub fn prints_schema(depth: DepthColumns) -> SchemaRef {
+    prints_schema_with(depth, false)
+}
+
+/// [`prints_schema`], with the `distribution` column on a model that pays
+/// dividends: the cash dividend per share the instrument went ex for at the
+/// day's open, on the day's first print, and 0.0 on every other row. The
+/// first print's `repriced` carries the drop it made. Absent on a model
+/// without dividends, so every such table is the one it was.
+pub fn prints_schema_with(depth: DepthColumns, distribution: bool) -> SchemaRef {
     let mut fields = vec![
         Field::new("day", DataType::UInt32, false),
         Field::new("tick", DataType::UInt32, false),
@@ -365,6 +383,9 @@ pub fn prints_schema(depth: DepthColumns) -> SchemaRef {
     if depth == DepthColumns::Present {
         fields.push(Field::new("unbounded_print", DataType::Float64, false));
         fields.push(Field::new("liquidity_share", DataType::Float64, false));
+    }
+    if distribution {
+        fields.push(Field::new("distribution", DataType::Float64, false));
     }
     // Computed from the state the caller is actually in, so the caveat
     // cannot describe a table this is not. A retyped sentence per branch is
@@ -418,8 +439,11 @@ pub fn prints_schema(depth: DepthColumns) -> SchemaRef {
 /// it, because only the caller can see whether every day it is serving
 /// agrees. A `Present` state with a buffer shorter than the table is an
 /// error rather than a pad.
+///
+/// With the `distribution` column when `distribution` is `Some`: one
+/// amount per instrument, written on the day's first print.
 #[allow(clippy::too_many_arguments)]
-pub fn prints_batch(
+pub fn prints_batch_with(
     day: u32,
     ticks: usize,
     instruments: usize,
@@ -432,6 +456,7 @@ pub fn prints_batch(
     unbounded_print: &[f64],
     liquidity_share: &[f64],
     depth: DepthColumns,
+    distribution: Option<&[f64]>,
 ) -> Result<RecordBatch, String> {
     let rows = ticks * instruments;
     for (name, len) in [
@@ -485,7 +510,21 @@ pub fn prints_batch(
         columns.push(Arc::new(Float64Array::from(unbounded_print[..rows].to_vec())));
         columns.push(Arc::new(Float64Array::from(liquidity_share[..rows].to_vec())));
     }
-    RecordBatch::try_new(prints_schema(depth), columns).map_err(|e| e.to_string())
+    if let Some(amounts) = distribution {
+        let mut col = vec![0.0; rows];
+        if ticks > 0 {
+            for (i, slot) in col.iter_mut().take(instruments).enumerate() {
+                *slot = amounts.get(i).copied().unwrap_or(0.0);
+            }
+        }
+        columns.push(Arc::new(Float64Array::from(col)));
+    }
+    let schema = if distribution.is_some() {
+        prints_schema_with(depth, true)
+    } else {
+        prints_schema(depth)
+    };
+    RecordBatch::try_new(schema, columns).map_err(|e| e.to_string())
 }
 
 /// A reader over a fixed set of batches.
@@ -535,11 +574,11 @@ impl PyArrowStream {
 impl PyArrowStream {
     /// The Arrow PyCapsule stream protocol.
     ///
-    /// `requested_schema` is accepted and ignored, which the protocol allows:
-    /// it is a hint for casting, and this stream has exactly one schema it can
-    /// produce. Silently casting f64 columns to something narrower on request
-    /// is precisely the parity-breaking switch the dtype rule exists to
-    /// prevent, so a caller asking for one gets the honest schema instead.
+    /// `requested_schema` is accepted and ignored, which the protocol allows.
+    /// It is a hint for casting, and this stream can produce exactly one
+    /// schema. Casting f64 columns to something narrower on request would
+    /// break the bit parity the dtype rule protects, so a caller who asks
+    /// for that gets the stream's own schema.
     #[pyo3(signature = (requested_schema = None))]
     fn __arrow_c_stream__<'py>(
         &self,
@@ -658,6 +697,32 @@ pub fn macro_batch(rows: &[MacroRow]) -> Result<RecordBatch, String> {
     RecordBatch::try_new(macro_schema(), columns).map_err(|e| e.to_string())
 }
 
+/// `distributions`: one row per declared cash dividend. See
+/// `PyEngine::distributions`.
+pub fn distributions_schema() -> SchemaRef {
+    Arc::new(Schema::new(vec![
+        Field::new("day", DataType::UInt32, false),
+        Field::new("instrument_id", DataType::UInt32, false),
+        Field::new("declared_day", DataType::UInt32, false),
+        Field::new("ex_day", DataType::UInt32, false),
+        Field::new("amount", DataType::Float64, false),
+        Field::new("kind", DataType::Utf8, false),
+    ]))
+}
+
+pub fn distributions_batch(rows: &[&crate::engine::Distribution]) -> Result<RecordBatch, String> {
+    let u = |x: i64| if x < 0 { 0u32 } else { x as u32 };
+    let columns: Vec<ArrayRef> = vec![
+        Arc::new(UInt32Array::from(rows.iter().map(|r| u(r.ex_day)).collect::<Vec<_>>())),
+        Arc::new(UInt32Array::from(rows.iter().map(|r| r.company as u32).collect::<Vec<_>>())),
+        Arc::new(UInt32Array::from(rows.iter().map(|r| u(r.declared_day)).collect::<Vec<_>>())),
+        Arc::new(UInt32Array::from(rows.iter().map(|r| u(r.ex_day)).collect::<Vec<_>>())),
+        Arc::new(Float64Array::from(rows.iter().map(|r| r.amount).collect::<Vec<_>>())),
+        Arc::new(arrow::array::StringArray::from(rows.iter().map(|_| "cash").collect::<Vec<_>>())),
+    ];
+    RecordBatch::try_new(distributions_schema(), columns).map_err(|e| e.to_string())
+}
+
 /// `fills`: one row per execution.
 ///
 /// The trader's own record, not the market's. It exists so a study can join
@@ -726,10 +791,10 @@ pub fn fills_batch(
 
 /// Build a `fills` stream from parallel columns.
 ///
-/// Takes columns rather than a list of row objects because that is the shape
-/// the data is already in on both sides, and marshalling a million small
-/// objects across the boundary to immediately transpose them would be the cost
-/// this whole surface exists to avoid.
+/// It takes columns rather than a list of row objects because the data is
+/// already in columns on both sides. Marshalling a million small objects
+/// across the boundary only to transpose them is the cost this surface
+/// exists to avoid.
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
 pub fn fills_stream(
@@ -793,6 +858,11 @@ pub struct RecordedDay {
     /// wrong for the rest.
     pub unbounded_print: Vec<f64>,
     pub liquidity_share: Vec<f64>,
+    /// The cash dividend per share each instrument went ex for at this
+    /// day's open, one per instrument, or EMPTY on a model without
+    /// dividends (`dividend_payout_share`), whose `prints` carry no
+    /// `distribution` column.
+    pub distribution: Vec<f64>,
 }
 
 /// `bars` at a coarser grain: real OHLCV.

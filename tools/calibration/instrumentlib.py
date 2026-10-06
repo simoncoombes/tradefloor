@@ -161,10 +161,92 @@ PARAM_SPECS: dict[str, dict] = {
     "market_beta_down_asym_lag_recentre": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
     "fair_value_market_linear": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0)},
     "fair_value_market_vol_cap": {"kind": "abs", "step_unit": 0.25, "hard_range": (0.0, 32.0)},
+    "fair_value_market_excess_share": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
     "fair_value_vix_discount": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 1.0)},
     "fair_value_vix_knee": {"kind": "rel", "step_unit": 0.05, "hard_range": (1.0, 200.0)},
     "fair_value_vix_half_life": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 252.0)},
+    "fair_value_vix_release_half_life": {"kind": "abs", "step_unit": 5.0, "hard_range": (0.0, 2520.0)},
+    "fair_value_relative_knee": {"kind": "abs", "step_unit": 0.25, "hard_range": (0.0, 20.0)},
+    "fair_value_relative_half_life": {"kind": "abs", "step_unit": 21.0, "hard_range": (0.0, 25200.0)},
+    # Switches whose identity is the value, read only under a macro pin.
+    "macro_pins_hold": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0),
+                        "derived": True},
+    "pinned_vix_feedback": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0),
+                            "derived": True},
+    # The most of a pinned session's market variance a priced VIX move may
+    # take; read only with `pinned_vix_feedback` on.
+    "pinned_vix_variance_share": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    # A pinned VIX's calm line and the switch that holds a pin's priced
+    # share; read only with `pinned_vix_feedback` on.
+    "pinned_vix_calm_knee": {"kind": "abs", "step_unit": 0.5, "hard_range": (0.0, 200.0)},
+    "pinned_vix_calm_share": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    "pinned_vix_priced_cap": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0),
+                              "derived": True},
     "buyback_yield_cap": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 1.0)},
+    # Refused in (0, 0.2] by the engine; see atlas_survey's range.
+    "cycle_nowcast_accuracy": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    "corporate_spread_cycle": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    # The r13 macro-clock dials.
+    "earnings_anticipation_drift_share": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    "earnings_anticipation_drift_half_life": {"kind": "abs", "step_unit": 21.0, "hard_range": (0.0, 5040.0)},
+    "fed_growth_cut": {"kind": "abs", "step_unit": 0.1, "hard_range": (-5.0, 5.0)},
+    "cycle_publication_lag_draw": {"kind": "abs", "step_unit": 1.0,
+                                   "hard_range": (0.0, 1.0), "derived": False},
+    "buyback_accrual": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0)},
+    # The bond timing (r13). The live mark is refused without the re-mark;
+    # the stress start and gap are read only with the cut on.
+    "rate_close_remark": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0),
+                          "derived": True},
+    "rate_intraday_live": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0),
+                           "derived": True},
+    "fed_stress_cut": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    "fed_stress_vix": {"kind": "abs", "step_unit": 1.0, "hard_range": (10.0, 200.0)},
+    "fed_stress_inflation_gap": {"kind": "abs", "step_unit": 0.25, "hard_range": (0.0, 10.0)},
+    "dividend_payout_share": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 2.0)},
+    "dividend_growth_cutoff": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 10.0)},
+    "dividend_adjustment_speed": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.01, 1.0)},
+    "dividend_yield_ceiling": {"kind": "rel", "step_unit": 0.05, "hard_range": (1.0, 100.0)},
+    "dividend_buyback_substitution": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0)},
+    # The business cycle in the market factor's volatility (bear-dynamics).
+    # All ship at 0.0, so the hard range is what a search gets; each is the
+    # dial's own domain in `params.rs`.
+    "market_vol_cycle_ratio": {"kind": "abs", "step_unit": 0.25, "hard_range": (0.0, 5.0)},
+    "market_vol_cycle_expansion": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 2.0)},
+    "market_vol_cycle_half_life": {"kind": "abs", "step_unit": 5.0, "hard_range": (0.0, 2520.0)},
+    "market_vol_cycle_relative": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 1.0)},
+    "market_vol_cycle_relative_calm": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 1.0)},
+    "market_vol_cycle_cap_relative": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 1.0)},
+    "market_vol_cycle_pin_neutral": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0)},
+    "market_vol_cycle_pin_phase": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0)},
+    "market_vol_cycle_trough_release": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 1.0)},
+    "market_vol_cycle_release_half_life": {"kind": "abs", "step_unit": 5.0, "hard_range": (0.0, 2520.0)},
+    "market_vol_cycle_recovery_release": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 1.0)},
+    "market_vol_cycle_recovery_scale": {"kind": "abs", "step_unit": 0.02, "hard_range": (0.0, 2.0)},
+    "vix_stress_premium": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 10.0)},
+    "vix_stress_premium_knee": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 3.0)},
+    "vix_stress_premium_cap": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 1.0)},
+    "fed_put_gain": {"kind": "abs", "step_unit": 0.25, "hard_range": (0.0, 10.0)},
+    "fed_put_threshold": {"kind": "abs", "step_unit": 0.005, "hard_range": (0.0, 0.2)},
+    "fed_put_half_life": {"kind": "abs", "step_unit": 5.0, "hard_range": (0.0, 504.0)},
+    "fed_put_emergency_vix": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 90.0)},
+    "treasury_put_pricing": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    "treasury_haven_gain": {"kind": "abs", "step_unit": 0.001, "hard_range": (0.0, 0.05)},
+    "fed_stress_hold": {"kind": "abs", "step_unit": 5.0, "hard_range": (0.0, 504.0)},
+    "treasury_path_pricing": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 3.0)},
+    "treasury_path_half_life": {"kind": "abs", "step_unit": 5.0, "hard_range": (0.0, 504.0)},
+    "treasury_policy_damping": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 0.9)},
+    "policy_anticipation": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 3.0)},
+    "policy_anticipation_cut_share": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    "corporate_spread_vix_cut": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    "corporate_spread_equity_gain": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 10.0)},
+    "corporate_spread_equity_half_life": {"kind": "abs", "step_unit": 5.0, "hard_range": (0.0, 1260.0)},
+    "cycle_equity_hazard": {"kind": "abs", "step_unit": 0.5, "hard_range": (0.0, 20.0)},
+    "cycle_equity_hazard_knee": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 1.0)},
+    "cycle_equity_hazard_opening": {"kind": "abs", "step_unit": 0.002, "hard_range": (0.0, 1.0)},
+    "market_prehistory_sessions": {"kind": "abs", "step_unit": 63.0, "hard_range": (0.0, 2520.0)},
+    "market_prehistory_valuation": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0)},
+    "fed_put_carry": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    "fed_drawdown_hold": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 1.0)},
     # The variance-neutral down-tick reallocation. Ships at 0.0, so the
     # multiplicative box collapses and the hard range is what a search gets.
     # The top is the construction's own domain rather than a taste: the down
@@ -246,15 +328,29 @@ PARAM_SPECS: dict[str, dict] = {
                            "hard_range": (0.0, 1095.0)},
     # A SHARE of earnings, so [0, 1]. Past 1.0 a company returns more than
     # it earns every year, which is a claim about leverage this model does
-    # not carry.
+    # not carry -- except under `dividend_buyback_substitution`, where this
+    # is the TOTAL payout and a name's buyback share is it less the name's
+    # dividend payout, so the box reaches 1.5.
     "buyback_payout_share": {"kind": "abs", "step_unit": 0.05,
-                             "hard_range": (0.0, 1.0)},
+                             "hard_range": (0.0, 1.5)},
     # The overnight move's variance as a fraction of a session's. A RATIO
     # of variances, so an absolute box from zero; 1.0 is a night as large
     # as a session, and the real share of 0.23 to 0.43 sits well below it
     # even with the jump realised at the open.
     "overnight_variance_ratio": {"kind": "abs", "step_unit": 0.05,
                                  "hard_range": (0.0, 2.0)},
+    # The night's shares of the day, split rather than added, so a unit
+    # box less the session's minimum; the degrees of freedom are integers.
+    "overnight_market_share": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 0.9)},
+    "overnight_idio_share": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 0.9)},
+    "overnight_idio_df": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 30.0)},
+    # The earnings calendar's sizes, in own-sigma units, and its volume.
+    "earnings_surprise_sigma": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 20.0)},
+    "earnings_surprise_df": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 30.0)},
+    "earnings_session_sigma": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 20.0)},
+    "earnings_followthrough_sigma": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 20.0)},
+    "earnings_volume_multiple": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 10.0)},
+    "earnings_cycle_report_share": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
     # A SHARE of the jump drift returned, so [0, 1]. 1.0 is the
     # martingale and past it the compensator overshoots.
     "jump_mean_compensated": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
@@ -314,6 +410,11 @@ PARAM_SPECS: dict[str, dict] = {
     "sector_vol_beta": {"kind": "abs", "step_unit": 0.02, "hard_range": (0.0, 0.99)},
     "jump_idio_excitation": {"kind": "abs", "step_unit": 0.25, "hard_range": (0.0, 5.0)},
     "jump_idio_excitation_decay": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 0.95)},
+    # The per-name idiosyncratic variance state; alpha + beta < 1 is
+    # validated by the engine.
+    "idio_vol_alpha": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 0.5)},
+    "idio_vol_beta": {"kind": "abs", "step_unit": 0.02, "hard_range": (0.0, 0.95)},
+    "idio_vol_jump_bump": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 4.0)},
     "jump_idio_vix_decoupled": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0)},
     "forced_flow_gain": {"kind": "abs", "step_unit": 0.0001, "hard_range": (0.0, 0.01)},
     "forced_flow_threshold": {"kind": "abs", "step_unit": 1.0, "hard_range": (20.0, 60.0)},
@@ -537,6 +638,26 @@ PARAM_SPECS: dict[str, dict] = {
     # for leaving a range narrower than the sampler.
     "market_vol_gamma":         {"kind": "abs", "step_unit": 0.1,
                                  "hard_range": (0.0, 2.0)},
+    # The slow component's GJR loading and the factor's return memory
+    # (crash-vol-state). All ship at 0.0, so the hard range is what a
+    # search gets. Each top is the dial's own domain in `params.rs`; the
+    # slow gamma is further bounded there by twice the slow carried share.
+    "market_vol_slow_gamma":    {"kind": "abs", "step_unit": 0.05,
+                                 "hard_range": (0.0, 1.0)},
+    "market_vol_leverage":      {"kind": "abs", "step_unit": 0.5,
+                                 "hard_range": (0.0, 50.0)},
+    "market_vol_leverage_half_life": {"kind": "abs", "step_unit": 5.0,
+                                      "hard_range": (0.0, 2520.0)},
+    "market_vol_leverage_down": {"kind": "abs", "step_unit": 0.1,
+                                 "hard_range": (0.0, 1.0)},
+    "market_vol_leverage_standardise": {"kind": "abs", "step_unit": 0.1,
+                                        "hard_range": (0.0, 1.0)},
+    "market_beta_normalise": {"kind": "abs", "step_unit": 0.1,
+                              "hard_range": (0.0, 1.0)},
+    "market_day_tail_df": {"kind": "abs", "step_unit": 1.0,
+                           "hard_range": (0.0, 200.0)},
+    "market_day_tail_state_share": {"kind": "abs", "step_unit": 0.1,
+                                    "hard_range": (0.0, 1.0)},
     "market_vol_vix_coupling":  {"kind": "abs", "step_unit": 0.1,
                                  "hard_range": (0.0, 1.0)},
     # How far the factor's shock share rotates with its own variance
@@ -673,6 +794,14 @@ PARAM_SPECS: dict[str, dict] = {
     "cycle_publication_lag": {"kind": "abs", "step_unit": 21.0, "hard_range": (0.0, 2520.0)},
     "gdp_publication_lag": {"kind": "abs", "step_unit": 21.0, "hard_range": (0.0, 2520.0)},
     "unemployment_adjustment_half_life": {"kind": "abs", "step_unit": 10.0, "hard_range": (0.0, 2520.0)},
+    # Unemployment's anchor and oil's interior (issues #170 to #172). Each
+    # hard range is the one `ModelParams::validate` enforces; 0.0 is the
+    # shipped arithmetic on every one of them.
+    "unemployment_natural_pull": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 1.0)},
+    "unemployment_okun_coefficient": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 2.4)},
+    "unemployment_natural_rate": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 8.0)},
+    "oil_inventory_reversion": {"kind": "abs", "step_unit": 0.0005, "hard_range": (0.0, 1.0)},
+    "oil_inflation_passthrough": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 3.0)},
     "fear_greed_published_inputs": {"kind": "abs", "step_unit": 1.0,
                                     "hard_range": (0.0, 1.0), "derived": False},
     # A switch whose identity is the value: 1.0 prices a macro decision the
@@ -688,14 +817,34 @@ PARAM_SPECS: dict[str, dict] = {
                             "hard_range": (0.0, 1.0), "derived": False},
     "book_depth_reach": {"kind": "abs", "step_unit": 0.25,
                          "hard_range": (0.0, 10.0), "derived": False},
+    "book_depth_nesting": {"kind": "abs", "step_unit": 0.1,
+                           "hard_range": (0.0, 1.0), "derived": False},
     "book_shared": {"kind": "abs", "step_unit": 1.0,
                     "hard_range": (0.0, 1.0), "derived": False},
     "book_refill_half_life": {"kind": "abs", "step_unit": 1.0,
                               "hard_range": (0.0, 390.0), "derived": True},
     "book_resting": {"kind": "abs", "step_unit": 1.0,
                      "hard_range": (0.0, 1.0), "derived": False},
+    "book_arrival_shuffle": {"kind": "abs", "step_unit": 1.0,
+                             "hard_range": (0.0, 1.0), "derived": False},
     "fill_impact_coefficient": {"kind": "abs", "step_unit": 0.01,
                                 "hard_range": (0.0, 5.0), "derived": False},
+    # The metaorder memory (sqrt-impact). Read only on an agent's path.
+    "impact_memory_coefficient": {"kind": "abs", "step_unit": 0.05,
+                                  "hard_range": (0.0, 10.0), "derived": False},
+    "impact_memory_half_life": {"kind": "abs", "step_unit": 10.0,
+                                "hard_range": (0.0, 39000.0), "derived": False},
+    "impact_memory_slow_half_life": {"kind": "abs", "step_unit": 390.0,
+                                     "hard_range": (0.0, 98280.0), "derived": False},
+    "impact_memory_slow_weight": {"kind": "abs", "step_unit": 0.05,
+                                  "hard_range": (0.0, 0.999), "derived": False},
+    "impact_memory_crossover": {"kind": "abs", "step_unit": 0.0005,
+                                "hard_range": (0.0, 0.05), "derived": False},
+    # Switches (sim/r17-wash), read only on an agent's resting orders.
+    "impact_memory_refill": {"kind": "abs", "step_unit": 1.0,
+                             "hard_range": (0.0, 1.0), "derived": False},
+    "book_cross_at_limit": {"kind": "abs", "step_unit": 1.0,
+                            "hard_range": (0.0, 1.0), "derived": False},
     # The crisis epicentre's extra volatility, DERIVED 1.93 as the median of
     # the tape's three epicentre episodes (2.43, 1.93, 1.41). 0.0 is the
     # branch not taken; the range opens at zero to hold it and stops at 3.0,
@@ -1074,6 +1223,17 @@ def feasibility_violation(vector: dict[str, float],
     if ma + mb + mg / 2.0 >= 1.0:
         return ("factor-variance GJR stationarity: alpha+beta+gamma/2 = "
                 f"{ma + mb + mg / 2.0:.4f} >= 1")
+    # The slow component's GJR loading gives back half of itself from the
+    # slow carried share, and the return memory needs a half-life: the two
+    # cross-dial refusals `ModelParams` makes (crash-vol-state), here so a
+    # plan records such a vector as infeasible instead of erroring on it.
+    sg = val("market_vol_slow_gamma")
+    carried = (1.0 - val("market_vol_slow_gain")) * val("market_vol_slow_persistence")
+    if sg != 0.0 and carried - sg / 2.0 < 0.0:
+        return (f"market_vol_slow_gamma {sg:.4f} exceeds twice the slow "
+                f"carried share {carried:.4f}")
+    if val("market_vol_leverage") != 0.0 and val("market_vol_leverage_half_life") == 0.0:
+        return "market_vol_leverage is set with a half-life of 0"
     if not 0.0 <= val("momentum_theta") < 1.0:
         return "momentum_theta must lie in [0, 1)"
     for name in ("market_factor_sigma", "sector_factor_sigma",

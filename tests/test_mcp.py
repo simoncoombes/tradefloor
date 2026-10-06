@@ -50,24 +50,34 @@ def test_every_tool_registers_with_a_description():
 
 def test_the_readme_counts_the_tools_the_server_registers():
     """The README's Contents table said twelve at 0.8.5, when the server
-    registered thirteen. The count is read off that row and compared with
-    the server, not with a literal here."""
+    registered thirteen. Both counts, every tool and the read-only ones,
+    are read off that row and compared with the server's annotations, not
+    with a literal here. The row called all thirteen read-only until the
+    sessions arrived, and start_job was not."""
     import pathlib
     import re
     readme = (pathlib.Path(__file__).resolve().parent.parent
               / "README.md").read_text(encoding="utf-8")
-    row = re.search(r"^\| MCP server \| (\w+) read-only tools", readme, re.M)
+    row = re.search(r"^\| MCP server \| (\w+) tools for a coding agent, "
+                    r"(\w+) of them read-only", readme, re.M)
     assert row, "README.md's Contents table has no MCP server row"
     words = ["zero", "one", "two", "three", "four", "five", "six", "seven",
              "eight", "nine", "ten", "eleven", "twelve", "thirteen",
              "fourteen", "fifteen", "sixteen", "seventeen", "eighteen",
-             "nineteen", "twenty"]
-    word = row.group(1).lower()
-    claimed = int(word) if word.isdigit() else words.index(word)
+             "nineteen", "twenty", "twenty-one", "twenty-two"]
+
+    def count(word):
+        word = word.lower()
+        return int(word) if word.isdigit() else words.index(word)
+
     tools = asyncio.run(mcp.server.list_tools())
-    assert claimed == len(tools), (
-        f"README.md says {word} tools and the server registers {len(tools)}: "
-        f"{sorted(t.name for t in tools)}")
+    read_only = [t.name for t in tools if t.annotations.read_only_hint]
+    assert count(row.group(1)) == len(tools), (
+        f"README.md says {row.group(1)} tools and the server registers "
+        f"{len(tools)}: {sorted(t.name for t in tools)}")
+    assert count(row.group(2)) == len(read_only), (
+        f"README.md says {row.group(2)} are read-only and the server marks "
+        f"{len(read_only)}: {sorted(read_only)}")
 
 
 def test_the_catalogue_lists_the_pack_the_constructors_and_the_registry():
@@ -289,8 +299,8 @@ def test_every_successful_result_carries_its_provenance(call):
     prov = r["provenance"]
     assert prov["model_preset"] == pt.model_preset()["name"]
     assert prov["tradefloor_version"] == pt.__version__
-    # Kept for the 0.8 line, so an earlier reader does not break.
-    assert prov["pretium_version"] == pt.__version__
+    # The package's name before 0.5.0, carried beside it until 0.9.1 (#237).
+    assert "pretium_version" not in prov
     assert prov["model_fingerprint"], "an empty fingerprint cites nothing"
 
 
@@ -408,25 +418,16 @@ def test_a_stress_test_always_carries_its_control():
     assert any("MAGNITUDE" in c for c in r["caveats"])
 
 
-def _on_ceiling_preset(monkeypatch):
-    """Run the tools' evaluations on pt-v19, where the Oracle is a ceiling.
-
-    No tool takes a preset, so the library calls they make are pinned
-    instead. What is checked is the capture path the server keeps for a
-    default whose Oracle is a ceiling."""
-    import functools
-
-    monkeypatch.setattr(pt, "evaluate",
-                        functools.partial(pt.evaluate, model="pt-v19"))
-    monkeypatch.setattr(pt, "rank", functools.partial(pt.rank, model="pt-v19"))
-    monkeypatch.setattr(pt.baselines, "oracle_is_ceiling",
-                        lambda model=None: True)
+#: A preset on which the Oracle is a ceiling. The tools pinned the library
+#: calls to it until they took a preset of their own; they run it by name
+#: now, which checks the capture path through the argument a client uses.
+CEILING_PRESET = "pt-v19"
 
 
-def test_the_ranking_is_ordered_and_points_at_the_number_to_quote(
-        monkeypatch):
-    _on_ceiling_preset(monkeypatch)
-    r = mcp.rank_strategies({"mine": MOMENTUM}, seeds=[1, 2, 3], days=1)
+def test_the_ranking_is_ordered_and_points_at_the_number_to_quote():
+    assert pt.baselines.oracle_is_ceiling(CEILING_PRESET)
+    r = mcp.rank_strategies({"mine": MOMENTUM}, seeds=[1, 2, 3], days=1,
+                            preset=CEILING_PRESET)
     assert r["ok"]
     assert "capture_withheld" not in r
     caps = [x["pooled_capture"] for x in r["records"]
@@ -444,8 +445,9 @@ def test_on_pt_v20_the_ranking_quotes_buy_and_hold_and_no_capture():
     table is ordered on it, and the reason is sent."""
     r = mcp.rank_strategies({"mine": MOMENTUM}, seeds=[1, 2, 3], days=1)
     assert r["ok"]
-    assert r["provenance"]["model_preset"] == "pt-v20"
-    assert r["capture_withheld"] == pt.baselines.ORACLE_NOT_A_CEILING["pt-v20"]
+    # The default, pt-v21 from 0.10.0 (these read "pt-v20" until then).
+    assert r["provenance"]["model_preset"] == "pt-v21"
+    assert r["capture_withheld"] == pt.baselines.ORACLE_NOT_A_CEILING["pt-v21"]
     assert "unmeasurable" not in r
     for record in r["records"]:
         assert not {"pooled_capture", "median_capture",
@@ -461,7 +463,7 @@ def test_on_pt_v20_an_evaluation_quotes_buy_and_hold_and_no_capture():
     assert r["ok"]
     assert "capture_ratio" not in r and "capture_note" not in r
     assert r["capture_ratio_withheld"] == (
-        pt.baselines.ORACLE_NOT_A_CEILING["pt-v20"])
+        pt.baselines.ORACLE_NOT_A_CEILING["pt-v21"])  # the default; was pt-v20
     pnl = {row["name"]: row["pnl"] for row in r["scores"]}
     assert set(r["versus_buy_and_hold"]) == set(pnl) - {"buy_and_hold"}
     for name, value in r["versus_buy_and_hold"].items():
@@ -469,10 +471,10 @@ def test_on_pt_v20_an_evaluation_quotes_buy_and_hold_and_no_capture():
                                       abs=0.02)
 
 
-def test_where_the_oracle_is_a_ceiling_an_evaluation_quotes_capture(
-        monkeypatch):
-    _on_ceiling_preset(monkeypatch)
-    r = mcp.evaluate_strategies({"mine": MOMENTUM}, days=1)
+def test_where_the_oracle_is_a_ceiling_an_evaluation_quotes_capture():
+    assert pt.baselines.oracle_is_ceiling(CEILING_PRESET)
+    r = mcp.evaluate_strategies({"mine": MOMENTUM}, days=1,
+                                preset=CEILING_PRESET)
     assert r["ok"]
     assert "capture_ratio_withheld" not in r
     assert "versus_buy_and_hold" not in r
@@ -1383,20 +1385,37 @@ def test_a_top_n_below_one_is_refused(top_n):
     assert r["ok"] is False and "top_n" in r["error"]
 
 
+#: What each tool that is not read-only does to the world, as
+#: (read_only, destructive, idempotent). start_job, open_session and
+#: session_fork add to the server's memory. session_step advances a session
+#: and keeps the state it left. session_rewind and close_session drop state,
+#: and doing either twice drops nothing more.
+NOT_READ_ONLY = {
+    "start_job": (False, False, False),
+    "open_session": (False, False, False),
+    "session_fork": (False, False, False),
+    "session_step": (False, False, False),
+    "session_rewind": (False, True, True),
+    "close_session": (False, True, True),
+}
+
+
 def test_every_tool_says_what_it_does_to_the_world():
     """Directories and clients read these annotations, and Anthropic's
     connector directory requires a title and the read-only hint on every
-    tool. Every tool builds its own engine and only reads, except start_job,
-    which adds a job to the server's memory."""
+    tool. Every other tool builds its own engine and only reads, or reads a
+    session without changing it."""
     tools = asyncio.run(mcp.server.list_tools())
-    assert len(tools) == 13
+    assert len(tools) == 19
+    assert set(NOT_READ_ONLY) <= {t.name for t in tools}
     for t in tools:
         a = t.annotations
         assert t.title, t.name
         assert a is not None, t.name
-        assert a.destructive_hint is False and a.open_world_hint is False, t.name
-        assert a.read_only_hint is (t.name != "start_job"), t.name
-        assert a.idempotent_hint is (t.name != "start_job"), t.name
+        assert a.open_world_hint is False, t.name
+        expected = NOT_READ_ONLY.get(t.name, (True, False, True))
+        assert (a.read_only_hint, a.destructive_hint,
+                a.idempotent_hint) == expected, t.name
 
 
 def test_explain_says_when_to_use_it_instead_of_explain_price_move():
@@ -1500,3 +1519,170 @@ def test_a_background_job_takes_a_fork_day():
                       {"scenario": "liquidity_crisis", "days": 12,
                        "fork_day": 4, "universe_size": 6})
     assert j["ok"], j
+
+
+# -- presets ---------------------------------------------------------------
+#
+# The run tools take a shipped preset by name. The envelope certifies the
+# default alone, so a result under another preset says so, and a result
+# under the default is the result it always was.
+
+OTHER = "pt-v19"
+
+
+@pytest.mark.parametrize("call", [
+    lambda **kw: mcp.evaluate_strategies({"m": MOMENTUM}, days=1,
+                                         universe_size=8, **kw),
+    lambda **kw: mcp.rank_strategies({"m": MOMENTUM}, seeds=[1, 2], days=1,
+                                     universe_size=8, **kw),
+    lambda **kw: mcp.run_stress_scenario("rate_ramp", days=3, peak_day=2,
+                                         universe_size=8, **kw),
+    lambda **kw: mcp.explain_price_move(universe_size=8, day=1, top_n=2,
+                                        **kw),
+    lambda **kw: mcp.explain(universe_size=8, day=1, **kw),
+    lambda **kw: mcp.check_envelope(horizon_days=100, **kw),
+])
+def test_naming_the_default_preset_returns_the_bytes_omitting_it_does(call):
+    assert json.dumps(call(), sort_keys=True) == json.dumps(
+        call(preset=pt.model_preset()["name"]), sort_keys=True)
+
+
+@pytest.mark.parametrize("call", [
+    lambda **kw: mcp.evaluate_strategies({"m": MOMENTUM}, days=1,
+                                         universe_size=8, **kw),
+    lambda **kw: mcp.rank_strategies({"m": MOMENTUM}, seeds=[1, 2], days=1,
+                                     universe_size=8, **kw),
+    lambda **kw: mcp.run_stress_scenario("rate_ramp", days=3, peak_day=2,
+                                         universe_size=8, **kw),
+    lambda **kw: mcp.explain_price_move(universe_size=8, day=1, top_n=2,
+                                        **kw),
+    lambda **kw: mcp.explain(universe_size=8, day=1, **kw),
+    lambda **kw: mcp.open_session(universe_size=8, **kw),
+])
+def test_another_preset_runs_and_says_it_is_outside_the_certification(call):
+    r = call(preset=OTHER)
+    assert r["ok"], r.get("error")
+    prov = r["provenance"]
+    assert prov["model_preset"] == OTHER
+    assert prov["model_fingerprint"] == pt.ModelParams.from_preset(
+        OTHER).fingerprint
+    assert prov["certified_preset"] == envelope.PRESET
+    preset_caveats = [c for c in r["caveats"] if c.startswith("PRESET ")]
+    assert len(preset_caveats) == 1, r["caveats"]
+    record = pt.preset_record(OTHER)
+    held = record["in_band"]["252"]
+    of = held + len(record["misses"]["252"])
+    assert f"holds {held} of {of} panel rows" in preset_caveats[0]
+    assert envelope.PRESET in preset_caveats[0]
+    if "session_id" in r:
+        mcp.close_session(r["session_id"])
+
+
+def test_another_preset_runs_another_market():
+    default = mcp.evaluate_strategies({"m": MOMENTUM}, days=2, universe_size=8)
+    other = mcp.evaluate_strategies({"m": MOMENTUM}, days=2, universe_size=8,
+                                    preset=OTHER)
+    cards = pt.evaluate({"m": pt.StrategySpec.from_json(
+        mcp._normalise(MOMENTUM)[0])}, seed=7,
+        universe=pt.Universe.random(8, seed=111), days=2, model=OTHER)
+    mine = {row["name"]: row for row in other["scores"]}["m"]
+    assert mine["final_net_worth"] == round(cards["m"].final_net_worth, 2)
+    assert default["scores"] != other["scores"]
+
+
+def test_a_default_result_carries_no_preset_caveat_or_key():
+    r = mcp.evaluate_strategies({"m": MOMENTUM}, days=1, universe_size=8)
+    assert not any(c.startswith("PRESET ") for c in r["caveats"])
+    assert "certified_preset" not in r["provenance"]
+
+
+@pytest.mark.parametrize("call", [
+    lambda: mcp.evaluate_strategies({"m": MOMENTUM}, days=1, universe_size=4,
+                                    preset="pt-v99"),
+    lambda: mcp.rank_strategies({"m": MOMENTUM}, seeds=[1, 2], days=1,
+                                universe_size=4, preset="pt-v99"),
+    lambda: mcp.run_stress_scenario("rate_ramp", days=3, universe_size=4,
+                                    preset="pt-v99"),
+    lambda: mcp.explain_price_move(universe_size=4, preset="pt-v99"),
+    lambda: mcp.explain(universe_size=4, preset="pt-v99"),
+    lambda: mcp.check_envelope(horizon_days=10, preset="pt-v99"),
+    lambda: mcp.open_session(universe_size=4, preset="pt-v99"),
+    lambda: mcp.start_job("evaluate_strategies",
+                          {"strategies": {"m": MOMENTUM}, "days": 1,
+                           "universe_size": 4, "preset": "pt-v99"}),
+])
+def test_an_unknown_preset_is_refused_with_the_shipped_list(call):
+    r = call()
+    assert r["ok"] is False
+    assert "unknown preset 'pt-v99'" in r["error"]
+    for name in pt.preset_names():
+        assert repr(name) in r["error"]
+
+
+def test_a_job_runs_the_preset_its_arguments_name():
+    j = mcp.start_job("evaluate_strategies",
+                      {"strategies": {"m": MOMENTUM}, "days": 1,
+                       "universe_size": 4, "preset": OTHER})
+    assert j["ok"], j
+    assert j["provenance"]["model_preset"] == OTHER
+    deadline = time.time() + 60
+    while time.time() < deadline:
+        done = mcp.check_job(j["job_id"])
+        if done["status"] != "running":
+            break
+        time.sleep(0.2)
+    assert done["status"] == "done", done
+    assert done["result"]["provenance"]["model_preset"] == OTHER
+
+
+def test_check_envelope_answers_outside_for_another_preset():
+    inside = mcp.check_envelope(horizon_days=100)
+    assert inside["inside"] is True and "preset" not in inside
+    other = mcp.check_envelope(horizon_days=100, preset=OTHER)
+    assert other["inside"] is False
+    assert other["reasons"][0].startswith(f"PRESET {OTHER}")
+    assert other["preset"]["certified"] is False
+    assert other["preset"]["record"]["252"]["in_band"] == pt.preset_record(
+        OTHER)["in_band"]["252"]
+    # A gap the question meets is still reported beside the preset's.
+    longer = mcp.check_envelope(horizon_days=400, preset=OTHER)
+    assert [g["id"] for g in longer["gaps"]] == ["horizon"]
+    assert len(longer["reasons"]) == 2
+
+
+def test_describe_simulator_lists_every_preset_and_which_is_certified():
+    d = mcp.describe_simulator()["presets"]
+    assert d["certified"] == envelope.PRESET
+    assert d["default"] == pt.model_preset()["name"]
+    shipped = {p["name"]: p for p in d["shipped"]}
+    assert list(shipped) == list(pt.preset_names())
+    assert [n for n, p in shipped.items() if p["certified"]] == [
+        envelope.PRESET]
+    for name, entry in shipped.items():
+        record = pt.preset_record(name)
+        assert entry["record"]["252"]["in_band"] == record["in_band"]["252"]
+        assert entry["record"]["252"]["misses"] == record["misses"]["252"]
+
+
+def test_a_momentum_caveat_on_another_preset_quotes_that_presets_record():
+    r = mcp.evaluate_strategies({"m": MOMENTUM}, days=1, universe_size=8,
+                                preset=OTHER)
+    [line] = [c for c in r["caveats"] if "return autocorrelation" in c]
+    own = pt.preset_record(OTHER)["panel_252"]["return_acf1"]
+    assert f"{own:.4g}" in line and OTHER in line
+    assert mcp._statistic_line("return_acf1") in line
+
+
+def test_the_oracle_caveat_reads_the_runs_preset():
+    oracle = {"signal": {"kind": "oracle"}, "portfolio": {"top_k": 3}}
+    default = mcp.evaluate_strategies({"o": oracle}, days=1, universe_size=8)
+    other = mcp.evaluate_strategies({"o": oracle}, days=1, universe_size=8,
+                                    preset=OTHER)
+
+    def line(r):
+        return next(c for c in r["caveats"] if "PRIVILEGED" in c)
+
+    assert ("ceiling for measuring capture" in line(other)) is \
+        pt.baselines.oracle_is_ceiling(OTHER)
+    assert ("ceiling for measuring capture" in line(default)) is \
+        pt.baselines.oracle_is_ceiling()

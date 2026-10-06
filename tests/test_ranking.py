@@ -36,7 +36,7 @@ def ranking():
                         workers=4)
 
 
-#: The preset the capture tests run on. pt-v20, the default, reports no
+#: The preset the capture tests run on. pt-v20, and pt-v21, the default, report no
 #: capture (`baselines.ORACLE_NOT_A_CEILING`), so what a capture table does
 #: is checked where the Oracle is a ceiling: pt-v19, the last such preset.
 CEILING_PRESET = "pt-v19"
@@ -235,25 +235,33 @@ def test_a_real_difference_separates_and_a_median_gap_may_not(ranking):
     unmeasurable, since nothing divides by the Oracle. On pt-v19 the same
     grid reads the pooled captures in this module's docstring.
 
+    Re-measured when pt-v21 became the default (0.10.0), and the weak pair
+    swapped again, the sixth time momentum and mean reversion have traded
+    places here. The strong pair holds, buy-and-hold against random 11 to 1
+    at p = 0.0063. Momentum now trails buy-and-hold by less than mean
+    reversion (-41,696 a seed against -43,695) and wins 8 of 12 paired
+    seeds, p = 0.39. On pt-v20's graded arm this pair read the other way
+    round: mean reversion -31,797 against -35,129, 7 of 12, p = 0.77.
+
     Asserted as the CONTRAST rather than as two fixed p-values, because the
     counts belong to these seeds. What must hold is that the sign test can
     tell the two situations apart at all.
     """
     strong = ranking.separation("buy_and_hold", "random")
-    weak = ranking.separation("mean_reversion", "momentum")
+    weak = ranking.separation("momentum", "mean_reversion")  # was the reverse on pt-v20
     assert strong["p_value"] < 0.05, (
         f"buy-and-hold did not separate from random: {strong}"
     )
     assert not weak["decisive"]
     assert weak["p_value"] > strong["p_value"], (
-        "the sign test gave mean-reversion-vs-momentum at least as much "
+        "the sign test gave momentum-vs-mean-reversion at least as much "
         "confidence as buy-and-hold-vs-random; it is not discriminating"
     )
     # And the ordering the aggregate suggests is the one the sign test
     # refuses to confirm, and reporting both exists for that.
     table = {r.name: r.mean_excess_pnl for r in ranking.table()}
     assert table["buy_and_hold"] > table["random"]
-    assert table["mean_reversion"] > table["momentum"]
+    assert table["momentum"] > table["mean_reversion"]  # reversed on pt-v20
 
 
 def test_separation_is_symmetric_in_its_verdict(ranking):
@@ -325,8 +333,10 @@ def test_on_pt_v20_no_capture_is_reported_and_the_reason_is(ranking):
     `capture_withheld` and the report."""
     from tradefloor.baselines import ORACLE_NOT_A_CEILING
 
-    assert ranking.model_fingerprint == "pt-v20"
-    assert ranking.capture_withheld == ORACLE_NOT_A_CEILING["pt-v20"]
+    # The default: pt-v21 from 0.10.0, which keeps pt-v20's permanent
+    # share. These two read "pt-v20" while it was the default.
+    assert ranking.model_fingerprint == "pt-v21"
+    assert ranking.capture_withheld == ORACLE_NOT_A_CEILING["pt-v21"]
     assert ranking.unmeasurable == []
     for record in ranking.records.values():
         assert record.captures == [None] * len(ranking.seeds)
@@ -338,7 +348,7 @@ def test_on_pt_v20_no_capture_is_reported_and_the_reason_is(ranking):
     for record in payload["agents"].values():
         assert not {"captures", "pooled_capture",
                     "median_capture"} & set(record)
-    assert "No capture ratio on pt-v20" in ranking.report()
+    assert "No capture ratio on pt-v21" in ranking.report()  # was pt-v20
     assert "capture +" not in ranking.report()
 
 
@@ -740,7 +750,7 @@ def test_the_withheld_capture_reason_is_printed_only_when_the_oracle_ran():
     paragraph is left out."""
     from tradefloor.baselines import ORACLE_NOT_A_CEILING
 
-    reason = ORACLE_NOT_A_CEILING["pt-v20"]
+    reason = ORACLE_NOT_A_CEILING["pt-v21"]  # the default's; was "pt-v20"
     without = tradefloor.rank(
         lambda: {"mine": Momentum(), "buy_and_hold": BuyAndHold()},
         seeds=[1, 2], universe=UNIVERSE, days=1)

@@ -190,7 +190,7 @@ def write_report(rows: list[dict], meta: dict, path: Path) -> None:
     lines = [
         "# Published-figure re-measurement",
         "",
-        f"Commit `{meta['commit']}`, {meta['date']}, tradefloor {meta['pretium_version']}. "
+        f"Commit `{meta['commit']}`, {meta['date']}, tradefloor {meta.get('tradefloor_version', meta.get('pretium_version'))}. "
         f"{_scope_line(meta)}",
         "",
         "| status | figures |",
@@ -346,7 +346,7 @@ def main() -> int:
     meta = {
         "commit": commit or "unknown",
         "date": time.strftime("%Y-%m-%d %H:%M"),
-        "pretium_version": pt.version(),
+        "tradefloor_version": pt.version(),
         "wall_s": time.time() - started,
         "workers": args.workers,
         "groups_run": sorted(results),

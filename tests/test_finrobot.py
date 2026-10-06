@@ -575,13 +575,17 @@ PAYLOAD_KEYS = {"step", "day", "steps_per_day", "macro", "assets", "portfolio"}
 ASSET_KEYS = {"symbol", "price", "return_1d", "return_5d", "volatility",
               "best_bid", "best_ask", "avg_daily_volume", "max_order_shares",
               "position", "fundamentals"}
+#: And two more on a model that pays dividends or runs the earnings
+#: calendar, as the shared serializer adds them; pt-v21, the default from
+#: 0.10.0, does both (these read `ASSET_KEYS` until then).
+DEFAULT_ASSET_KEYS = ASSET_KEYS | {"dividend", "next_earnings_in_sessions"}
 
 
 def test_the_payload_carries_exactly_the_allowlisted_keys():
     world, agent = one_observation(days=2)
     payload = fr.observe(_observation(world), history=agent.history)
     assert set(payload) == PAYLOAD_KEYS
-    assert set(payload["assets"][0]) == ASSET_KEYS
+    assert set(payload["assets"][0]) == DEFAULT_ASSET_KEYS
     assert set(payload["macro"]) == set(fr.OBSERVABLE_MACRO)
     # `max_leverage` and `buying_power` state the constraint that actually
     # refuses a trade. The payload already named a participation cap worth
@@ -2599,7 +2603,7 @@ def test_the_large_form_adds_two_keys_and_removes_none():
     payload = fr.observe(_observation(world), history=agent.history,
                          fundamentals=facts, detail=[world.engine.tickers[0]])
     assert set(payload) == LARGE_PAYLOAD_KEYS
-    assert set(payload["assets"][0]) == ASSET_KEYS
+    assert set(payload["assets"][0]) == DEFAULT_ASSET_KEYS
     assert all(set(row) == SECTOR_KEYS for row in payload["sectors"])
 
 

@@ -12,10 +12,11 @@ already recorded (a World run with `record=True`; `tf.evaluate` records none),
 the published macro fields, the curve and which names have news today.
 `obs.history` holds a daily bar per name and the published macro for every day
 the run has closed, in `evaluate`, `rank`, `World` and `tca.analyse`, and
-needs no extra package. A bar's close is the day's last print. On pt-v20 the
-market's close then re-marks every name, so the next day starts from a
-different price: 15 bp away at the median on a 20-name roster. A broker's
-daily bar closes at the official close. `obs.portfolio` reads the agent's own
+needs no extra package. A bar's close is the day's last print. On pt-v21 the
+market's close then re-marks every name, about 11 bp from the last print at
+the median on a 20-name roster, and pt-v21 also moves prices overnight, so
+the next day opens about 27 bp from the bar's close at the median. A
+broker's daily bar closes at the official close. `obs.portfolio` reads the agent's own
 positions and cannot trade. Forking the engine, writing to it and reading the
 hidden state all raise `tf.SandboxError`. The hidden state includes the true
 business-cycle phase; the macro fields carry the phase as published. The gym
@@ -86,25 +87,28 @@ Add `tf.baselines.reference_agents()` to the entrants to read a score against
 buy-and-hold on the same market: `tf.versus_buy_and_hold(scores)` gives each
 agent's P&L less buy-and-hold's. The reference set includes an Oracle that
 reads the model's fair value. On pt-v19 and earlier `tf.capture_ratio(scores)`
-gives each P&L as a fraction of the Oracle's. On pt-v20, the default, it
-returns `{}` and warns why: market moves there mostly stick, so even perfect
+gives each P&L as a fraction of the Oracle's. On pt-v20 and on pt-v21, the
+default, it returns `{}` and warns why: market moves there mostly stick, so even perfect
 knowledge of fair value leaves little edge, and buy-and-hold is the
 comparison to quote.
 
 ### Explanation scores
 
-The eleven factors `engine.truth()` reports sum to the change in mispricing,
-the log gap between the price and the model's fair value. On pt-v20 a shock
-that sticks is booked whole to `random_noise` and then taken back out by
-`fair_value_shift`, so the two move against each other (a per-tick
-correlation of about -0.75 on one seed) and should be read together.
+The twelve factors `engine.truth()` reports sum to the change in mispricing,
+the log gap between the price and the model's fair value. On pt-v20 and
+pt-v21 a shock that sticks is booked whole to `random_noise` and then taken
+back out by `fair_value_shift`, so the two move against each other (a
+per-tick correlation of -0.99 on pt-v21, three seeds of a 20-name roster
+over five days) and should be read together.
 `engine.explain(ticker, day)` breaks down the move in the printed price
 instead. An agent scored on explaining moves gets an `explanation_accuracy`:
 the share of days on which it named the factor that moved prices most, open
 to close, summed over every name. `fair_value_shift` moves no price and is
-never that answer. On pt-v20 a constant answer scores near the top, because
-`random_noise` wins almost every day: answering it every day scores 0.95 to
-1.0. So the scorecard carries `explanation_baseline`, what a constant answer
+never that answer. A constant answer scores near the top, because
+`random_noise` wins most days. On pt-v21 it wins about four days in five and
+`overnight` most of the rest, so answering `random_noise` every day scores
+0.60 to 1.0 (median 0.83) over ten seeds of 20 days on a 20-name roster. So
+the scorecard carries `explanation_baseline`, what a constant answer
 scores on the same days, and `explanation_edge`, the accuracy minus the
 baseline, and its repr prints the three together. Only the edge means
 anything. Quote it, or all three, and never the accuracy alone.

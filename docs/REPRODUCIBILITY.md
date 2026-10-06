@@ -10,7 +10,8 @@ for five platforms, runs one fixed simulation on each, and stops if any result
 differs. tradefloor ships its own `exp`, `log`, `pow`, `sin` and `cos`, so
 the system's math library cannot change a result.
 
-`pt-v20` became the default in 0.8.5, replacing `pt-v19`. Every preset from
+`pt-v21` became the default in 0.10.0, replacing `pt-v20`, which was the
+default from 0.8.5. Every preset from
 `pt-v1` on can still be selected, and a market with no agent orders in it
 replays exactly on its named preset in every later release. Each release
 checks that with a digest per shipped preset.
@@ -20,7 +21,8 @@ releases the promise is narrower. 0.8.5 changed how an agent's fills reach
 the market, on every preset, so a traded run recorded before 0.8.5 matches up
 to its first trade and differs after it. One traded `evaluate` run has a
 digest from 0.8.5, checked on all five platforms: the reference agents on
-`pt-v20`, with their orders, fills and scorecards.
+the default preset (`pt-v21` from 0.10.0, `pt-v20` before it), with their
+orders, fills and scorecards.
 [docs/SUPPORT.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/SUPPORT.md)
 lists what each digest covers.
 
@@ -51,6 +53,19 @@ Snapshots written by 0.8.5 to 0.8.8 carry no version and restore as version
 Earlier ones lack the day state and are refused, because the day they were
 taken on cannot be recovered from them. A newer schema is refused. If you
 know what a missing field held, write it into the dict and restore that.
+
+The Rust crate has the same pair, and the Python methods call it:
+`Engine::snapshot` returns an `EngineSnapshot` with the dict's fields in the
+dict's order, and `Engine::restore` checks it under the same rules and
+refuses with a `SnapshotError` that names the field. `EngineSnapshot::to_bytes`
+and `from_bytes` give it one exact binary form, for a host that stores state
+itself, a browser included. The engine does not count days or track whether
+one is open, so a caller that does passes its count, its open flag and its
+pending tape rows to `Engine::snapshot_with` as a `DayLoop`, and
+`Engine::restore` hands them back. The crate's tests run a snapshot through
+bytes into a new engine and continue it to the uninterrupted run, bit for
+bit, on `pt-v20`, `pt-v19`, `pt-v16` and `pt-v3`, at a close and in the
+middle of a session.
 
 ## Publishing a result
 

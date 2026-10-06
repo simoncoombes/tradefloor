@@ -23,6 +23,12 @@ A preset under development, on a branch and in no tagged release, can still
 change. pt-v19 went through five compositions before it shipped in 0.8.0.
 Only the vector a tagged release ships is frozen.
 
+## The Rust crate's version policy
+
+From 0.10.0 the crate follows [Cargo's semver rules](https://doc.rust-lang.org/cargo/reference/semver.html). While the version is 0.x, a minor release (0.10 to 0.11) may break the crate's API and a patch release (0.10.0 to 0.10.1) does not, so `tradefloor = "0.10"` in a `Cargo.toml` takes every patch release safely. The release workflow runs `cargo semver-checks` against the newest published crate under the release type the version bump implies, and a patch release that breaks the API does not publish. A minor release lists each break in the CHANGELOG, together with any change to a state width or to what a constructor does with its arguments, which no compiler or semver check catches.
+
+Releases before 0.10.0 did not follow this: 0.8.5 broke code written for 0.8.1 in a patch release.
+
 ## The LTS line
 
 **0.8.5 starts the first LTS line.** It is the first release whose default
@@ -76,17 +82,22 @@ A replay refuses a recording made under another payload version before it
 looks anything up, and names both versions. A recording made before 0.8.5
 carries neither field, predates this payload, and does not replay on 0.8.5.
 
-**Observation payload, version 1** (`OBSERVATION_SCHEMA_VERSION`, built by
-`serialize_observation`):
+**Observation payload, version 2** (`OBSERVATION_SCHEMA_VERSION`, built by
+`serialize_observation`, from 0.10.0):
 
 - Top level: `step`, `day`, `steps_per_day`, `macro`, `assets`, `portfolio`.
 - `macro`: the fields in `tradefloor.counterfactual.MACRO_FIELDS`.
-- Each entry of `assets`: `symbol`, `price`, `return_1d`, `return_5d`, `volatility`, `best_bid`, `best_ask`, `avg_daily_volume`, `max_order_shares`, `position`, `fundamentals`. `fundamentals` holds whatever the caller supplied for that symbol.
+- Each entry of `assets`: `symbol`, `price`, `return_1d`, `return_5d`, `volatility`, `best_bid`, `best_ask`, `avg_daily_volume`, `max_order_shares`, `position`, `fundamentals`. `fundamentals` holds whatever the caller supplied for that symbol. On a model that pays dividends an entry also carries `dividend`, the cash per share the name went ex for at that day's open, and on a model that runs the earnings calendar `next_earnings_in_sessions`, the sessions to its next report. pt-v21, the default from 0.10.0, does both; no earlier preset does either.
 - `portfolio`: `cash`, `net_worth`, `leverage`, `max_leverage`, `buying_power`, `open_orders`. `leverage` is gross exposure as a multiple of net worth. `cash`, `net_worth` and `buying_power` are dollars.
 - Each entry of `open_orders`, one per limit order of the agent's still waiting in the book: `symbol`, `side`, `limit_price`, `remaining`.
 
 A return or volatility the agent has not yet seen enough prices for is
 `null`. `return_5d` covers 30 steps, five days at six steps a day.
+
+Compared with version 1, the 0.8.x and 0.9.x payload: each asset gains
+`dividend` and `next_earnings_in_sessions` on a model that has them, and
+nothing else changes. On a model with neither the payload is version 1's,
+so a version-1 recording still replays there.
 
 Compared with 0.8.1: `portfolio.gross_exposure` is renamed `leverage` (same
 value), `portfolio.open_orders` is new, and `return_5d` covers five days
@@ -119,11 +130,11 @@ The known-answer tests run on all five platforms at every release, through
 - `tests/known_answer.py` runs one fixed simulation and hashes it (`tests/known_answer.json`), with a second digest for a roster holding the rate indices. `tests/known_answer_seed64.py` does the same for a seed above 2**32. No agent trades in any of them.
 - `tests/known_answer_presets.py` runs one fixed 60-session market on every shipped preset and hashes each on its own (`tests/known_answer_presets.json`). No agent trades in these either.
 - `tests/known_answer_book.py` covers the book agents trade against (`tests/known_answer_book.json`). It builds pt-v19 with the seven book dials at pt-v20's values, on a fixed 12-name roster, for 3 days of 6 steps. Four scripted agents send market orders from a tenth of a percent to a whole day's volume, queue limit orders at the touch and a cent inside the spread, and cancel, all through `Engine.submit_many` and `Engine.cancel`. The digest covers every report, fill, waiting order and impact row, the closing prices and the engine's state hash.
-- `tests/known_answer_traded.py` covers a run through the Python harness (`tests/known_answer_traded.json`). It runs the five agents from `tf.baselines.reference_agents()` and one scripted agent that sends limit orders and cancels them, through `tf.evaluate` on pt-v20, with seed 20260930, a fixed 12-name roster and 10 days of 6 steps. For each agent it hashes three things: the order log (what `act()` returned at each step, the prices the agent was shown, and what `explain()` answered), every fill with the closing prices of that agent's market, and every scorecard field. The lines in `errors` and `partial_fills` are hashed as counts, so rewording a message moves nothing. The baseline keeps a digest per agent and per part, so a failure names the agent and the part that moved.
+- `tests/known_answer_traded.py` covers a run through the Python harness (`tests/known_answer_traded.json`). It runs the five agents from `tf.baselines.reference_agents()` and one scripted agent that sends limit orders and cancels them, through `tf.evaluate` on the default preset by name (pt-v21 from 0.10.0, pt-v20 in 0.8.5 to 0.9.1), with seed 20260930, a fixed 12-name roster and 10 days of 6 steps. For each agent it hashes three things: the order log (what `act()` returned at each step, the prices the agent was shown, and what `explain()` answered), every fill with the closing prices of that agent's market, and every scorecard field. The lines in `errors` and `partial_fills` are hashed as counts, so rewording a message moves nothing. The baseline keeps a digest per agent and per part, so a failure names the agent and the part that moved.
 
 So an untraded market is pinned on every preset, the engine's book and
 fill path is pinned on one fixed script, and one traded `tf.evaluate` run is
-pinned on pt-v20. That run is what an agent benchmark reports. Runs with
+pinned on the default preset. That run is what an agent benchmark reports. Runs with
 your own agents, or through `tf.rank`, use the same harness code, and the
 digest checks that code on this one run. A traded run made before 0.8.5
 reproduces only on the release that made it.

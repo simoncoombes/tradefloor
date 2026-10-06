@@ -138,7 +138,7 @@ def test_a_pinned_run_matches_its_endogenous_twin_when_the_values_agree(model):
 
 
 def test_under_the_close_re_mark_a_pinned_twin_agrees_to_rounding():
-    """The same twin on pt-v20, the default, where the close re-marks every
+    """The same twin on pt-v20, the default until 0.10.0, where the close re-marks every
     traded name to the macro state it publishes
     (`macro_publication_repricing`), and a pin re-marks it again.
 
@@ -160,7 +160,11 @@ def test_under_the_close_re_mark_a_pinned_twin_agrees_to_rounding():
     two re-marks, which is what the mechanism allows, and no more: a
     tolerance of eight units in the last place.
     """
-    a, b, economies, pinned = _pinned_twin(None)
+    # pt-v20 by name, the default until 0.10.0 (this passed None). On
+    # pt-v21 B's economy after its first pin is not A's: B's `vix_feedback`
+    # reads 0.0456 where A's reads 0.0, and no single pt-v21 dial does that
+    # on pt-v20 alone. The twin there is a different test.
+    a, b, economies, pinned = _pinned_twin("pt-v20")
     assert pinned == economies
     assert market_stream_state(a) == market_stream_state(b)
     pa, pb = prices(a), prices(b)

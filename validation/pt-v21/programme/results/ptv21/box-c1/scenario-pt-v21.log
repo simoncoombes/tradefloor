@@ -1,0 +1,7 @@
+31s
+rate_shock             paired index 21/63/85/120d:   -7.4   -7.6   -7.6   -7.2 | scen maxdd120  -10.0 (base   -7.5) | vix 16.0->24.5 (base peak 24.1) | corp +201bp policy +200bp | rv63 19.0 vs 12.2
+recession              paired index 21/63/85/120d:  -18.4  -27.7  -31.1  -37.6 | scen maxdd120  -41.6 (base   -7.5) | vix 16.0->52.7 (base peak 24.1) | corp +151bp policy -100bp | rv63 47.3 vs 12.2
+liquidity_crisis       paired index 21/63/85/120d:  -15.8  -19.6  -12.2   -6.2 | scen maxdd120  -32.4 (base   -7.5) | vix 16.0->59.7 (base peak 24.1) | corp -71bp policy -78bp | rv63 49.8 vs 12.2
+geopolitical_conflict  paired index 21/63/85/120d:  -10.1   -2.0   -1.5   -1.9 | scen maxdd120  -15.3 (base   -7.5) | vix 16.0->30.4 (base peak 24.1) | corp -20bp policy -25bp | rv63 30.8 vs 12.2
+oil_price_spike        paired index 21/63/85/120d:   -1.8   -1.5   -1.6   -1.1 | scen maxdd120   -7.4 (base   -7.5) | vix 16.0->24.8 (base peak 24.1) | corp +54bp policy +25bp | rv63 12.2 vs 12.2
+policy_regime_shift    paired index 21/63/85/120d:   -0.0   +0.1   +0.0   +0.4 | scen maxdd120   -7.4 (base   -7.5) | vix 16.0->24.3 (base peak 24.1) | corp +1bp policy +0bp | rv63 11.4 vs 12.2

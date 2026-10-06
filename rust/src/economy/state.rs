@@ -179,6 +179,7 @@ pub const FISCAL_MULTIPLIER: f64 = 0.30;
 pub const CRISIS_VIX_THRESHOLD: f64 = 25.5;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum CyclePhase {
     Expansion,
     Peak,
@@ -240,6 +241,7 @@ impl CyclePhase {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct PhaseCharacteristics {
     pub gdp_growth_range: (f64, f64),
     pub unemployment_trend: f64,
@@ -366,6 +368,7 @@ pub fn us_cycle_hazard_params(phase: CyclePhase) -> (f64, f64) {
 /// construction, so the `??` sites in the original become ordinary reads
 /// here — with one exception noted at [`EconomyState::market_pe`].
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct EconomyState {
     // Interest rates
     pub federal_funds_rate: f64,
@@ -438,6 +441,30 @@ pub struct EconomyState {
     /// `fair_value_vix_half_life` is set. 0.0, and never written, on every
     /// preset through pt-v19, whose `fair_value_vix_discount` is 0.0.
     pub vix_feedback: f64,
+    /// The index's log return since the last central-bank meeting: the
+    /// log change of total public market cap, summed over the closes and
+    /// restarted by every meeting. Written only with `fed_put_gain` set;
+    /// 0.0, and never written, on every preset.
+    pub intermeeting_return: f64,
+    /// The Fed put's stock, percentage points: each put cut adds what it
+    /// took off the ladder's path, and it decays at `fed_put_half_life`.
+    /// The calm meetings give the put back once this has fallen an eighth
+    /// under `fed_put_owed`. Written only with `fed_put_gain` set.
+    pub fed_put: f64,
+    /// The Fed put's overlay not yet given back, percentage points: the
+    /// ladder's own path less the policy rate. The Taylor rate the ladder
+    /// reads is lowered by it. Written only with `fed_put_gain` set.
+    pub fed_put_owed: f64,
+    /// Total public market cap at the previous close, the base the next
+    /// close's log change is read against. Written only with
+    /// `fed_put_gain` set.
+    pub fed_put_mcap_prev: f64,
+    /// The index's log fall below its own slow average, the credit leverage
+    /// term's state (`ModelParams::corporate_spread_equity_gain`): each close
+    /// steps `D = 0.5^(1/H) (D - ln(1 + r))` on the session's index return
+    /// from the last close, H the dial's half-life. Written only with that
+    /// gain set; 0.0, and never written, on every preset.
+    pub spread_equity_gap: f64,
     /// What the valuation reads beyond `earnings_cycle`: the anticipated
     /// level of the earnings cycle over the valuation's horizon minus the
     /// current one (`ModelParams::earnings_anticipation_half_life`). Derived
@@ -483,9 +510,20 @@ pub struct EconomyState {
     pub recession_probability: f64,
 }
 
+/// The library's default opening economy:
+/// `create_initial_economy_state(&InitialEconomyOptions::default())`.
+/// A host that sets its own economy starts from this, or from
+/// [`create_initial_economy_state`] with its options, and assigns fields.
+impl Default for EconomyState {
+    fn default() -> Self {
+        create_initial_economy_state(&InitialEconomyOptions::default())
+    }
+}
+
 /// Options for [`create_initial_economy_state`]. `None` selects the
 /// reference-implementation default parameter.
 #[derive(Debug, Clone, Copy, Default)]
+#[non_exhaustive]
 pub struct InitialEconomyOptions {
     pub cycle_phase: Option<CyclePhase>,
     pub inflation_rate: Option<f64>,
@@ -599,6 +637,11 @@ pub fn create_initial_economy_state(options: &InitialEconomyOptions) -> EconomyS
         rolling_market_return_30d: 0.0,
         earnings_cycle: 0.0,
         vix_feedback: 0.0,
+        intermeeting_return: 0.0,
+        fed_put: 0.0,
+        fed_put_owed: 0.0,
+        fed_put_mcap_prev: 0.0,
+        spread_equity_gap: 0.0,
         earnings_anticipation: 0.0,
         unemployment_impulse: 0.0,
         market_pe: Some(18.0),
@@ -632,6 +675,7 @@ pub fn create_initial_economy_state(options: &InitialEconomyOptions) -> EconomyS
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ForwardGuidance {
     OngoingIncreases,
     Accommodative,
@@ -660,6 +704,7 @@ impl ForwardGuidance {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct CentralBankState {
     /// Game timestamps are integer minutes.
     pub last_meeting_date: i64,
@@ -673,6 +718,22 @@ pub struct CentralBankState {
     /// nothing read it, which is the defect D1 corrects.
     pub hawkish_dovish_score: f64,
     pub forward_guidance: ForwardGuidance,
+}
+
+impl CentralBankState {
+    /// The opening central bank, as [`create_initial_central_bank_state`]
+    /// builds it: last meeting at `start_timestamp` (game minutes), the next
+    /// 45 days later, a 2 per cent inflation target, no QE.
+    pub fn new(start_timestamp: i64) -> Self {
+        create_initial_central_bank_state(start_timestamp)
+    }
+}
+
+/// [`CentralBankState::new`] at timestamp 0.
+impl Default for CentralBankState {
+    fn default() -> Self {
+        CentralBankState::new(0)
+    }
 }
 
 pub fn create_initial_central_bank_state(start_timestamp: i64) -> CentralBankState {
@@ -690,13 +751,21 @@ pub fn create_initial_central_bank_state(start_timestamp: i64) -> CentralBankSta
 
 /// An active economic shock, as `update_economy_daily` reads it.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct EconomicShock {
     pub kind: ShockKind,
     pub severity: f64,
     pub gdp_impact: f64,
 }
 
+impl EconomicShock {
+    pub fn new(kind: ShockKind, severity: f64, gdp_impact: f64) -> Self {
+        EconomicShock { kind, severity, gdp_impact }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ShockKind {
     OilShock,
     Pandemic,

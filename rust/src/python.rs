@@ -280,6 +280,8 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(impulse_response, m)?)?;
     m.add_function(wrap_pyfunction!(model_preset, m)?)?;
     m.add_function(wrap_pyfunction!(preset_names, m)?)?;
+    m.add_function(wrap_pyfunction!(calibrated_flow, m)?)?;
+    m.add_function(wrap_pyfunction!(assess_external_flow, m)?)?;
     m.add_class::<PyMispricingState>()?;
     m.add_class::<PyFairValue>()?;
     m.add_class::<crate::python_book::PyOrderBook>()?;
@@ -798,6 +800,108 @@ fn model_preset(py: Python<'_>, name: Option<&str>) -> PyResult<PyObject> {
     d.set_item("crowd_momentum_gain", preset.crowd_momentum_gain)?;
     d.set_item("crowd_lean_cap", preset.crowd_lean_cap)?;
     Ok(d.into())
+}
+
+/// The shock flow a preset generates for itself: `tradefloor.flow::CalibratedFlow`
+/// as a dict. `tradefloor.envelope.CALIBRATED_FLOW` is built from this.
+#[pyfunction]
+#[pyo3(signature = (model = None))]
+fn calibrated_flow(
+    py: Python<'_>,
+    model: Option<&Bound<'_, PyAny>>,
+) -> PyResult<PyObject> {
+    let params = crate::python_engine::model_params_from(model)?;
+    let f = crate::flow::CalibratedFlow::of(&params);
+    let d = pyo3::types::PyDict::new_bound(py);
+    d.set_item("company_news_rate", f.company_news_rate)?;
+    d.set_item("company_news_sigma", f.company_news_sigma)?;
+    d.set_item("company_news_variance", f.company_news_variance())?;
+    d.set_item("sector_news_rate", f.sector_news_rate)?;
+    d.set_item("market_news_rate", f.market_news_rate)?;
+    d.set_item("news_sector_weight", f.news_sector_weight)?;
+    d.set_item("news_market_weight", f.news_market_weight)?;
+    d.set_item("idio_jump_rate", f.idio_jump_rate)?;
+    d.set_item("idio_jump_sigma", f.idio_jump_sigma)?;
+    d.set_item("market_jump_rate", f.market_jump_rate)?;
+    d.set_item("market_jump_mean", f.market_jump_mean)?;
+    d.set_item("market_jump_sigma", f.market_jump_sigma)?;
+    d.set_item("market_factor_sigma", f.market_factor_sigma)?;
+    d.set_item("macro_shock_share", f.macro_shock_share)?;
+    d.set_item("macro_steps_per_session", f.macro_steps_per_session)?;
+    Ok(d.into_py(py))
+}
+
+/// The keys `assess_external_flow` reads from its tally, every one required.
+const FLOW_TALLY_KEYS: [&str; 16] = [
+    "names", "sessions", "company_events", "company_sum_sq", "sector_events",
+    "sector_sum_sq", "market_events", "market_sum_sq", "fundamental_events",
+    "fundamental_sum_sq", "vix_writes", "vix_write_abs", "vix_write_max",
+    "macro_steps", "macro_shock_steps", "macro_shock_load",
+];
+
+/// `tradefloor.flow::ExternalFlow::assess`, from a tally a caller kept.
+/// `tradefloor.envelope.external_flow` builds the tally; this is the one
+/// implementation both languages share.
+#[pyfunction]
+#[pyo3(signature = (tally, model = None))]
+fn assess_external_flow(
+    py: Python<'_>,
+    tally: &Bound<'_, pyo3::types::PyDict>,
+    model: Option<&Bound<'_, PyAny>>,
+) -> PyResult<PyObject> {
+    let params = crate::python_engine::model_params_from(model)?;
+    for key in tally.keys().iter() {
+        let k: String = key.extract()?;
+        if !FLOW_TALLY_KEYS.contains(&k.as_str()) {
+            return Err(ValidationError::new_err(format!(
+                "unknown flow tally key {k:?}; the keys are {FLOW_TALLY_KEYS:?}")));
+        }
+    }
+    let get = |k: &str| -> PyResult<Bound<'_, PyAny>> {
+        tally.get_item(k)?.ok_or_else(|| ValidationError::new_err(format!(
+            "the flow tally needs {k:?}; the keys are {FLOW_TALLY_KEYS:?}")))
+    };
+    let count = |k: &str| -> PyResult<u64> {
+        get(k)?.extract::<u64>().map_err(|_| ValidationError::new_err(format!(
+            "{k} must be a non-negative integer")))
+    };
+    let real = |k: &str| -> PyResult<f64> {
+        let v: f64 = get(k)?.extract().map_err(|_| ValidationError::new_err(format!(
+            "{k} must be a number")))?;
+        if !(v >= 0.0) || !v.is_finite() {
+            return Err(ValidationError::new_err(format!(
+                "{k} must be finite and non-negative, got {v}")));
+        }
+        Ok(v)
+    };
+    let mut obs = crate::flow::ExternalFlow::new(count("names")? as usize);
+    obs.sessions = count("sessions")?;
+    obs.company_events = count("company_events")?;
+    obs.company_sum_sq = real("company_sum_sq")?;
+    obs.sector_events = count("sector_events")?;
+    obs.sector_sum_sq = real("sector_sum_sq")?;
+    obs.market_events = count("market_events")?;
+    obs.market_sum_sq = real("market_sum_sq")?;
+    obs.fundamental_events = count("fundamental_events")?;
+    obs.fundamental_sum_sq = real("fundamental_sum_sq")?;
+    obs.vix_writes = count("vix_writes")?;
+    obs.vix_write_abs = real("vix_write_abs")?;
+    obs.vix_write_max = real("vix_write_max")?;
+    obs.macro_steps = count("macro_steps")?;
+    obs.macro_shock_steps = count("macro_shock_steps")?;
+    obs.macro_shock_load = real("macro_shock_load")?;
+    let a = obs.assess(&params);
+    let d = pyo3::types::PyDict::new_bound(py);
+    d.set_item("inside", a.inside)?;
+    d.set_item("company_news_ratio", a.company_news_ratio)?;
+    d.set_item("common_news_ratio", a.common_news_ratio)?;
+    d.set_item("fundamental_ratio", a.fundamental_ratio)?;
+    d.set_item("vix_write_per_session", a.vix_write_per_session)?;
+    d.set_item("macro_shock_share", a.macro_shock_share)?;
+    d.set_item("macro_shock_load", a.macro_shock_load)?;
+    d.set_item("macro_steps_per_session", a.macro_steps_per_session)?;
+    d.set_item("findings", a.findings)?;
+    Ok(d.into_py(py))
 }
 
 /// The shipped preset names, in the order the engine lists them.

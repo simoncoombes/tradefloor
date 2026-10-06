@@ -45,7 +45,7 @@ SCHEMA = 1
 DEFAULT_SINCE = {
     "pt-v3": "0.1.0", "pt-v10": "0.2.0", "pt-v12": "0.3.0",
     "pt-v14": "0.4.0", "pt-v16": "0.6.0", "pt-v18": "0.7.0", "pt-v19": "0.8.0",
-    "pt-v20": "0.8.5",
+    "pt-v20": "0.8.5", "pt-v21": "0.10.0",
 }
 
 #: Grades published in this repository, by the box that ran them, and the
@@ -53,10 +53,20 @@ DEFAULT_SINCE = {
 #: its inputs by paths that start `programme/`, the layout the grade ran in,
 #: so a verdict from a box listed here has each of those paths rewritten under
 #: the folder when it is written onto a record, and the record then names
-#: files a reader can open.
-PUBLISHED_GRADES = {"ptv20g6": "validation/pt-v20"}
+#: files a reader can open. A verdict read from two boxes names both, joined
+#: by "+" (pt-v21's certification and its supplement), and is rewritten only
+#: when both are published to the same folder.
+PUBLISHED_GRADES = {"ptv20g6": "validation/pt-v20",
+                    "ptv21c1": "validation/pt-v21",
+                    "ptv21c1s": "validation/pt-v21"}
 
 _DESIGN_PATH = re.compile(r"(?<![\w./-])programme/")
+
+
+def _panel_version(panel: dict) -> str:
+    """The version a preset_panel.py artefact names: `tradefloor_version` from
+    0.10.0, `pretium_version` in the artefacts written before it."""
+    return panel.get("tradefloor_version", panel.get("pretium_version"))
 
 
 def public_paths(block: dict) -> dict:
@@ -66,9 +76,11 @@ def public_paths(block: dict) -> dict:
     other block comes back as it was, because its files are not published
     and a rewritten path would name a file that does not exist.
     """
-    folder = PUBLISHED_GRADES.get((block.get("measured") or {}).get("box"))
-    if folder is None:
+    boxes = str((block.get("measured") or {}).get("box") or "").split("+")
+    folders = {PUBLISHED_GRADES.get(box) for box in boxes}
+    if len(folders) != 1 or None in folders:
         return block
+    folder = folders.pop()
 
     def walk(value):
         if isinstance(value, str):
@@ -100,11 +112,16 @@ def recorded_values(values: dict[str, float]) -> dict[str, float]:
     is 0.0, the rule the Rust digest follows, because at zero it is the
     model that existed before it was added. So adding one moves no
     record's `coefficients` or `coefficient_digest`. Off zero it is kept.
+    A dial in `ModelParams.digest_silent_at_default()` is left out the same
+    way while it holds its default.
     """
     import tradefloor  # noqa: PLC0415
 
     silent = set(tradefloor.ModelParams.digest_silent_at_zero())
-    return {k: v for k, v in values.items() if not (k in silent and v == 0.0)}
+    at_default = tradefloor.ModelParams.digest_silent_at_default()
+    return {k: v for k, v in values.items()
+            if not (k in silent and v == 0.0)
+            and not (k in at_default and v == at_default[k])}
 
 
 def coefficient_digest(values: dict[str, float]) -> str:
@@ -164,7 +181,7 @@ def structure_measured(panel: dict) -> dict:
     opposite of what the check is for.
     """
     return {
-        "tradefloor_version": panel["pretium_version"],
+        "tradefloor_version": _panel_version(panel),
         # The PANEL's commit first, for `build`'s reason: `git rev-parse
         # HEAD` here names the checkout writing the file, which is the
         # measuring one only when the record is written on the box.
@@ -254,7 +271,7 @@ def build(name: str, panel: dict, values: dict[str, float]) -> dict:
         # The panel names the version and the box it ran on. A figure without
         # the build that produced it cannot be re-derived, which is the whole
         # reason `RunManifest` exists for runs.
-        "tradefloor_version": panel["pretium_version"],
+        "tradefloor_version": _panel_version(panel),
         # The panel's own commit first. `git rev-parse HEAD` here names the
         # checkout writing the file, which is the measuring one only when the
         # record is written on the box that measured it.
@@ -1016,7 +1033,7 @@ def write_mechanism_gate(panel_path: str) -> int:
     """
     panel = json.loads(pathlib.Path(panel_path).read_text(encoding="utf-8"))
     measured = {
-        "tradefloor_version": panel["pretium_version"],
+        "tradefloor_version": _panel_version(panel),
         "commit": git("rev-parse", "HEAD") or None,
         "method": panel["method"],
     }

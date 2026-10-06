@@ -56,7 +56,9 @@ def walk(engine, days, pins=None):
 # Every preset through pt-v19. pt-v20 sets cycle_publication_lag to 252 since its graded
 # arm (2026-09-26; validation/pt-v20/programme/ptv20-registration.md),
 # which the test below holds. Was parametrized over every preset.
-@pytest.mark.parametrize("preset", [p for p in tf.preset_names() if p != "pt-v20"])
+# pt-v21 (0.10.0) inherits pt-v20's value, so it leaves this list too.
+@pytest.mark.parametrize("preset", [p for p in tf.preset_names()
+                                    if p not in ("pt-v20", "pt-v21")])
 def test_off_on_every_shipped_preset(preset):
     """0.0 on every preset: the phase reported is the phase the economy is
     in, a pin reads straight back, and the snapshot carries no history."""
@@ -70,6 +72,10 @@ def test_off_on_every_shipped_preset(preset):
 
 def test_pt_v20_sets_the_graded_arms_value():
     assert tf.ModelParams.from_preset("pt-v20").to_dict()["cycle_publication_lag"] == 252.0
+
+def test_pt_v21_keeps_pt_v20s_value():
+    assert tf.ModelParams.from_preset("pt-v21").to_dict()["cycle_publication_lag"] == 252.0
+
 
 
 def test_the_published_phase_is_the_true_phase_lag_sessions_earlier():

@@ -481,6 +481,7 @@ _UNITS: dict[str, dict[str, str]] = {
         "random_noise": "log-return contribution",
         "circuit_breaker": "log-return contribution",
         "jump": "log-return contribution",
+        "dividend": "change in mispricing_s at an ex-date open",
     },
     "prints": {
         "day": "day index", "tick": "tick index within the day",
@@ -490,6 +491,9 @@ _UNITS: dict[str, dict[str, str]] = {
         "absorbed": "log distance, model price to print",
         "clamp": "log distance, the circuit breaker's own share of "
                 "absorbed (book = absorbed - clamp)",
+        "distribution": "dollars per share, the cash dividend gone ex at "
+                        "the day's open, on its first print (present only "
+                        "on a model that pays dividends)",
     },
     "macro": {
         "day": "day index", "vix": "points",

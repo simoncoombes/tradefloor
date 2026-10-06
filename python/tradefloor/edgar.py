@@ -1,44 +1,42 @@
 """Real fundamentals as initial conditions.
 
 Nothing in the model requires fictional companies. Fair value reads
-`eps`, `book_value_per_share`, `revenue_growth` and a sector anchor; the
-liquidity dial reads shares and volume. Those are numbers, and the SEC
-publishes them, structured, in the public domain.
+`eps`, `book_value_per_share`, `revenue_growth` and a sector anchor, and the
+liquidity dial reads shares and volume. The SEC publishes those numbers,
+structured, in the public domain.
 
 Seeding from real filings gives an experiment whose **cross-sectional
 structure is real**, meaning the true dispersion of valuations, actual sector
 weights and real loss-makers in realistic proportion, while every price path
-stays synthetic. For anything cross-sectional that is a materially better
-test bed than a generated universe, which only has the dispersion its
-generator was told to have.
+stays synthetic. For cross-sectional work that is a better test bed than a
+generated universe, which only has the dispersion its generator was told to
+have.
 
 ## Be precise about which of three things this is
 
 1. **A synthetic universe**, via ``Universe.random``. Works.
 2. **Real fundamentals as initial conditions**, which is this. Works.
 3. **Replicating a specific company's realised behaviour**, which does **not**
-   work, and this needs saying before a user discovers it. The dynamics are
-   the preset's, not the company's: the GARCH coefficients are model-global,
-   base variance and anchor P/E are sector-level, and beta and spread are
-   fitted to no name's history. A loaded ticker is *a stock with that
-   company's fundamentals under this model's assumptions*, not that company,
-   not its volatility, not its microstructure. Making mode 3 real needs a
+   work. The dynamics are the preset's. The GARCH coefficients are
+   model-global, base variance and anchor P/E are sector-level, and beta and
+   spread are fitted to no name's history. A loaded ticker is *a stock with
+   that company's fundamentals under this model's assumptions*. It does not
+   have that company's volatility or microstructure. Mode 3 would need a
    per-name calibration layer, which is a different product.
 
 ## The fetch and the universe are separate operations
 
-Deliberately, because they have different determinism properties. Fetching
-does I/O and cannot be reproducible: **EDGAR is not append-only.** Companies
-amend and restate, so the same query run today and next year returns
-different numbers.
+They are separate because they have different determinism properties.
+Fetching does I/O and cannot be reproducible, because **EDGAR is not
+append-only.** Companies amend and restate, so the same query run today and
+next year returns different numbers.
 
-So the *snapshot* is the artifact, not the query. ``fetch`` produces a frozen,
-hashable snapshot; ``Universe.from_edgar`` is pure and takes one. Re-running
-``fetch`` is expected to produce a different hash. The design is working
-there, not failing.
+So the *snapshot* is the artifact you keep. ``fetch`` produces a frozen,
+hashable snapshot, and ``Universe.from_edgar`` is pure and takes one.
+Re-running ``fetch`` is expected to produce a different hash.
 
-This is the same discipline applied to the golden vectors: pin the artifact,
-because a rebuild would silently change the reference.
+The golden vectors are handled the same way: pin the artifact, because a
+rebuild would silently change the reference.
 """
 
 from __future__ import annotations
@@ -96,8 +94,8 @@ def _beta_for(sector: str) -> float:
 class Snapshot:
     """A frozen set of filings, hashable and serialisable.
 
-    The reproducible input to an experiment. A citable specification names it
-    by hash alongside the seed, preset and macro path.
+    This is the reproducible input to an experiment. A citable specification
+    names it by hash alongside the seed, preset and macro path.
     """
 
     __slots__ = ("as_of", "source", "loader_version", "rows", "excluded", "notes")
@@ -139,9 +137,8 @@ class Snapshot:
     def save(self, path: str) -> str:
         """Write the snapshot and return its content hash.
 
-        The bytes on disk are the same bytes on every platform, so a
-        digest over the file identifies the snapshot rather than the
-        machine that saved it.
+        The bytes on disk are the same on every platform, so a digest over
+        the file identifies the snapshot whatever machine saved it.
         """
         # write_bytes, not text mode: the caller is told to hash this
         # file and cite the digest, and Python's text mode would make
@@ -211,11 +208,11 @@ def to_instruments(
     company starts at its own computed fair value, so initial mispricing is
     exactly zero.
 
-    Fair value under WHICH model: `model` names it (a preset name or a
-    `ModelParams`), defaulting to the shipped default that `Engine` also
-    defaults to. It must be the model the engine then runs, for the same
-    reason the macro must be: otherwise every company starts mispriced by the
-    difference between two valuations. Every value the valuation reads comes
+    `model` names the model fair value is computed under (a preset name or
+    a `ModelParams`), and defaults to the same shipped default as `Engine`.
+    It must be the model the engine then runs, for the same reason the macro
+    must be. Otherwise every company starts mispriced by the difference
+    between two valuations. Every value the valuation reads comes
     from it (the neutral rate, the rate sensitivity, the QE gains and the
     book floor), through `fair_value(..., model=model)`.
 
@@ -226,21 +223,21 @@ def to_instruments(
     opening books it into each name's fair-value level, so it does not open
     as mispricing. `Engine.fair_values()` reads the engine's own number.
 
-    That is well-defined, needs no second data source, and is consistent with
-    a fundamentals-anchored model. The honest cost, stated rather than hidden:
-    a universe that starts perfectly priced has **no initial mispricing
-    dispersion**, so a strategy that harvests mispricing sees nothing until
-    shocks accumulate, on the order of one 60-day half-life. Run a burn-in
-    before handing control to an agent if that matters.
+    That needs no second data source and is consistent with a
+    fundamentals-anchored model. The cost is that a universe that starts
+    perfectly priced has **no initial mispricing dispersion**, so a strategy
+    that harvests mispricing sees nothing until shocks accumulate, on the
+    order of one 60-day half-life. Run a burn-in before handing control to
+    an agent if that matters.
 
     # On pt-v20 the engine draws the opening
 
     That cost, the `initial_s` option below and the macro warning at the
     end describe presets that take the day-zero premium of price over fair
-    value as the mispricing, which is every preset through pt-v19. pt-v20,
-    the default since 0.8.5, draws the opening mispricing itself
+    value as the mispricing, which is every preset through pt-v19. pt-v20
+    and pt-v21, the default since 0.10.0, draw the opening mispricing itself
     (`opening_market_sigma` 0.1 on the index, `opening_mispricing_sigma`
-    0.016 per name) and books the rest of each name's premium as its
+    0.016 per name) and book the rest of each name's premium as its
     fair-value level, which scales the fundamentals it values. On pt-v20 a
     loaded universe opens with the preset's own dispersion whatever
     `initial_s` says, and a macro mismatch opens as a fair-value level and
@@ -248,23 +245,22 @@ def to_instruments(
 
     # initial_s="stationary" starts the universe where a long run would be
 
-    ``"zero"`` (the default) prices everything at fair value, which is honest
-    and has the cost above. ``"stationary"`` instead draws each company's
+    ``"zero"`` (the default) prices everything at fair value, with the cost
+    above. ``"stationary"`` instead draws each company's
     mispricing from the distribution the process settles into, so the universe
     begins with realistic cross-sectional dispersion, around 19% for a
     technology name and 6% for consumer staples, from each sector's own
     long-run volatility.
 
-    That is not a fudge: it is the distribution the model itself implies, and
-    the width is computed from the AR(2) parameters rather than chosen. The
+    That is the distribution the model itself implies, and the width is
+    computed from the AR(2) parameters, not chosen. The
     draw uses its own RNG stream, so seeding a universe's dispersion cannot
     perturb the market it is built for. ``s_seed`` is any integer from 0 to
     ``2**64 - 1``.
 
     The macro arguments are the conditions the fair value is computed under.
     They must match the macro the engine then runs, or every company starts
-    mispriced by the difference, which is a subtle way to get a universe
-    nobody specified.
+    mispriced by the difference and nothing warns you.
     """
     if initial_s not in ("zero", "stationary"):
         raise ValidationError(
@@ -340,12 +336,11 @@ def filter_rows(rows: Sequence[dict], *, exclude_negative_equity: bool = True):
     Negative-equity loss-makers are excluded by default. A company with
     negative EPS takes the book-value valuation path, and negative book value
     there produces a negative fair value which the floor then clamps, so the
-    name would trade at the floor with no fundamental anchor at all. What
-    trades then is a constant wearing a ticker.
+    name would trade at the floor with no fundamental anchor at all.
 
-    Excluded rows are RETURNED, not dropped. A loader that silently discarded
-    a tenth of the market would produce a universe whose composition nobody
-    chose, and the exclusions are often the interesting part.
+    Excluded rows are returned. A loader that silently discarded a tenth of
+    the market would produce a universe whose composition nobody chose, and
+    the exclusions are often the interesting part.
     """
     keep, drop = [], []
     for row in rows:
@@ -425,12 +420,10 @@ def default_transport(user_agent: str, *, timeout: float = 30.0, clock=None,
                       sleep=None):
     """A rate-limited urllib transport. Standard library only.
 
-    Injectable, and the injection point is the whole design: :func:`fetch` is
-    pure given a transport, so the derivation is tested against recorded
-    responses with no socket in the test suite. That matters more here than it
-    usually would -- the one part of this library that cannot be
-    deterministic is the part that talks to the network, so the boundary is
-    drawn tightly around it.
+    You can pass your own. :func:`fetch` is pure given a transport, so the
+    derivation is tested against recorded responses with no socket in the
+    test suite. The network code is the one part of this library that cannot
+    be deterministic, so the boundary is drawn tightly around it.
     """
     import time
     import urllib.error
@@ -550,78 +543,75 @@ def fetch(
     publishes no index membership, so neither ranking approximates one.
     ``rank_by="public_float"`` ranks by reported public float and returns a
     roster whose sector composition resembles an index, which is a weaker
-    claim than membership and the only one it supports.
+    claim than membership and the only one this ranking supports.
 
     Under ``ciks`` every requested filer reaches one of two places. It is a
     row in :attr:`Snapshot.rows`, or it is an entry in
     :attr:`Snapshot.excluded` carrying its CIK and a ``reason`` string. No
     filer outside the request can enter either, and none is dropped in
-    silence: ``test_edgar.py`` pins the partition against the request.
+    silence. ``test_edgar.py`` pins the partition against the request.
 
-    Rows come back in the order requested. That is the caller's order and not
-    a ranking, so a roster file with a stable order produces a stable
-    snapshot and the same file produces the same hash.
+    Rows come back in the order requested, so a roster file with a stable
+    order produces a stable snapshot and the same file produces the same
+    hash.
 
     # Which companies you get, and why it matters
 
     ``rank_by`` decides which ``limit`` companies are taken, and the choice
-    changes the roster's SHAPE, not just its membership.
+    changes the roster's sector mix as well as its membership.
 
     ``"equity"`` (the default, and what this function has always done) ranks
-    by shareholders' equity. That is a book quantity, and book equity bears a
-    wildly different relation to size across sectors: a bank carries enormous
-    equity against its market value while a software company carries almost
-    none. Measured on the live SEC for CY2025, the top 150 by equity came
-    back **27% financial services and 17% technology**, with five banks in
-    the top ten -- against roughly 13% and 30% for the S&P 500. So the
-    default roster is bank-heavy by construction, and any realism measured on
-    it inherits that.
+    by shareholders' equity. That is a book quantity, and book equity relates
+    to size very differently across sectors. A bank carries enormous equity
+    against its market value while a software company carries almost none.
+    Measured on the live SEC for CY2025, the top 150 by equity came back
+    **27% financial services and 17% technology**, with five banks in the top
+    ten, against roughly 13% and 30% for the S&P 500. So the default roster
+    is bank-heavy, and any realism measured on it inherits that.
 
-    ``"public_float"`` ranks by ``dei:EntityPublicFloat`` instead -- the
+    ``"public_float"`` ranks by ``dei:EntityPublicFloat`` instead, the
     aggregate market value of stock held by non-affiliates, filed on the 10-K
     cover page. It is the one market-derived number in EDGAR, and it produces
     a roster whose composition resembles a real index.
 
-    Its two costs are real and are not hidden. It is **stale**: as-of the
-    last business day of the most recently completed second fiscal quarter,
-    so six to eighteen months old depending on the filer. And it is
-    **float, not capitalisation** -- it excludes affiliate and insider
-    holdings, which understates founder-controlled companies specifically.
+    It has two costs. It is **stale**, as of the last business day of the
+    most recently completed second fiscal quarter, so six to eighteen months
+    old depending on the filer. And it is **float, not capitalisation**. It
+    excludes affiliate and insider holdings, which understates
+    founder-controlled companies in particular.
 
-    It is also visibly mis-tagged in places: XBRL scale errors put several
-    filers above any real company's market value. Rather than a magic
-    threshold, the implausible ones are rejected by a quantity that means
-    something -- the implied price per share, ``public_float / shares``,
+    It is also mis-tagged in places, where XBRL scale errors put several
+    filers above any real company's market value. The implausible ones are
+    rejected on the implied price per share, ``public_float / shares``,
     which must land in ``PLAUSIBLE_IMPLIED_PRICE``. A filer whose filing
-    implies a share price of eight million dollars has a units error, and
-    saying so in those terms beats saying "too big".
+    implies a share price of eight million dollars has a units error.
 
     Neither ranking is a market-cap ranking, because EDGAR has no prices.
     For that, set ``initial_price`` yourself from a market data source.
 
-    ``user_agent`` is required and must identify you -- the SEC's fair-access
+    ``user_agent`` is required and must identify you. The SEC's fair-access
     policy asks for a name and a contact address, e.g.
     ``"Jane Roe jane@example.org"``. Requests without one are refused at the
     edge, and this function will not invent one on your behalf.
 
     Whichever ranking you pick, the largest ``limit`` companies that map to a
-    sector are kept. Under the default ``"equity"``, said plainly rather than
-    discovered later: **the ranking is by book size, not market size**, so the
-    universe skews towards balance-sheet-heavy names. Take a larger ``limit``
+    sector are kept. Under the default ``"equity"``, **the ranking is by book
+    size, not market size**, so the universe skews towards
+    balance-sheet-heavy names. Take a larger ``limit``
     and filter yourself if that matters.
 
     Ten market-wide frame requests plus one submissions request per company
     kept, rate limited to eight a second. The ten are diluted EPS,
     shareholders' equity, two share-count tags, and three revenue tags at two
-    periods each; ``rank_by="public_float"`` adds an eleventh. Counted through
-    the recording transport in ``tests/test_edgar.py``: 10 frame calls and 4
-    submissions calls on a four-filer market, 11 frame calls under
-    ``public_float``.
+    periods each, and ``rank_by="public_float"`` adds an eleventh. Counted
+    through the recording transport in ``tests/test_edgar.py``: 10 frame
+    calls and 4 submissions calls on a four-filer market, 11 frame calls
+    under ``public_float``.
 
-    The result is a frozen artifact. Save it, hash it, cite it -- and do not
-    expect a re-fetch to reproduce it. EDGAR is not append-only: companies
-    amend and restate, so the same query returns different numbers next year.
-    So the snapshot, rather than the query, is the input to everything
+    The result is a frozen artifact. Save it, hash it and cite it, and do
+    not expect a re-fetch to reproduce it. EDGAR is not append-only.
+    Companies amend and restate, so the same query returns different numbers
+    next year. The snapshot, and not the query, is the input to everything
     downstream.
     """
     if not user_agent or "@" not in user_agent:
@@ -1026,10 +1016,10 @@ _SIC_RANGES: tuple[tuple[int, int, str], ...] = (
 def sector_for_sic(sic) -> str | None:
     """Map an SEC SIC code to one of the model's twelve sectors.
 
-    Returns ``None`` for a code with no sensible home -- 6770 blank checks,
-    9995 nonclassifiable, an empty string on a filer that never got one. A
-    guess would be worse than an exclusion: it would put a shell company in a
-    sector and give it that sector's volatility and anchor P/E.
+    Returns ``None`` for a code with no sensible sector: 6770 blank checks,
+    9995 nonclassifiable, or an empty string on a filer that never got one.
+    A guess would put a shell company in a sector and give it that sector's
+    volatility and anchor P/E.
     """
     if sic is None or sic == "":
         return None

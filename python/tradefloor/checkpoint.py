@@ -1,9 +1,9 @@
 """Fork a simulation mid-flight and run both futures.
 
-Run to day sixty, then ask two questions of the same market: what happens under
-a rate shock, and what happens without one. Everything before the fork is
-identical, not statistically similar but identical, because both branches are
-the same seed replayed to the same point.
+Run to day sixty, then ask the same market what happens under a rate shock
+and what happens without one. Everything before the fork is exactly
+identical, because both branches are the same seed replayed to the same
+point.
 
 ```python
 mark = tf.Checkpoint.of(engine)          # after sixty days
@@ -11,24 +11,24 @@ calm, hiked = mark.branch(2)
 run_scenario(shock, engine=hiked, ...)
 ```
 
-That is a counterfactual real markets cannot offer, and a different one from
-the two already here. `tca.analyse` asks what your trading cost against a
+Real markets cannot offer this counterfactual, and it differs from the two
+already here. `tca.analyse` asks what your trading cost against a
 world where you did not trade; `scenario.compare` asks what a macro path did.
 This asks what happens NEXT, from a state you have already reached and want to
 keep.
 
 ## Two ways to fork, and they are for different things
 
-:func:`branch` forks in memory by COPYING the engine. Measured on a sixty-day,
-forty-instrument run: **under a millisecond**, against 2,740 ms to replay the
-same history. A copy carries everything the engine holds, including the run's
-order log, so a fork can itself be checkpointed, forked again, or written to a
-:class:`tradefloor.RunManifest`.
+:func:`branch` forks in memory by COPYING the engine. On a sixty-day,
+forty-instrument run it takes under a millisecond, against 2,740 ms to replay
+the same history. A copy carries everything the engine holds, including the
+run's order log, so a fork can itself be checkpointed, forked again, or
+written to a :class:`tradefloor.RunManifest`.
 
-:class:`Checkpoint` forks by replaying the order log. Slower by three orders
-of magnitude, and the one you want when the fork has to OUTLIVE the process.
-A snapshot is a state; a log is a history. A published result cites the
-history, because that is what another person can re-run.
+:class:`Checkpoint` forks by replaying the order log. It is three orders of
+magnitude slower, and it is the one to use when the fork has to OUTLIVE the
+process. A snapshot is a state and a log is a history, and a published result
+cites the history, because that is what another person can re-run.
 
 Use `branch` for an experiment inside one script, and `Checkpoint` for
 anything you save, send or cite.
@@ -44,30 +44,31 @@ instruments:
     60 days    run 2.63s    restore 2.74s
 
 So restoring costs about what the original run cost, and branching to `n`
-futures costs `n` times that. Stated plainly because the word "checkpoint"
-usually implies cheap restoration and here it does not.
+futures costs `n` times that. The word "checkpoint" usually implies cheap
+restoration, and here restoration is not cheap.
 
-What you get for it is that the checkpoint is DATA, a few kilobytes of JSON
-at about 200 bytes per day, rather than an opaque memory image. It survives the
+In return the checkpoint is DATA, a few kilobytes of JSON at about 200 bytes
+per day, rather than an opaque memory image. It survives the
 process, the version and the machine, which an in-memory snapshot of a PCG32
 state and a maker inventory would not.
 
 ## Why `branch` copies rather than rebuilding from a state snapshot
 
-Because a rebuild needs a list of fields to carry, and that list was wrong
-five separate times.
+A rebuild needs a list of fields to carry, and that list was wrong five
+separate times.
 
 `branch` used to construct a fresh engine and write
 :meth:`Engine.state_snapshot` into it. The engine holds the generator
 position, a cached Box-Muller spare, per-company GARCH variance, maker
-inventories, the mispricing carry -- and, beside all of those, per-DAY state.
+inventories, the mispricing carry and, beside all of those, per-DAY state.
 The snapshot carried the columns and the generator and missed the
 accumulators, so a fork taken BETWEEN two sessions of the same day lost the
 day's attribution and the market-open flag; it re-opened the day on its next
 session, re-anchored `previous_close`, and priced differently from the parent
 it was supposed to be a copy of. That was found and the fields were added.
-Then the market factor's variance was missing. Then the common log-volume
-state. Then the day counter. Each was added after a fork diverged.
+After that the market factor's variance, the common log-volume state and the
+day counter were each found missing, and each was added after a fork
+diverged.
 
 The fifth was the day's endogenous news, which is generated once at
 `open_market` and read by every tick of that day. A mid-day fork ran the rest
@@ -82,20 +83,21 @@ the platform. A mid-day fork lost the day's already-recorded ticks and wrote a
 day half as long. And it lost the previous close's pending jump, so the first
 row of its next recorded day attributed nothing to a move that happened.
 
-The lesson is not "the list was missing five things". It is that a list
-maintained by hand beside a growing struct will be missing a sixth. So there
-is no list: a fork is `engine.clone()`, and a field added tomorrow is carried
-without anyone remembering to carry it.
+A list maintained by hand beside a growing struct will eventually miss a
+sixth field, so there is no list. A fork is `engine.clone()`, and a field
+added later is carried without anyone remembering to carry it.
 
-`state_snapshot` remains, with a narrower and now accurate promise: it carries
-the market state, and not the order log, the recorded tape or the pending
-jump. Those are history and output rather than state, and the method says so.
+`state_snapshot` remains, with a narrower promise that is now accurate. It
+carries the market state, and not the order log, the recorded tape or the
+pending jump. Those are history and output rather than state, and the method
+says so.
 
 ## Why the SERIALISED form is still the log
 
-A copy cannot leave the process. A checkpoint has to, so it is data: the seed,
-the universe and the order log, which is already the reproduction mechanism,
-already tested, and already the thing a published result cites. A JSON dump of
+A copy cannot leave the process and a checkpoint has to, so a checkpoint is
+data: the seed, the universe and the order log. The log is already the
+reproduction mechanism, it is tested, and it is what a published result
+cites. A JSON dump of
 a PCG32 position and a maker inventory would be an opaque memory image that
 survives neither the version nor the machine.
 """
@@ -111,16 +113,26 @@ from ._core import check_seed
 CHECKPOINT_SCHEMA = 1
 
 
+def _population_doc(engine: Engine) -> dict | None:
+    """The engine's population as `Population.as_dict()`, or None."""
+    spec = engine.population_spec()
+    if spec is None:
+        return None
+    return {"version": 1, "name": "recorded",
+            "participants": list(spec["participants"])}
+
+
 class Checkpoint:
     """A point in a simulation you can return to, as data."""
 
     __slots__ = ("seed", "universe", "log", "macro", "label", "model",
-                 "written_by", "era")
+                 "written_by", "era", "population")
 
     def __init__(self, *, seed: int, universe: Sequence[Instrument],
                  log: Sequence[dict], macro: Macro | None = None,
                  label: str = "", model: dict | None = None,
-                 written_by: str | None = None, era: str | None = None) -> None:
+                 written_by: str | None = None, era: str | None = None,
+                 population: dict | None = None) -> None:
         self.seed = check_seed(seed)
         self.universe = list(universe)
         self.log = [dict(entry) for entry in log]
@@ -138,6 +150,10 @@ class Checkpoint:
         # replayed and only the version can say what to install instead.
         self.written_by = written_by
         self.era = era
+        # The population a populated run was built with
+        # (`Population.as_dict()`), or None for an isolated run. Identity,
+        # like the model: its orders are not in the log.
+        self.population = dict(population) if population else None
 
     @property
     def fingerprint(self) -> str:
@@ -145,12 +161,12 @@ class Checkpoint:
 
         Two people holding the same seed, roster, macro, model and log
         compute the same value, and anything else computes a different one.
-        That is what lets a fork's manifest NAME the point it began at
-        instead of describing it: `derived_from` on a
-        :class:`tradefloor.RunManifest` records this string.
+        So a fork's manifest can NAME the point it began at instead of
+        describing it. `derived_from` on a :class:`tradefloor.RunManifest`
+        records this string.
 
-        Over `to_json`, which is canonical -- sorted keys, fixed separators
-        -- so the digest is a fact about the checkpoint rather than about how
+        It is taken over `to_json`, which is canonical (sorted keys, fixed
+        separators), so the digest depends on the checkpoint and not on how
         it happened to be serialised. It therefore covers the label and the
         version that wrote it, both of which are part of what a citation
         means.
@@ -174,9 +190,9 @@ class Checkpoint:
 
         ``universe`` and ``seed`` are passed rather than read off the engine
         because it does not carry them: an engine is built FROM a universe and
-        a seed and keeps neither. Requiring them here is honest about that,
-        and it means a checkpoint records the inputs it will need rather than
-        discovering at resume time that it cannot reproduce anything.
+        a seed and keeps neither. Requiring them here means a checkpoint
+        records the inputs it will need, instead of discovering at resume
+        time that it cannot reproduce anything.
 
         Nothing here can tell a wrong seed from the right one, since the
         engine does not carry its seed: a checkpoint taken under seed 8 of an
@@ -206,7 +222,8 @@ class Checkpoint:
                          macro=macro, label=label,
                          model=(dict(engine.model_params)
                                 if fingerprint != default else None),
-                         written_by=__version__, era=era_fingerprint())
+                         written_by=__version__, era=era_fingerprint(),
+                         population=_population_doc(engine))
         if verify:
             try:
                 reached = checkpoint.resume().state_hash()
@@ -231,15 +248,15 @@ class Checkpoint:
         first time.
 
         Refuses a checkpoint written by a build whose arithmetic differs from
-        this one's. A replay is the ORIGINAL run re-executed, so a release that
-        moved a trajectory does not make an old checkpoint resume wrongly in a
-        visible way: it makes it resume into a market that never existed, at
-        the right size, with the right shape, silently. `RunManifest` has
+        this one's. A replay is the ORIGINAL run re-executed, so under a
+        release that moved a trajectory an old checkpoint would resume,
+        silently, into a market that never existed, at the right size and
+        with the right shape. `RunManifest` has
         checked this since 0.2; a checkpoint carried no version at all.
 
         Pass ``universe`` to resume onto a roster you already hold rather than
         the one carried in the checkpoint. It is checked against the recorded
-        fingerprint and refused on a mismatch -- tickers are generated
+        fingerprint and refused on a mismatch. Tickers are generated
         positionally, so two universes can share every name and no
         fundamentals, and comparing names would be checking almost nothing.
         """
@@ -271,17 +288,22 @@ class Checkpoint:
                     "Restoring onto a different roster gives right prices and "
                     "wrong fair values."
                 )
+        population = None
+        if self.population is not None:
+            from .population import Population
+            population = Population.from_dict(self.population)
         return replay(self.log, seed=self.seed, universe=roster,
                       macro=self.macro,
                       model=(ModelParams.from_dict(self.model)
-                             if self.model else None))
+                             if self.model else None),
+                      population=population)
 
     def branch(self, count: int = 2) -> list[Engine]:
         """``count`` independent engines, all at this state.
 
-        Independent in the strong sense: they share no memory, so diverging
-        one cannot perturb another. That is what makes a fork a controlled
-        experiment rather than two runs that happen to start similarly.
+        They share no memory, so diverging one cannot perturb another. That
+        makes a fork a controlled experiment rather than two runs that
+        happen to start similarly.
         """
         if count < 1:
             raise ValidationError(f"count must be at least 1, got {count}")
@@ -292,9 +314,9 @@ class Checkpoint:
     def to_json(self) -> str:
         """The whole checkpoint as JSON: seed, universe, log and macro.
 
-        Everything needed to reproduce the state, so a published result can
-        ship the point its analysis starts from rather than a description of
-        how to get there.
+        It holds everything needed to reproduce the state, so a published
+        result can ship the point its analysis starts from rather than a
+        description of how to get there.
         """
         from . import Universe
 
@@ -312,6 +334,8 @@ class Checkpoint:
             payload["era"] = self.era
         if self.model is not None:
             payload["model"] = self.model
+        if self.population is not None:
+            payload["population"] = self.population
         if self.macro is not None:
             payload["macro"] = {
                 "vix": self.macro.vix,
@@ -391,6 +415,7 @@ class Checkpoint:
             model=payload.get("model"),
             written_by=payload.get("tradefloor_version"),
             era=payload.get("era"),
+            population=payload.get("population"),
         )
 
     def __len__(self) -> int:
@@ -421,27 +446,28 @@ def branch(
     market, against 2,740 ms to reach the same point by replaying its log.
 
     The branches share no memory, so driving one cannot perturb another. That
-    is what makes a fork a controlled experiment rather than two runs that
-    started similarly.
+    makes a fork a controlled experiment rather than two runs that started
+    similarly.
 
     Because the fork carries the parent's order log, it can itself be
-    checkpointed, forked again, or written to a :class:`tradefloor.RunManifest`.
-    That was not true while a fork was rebuilt from a state snapshot: the new
-    engine's log was empty, so a checkpoint taken on it replayed a market
-    beginning at day zero, silently.
+    checkpointed, forked again, or written to a
+    :class:`tradefloor.RunManifest`. That was not true while a fork was
+    rebuilt from a state snapshot, because the new engine's log was empty, so
+    a checkpoint taken on it replayed a market beginning at day zero,
+    silently.
 
     ``universe``, ``seed`` and ``macro`` are accepted for compatibility and are
     no longer needed. A copy cannot land on the wrong roster, the hazard
-    ``universe`` and ``seed`` were there to prevent; a ``universe`` that IS
+    ``universe`` and ``seed`` were there to prevent. A ``universe`` that IS
     passed is checked against the engine's own tickers, so a caller who
-    believes they are forking a different market is told rather than humoured.
+    believes they are forking a different market is told so.
 
-    ``macro`` has never done anything here and does not now: it used to be
+    ``macro`` has never done anything here and does not now. It used to be
     handed to the fresh engine's constructor and then immediately overwritten
     by the snapshot's own economy. A fork inherits its parent's macro state,
     which is the only reading that makes it a fork. To give a branch a
     different economy, drive it with a :class:`tradefloor.Scenario` after
-    forking. That is the intervention half of an experiment.
+    forking, which is the intervention half of an experiment.
 
     For a fork that must survive the process, use :class:`Checkpoint`.
     """

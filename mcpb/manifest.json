@@ -2,9 +2,9 @@
   "manifest_version": "0.3",
   "name": "tradefloor",
   "display_name": "tradefloor",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "description": "Simulated stock markets that react to your orders: run, fork and score trading agents.",
-  "long_description": "tradefloor generates simulated stock markets with a limit order book and an economy, for testing trading algorithms and AI agents. Markets react to your orders, a year runs in seconds, and any market can be recreated exactly or forked on any day to compare scenarios. The server lets an AI assistant evaluate and rank strategies across many markets, run stress scenarios such as a recession or a liquidity crisis, and check a question against the model's validated limits. It runs on your machine and places no real orders.",
+  "long_description": "tradefloor generates simulated stock markets with a limit order book and an economy, for testing trading algorithms and AI agents. Markets react to your orders, a year runs in seconds, and any market can be recreated exactly or forked on any day to compare scenarios. The server lets an AI assistant evaluate and rank strategies across many markets, run stress scenarios such as a recession or a liquidity crisis, trade one market a step at a time and fork or rewind it, and check a question against the model's validated limits. It runs on your machine and places no real orders.",
   "author": {
     "name": "Simon Coombes",
     "url": "https://github.com/simoncoombes"
@@ -83,7 +83,7 @@
     },
     {
       "name": "explain_price_move",
-      "description": "Break one day's move for each name into the 11 factor contributions that sum to the day's change in the mispricing, the log gap between the model price and fair value."
+      "description": "Break one day's move for each name into the 12 factor contributions that sum to the day's change in the mispricing, the log gap between the model price and fair value."
     },
     {
       "name": "explain",
@@ -100,6 +100,30 @@
     {
       "name": "check_job",
       "description": "Check a background job started by start_job."
+    },
+    {
+      "name": "open_session",
+      "description": "Open a simulated market that this server keeps between calls, and get a session id back."
+    },
+    {
+      "name": "session_step",
+      "description": "Advance an open session by a number of steps or days, optionally sending orders for one of its agents at the first step, and get back the fills, each agent's portfolio, the prices and what changed."
+    },
+    {
+      "name": "session_state",
+      "description": "Read an open session without changing it: the clock, every price, the published macro figures, today's news by name, each agent's portfolio and open orders, and the checkpoints session_rewind can return to."
+    },
+    {
+      "name": "session_fork",
+      "description": "Copy an open session, at its present state, into a new session with its own id, so you can try two different actions from the same market and compare them."
+    },
+    {
+      "name": "session_rewind",
+      "description": "Put an open session back to a checkpoint it kept, by step, and drop every checkpoint after it."
+    },
+    {
+      "name": "close_session",
+      "description": "Close an open session and free its memory, returning each agent's final portfolio and every order sent on the session's line, which is what re-runs it from open_session."
     }
   ]
 }

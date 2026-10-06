@@ -140,6 +140,7 @@ pub const PRICE_HARD_CAP: f64 = 50_000.0;
 
 /// The mutable stock state a tick reads and writes.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct TickStock {
     pub price: f64,
     pub previous_close: f64,
@@ -165,6 +166,15 @@ pub struct TickStock {
     /// stand. See `ModelParams::fair_value_news_share` and
     /// `ModelParams::opening_mispricing_sigma`.
     pub fair_value_offset: Option<f64>,
+    /// The running log share-count reduction `L` under `buyback_accrual`:
+    /// the close adds one session's buyback yield, and fair value reads
+    /// `exp(L)`. None is 0.0, which every name holds while the switch or
+    /// `buyback_payout_share` is off, and which a new listing starts at.
+    pub buyback_log_shares: Option<f64>,
+    /// The name's dividend state (`ModelParams::dividend_payout_share`).
+    /// `None` on every preset, which pays no dividend; see
+    /// [`crate::market::dividends`].
+    pub dividend: Option<crate::market::dividends::DividendState>,
     pub maker_inventory: Option<f64>,
     pub garch_variance: f64,
     /// The variance cascade's components, when one is running.
@@ -182,6 +192,46 @@ pub struct TickStock {
     pub float: f64,
 }
 
+impl TickStock {
+    /// A stock at `price` before its first tick: the open, high, low and
+    /// previous close all at `price`, no volume yet, market cap
+    /// `price * shares_outstanding`, the float equal to the shares
+    /// outstanding, and every carried state absent or zero.
+    ///
+    /// `garch_variance` and `avg_volume` start at zero and a host sets them:
+    /// [`crate::universe::InstrumentInit::to_tick_company`] seeds the
+    /// variance at the sector's base, `sectors::by_key(key)` then
+    /// `base_daily_variance()`. `garch_cascade` is all zeros, the "cascade
+    /// has never run" state, which seeds from the sector base on first use.
+    pub fn new(price: f64, shares_outstanding: f64) -> Self {
+        TickStock {
+            price,
+            previous_close: price,
+            previous_tick_price: None,
+            open: price,
+            high: price,
+            low: price,
+            volume: 0.0,
+            avg_volume: 0.0,
+            shares_outstanding,
+            market_cap: price * shares_outstanding,
+            mispricing_s: None,
+            mispricing_s_prev_close: None,
+            mispricing_momentum: None,
+            fair_value_offset: None,
+            buyback_log_shares: None,
+            dividend: None,
+            maker_inventory: None,
+            garch_variance: 0.0,
+            garch_cascade: [0.0; crate::market::garch::CASCADE_MAX],
+            last_daily_return: None,
+            beta: None,
+            short_interest: 0.0,
+            float: shares_outstanding,
+        }
+    }
+}
+
 /// One company, as the tick sees it.
 ///
 /// A single struct rather than three composed ones. `fair_value`,
@@ -190,6 +240,7 @@ pub struct TickStock {
 /// invite them to disagree. The narrow views are BUILT from this on demand,
 /// so there is one source of truth per field.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct TickCompany {
     pub id: String,
     pub ticker: String,
@@ -206,6 +257,32 @@ pub struct TickCompany {
     pub eps: Option<f64>,
     pub book_value_per_share: Option<f64>,
     pub revenue_growth: Option<f64>,
+}
+
+impl TickCompany {
+    /// A listed, solvent company with no sector figures or fundamentals.
+    /// Set `sector_volatility`, `sector_avg_pe`, `eps`,
+    /// `book_value_per_share` and `revenue_growth` on the value.
+    pub fn new(
+        id: impl Into<String>,
+        ticker: impl Into<String>,
+        sector: impl Into<String>,
+        stock: TickStock,
+    ) -> Self {
+        TickCompany {
+            id: id.into(),
+            ticker: ticker.into(),
+            sector: sector.into(),
+            is_bankrupt: false,
+            is_public: true,
+            stock,
+            sector_volatility: None,
+            sector_avg_pe: None,
+            eps: None,
+            book_value_per_share: None,
+            revenue_growth: None,
+        }
+    }
 }
 
 /// Trading days in a year, the clock a market rate is quoted on.
@@ -257,7 +334,20 @@ pub const MARKET_DAYS_PER_YEAR: f64 = 252.0;
 /// roster once rather than branching on a zero-mean quantity every day. On
 /// `Universe.random(40, seed=111)` it is 3 names of 40.
 pub fn buyback_scale(p: &ModelParams, eps: Option<f64>, price: f64, elapsed_days: i64) -> f64 {
-    if p.buyback_payout_share == 0.0 {
+    buyback_scale_at(p, p.buyback_payout_share, eps, price, elapsed_days)
+}
+
+/// [`buyback_scale`] at an explicit share of earnings: the name's own under
+/// `dividend_buyback_substitution` (`market::dividends::buyback_share`),
+/// `buyback_payout_share` otherwise, where the two are the same arithmetic.
+pub fn buyback_scale_at(
+    p: &ModelParams,
+    share: f64,
+    eps: Option<f64>,
+    price: f64,
+    elapsed_days: i64,
+) -> f64 {
+    if p.buyback_payout_share == 0.0 || share == 0.0 {
         return 1.0;
     }
     let eps = match eps {
@@ -267,7 +357,7 @@ pub fn buyback_scale(p: &ModelParams, eps: Option<f64>, price: f64, elapsed_days
     if !(price > 0.0) || !price.is_finite() || elapsed_days <= 0 {
         return 1.0;
     }
-    let b = p.buyback_payout_share * eps / price;
+    let b = share * eps / price;
     // The yield is read at TODAY's price and applied over every elapsed
     // year, so a name whose price collapses toward the 0.01 floor reads a
     // yield of hundreds and a fair value of exp(hundreds): the re-mark's
@@ -275,6 +365,67 @@ pub fn buyback_scale(p: &ModelParams, eps: Option<f64>, price: f64, elapsed_days
     // (`buyback_yield_cap`). A branch at 0.0, the arithmetic that stood.
     let b = if p.buyback_yield_cap == 0.0 { b } else { mathx::min(b, p.buyback_yield_cap) };
     mathx::exp(b * elapsed_days as f64 / MARKET_DAYS_PER_YEAR)
+}
+
+/// The buyback factor the valuation applies. Under `buyback_accrual` it is
+/// the accrued `exp(L)`, where `L` is the name's running log share-count
+/// reduction (`TickStock::buyback_log_shares`), which does not read today's
+/// price or the elapsed time; otherwise it is [`buyback_scale`], the term
+/// that stood. A branch at 0.0, so every preset's arithmetic is the one it
+/// was. `share` is the name's share of earnings spent on buybacks
+/// (`market::dividends::buyback_share`): `buyback_payout_share` itself, or
+/// under `dividend_buyback_substitution` that less the name's dividend
+/// payout, in both the term that stood and the accrual.
+///
+/// [`buyback_scale`] reads the yield at today's price and applies it to
+/// every elapsed year, so `d ln FV / d ln P_today = -b t`: fair value is
+/// anti-elastic in the price it anchors, with a gain that grows with the
+/// elapsed years. Past `b t = 1` the close's re-mark stops contracting and
+/// the price flips each session (tick lag-1 autocorrelation toward -1 from
+/// about year 30 on pt-v20), and relabelling the calendar origin moves
+/// prices. The accrued factor is fixed within a session, so the elasticity
+/// is zero at every horizon and the origin does not matter.
+pub fn buyback_factor(p: &ModelParams, share: f64, eps: Option<f64>, price: f64,
+                      elapsed_days: i64, log_shares: Option<f64>) -> f64 {
+    if p.buyback_accrual != 0.0 {
+        return match log_shares {
+            Some(l) if l != 0.0 => mathx::exp(l),
+            _ => 1.0,
+        };
+    }
+    buyback_scale_at(p, share, eps, price, elapsed_days)
+}
+
+/// One session's increment to the log share-count reduction `L` under
+/// `buyback_accrual`: `min(share * eps * exp(L) / price,
+/// buyback_yield_cap) / 252`, where `share` is the name's buyback share of
+/// earnings (`market::dividends::buyback_share`: `buyback_payout_share`, less
+/// the name's dividend payout under `dividend_buyback_substitution`), `eps`
+/// is the earnings the valuation holds before the buyback factor and `price`
+/// is the close.
+///
+/// This is the exact form [`buyback_scale`]'s own docstring names: a buyback
+/// retires shares at the price paid, so `dN/N = -payout * EPS_now / P dt`,
+/// and EPS_now is `eps * exp(L)` because per-share earnings rise as the
+/// share count falls. The cap, when set, bounds one session's increment. A
+/// loss-maker (`eps <= 0`) neither retires nor issues, as in
+/// [`buyback_scale`]. Zero when the switch or the payout share is off.
+pub fn buyback_accrual_step(p: &ModelParams, share: f64, eps: Option<f64>, price: f64,
+                            log_shares: f64) -> f64 {
+    if p.buyback_accrual == 0.0 || p.buyback_payout_share == 0.0 || share == 0.0 {
+        return 0.0;
+    }
+    let eps = match eps {
+        Some(e) if e > 0.0 && e.is_finite() => e,
+        _ => return 0.0,
+    };
+    if !(price > 0.0) || !price.is_finite() {
+        return 0.0;
+    }
+    let per_share = if log_shares == 0.0 { eps } else { eps * mathx::exp(log_shares) };
+    let b = share * per_share / price;
+    let b = if p.buyback_yield_cap == 0.0 { b } else { mathx::min(b, p.buyback_yield_cap) };
+    b / MARKET_DAYS_PER_YEAR
 }
 
 /// The sector draw's DAILY sigma, which follows VIX when coupled, on the
@@ -477,13 +628,21 @@ impl TickCompany {
 
 /// Pending order volume for one ticker.
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
+#[non_exhaustive]
 pub struct OrderVolume {
     pub buy: f64,
     pub sell: f64,
 }
 
+impl OrderVolume {
+    pub const fn new(buy: f64, sell: f64) -> Self {
+        OrderVolume { buy, sell }
+    }
+}
+
 /// A live news-impact entry, for the volume amplifier.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
+#[non_exhaustive]
 pub struct NewsImpactEntry {
     pub company_id: Option<String>,
     pub sector: Option<String>,
@@ -505,6 +664,7 @@ pub struct NewsImpactEntry {
 /// current builds and observed at -4 draws on an older one: real, rare,
 /// and impossible to rule out while the consumption is conditional.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum SettleDrawPolicy {
     /// Four uniforms are drawn per active company on every open tick,
     /// whether or not the settle uses them. The draw schedule becomes a
@@ -521,6 +681,7 @@ pub enum SettleDrawPolicy {
 
 /// Everything the tick needs that is not a company.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct TickInputs<'a> {
     pub economy: &'a EconomyState,
     pub market_status: MarketStatus,
@@ -538,6 +699,12 @@ pub struct TickInputs<'a> {
     /// state (`sector_vol_alpha` / `_beta`), or EMPTY, which is the stateless
     /// draw at `sector_sigma_at` every preset up to pt-v19 runs.
     pub sector_sigmas: &'a [f64],
+    /// The per-name idiosyncratic variance state
+    /// (`ModelParams::idio_vol_alpha`): one RATIO per company slot,
+    /// multiplying the variance of the name's own draw, or EMPTY when
+    /// `idio_vol_alpha`, `_beta` and `_jump_bump` are all 0.0, which is the draw every
+    /// preset runs and multiplies nothing.
+    pub idio_vol_ratios: &'a [f64],
     /// Whether yesterday's session accumulated a DOWN market factor.
     /// Read only by the lagged transmission wire
     /// (`market_beta_down_asym_lag`); false everywhere that dial is 0.0,
@@ -564,6 +731,12 @@ pub struct TickInputs<'a> {
     /// constant sigma. A caller building `TickInputs` directly and wanting
     /// the old constant-sigma behaviour passes the constant.
     pub market_sigma_daily: f64,
+    /// The factor by which `fair_value_market_vol_cap`'s ceiling is
+    /// scaled: exactly 1.0 unless `market_vol_cycle_cap_relative` is set
+    /// and the cycle's volatility multiplier is over one, where the ceiling
+    /// is read against the phase's normal volatility. See
+    /// `ModelParams::market_vol_cycle_cap_relative`.
+    pub market_permanent_ceiling_scale: f64,
     /// The VIX at which every variance coupling reads ONE.
     ///
     /// `params.market_vol_vix_anchor` under every preset before pt-v19,
@@ -589,6 +762,10 @@ pub struct TickInputs<'a> {
     /// whole of the day's move, which is every preset: see
     /// [`crate::params::ModelParams::volume_move_jump_share`].
     pub jump_move: &'a [f64],
+    /// Each name's volume multiple on an earnings reaction session
+    /// (`earnings_volume_multiple`), in roster order; EMPTY off the
+    /// calendar, which every preset is, and then nothing is read.
+    pub earnings_volume: &'a [f64],
     /// See [`SettleDrawPolicy`]. `FourAlways` unless replaying a recorded
     /// reference stream.
     pub settle_draws: SettleDrawPolicy,
@@ -643,6 +820,49 @@ pub struct TickInputs<'a> {
     /// passes [`crate::params::PT_V1`] for the shipped model, which is
     /// bit-identical to the const build.
     pub params: &'a ModelParams,
+}
+
+impl<'a> TickInputs<'a> {
+    /// A single open-market tick at mid-session over `economy`: volatility
+    /// multiplier 1.0, no news, orders, sectors, resting orders or jumps,
+    /// the market factor at its baseline sigma
+    /// ([`MARKET_FACTOR_SIGMA`]), the preset's VIX anchor, the generated
+    /// draw schedule, and this tick's own nominal output as the base, so
+    /// the nominal growth ratio is 1.0. Set any other field on the value.
+    pub fn new(economy: &'a EconomyState, params: &'a ModelParams) -> Self {
+        TickInputs {
+            economy,
+            market_status: MarketStatus::Open,
+            intraday_t: 0.5,
+            volatility_multiplier: 1.0,
+            news: &[],
+            news_impact_queue: &[],
+            order_volumes: &[],
+            sector_keys: &[],
+            sector_sigmas: &[],
+            idio_vol_ratios: &[],
+            prev_day_down: false,
+            prev_day_factor: 0.0,
+            day_factor: 0.0,
+            forced_flow_eff: 1.0,
+            market_sigma_daily: MARKET_FACTOR_SIGMA,
+            market_permanent_ceiling_scale: 1.0,
+            vix_anchor: params.market_vol_vix_anchor,
+            universe_stress: 0.0,
+            volume_state: 0.0,
+            volume_idio: &[],
+            jump_move: &[],
+            earnings_volume: &[],
+            settle_draws: SettleDrawPolicy::FourAlways,
+            settle_depth_counterfactual: false,
+            resting_orders: &[],
+            fill_impact: &[],
+            nominal_output_base: economy.gdp * economy.cpi,
+            crisis_epicentre: None,
+            elapsed_days: 0,
+            params,
+        }
+    }
 }
 
 /// What one tick produced, beyond the mutations applied to the companies.
@@ -806,15 +1026,32 @@ fn variance_volume_multiplier(inputs: &TickInputs) -> f64 {
 /// The share of a market shock that moves fair value for good at the
 /// market's current daily sigma: `fair_value_market_share`, scaled down by
 /// `fair_value_market_vol_cap` once the sigma is above that multiple of
-/// `market_factor_sigma`. The share itself at a cap of 0.0, bit for bit.
-pub fn market_permanent_share(p: &crate::params::ModelParams, market_sigma_daily: f64) -> f64 {
+/// `market_factor_sigma`, times `ceiling_scale` (exactly 1.0 unless
+/// `market_vol_cycle_cap_relative` is set; a branch at 1.0). The share
+/// itself at a cap of 0.0, bit for bit.
+///
+/// Above the ceiling, `fair_value_market_excess_share` of what the ceiling
+/// took off the share is put back: `capped + e * (share - capped)`. At 0.0,
+/// every preset's value, that is the capped share bit for bit (a branch);
+/// at 1.0 it is the share itself, as a cap of 0.0 gives.
+pub fn market_permanent_share(
+    p: &crate::params::ModelParams,
+    market_sigma_daily: f64,
+    ceiling_scale: f64,
+) -> f64 {
     let share = p.fair_value_market_share;
     if p.fair_value_market_vol_cap == 0.0 {
         return share;
     }
     let ceiling = p.fair_value_market_vol_cap * p.market_factor_sigma;
+    let ceiling = if ceiling_scale == 1.0 { ceiling } else { ceiling * ceiling_scale };
     if market_sigma_daily > ceiling {
-        share * (ceiling / market_sigma_daily)
+        let capped = share * (ceiling / market_sigma_daily);
+        if p.fair_value_market_excess_share == 0.0 {
+            capped
+        } else {
+            capped + p.fair_value_market_excess_share * (share - capped)
+        }
     } else {
         share
     }
@@ -866,6 +1103,21 @@ pub fn simulate_market_tick(
     let economy = inputs.economy;
     let open = inputs.market_status == MarketStatus::Open;
     let p = inputs.params;
+    // THE SESSION'S SHARE OF THE DAY under a night split
+    // (`overnight_market_share`, `overnight_idio_share`): the open drew the
+    // night at `sqrt(w)`, so the session draws at `sqrt(1 - w)` and the two
+    // sum to the day. Branches, so at 0.0 every scale is the one that stood.
+    let tick_scale_market = if p.overnight_market_share == 0.0 {
+        tick_scale
+    } else {
+        tick_scale * mathx::sqrt(1.0 - p.overnight_market_share)
+    };
+    let (tick_scale_own, volatility_multiplier) = if p.overnight_idio_share == 0.0 {
+        (tick_scale, inputs.volatility_multiplier)
+    } else {
+        let k = mathx::sqrt(1.0 - p.overnight_idio_share);
+        (tick_scale * k, inputs.volatility_multiplier * k)
+    };
 
     // ── Shared factors: 1 normal, then one per sector ─────────────────────
     // Drawn at PER-TICK scale directly, so the noise is not divided by 390
@@ -874,7 +1126,7 @@ pub fn simulate_market_tick(
     // baseline (`MARKET_FACTOR_SIGMA`) this line is bit-identical to the
     // constant-sigma era's spelling, association included.
     rng.site(crate::rng::Site::MarketFactorZ, 0);
-    let market_factor = rng.next_normal() * inputs.market_sigma_daily * tick_scale;
+    let market_factor = rng.next_normal() * inputs.market_sigma_daily * tick_scale_market;
 
     // Crisis correlation: above the crisis threshold, sector factors blend
     // toward the market factor, so diversification stops working exactly
@@ -907,7 +1159,7 @@ pub fn simulate_market_tick(
             Some(s) => *s,
             None => sector_sigma,
         };
-        let idiosyncratic = rng.next_normal() * sector_sigma * tick_scale;
+        let idiosyncratic = rng.next_normal() * sector_sigma * tick_scale_own;
         // Where the blend takes from. At source 0.0 the sector draw is
         // attenuated and the market factor injected through this slot, the
         // reference behaviour. At 1.0 the draw is kept whole and the same
@@ -958,7 +1210,7 @@ pub fn simulate_market_tick(
         // The same expression the draw above multiplied the normal by, so
         // the recentring reads the sigma that was actually used rather
         // than one recomputed from the constant.
-        market_sigma_tick: inputs.market_sigma_daily * tick_scale,
+        market_sigma_tick: inputs.market_sigma_daily * tick_scale_market,
         // Resolved once at `open_market` and carried, not recomputed: the
         // episode's epicentre is a property of the SESSION, and a tick that
         // re-read the engine's state mid-day would let an episode start
@@ -970,12 +1222,15 @@ pub fn simulate_market_tick(
     let intraday_volume_mult = intraday_volume(inputs.intraday_t, inputs.market_status);
 
     // ── Phase 1: factors ──────────────────────────────────────────────────
-    let mut active_indices: Vec<usize> = Vec::new();
-    let mut all_factors: Vec<LiveFactors> = Vec::new();
-    let mut all_drifts: Vec<f64> = Vec::new();
-    let mut all_noises: Vec<f64> = Vec::new();
-    let mut all_news_vol_mults: Vec<f64> = Vec::new();
-    let mut all_randoms: Vec<f64> = Vec::new();
+    // Sized for the roster once rather than grown name by name: allocation
+    // only, so no arithmetic or draw moves.
+    let roster = companies.len();
+    let mut active_indices: Vec<usize> = Vec::with_capacity(roster);
+    let mut all_factors: Vec<LiveFactors> = Vec::with_capacity(roster);
+    let mut all_drifts: Vec<f64> = Vec::with_capacity(roster);
+    let mut all_noises: Vec<f64> = Vec::with_capacity(roster);
+    let mut all_news_vol_mults: Vec<f64> = Vec::with_capacity(roster);
+    let mut all_randoms: Vec<f64> = Vec::with_capacity(roster);
 
     for (idx, company) in companies.iter().enumerate() {
         if company.is_bankrupt || !company.is_public {
@@ -998,11 +1253,20 @@ pub fn simulate_market_tick(
 
         // DRAW SITE: one normal, inside the factor computation.
         rng.site(crate::rng::Site::FactorIdioZ, idx as u32);
+        // The idiosyncratic variance state scales the name's own draw
+        // through the one multiplier that reaches only that draw (and its
+        // unit, so `noise_own_scale2` carries it). EMPTY is a branch. It
+        // scales the session's share under a night split, which the
+        // multiplier above already carries.
+        let volatility_multiplier = match inputs.idio_vol_ratios.get(idx) {
+            Some(&r) => volatility_multiplier * mathx::sqrt(r),
+            None => volatility_multiplier,
+        };
         let factors = calculate_live_factors(
             &company.factor_view(),
             inputs.news,
             imbalance,
-            inputs.volatility_multiplier,
+            volatility_multiplier,
             &shared,
             p,
             rng,
@@ -1116,7 +1380,10 @@ pub fn simulate_market_tick(
         // Per NAME, unlike the growth term above: the yield is this
         // company's own earnings over its own price. A BRANCH at 1.0 for
         // the same reason as the one above.
-        let buyback = buyback_scale(p, grown.eps, current_prices[i], inputs.elapsed_days);
+        let buyback = buyback_factor(
+            p, crate::market::dividends::buyback_share(p, &companies[idx]),
+            grown.eps, current_prices[i], inputs.elapsed_days,
+            companies[idx].stock.buyback_log_shares);
         let valuation = if buyback == 1.0 {
             grown
         } else {
@@ -1126,6 +1393,9 @@ pub fn simulate_market_tick(
             &valuation, &econ_view, p.fair_value_book_floor,
             p.qe_pe_gain, p.qe_pe_stock_gain, p.neutral_discount_rate, p.rate_pe_sensitivity);
         let fv = with_vix_discount(p, breakdown.fair_value, vix_exposure, companies[idx].stock.beta);
+        // The dividend accrued since the last ex-date, in price units. A
+        // branch inside: no state, or no accrual, is `fv` bit for bit.
+        let fv = crate::market::dividends::with_accrual(fv, &companies[idx]);
 
         // Lazy init: adopt the current premium/discount as the starting `s`,
         // so enabling the model — or loading an old save — causes no level
@@ -1255,7 +1525,8 @@ pub fn simulate_market_tick(
             let dv = if p.fair_value_market_share == 0.0 {
                 own_noise + own_news
             } else {
-                let psim = market_permanent_share(p, inputs.market_sigma_daily);
+                let psim = market_permanent_share(
+                    p, inputs.market_sigma_daily, inputs.market_permanent_ceiling_scale);
                 // Under `fair_value_market_linear` only the plain loading on
                 // the draw is permanent; the tilt, the lagged wire, the
                 // crisis injection and the amplifier stay in `s`.
@@ -1376,7 +1647,18 @@ pub fn simulate_market_tick(
             // the price before it, so at share 1.0 a gap counts as a day the
             // name travelled that far. See
             // `ModelParams::volume_move_jump_share`.
-            if inputs.params.volume_move_jump_share == 1.0 {
+            //
+            // Under a night split the day is measured from the last close
+            // (`previous_close`, which the open then leaves at the close):
+            // the session carries only part of the day's move, and a real
+            // day's volume answers the whole of it.
+            if p.overnight_market_share != 0.0 || p.overnight_idio_share != 0.0 {
+                if stock.previous_close > 0.0 {
+                    ((new_prices[i] - stock.previous_close) / stock.previous_close).abs()
+                } else {
+                    move_from_open.abs()
+                }
+            } else if inputs.params.volume_move_jump_share == 1.0 {
                 move_from_open.abs()
             } else {
                 match inputs.jump_move.get(idx) {
@@ -1409,6 +1691,13 @@ pub fn simulate_market_tick(
             * intraday_volume_mult
             * all_news_vol_mults[i])
             .floor();
+        // A reaction session's multiple (`earnings_volume_multiple`), read
+        // only where the engine passed one: empty off the calendar.
+        if let Some(&m) = inputs.earnings_volume.get(idx) {
+            if m != 1.0 {
+                volumes[i] = (volumes[i] * m).floor();
+            }
+        }
     }
 
     // ── Phase 4: settlement ───────────────────────────────────────────────
@@ -1695,6 +1984,20 @@ pub fn vix_excess(p: &ModelParams, vix: f64) -> f64 {
     mathx::log(vix / p.fair_value_vix_knee)
 }
 
+/// What a PINNED VIX moves the volatility feedback's exposure toward
+/// (`pinned_vix_feedback`): its log excess over the knee, or, with
+/// `pinned_vix_calm_knee` and `pinned_vix_calm_share` both set, the larger
+/// of that and the calm line `share * ln(vix / calm_knee)`, so a pin below
+/// the knee is priced too. The knee's excess, bit for bit, with either dial
+/// at 0.0.
+pub fn pinned_vix_excess(p: &ModelParams, vix: f64) -> f64 {
+    let excess = vix_excess(p, vix);
+    if p.pinned_vix_calm_share == 0.0 || !(p.pinned_vix_calm_knee > 0.0) || !(vix > p.pinned_vix_calm_knee) {
+        return excess;
+    }
+    mathx::max(excess, p.pinned_vix_calm_share * mathx::log(vix / p.pinned_vix_calm_knee))
+}
+
 /// What the volatility-feedback discount reads (`fair_value_vix_discount`):
 /// the VIX's log excess over the knee as it stands, or, with
 /// `fair_value_vix_half_life` set, its smoothed level the close carries
@@ -1740,7 +2043,9 @@ pub fn published_fair_value(
     } else {
         scale_valuation(company.valuation(), nominal)
     };
-    let buyback = buyback_scale(p, grown.eps, company.stock.price, elapsed_days);
+    let buyback = buyback_factor(
+        p, crate::market::dividends::buyback_share(p, company), grown.eps,
+        company.stock.price, elapsed_days, company.stock.buyback_log_shares);
     let valuation = if buyback == 1.0 { grown } else { scale_valuation(grown, buyback) };
     let econ_view = EconomyValuationInputs {
         corporate_bond_yield: Some(economy.corporate_bond_yield),
@@ -1752,7 +2057,8 @@ pub fn published_fair_value(
         &valuation, &econ_view, p.fair_value_book_floor,
         p.qe_pe_gain, p.qe_pe_stock_gain, p.neutral_discount_rate, p.rate_pe_sensitivity)
     .fair_value;
-    with_vix_discount(p, fv, vix_feedback_exposure(p, economy), company.stock.beta)
+    let fv = with_vix_discount(p, fv, vix_feedback_exposure(p, economy), company.stock.beta);
+    crate::market::dividends::with_accrual(fv, company)
 }
 
 /// A name's fair value as the tick's phase 2 computes it: the nominal
@@ -1781,7 +2087,9 @@ pub fn tick_fair_value(
     } else {
         scale_valuation(grown, mathx::exp(v_level))
     };
-    let buyback = buyback_scale(p, grown.eps, price, elapsed_days);
+    let buyback = buyback_factor(
+        p, crate::market::dividends::buyback_share(p, company), grown.eps, price, elapsed_days,
+        company.stock.buyback_log_shares);
     let valuation = if buyback == 1.0 { grown } else { scale_valuation(grown, buyback) };
     let econ_view = EconomyValuationInputs {
         corporate_bond_yield: Some(economy.corporate_bond_yield),
@@ -1793,7 +2101,44 @@ pub fn tick_fair_value(
         &valuation, &econ_view, p.fair_value_book_floor,
         p.qe_pe_gain, p.qe_pe_stock_gain, p.neutral_discount_rate, p.rate_pe_sensitivity)
     .fair_value;
-    with_vix_discount(p, fv, vix_feedback_exposure(p, economy), company.stock.beta)
+    let fv = with_vix_discount(p, fv, vix_feedback_exposure(p, economy), company.stock.beta);
+    crate::market::dividends::with_accrual(fv, company)
+}
+
+/// The opening print of a name whose mispricing stands at `s`: the price
+/// `P = fv(P) exp(s)`, fair value read as the tick reads it
+/// ([`tick_fair_value`]). Fair value reads the price through the buyback
+/// term (the yield is earnings over price), so the first step, at the last
+/// price, is exact only with `buyback_payout_share` at 0.0; with it on the
+/// fixed point is iterated as the close's re-mark iterates it
+/// (`Engine::reprice_to_published_macro`), a contraction because the term's
+/// elasticity is the buyback yield times the years elapsed, well under one
+/// (and capped by `buyback_yield_cap`). Stops when a step moves nothing, or
+/// at sixteen, and takes no draw.
+pub fn opening_print(
+    p: &ModelParams,
+    economy: &EconomyState,
+    nominal_output_base: f64,
+    elapsed_days: i64,
+    company: &TickCompany,
+    s: f64,
+) -> f64 {
+    let clamp = |x: f64| mathx::min(mathx::max(x, 0.01), p.price_hard_cap);
+    let level = mathx::exp(s);
+    let last = company.stock.price;
+    let mut price = clamp(
+        tick_fair_value(p, economy, nominal_output_base, elapsed_days, company, last) * level);
+    if p.buyback_payout_share != 0.0 {
+        for _ in 0..16 {
+            let fv = tick_fair_value(p, economy, nominal_output_base, elapsed_days, company, price);
+            let next = clamp(fv * level);
+            if next == price {
+                break;
+            }
+            price = next;
+        }
+    }
+    price
 }
 
 pub fn clamp_s(params: &ModelParams, s: f64) -> f64 {
@@ -1848,6 +2193,65 @@ impl Rng for PredrawnUniforms {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_excess_share_is_a_floor_under_the_share_above_the_ceiling() {
+        let mut p = crate::params::PT_V20;
+        let base = p.fair_value_market_vol_cap * p.market_factor_sigma;
+        // Off: the ceiling as it stood, bit for bit, above and below it.
+        assert_eq!(p.fair_value_market_excess_share, 0.0);
+        assert_eq!(market_permanent_share(&p, 0.5 * base, 1.0), p.fair_value_market_share);
+        assert_eq!(market_permanent_share(&p, 4.0 * base, 1.0), p.fair_value_market_share / 4.0);
+        // On: below the ceiling nothing moves; above it, capped + e (share - capped).
+        p.fair_value_market_excess_share = 0.5;
+        assert_eq!(market_permanent_share(&p, 0.5 * base, 1.0), p.fair_value_market_share);
+        let capped = p.fair_value_market_share / 4.0;
+        let want = capped + 0.5 * (p.fair_value_market_share - capped);
+        assert!((market_permanent_share(&p, 4.0 * base, 1.0) - want).abs() < 1e-15);
+        // However turbulent the market, at least e of the share stays.
+        assert!(market_permanent_share(&p, 1e6 * base, 1.0) >= 0.5 * p.fair_value_market_share);
+        // At 1.0 it is no ceiling.
+        p.fair_value_market_excess_share = 1.0;
+        assert_eq!(market_permanent_share(&p, 4.0 * base, 1.0), p.fair_value_market_share);
+    }
+
+    #[test]
+    fn buyback_accrual_is_inert_off_and_does_not_read_the_price_on() {
+        let mut p = crate::params::PT_V1;
+        p.buyback_payout_share = 0.75;
+        // Off: the factor is the term that stood, and the step is zero.
+        assert_eq!(buyback_factor(&p, p.buyback_payout_share, Some(2.0), 40.0, 500, Some(0.3)),
+                   buyback_scale(&p, Some(2.0), 40.0, 500));
+        assert_eq!(buyback_accrual_step(&p, p.buyback_payout_share, Some(2.0), 40.0, 0.0), 0.0);
+        // On: exp(L), whatever the price and the day.
+        p.buyback_accrual = 1.0;
+        let a = buyback_factor(&p, p.buyback_payout_share, Some(2.0), 40.0, 500, Some(0.3));
+        let b = buyback_factor(&p, p.buyback_payout_share, Some(2.0), 20.0, 9000, Some(0.3));
+        assert_eq!(a, b);
+        assert_eq!(a, mathx::exp(0.3));
+        assert_eq!(buyback_factor(&p, p.buyback_payout_share, Some(2.0), 40.0, 500, None), 1.0);
+    }
+
+    #[test]
+    fn buyback_accrual_step_is_the_capped_yield_on_the_grown_earnings() {
+        let mut p = crate::params::PT_V1;
+        p.buyback_payout_share = 0.5;
+        p.buyback_accrual = 1.0;
+        let l = 0.2;
+        let want = 0.5 * 2.0 * mathx::exp(l) / 40.0 / MARKET_DAYS_PER_YEAR;
+        assert_eq!(buyback_accrual_step(&p, p.buyback_payout_share, Some(2.0), 40.0, l), want);
+        // The cap bounds one session's increment.
+        p.buyback_yield_cap = 0.01;
+        assert_eq!(buyback_accrual_step(&p, p.buyback_payout_share, Some(2.0), 40.0, l), 0.01 / MARKET_DAYS_PER_YEAR);
+        // A loss-maker, a missing figure and a bad price accrue nothing.
+        assert_eq!(buyback_accrual_step(&p, p.buyback_payout_share, Some(-1.0), 40.0, l), 0.0);
+        assert_eq!(buyback_accrual_step(&p, p.buyback_payout_share, None, 40.0, l), 0.0);
+        assert_eq!(buyback_accrual_step(&p, p.buyback_payout_share, Some(2.0), 0.0, l), 0.0);
+        assert_eq!(buyback_accrual_step(&p, p.buyback_payout_share, Some(2.0), f64::NAN, l), 0.0);
+        // No payouts, nothing to accrue.
+        p.buyback_payout_share = 0.0;
+        assert_eq!(buyback_accrual_step(&p, p.buyback_payout_share, Some(2.0), 40.0, l), 0.0);
+    }
 
     #[test]
     fn s_phi_tick_matches_the_recorded_v8_bits() {

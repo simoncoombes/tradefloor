@@ -37,6 +37,14 @@ RATES = ("UST2Y", "UST10Y", "IGCORP")
 SPECS = {s["ticker"]: s for s in tf.rate_specs()}
 
 
+#: The preset the index mechanics below were measured on: pt-v20, the
+#: default until 0.10.0. pt-v21, the default from then, re-marks the rate
+#: indices at the close and live in the session (`rate_close_remark`,
+#: `rate_intraday_live`), which `tests/test_bond_timing.py` covers; the tests
+#: that pass `model=BASE` built their engine on the default until then.
+BASE = "pt-v20"
+
+
 def f64(buf: bytes) -> list[float]:
     return list(struct.unpack("<%dd" % (len(buf) // 8), buf))
 
@@ -202,7 +210,7 @@ def repriced(level: float, duration: float, convexity: float, dy: float,
 
 
 def test_every_close_to_close_return_is_the_formula_to_the_bit():
-    e = tf.Engine(seed=8, universe=universe())
+    e = tf.Engine(seed=8, universe=universe(), model=BASE)
     marks = [{r["ticker"]: (r["level"], r["yield"]) for r in e.rate_instruments}]
     first = True
     for d in range(40):
@@ -226,7 +234,7 @@ def test_every_close_to_close_return_is_the_formula_to_the_bit():
 
 
 def test_the_components_sum_to_the_days_return():
-    e = tf.Engine(seed=8, universe=universe())
+    e = tf.Engine(seed=8, universe=universe(), model=BASE)
     day(e)
     before = dict(zip(e.tickers, f64(e.prices())))
     day(e)
@@ -242,7 +250,7 @@ def test_the_components_sum_to_the_days_return():
 
 
 def test_a_200bp_parallel_shock_reprices_on_the_day_it_lands():
-    e = tf.Engine(seed=8, universe=universe())
+    e = tf.Engine(seed=8, universe=universe(), model=BASE)
     day(e)
     fields = e.macro_fields
     marked = {r["ticker"]: r["yield"] for r in e.rate_instruments}
@@ -279,7 +287,7 @@ def test_the_quadratic_stops_at_its_turning_point():
 
 
 def test_a_mid_day_pin_reaches_the_index_on_the_next_tick_and_no_sooner():
-    e = tf.Engine(seed=8, universe=universe())
+    e = tf.Engine(seed=8, universe=universe(), model=BASE)
     day(e)
     e.open_market()
     e.run_session(9, 30, 3, 100)
@@ -325,7 +333,7 @@ def test_no_price_reveals_tomorrows_yield():
 
 # -- the packaged scenarios ------------------------------------------------------
 
-def _scenario_run(scenario, days, seed=3, model=None):
+def _scenario_run(scenario, days, seed=3, model=BASE):
     e = tf.Engine(seed=seed, universe=universe(8), model=model)
     closes = []
     for d in range(days):
@@ -467,7 +475,7 @@ def test_the_60_40_bond_sleeve_takes_the_duration_weighted_hit():
     assert sleeve == pytest.approx(expected, abs=0.004)
 
 
-def _banded_through_the_curve_shock(band, model=None):
+def _banded_through_the_curve_shock(band, model=BASE):
     agent = Balanced(band=band)
     tf.evaluate({"banded": agent}, seed=4, universe=universe(16), days=53,
                 steps_per_day=1, ticks_per_step=390,
@@ -485,7 +493,8 @@ def test_a_rebalancer_buys_bonds_after_a_shock_that_crosses_its_band():
     Where the price takes the rate at the next tick (pt-v20 with
     `macro_publication_repricing` 0), the day-50 mark sees the bonds' fall
     and not yet the equities', the equity share reads 0.629 and a 2-point
-    band is crossed. On pt-v20, the default, the scenario's pins re-mark
+    band is crossed. On pt-v20 (the default until 0.10.0, and the preset
+    this runs on by name since), the scenario's pins re-mark
     every equity to the higher discount rate the moment they are written,
     before the open, so the equity sleeve takes its hit at the same mark
     (604,460 to 567,314) and the share moves only to 0.6125: inside 2
@@ -556,7 +565,7 @@ def test_an_agents_fill_is_priced_by_the_book_and_its_impact_decays():
 
 
 def test_the_tape_carries_the_indices():
-    e = tf.Engine(seed=1, universe=universe(4))
+    e = tf.Engine(seed=1, universe=universe(4), model=BASE)
     for d in range(2):
         day(e)
         e.record(d)

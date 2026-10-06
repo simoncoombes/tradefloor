@@ -270,8 +270,13 @@ def test_a_round_trip_leaves_no_lasting_information_impact():
     from tradefloor.harness import session_clock
     import struct
 
+    # pt-v20 by name, the default until 0.10.0 (this built the default). On
+    # pt-v21 the round trip leaves -3.55e-5 in `order_flow_impact` on this
+    # seed, all of it from the impact memory (`impact_memory_*`; pt-v20 with
+    # those dials alone leaves -7.0e-5): the memory carries the buy's
+    # displacement into the sell, so the two do not cancel to the bit.
     def lasting(unwind: bool) -> float:
-        engine = Engine(seed=2026, universe=UNIVERSE)
+        engine = Engine(seed=2026, universe=UNIVERSE, model="pt-v20")
         portfolio = Portfolio()
         ticker = engine.tickers[0]
         engine.open_market()
@@ -404,3 +409,21 @@ def test_both_worlds_are_copies_of_one_engine(monkeypatch):
     execution = tca.analyse(BuyOnce(), seed=5, universe=SMALL)
     assert len(built) == 1
     assert execution.fills
+
+
+def test_a_fill_short_by_rounding_is_not_partial():
+    """The book matches in floating point: on pt-v21 an order for
+    9,375.987599922682 shares filled 9,375.98759992268 and the engine's own
+    flag called it partial. tca counts a fill as partial only when it falls
+    short by more than a billionth of the request."""
+    from tradefloor.tca import _short_of_request
+
+    dust = {"requested": -9375.987599922682, "quantity": -9375.98759992268,
+            "partial": True}
+    short = {"requested": 4856.0, "quantity": 483.0, "partial": True}
+    whole = {"requested": 100.0, "quantity": 100.0, "partial": False}
+    assert not _short_of_request(dust)
+    assert _short_of_request(short)
+    assert not _short_of_request(whole)
+    # A fill that carries no request is read by its own flag.
+    assert _short_of_request({"partial": True})

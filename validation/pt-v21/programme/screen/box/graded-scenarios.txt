@@ -1,0 +1,13 @@
+# The scenario files the registered SF, S and C4b rows were banded on: the
+# packaged files of the pt-v20 grade's engine. assemble.py copies each from
+# the engine repository at ENGINE_REF into scripts/longrun/graded-scenarios/
+# and writes SOURCE.json with their sha256 (recession.yml: 9eac7e1a..., as
+# box-g15/recession.json records it).
+ENGINE_REF caaa4c6e36e49791ad230379bafad4c1dbbeddb4
+curve_shock
+geopolitical_conflict
+liquidity_crisis
+oil_price_spike
+policy_regime_shift
+rate_shock
+recession

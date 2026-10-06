@@ -1013,7 +1013,7 @@ def main() -> None:
                  if r["mechanism_252"]["reversed"] else ""), flush=True)
 
     out = {
-        "pretium_version": tradefloor.version(),
+        "tradefloor_version": tradefloor.version(),
         # The commit that MEASURED this, read here rather than stamped by
         # whoever writes a record from it later. `record.py` used to take
         # `git rev-parse HEAD` in its own working directory, which is the

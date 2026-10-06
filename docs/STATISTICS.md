@@ -12,12 +12,12 @@ The model itself is specified in
 
 ## The sets at a glance
 
-| Set | Count | Horizon | pt-v20, the default from 0.8.5 | pt-v19 |
-|---|---|---|---|---|
-| [The one-year table](#the-one-year-table) | 19 statistics | 252 sessions | 19 of 19 in band | 19 of 19 |
-| [The two-year panel](#the-two-year-panel) | 15 statistics, 14 with a band | 504 sessions | 14 of 14 in band | 14 of 14 |
-| [The long-run criteria](#the-long-run-criteria) | 40 registered rows for pt-v20; 17 in pt-v19's record, 15 in records up to 0.8.1 | 21 years | 40 of 40 met | fails 16 of the 40, C9 and D1 not scored; its own record reads 15 of 17 |
-| [The hosted report](#the-hosted-report) | no statistics of its own | | quotes the long-run criteria | |
+| Set | Count | Horizon | pt-v21, the default from 0.10.0 | pt-v20, the default from 0.8.5 to 0.9.1 | pt-v19 |
+|---|---|---|---|---|---|
+| [The one-year table](#the-one-year-table) | 19 statistics | 252 sessions | 18 of 19 in band | 19 of 19 in band | 19 of 19 |
+| [The two-year panel](#the-two-year-panel) | 15 statistics, 14 with a band | 504 sessions | 14 of 14 in band | 14 of 14 in band | 14 of 14 |
+| [The long-run criteria](#the-long-run-criteria) | 40 registered rows; 17 in pt-v19's record, 15 in records up to 0.8.1 | 21 years | 40 of 40 met, on 270 histories | 40 of 40 met | fails 16 of the 40, C9 and D1 not scored; its own record reads 15 of 17 |
+| [The hosted report](#the-hosted-report) | no statistics of its own | | quotes the long-run criteria | | |
 
 Three parts of the one-year table have counts of their own, and appear on
 some pages: [the 14 shape statistics](#the-shape-statistics), [the
@@ -27,8 +27,12 @@ rows](#the-index-rows).
 ## The one-year table
 
 **19 statistics, graded over 252 sessions.** This is the set the realism
-envelope publishes, over the one-year horizon it certifies. pt-v20 has all
-19 in band, and so does pt-v19.
+envelope publishes, over the one-year horizon it certifies. pt-v21 has 18
+of 19 in band. The one it misses is `index_tail_dn3_pct`: the index falls 3%
+or more on 0.60% of days over the thirty certification seeds, under the band's
+floor of 0.64, where real markets read 1.21. Pooled over 360 seeds of the same
+protocol the rate is 0.98, inside the band. The table above gives the count
+for each preset.
 
 | Statistic | What it measures | Group |
 |---|---|---|
@@ -52,25 +56,25 @@ envelope publishes, over the one-year horizon it certifies. pt-v20 has all
 | `fear_gauge_dn3` | the VIX's rise on a day the index falls 3% or more | index |
 | `index_tail_dn3_pct` | the share of days the index falls 3% or more | index |
 
-The two short-lag clustering rows pass low. pt-v20's certified median is
-0.0282 for `abs_return_acf1` and 0.0188 for `abs_return_acf5`. In
-`tf.facts.REAL_MARKETS_WINDOWS` the lowest real year reads 0.039 and 0.034
-and the median year 0.1025 and 0.0455, so the model sits below every one of
-those windows on both rows. The ruled floors, 0.02 and -0.03, are lower
-still, which is why both rows count as in band. The `decay-shape` gap in
-`tf.envelope.GAPS` carries the defect. Raising clustering changes the
-simulation, so it is for the next preset.
+Volatility clustering fades faster than real after the first day. pt-v21's
+certified median is 0.0948 for `abs_return_acf1`, against a median real year
+of 0.1025 in `tf.facts.REAL_MARKETS_WINDOWS`. At lag 5 it reads 0.0204 and at lag 20 0.0012,
+where the lowest real years read 0.034 and -0.015, so `abs_return_acf5`
+sits below every one of those windows. The ruled floor, -0.03, is lower
+still, which is why the row counts as in band. The `decay-shape` gap in
+`tf.envelope.GAPS` carries the defect. Changing it changes the simulation,
+so it is for the next preset.
 
 `tf.facts.measure()` returns 18 of the 19 on every run. The nineteenth,
 `crisis_sector_dispersion`, comes from `tf.facts.crisis_statistics()`, which
 `measure()` calls, and it appears only when a run holds at least 30 sessions
 with the VIX above the crisis threshold; otherwise `measure()` reports it
-absent and says why. On pt-v20 one of the thirty certification seeds reads
+absent and says why. On pt-v21 two of the thirty certification seeds read
 it at one year.
 
 **How it is measured.** Thirty seeds, 101 to 130, of a 252-session run.
 
-- The shape statistics and crisis dispersion are read on one fixed roster, `Universe.random(40, seed=111)`, and each is the median across seeds. Crisis dispersion needs 30 sessions with the VIX above the crisis threshold, so it is the median over the seeds that have them: 4 of 30 at one year.
+- The shape statistics and crisis dispersion are read on one fixed roster, `Universe.random(40, seed=111)`, and each is the median across seeds. Crisis dispersion needs 30 sessions with the VIX above the crisis threshold, so it is the median over the seeds that have them: 2 of 30 at one year on pt-v21.
 - The four index rows are read on a roster that changes with the seed, `Universe.random(40, seed=s)`, because an index level depends on the roster as much as on the model. The index return is a mean across seeds, the 1% fear row a median, the 3% fear row a median of the pooled days, and the tail row a pooled rate.
 
 **What grades it.** Each statistic has a band: the range real markets
@@ -99,8 +103,8 @@ the stricter comparison. Changing the rule changes the grade, so it waits for
 the next scoring rule.
 
 **One seed at a time.** The verdict is on the median across seeds. A single
-seed-year often misses one or more shape rows: on seeds 101 to 116 all 14
-shape rows were in band on 5 of the 16, and seed 114 had 8 of 14.
+seed-year often misses one or more shape rows: on pt-v21, seeds 101 to 116
+had all 14 shape rows in band on 8 of the 16, and seed 114 had 11 of 14.
 `tf.envelope.intervals()` takes one `facts.measure()` result per seed and
 gives each statistic's median, 10th and 90th percentiles and range across
 them, and flags a statistic whose middle 80 percent crosses a band edge.
@@ -121,8 +125,8 @@ the certificate's output. In the code the set is `facts.SHAPE`.
 The 14 shape statistics plus crisis dispersion: the 15 rows read on the
 fixed roster. This is the panel stored in each preset's record
 (`tf.preset_record()["panel_252"]`) and repeated on held-out seeds (1 to 30)
-and a held-out roster (`Universe.random(60, seed=909)`). pt-v20 and pt-v19
-each have 15 of 15 in band. Crisis dispersion joined in 0.8.0, so records of earlier presets
+and a held-out roster (`Universe.random(60, seed=909)`). pt-v21, pt-v20 and
+pt-v19 each have 15 of 15 in band, on both held-out axes as well. Crisis dispersion joined in 0.8.0, so records of earlier presets
 carry 14 rows. Used on the documentation site's Presets page ("In band,
 252d") and in the hosted preset list.
 
@@ -141,8 +145,8 @@ first a level row and the other three crisis rows (`facts.LEVEL`,
 14 with a two-year band.** `corr_persistence_acf1` has no two-year band,
 because the only band that exists for it was built on a different window
 protocol and describes a different quantity. So the panel is graded on 13
-shape statistics and crisis dispersion. pt-v20 and pt-v19 each have 14 of
-14 in band.
+shape statistics and crisis dispersion. pt-v21, pt-v20 and pt-v19 each have
+14 of 14 in band.
 
 The index rows have two-year bands, and this count leaves them out because
 they were measured at one year only. The certified horizon is one year, and
@@ -150,8 +154,8 @@ two years is graded as well.
 
 Records of presets before pt-v19 have no crisis dispersion row, so their
 two-year counts are out of 13: pt-v18 has 13 of 13, pt-v10 12 of 13, pt-v3
-7 of 13. The 14 of 14 of pt-v19 and pt-v20 is the same 13 plus crisis
-dispersion.
+7 of 13. The 14 of 14 of pt-v19, pt-v20 and pt-v21 is the same 13 plus
+crisis dispersion.
 
 **Where it is used.** The Realism envelope and The metrics pages ("14 of 14
 graded rows at 504 days"), the Presets page ("In band, 504d"), and the
@@ -159,13 +163,27 @@ hosted preset list.
 
 ## The long-run criteria
 
-**40 registered rows over 21 years for pt-v20.** The set grew as the model
+**40 registered rows over 21 years.** The set grew as the model
 did: 15 criteria when pt-v19 was adopted, 17 when C4a and C4b were added,
 28 on pt-v20's first grades, and 40 on its final one, which adds the
 driven 2020 and 2022 markets, the packaged recession and the audit's
 findings. Each row is something a user
 would notice, with a tolerance that is easy to read. The result is in
 `tf.preset_record()["long_run"]`.
+
+pt-v21 meets all 40. Its certification, boxes `ptv21c1` and `ptv21c1s` on
+the 0.10.0 engine, grades the same 40 rows with pt-v21 and pt-v20 both named,
+and reads the long-run rows (A1 to A3, B1 to B8, C1, C2, V1 and B9's spread)
+on 270 histories of 21 years: the 90 below and 180 more on the same seed
+blocks offset by 50000 and by 60000. R4 and D1 are read on the definitions
+pt-v21 was registered and graded on
+(`validation/pt-v21/programme/ptv21-registration-18.md`): R4 at the held
+close on 270 histories, and D1's two level rows pooled over 360 seeds. On
+the twelfth registration's definitions it reads 38 of 40: R4 at the last
+print is +0.112 against a floor of +0.15, and D1's tail rate on 30 seeds is
+0.598 against the certification's floor of 0.64. The grade, its scripts and
+both verdicts are in `validation/pt-v21/`. The rows nearest their edges are
+C10 (83% of its tolerance), R3 (79%), C3 and S1a (76%) and L1 (73%).
 
 pt-v20's rows were registered before the boxes that graded them
 (`validation/pt-v20/programme/ptv20-registration.md`). The final grade, box
@@ -184,48 +202,48 @@ says how to check the grade or run it again. pt-v19's own record, from an
 earlier box of 30 histories, carries 17 rows and reads 15 of 17. Records up
 to 0.8.1 carry the first 15, and pt-v18 met 8 of those.
 
-| Id | Criterion | Tolerance | pt-v20 | Real |
-|---|---|---|---|---|
-| A1 | worst month's volatility in the 2008 and 2020 replays, % | within 30% | 88.5, 76.5 | 84.3, 94.5 |
-| A2 | maximum drawdown in the 2008 and 2020 replays | within 30% | 0.450, 0.368 | 0.568, 0.339 |
-| A3 | peak stock correlation in the 2008 and 2020 replays | within 0.15 | 0.784, 0.784 | 0.748, 0.872 |
-| B1 | share of sessions with the VIX above 30 | half to twice | 0.059 | 0.082 |
-| B2 | mean length of a spell with the VIX above 30, sessions | half to twice | 27 | 22 |
-| B3 | 20% bear markets a decade | half to twice | 1.96 | 1.12 |
-| B4 | 10% corrections a decade | half to twice | 4.52 | 3.65 |
-| B5 | sessions down more than 5% a decade | half to twice | 9.6 | 6.2 |
-| B6 | share of sessions with the VIX under 15 | half to twice | 0.400 | 0.326 |
-| B7 | the index's annual volatility, % | within 20% | 19.1 | 18.1 |
-| B8 | the index's long-run return, % a year | within 2 points of the target | 6.4 | 6.25 |
-| B9 | sd of annual index returns, %; start-up volatility ratio | within 20%; two thirds to 1.5 | 16.3; 0.80 | 17.4; 1 |
-| C1 | crash rate in years 3 to 21 against years 1 to 2 | two thirds to 1.5 | 0.92 | 1.0 |
-| C2 | histories that touch the VIX ceiling | at most 3 of 90 | 0 | 0 |
-| C3 | the edge from reading a headline 5 ticks late, bp | under 20 | 15.8 | 0 |
-| C4a | lag-1 autocorrelation of 65-minute returns; Roll spread over quoted | at or above -0.05, or Roll at most twice quoted | -0.016; 1.21 | 0; 1 |
-| C4b | the best price-only rule on the suite: points over buy-and-hold; markets beaten of 20 | at most +5 and 14 | +0.2; 11 | 0; 10 |
-| C5 | a company's variance ratio at 60 sessions | 0.80 to 1.05 | 0.950 | 0.924 |
-| C6 | value signal's rank IC over 20 sessions, whole run and first 60 sessions | -0.03 to +0.05 | 0.000; 0.005 | 0.009 |
-| C7 | momentum's rank IC, 12-1 and 6-1 | -0.04 to +0.095; -0.02 to +0.10 | -0.003; -0.001 | 0.027; 0.041 |
-| C8 | one-day Lo-MacKinlay contrarian profit, bp a day | -6.4 to +2.9 | -0.06 | -1.74 |
-| C9 | cost of size of one immediate order: exponent; coefficient | 0.4 to 0.7; 0.33 to 0.67 | 0.484; 0.424 | 0.5; 0.5 |
-| C10 | timing rules on published macro data: the best rule's points a year over holding | at most +1.0, ahead in at most two thirds | +0.12 | -2.0 |
-| R1 | daily sd of the 2-year yield, bp | 3.65 to 6.80 | 3.87 | 5.23 |
-| R2 | daily sd of the 10-year yield, bp | 4.54 to 6.27 | 4.96 | 5.41 |
-| R3 | correlation of index and Treasury returns | -0.36 to +0.03 | -0.136 | -0.161 |
-| R4 | correlation of index and investment-grade bond returns | +0.15 to +0.39 | +0.200 | +0.272 |
-| R5 | the driven 2022 market: the index's maximum drawdown | 0.178 to 0.330 | 0.265 | 0.254 |
-| R6 | the driven 2022 market: P/E change per 100 bp of the corporate yield, % | -10.4 to -2.6 | -4.26 | -5.2 |
-| R7a | the first bar after a changed policy rate, less all days' first bars, bp: hike; cut | within 5 bp | -0.1; -1.7 | 0; 0 |
-| R7b | a rate-news agent against holding: points a year; histories ahead of 30 | at most 0; at most 20 | -0.32; 2 | 0; 15 |
-| E1 | median fall in earnings through a contraction | -0.40 to -0.046 | -0.172 | -0.17 |
-| D2 | the driven 2020-21 market: maximum drawdown; sessions back to the pre-crash high | 0.237 to 0.441; 63 to 252 | 0.374; 120.5 | 0.339; 126 |
-| F1 | the driven 2020 market's fast crash: the fall; sessions it took | 0.237 to 0.441; 12 to 46 | 0.307; 40 | 0.339; 23 |
-| L1 | sessions by which the index's trough leads the earnings trough, driven 2020 | 1 to 136 | 10.5 | 68 |
-| S1a | the packaged recession: share of the fall won back in 252 sessions | 45% to 100% | 0.49 | 0.62 |
-| S1b | the packaged recession: seeds out of contraction within 24 months | every seed | 30 of 30 | all |
-| S2 | the packaged recession: the index's rise in the 252 sessions after its low, % | +25 to +80 | +54.6 | +69 |
-| V1 | the index's variance ratio, two and five years against one | 0.75 to 1.15; 0.55 to 1.20 | 0.82; 0.62 | 0.93; 0.87 |
-| D1 | the one-year table, in band on all four cells | every band in | all | all |
+| Id | Criterion | Tolerance | pt-v21 | pt-v20 | Real |
+|---|---|---|---|---|---|
+| A1 | worst month's volatility in the 2008 and 2020 replays, % | within 30% | 93.0, 74.4 | 88.5, 76.5 | 84.3, 94.5 |
+| A2 | maximum drawdown in the 2008 and 2020 replays | within 30% | 0.473, 0.352 | 0.450, 0.368 | 0.568, 0.339 |
+| A3 | peak stock correlation in the 2008 and 2020 replays | within 0.15 | 0.825, 0.803 | 0.784, 0.784 | 0.748, 0.872 |
+| B1 | share of sessions with the VIX above 30 | half to twice | 0.052 | 0.059 | 0.082 |
+| B2 | mean length of a spell with the VIX above 30, sessions | half to twice | 19 | 27 | 22 |
+| B3 | 20% bear markets a decade | half to twice | 1.51 | 1.96 | 1.12 |
+| B4 | 10% corrections a decade | half to twice | 4.24 | 4.52 | 3.65 |
+| B5 | sessions down more than 5% a decade | half to twice | 6.9 | 9.6 | 6.2 |
+| B6 | share of sessions with the VIX under 15 | half to twice | 0.372 | 0.400 | 0.326 |
+| B7 | the index's annual volatility, % | within 20% | 18.0 | 19.1 | 18.1 |
+| B8 | the index's long-run return, % a year | within 2 points of the target | 6.4 | 6.4 | 6.25 |
+| B9 | sd of annual index returns, %; start-up volatility ratio | within 20%; two thirds to 1.5 | 16.5; 1.05 | 16.3; 0.80 | 17.4; 1 |
+| C1 | crash rate in years 3 to 21 against years 1 to 2 | two thirds to 1.5 | 1.11 | 0.92 | 1.0 |
+| C2 | histories that touch the VIX ceiling | at most 1 in 30 | 1 of 270 | 0 | 0 |
+| C3 | the edge from reading a headline 5 ticks late, bp | under 20 | 15.3 | 15.8 | 0 |
+| C4a | lag-1 autocorrelation of 65-minute returns; Roll spread over quoted | at or above -0.05, or Roll at most twice quoted | -0.020; 1.29 | -0.016; 1.21 | 0; 1 |
+| C4b | the best price-only rule on the suite: points over buy-and-hold; markets beaten of 20 | at most +5 and 14 | -2.0; 7 | +0.2; 11 | 0; 10 |
+| C5 | a company's variance ratio at 60 sessions | 0.80 to 1.05 | 0.954 | 0.950 | 0.924 |
+| C6 | value signal's rank IC over 20 sessions, whole run and first 60 sessions | -0.03 to +0.05 | 0.003; 0.000 | 0.000; 0.005 | 0.009 |
+| C7 | momentum's rank IC, 12-1 and 6-1 | -0.04 to +0.095; -0.02 to +0.10 | -0.003; -0.002 | -0.003; -0.001 | 0.027; 0.041 |
+| C8 | one-day Lo-MacKinlay contrarian profit, bp a day | -6.4 to +2.9 | -0.89 | -0.06 | -1.74 |
+| C9 | cost of size of one immediate order: exponent; coefficient | 0.4 to 0.7; 0.33 to 0.67 | 0.515; 0.438 | 0.484; 0.424 | 0.5; 0.5 |
+| C10 | timing rules on published macro data: the best rule's points a year over holding | at most +1.0, ahead in at most two thirds | +0.07 | +0.12 | -2.0 |
+| R1 | daily sd of the 2-year yield, bp | 3.65 to 6.80 | 5.55 | 3.87 | 5.23 |
+| R2 | daily sd of the 10-year yield, bp | 4.54 to 6.27 | 5.20 | 4.96 | 5.41 |
+| R3 | correlation of index and Treasury returns | -0.36 to +0.03 | -0.319 | -0.136 | -0.161 |
+| R4 | correlation of index and investment-grade bond returns | +0.15 to +0.39 | +0.328 at the held close (+0.112 at the last print) | +0.200 | +0.272 |
+| R5 | the driven 2022 market: the index's maximum drawdown | 0.178 to 0.330 | 0.238 | 0.265 | 0.254 |
+| R6 | the driven 2022 market: P/E change per 100 bp of the corporate yield, % | -10.4 to -2.6 | -6.97 | -4.26 | -5.2 |
+| R7a | the first bar after a changed policy rate, less all days' first bars, bp: hike; cut | within 5 bp | -0.9; -0.3 | -0.1; -1.7 | 0; 0 |
+| R7b | a rate-news agent against holding: points a year; histories ahead of 30 | at most 0; at most 20 | -0.79; 2 | -0.32; 2 | 0; 15 |
+| E1 | median fall in earnings through a contraction | -0.40 to -0.046 | -0.110 | -0.172 | -0.17 |
+| D2 | the driven 2020-21 market: maximum drawdown; sessions back to the pre-crash high | 0.237 to 0.441; 63 to 252 | 0.358; 136 | 0.374; 120.5 | 0.339; 126 |
+| F1 | the driven 2020 market's fast crash: the fall; sessions it took | 0.237 to 0.441; 12 to 46 | 0.285; 38.5 | 0.307; 40 | 0.339; 23 |
+| L1 | sessions by which the index's trough leads the earnings trough, driven 2020 | 1 to 136 | 19 | 10.5 | 68 |
+| S1a | the packaged recession: share of the fall won back in 252 sessions | 45% to 100% | 0.52 | 0.49 | 0.62 |
+| S1b | the packaged recession: seeds out of contraction within 24 months | every seed | 90 of 90 | 30 of 30 | all |
+| S2 | the packaged recession: the index's rise in the 252 sessions after its low, % | +25 to +80 | +65.3 | +54.6 | +69 |
+| V1 | the index's variance ratio, two and five years against one | 0.75 to 1.15; 0.55 to 1.20 | 0.93; 0.85 | 0.82; 0.62 | 0.93; 0.87 |
+| D1 | the one-year table, in band on all four cells | every band in | all | all | all |
 
 The real figures come from the S&P 500 and the VIX (A, B, C1 to C4), the
 40-company reference roster (C5 to C8), published impact studies (C9,
@@ -235,9 +253,11 @@ S&P 500 over 2020-21 and 2022 with FRED's Baa yield (D2, F1, L1, R5, R6),
 the S&P 500 after the NBER's dated turns (C10), 2009 (S1, S2) and the S&P
 500 from 1871 to 2023 (V1). R7's real value is zero: a price that has
 already taken the news leaves nothing to trade on. The R1 to R4 bands are
-the real figure plus or minus two bootstrap standard errors. The rows
-nearest their edges are C10 (92% of its tolerance), L1 and R1 (86%) and S1a
-(84%).
+the real figure plus or minus two bootstrap standard errors. pt-v21's C2 is
+out of 270 histories and pt-v20's out of 90, and the tolerance scales with the
+count. On pt-v20 the
+rows nearest their edges are C10 (92% of its tolerance), L1 and R1 (86%) and
+S1a (84%).
 
 C9 measures one order that sweeps the book at once. For every name on 40-name
 rosters and both sides, `tools/calibration/impact_curve.py` reads the average
@@ -248,11 +268,11 @@ size. A single name can fit steeper than the pooled line: on one name at
 seed 7 a one-shot buy fits an exponent of 0.60 to 0.65 over 3% to 100% of a
 day's volume, still inside the band, because the maker's ladder in front of
 the latent depth steepens the middle sizes. C9 does not measure an order
-sliced over time. One sliced over a day costs far less than the empirical
-law for such orders (0.04 of a daily standard deviation for 10% of a day's
-volume in 36 slices, against 0.15 to 0.3), because consumed depth refills
-with a 27-tick half-life and nothing in the model anticipates the order. That
-is for the next preset.
+sliced over time. On pt-v21 the metaorder memory makes a sliced order pay
+for the volume it has already taken: 10% of a day's volume in 36 slices over
+a day costs a median 0.13 of a daily standard deviation (0.06 to 0.35 over
+40 programmes on seeds 201 to 210, four names each), against 0.15 to 0.3 in
+published studies.
 
 D1 contains the one-year table: it requires the fixed-roster panel in band
 at one year, at two years, on held-out seeds and on a held-out roster, and
@@ -267,15 +287,15 @@ report.
 The hosted service's report card shows no realism statistics of its own.
 Its one count is the long-run verdict, "passes all 15 of its long-run
 checks", which is the long-run criteria as records up to 0.8.1 hold them;
-with pt-v20's record the same line counts 40. The hosted preset list quotes the
+with pt-v20's and pt-v21's records the same line counts 40. The hosted preset list quotes the
 fixed-roster panel and the two-year panel: "all 15 checks over one year and
 all 14 over two". Both use the word "checks" for different sets; the names
 on this page are the ones to use.
 
 ## Other sets you may meet
 
-- **The scoring rule (19 statistics, different members).** pt-v19's dials were chosen with a scoring rule over the 14 shape statistics, the 4 index rows and the VIX's persistence, without crisis dispersion, centred on 2015 to 2025 medians (`loss.rule_table`). pt-v20 keeps those dials, and its new ones were picked on grids and screens against long-run rows (B3, B9, C8, R1 to R4) and the two-year panel. So neither the one-year table nor those rows is a held-out test; the held-out checks are the fresh seeds, the fresh roster, and the rows registered before the final box.
-- **The VIX persistence row.** `vix_ar1_debiased`, the VIX's own day-to-day persistence. It is scored and reported, and it has no band.
+- **The scoring rule (19 statistics, different members).** pt-v19's dials were chosen with a scoring rule over the 14 shape statistics, the 4 index rows and the VIX's persistence, without crisis dispersion, centred on 2015 to 2025 medians (`loss.rule_table`). pt-v20 keeps those dials, and its new ones were picked on grids and screens against long-run rows (B3, B9, C8, R1 to R4) and the two-year panel. pt-v21 moves 104 of pt-v20's dials, to values picked in screens against registered rows on held-out seeds and then graded on fresh exam seeds. So neither the one-year table nor those rows is a held-out test; the held-out checks are the fresh seeds, the fresh roster, and the rows registered before each final grade.
+- **The VIX persistence row.** `vix_ar1_debiased`, the VIX's own day-to-day persistence. It has no band, and it is graded on its own, by a sign test against the real tape's centre (`structure_252` in a preset record). pt-v21 reads 0.956 against the tape's 0.930 and the test refuses it, at one year and on held-out seeds, so it is a gap: the VIX is stickier than real. Over two years pt-v21's rise in persistence matches the tape's.
 - **Reported, not graded (4).** `fear_gauge_dn5`, `fear_gauge_up1`, `index_excess_kurtosis` and `index_tail_up3_pct`. `tf.facts.measure()` returns them beside the graded rows, with the reason each has no band.
 - **Rows a model without the mechanism could pass (5).** `abs_return_acf20`, `leverage_effect`, `corr_asymmetry`, `corr_asymmetry_lagged` and `corr_persistence_acf1`. Their bands include the value a market with no such effect would give, so being in band shows the model is not wrong, not that it has the effect. `tf.facts.report()` names them.
 - **The decade table (18).** The older bands from 2015 to 2025 only, over the shape statistics and the index rows. `basis="shipped"` selects it. The one-year table uses the longer record.

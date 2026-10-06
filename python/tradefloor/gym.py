@@ -3,16 +3,17 @@
 ``gymnasium`` and ``numpy`` are OPTIONAL. The core package depends on neither,
 and importing this module without them raises a message saying what to install
 rather than an ImportError from three frames down. The environment also works
-without gymnasium installed at all, since it only subclasses ``gymnasium.Env`` when
-it is present, so the duck-typed reset/step contract is usable on its own.
+without gymnasium installed at all, since it only subclasses ``gymnasium.Env``
+when it is present, so the duck-typed reset/step contract is usable on its
+own.
 
 ## Actions are target weights, not share counts
 
 An action is a vector in ``[-1, 1]``, one entry per instrument, read as the
 fraction of net worth to hold in that name. Negative is short.
 
-Share counts would be the obvious alternative and they are wrong here: the
-right number of shares depends on price, which varies by two orders of
+Share counts are the obvious alternative, but the right number of shares
+depends on price, which varies by two orders of
 magnitude across a generated roster, and on net worth, which changes every
 step. A policy emitting share counts would have to learn the price scale of
 each instrument before it could learn anything about trading. Weights are
@@ -50,7 +51,7 @@ the price it was bought at would pay for trading rather than for being right.
 ## The env holds the market; training code gets a view of it
 
 The observation is an array and carries nothing but returns, holdings and
-cash. The env object is another matter: training code holds it, and until
+cash. The env object is different. Training code holds it, and until
 0.8.5 ``env.engine`` was the live engine, with the true business-cycle
 phase in ``state_snapshot()["economy"]``, the mispricing among its columns
 and ``fork`` to run the market ahead. ``env.engine`` and ``env.portfolio``
@@ -63,10 +64,10 @@ with the view or without it. See :mod:`tradefloor.sandbox`.
 
 ## Episodes end; they do not reset in place
 
-``reset`` builds a new engine, because that is what a reset IS here. A method
-that rewound would either secretly reconstruct, which is fine but then it is
-a constructor, or try to restore mutable state and eventually miss a field: the
-maker inventory, the Box-Muller spare, the GARCH state.
+``reset`` builds a new engine. A method that rewound would either rebuild the
+engine anyway, which makes it a constructor, or try to restore mutable state
+and eventually miss a field such as the maker inventory, the Box-Muller spare
+or the GARCH state.
 
 Which market the new engine runs follows the Gymnasium convention. The
 first ``reset()`` runs the constructor's ``seed``. ``reset(seed=n)`` runs
@@ -136,7 +137,7 @@ class TradingEnv(_Base):
     Prices are given as log returns since the previous step rather than as
     levels. A level of 512.44 tells a policy nothing without knowing what it
     was before, and the range across a generated roster spans two orders of
-    magnitude; returns are stationary and comparable across instruments.
+    magnitude. Returns are stationary and comparable across instruments.
 
     Action: a target weight in ``[-1, 1]`` per instrument, scaled down as a
     whole when the weights ask for more than ``max_leverage`` allows. Reward:
@@ -250,8 +251,8 @@ class TradingEnv(_Base):
         """Start a fresh episode.
 
         ``seed`` selects the market. Passing a different one gives a different
-        market, deliberately: an agent trained on one seed and evaluated on
-        another is being tested rather than recalled. Any integer from 0 to
+        market, so an agent trained on one seed can be evaluated on a market
+        it has not seen. Any integer from 0 to
         ``2**64 - 1``, checked before Gymnasium's own generator sees it, so a
         refusal names the engine's range rather than numpy's.
 
@@ -281,6 +282,9 @@ class TradingEnv(_Base):
         self._shown = (MarketView(engine), PortfolioView(portfolio, engine))
         self._step = 0
         engine.open_market()
+        # The cash dividends the open made payable (none at an episode's
+        # first open, and none on a model without dividends).
+        portfolio.collect_dividends(engine)
         self._prev_prices = self._prices()
         self._prev_worth = portfolio.net_worth(engine)
         # The info dict names the episode's market: the seed that drew it
@@ -327,6 +331,9 @@ class TradingEnv(_Base):
             engine.close_market()
             if self._step < self.max_steps:
                 engine.open_market()
+                # Collected at the open, before the reward is marked, so the
+                # ex-date drop and what the holder is paid net in one step.
+                portfolio.collect_dividends(engine)
 
         worth = portfolio.net_worth(engine)
         # Reward is the step's P&L in dollars, measured AFTER the market

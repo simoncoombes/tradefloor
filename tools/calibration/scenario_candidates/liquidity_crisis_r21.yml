@@ -1,0 +1,144 @@
+# Example experimental assumptions. This scenario is not a forecast, and not
+# a claim about how a real market would respond to a real liquidity event.
+#
+# Calibrated against March 2020. The S&P 500 fell 28.8 per cent in the 21
+# sessions to 23 March 2020 and 33.9 per cent at worst, with the VIX going
+# from 14 to 83. Its largest one-session fall was -12.8 per cent (log) on
+# 16 March.
+#
+# RESHAPED IN r13 (thirteenth registration candidate, scenario-frontrun). The
+# file before this held the VIX x3.5 for 25 sessions from day 50 at once, and
+# with the volatility feedback's discount (pt-v20's graded arm) that VIX was
+# published on the morning of day 50 while the price reached it over the
+# following weeks through the smoothed exposure: an agent reading the VIX
+# could step out above 40 and back in below 30 and beat holding by +10.4
+# points over 120 sessions (mean, desk seeds 201-212; ahead on 10 of 12).
+# Priced the morning it is published (`pinned_vix_feedback`), the same
+# x3.5 jump took -35 per cent (log) off the index in one morning. So the VIX
+# now ramps x3.0 over ten sessions, holds to day 74, falls to x0.6 over ten
+# sessions and holds there twenty more before it is released; earnings fall
+# 10 per cent over a month and come back over two; credit widens 50 basis
+# points on the spread over the 10-year, held 25 sessions and then ramped
+# back over ten, so the chain takes it up where it stood and the next
+# meeting's re-anchoring is small. Depth is as before.
+#
+# DESK FIGURES, not the registration's grade. pt-v20, the certified roster
+# `Universe.random(40, seed=111).with_bonds()`, the cap-weighted index of the
+# 40 names, each figure paired against the same seed with no scenario, seeds
+# 201-212, medians unless stated. With `macro_pins_hold` and
+# `pinned_vix_feedback` on: the morning of day 50 moves the index -2.4 per
+# cent (log), the close 24 sessions later is -26.3 below that mark, the
+# largest one-session fall is -8.3 (-14.7 on the worst seed), the VIX timer
+# above earns -6.0 points (mean; ahead on 4 of 12), and the corporate yield's
+# daily sd over the 245 sessions from day 55 is 9.8 bp (9.2 as shipped;
+# 5.3 for the unshocked world). On pt-v20 as shipped: -2.0, -17.7, -8.5
+# (-12.5), -3.6 (5 of 12) and 9.2 bp. The 30-seed figures come with the
+# thirteenth registration's grade.
+#
+# WHAT IT CANNOT DO. It reaches March 2020's depth over about a month from a
+# VIX path the file writes; nothing in the engine derives that path from
+# the funding event. S&P 2020 earnings fell further than this file's cut,
+# and the market looked through them. The earnings path is this file's
+# assumption.
+#
+# THE BOOK. `market.liquidity` scales the avg_volume column the market maker
+# quotes off, so every ladder level thins, a marketable order walks further
+# up it, and the same trade the agent would have made anyway costs more.
+# `Universe.random(20, seed=101)`, five seeds, book read after twenty days:
+# quoted depth scales exactly with the multiplier, 175,060 shares to 70,019
+# at x0.40, and the cost of sweeping 50,000 shares rises from 6.08 bps to
+# 8.57 bps, and to 14.59 bps at x0.10. Below x0.4 a 200,000-share order
+# cannot be filled from quoted depth at all. The quoted SPREAD does not move
+# with depth: spread here is a function of VIX and of the name's size tier,
+# not of avg_volume. Those book figures were measured on pt-v16 and describe
+# the mechanism, which no preset since has changed.
+
+version: 1
+
+scenario:
+  name: liquidity_crisis
+
+  description: >
+    A funding event with an earnings shock: quoted depth collapses to 40 per
+    cent for twenty-five days, the VIX triples over two weeks and holds,
+    then falls below where it started before it is released, credit widens
+    50 basis points over the 10-year for twenty-five days and eases back,
+    and earnings fall 10 per cent over a month and recover over two. Depth
+    is written back, because nothing in the engine writes that column.
+    Example experimental assumptions, not a forecast.
+
+  shocks:
+
+    - target: market.liquidity
+      operation: multiply
+      value: 0.40
+      at: 50
+      duration: 25
+
+    # The VIX: x3.0 over ten sessions, held to day 74, down to x0.6 of that
+    # over ten sessions, held twenty, then released to the endogenous chain.
+    - target: macro.vix
+      operation: multiply
+      value: 3.0
+      at: 50
+      shape: ramp
+      duration: 10
+
+    - target: macro.vix
+      operation: multiply
+      value: 1.0
+      at: 60
+      shape: hold
+      duration: 15
+
+    - target: macro.vix
+      operation: multiply
+      value: 0.6
+      at: 75
+      shape: ramp
+      duration: 10
+
+    - target: macro.vix
+      operation: multiply
+      value: 1.0
+      at: 85
+      shape: hold
+      duration: 20
+
+    # The earnings shock: down 10 per cent over a month, back over two. The
+    # windows are contiguous, because a gap between them restores the
+    # pre-shock earnings.
+    - target: market.earnings
+      operation: multiply
+      value: 0.9
+      at: 50
+      shape: ramp
+      duration: 21
+
+    - target: market.earnings
+      operation: multiply
+      value: 1.1111111111111112
+      at: 71
+      shape: ramp
+      duration: 42
+
+  transmission:
+
+    # An assumption, and one worth stating rather than burying: a funding
+    # event that halves depth is assumed to widen credit by 50 basis points
+    # as well. Nothing in this simulator derives that number. It is here so
+    # the scenario prices a credit channel alongside the execution one, and
+    # so that a reader can change it. Written as the spread over the
+    # 10-year, so the curve still moves the corporate yield.
+    - target: macro.corporate_spread
+      operation: add
+      value: 0.005
+      at: 50
+      duration: 25
+
+    - target: macro.corporate_spread
+      operation: add
+      value: -0.005
+      at: 75
+      shape: ramp
+      duration: 10

@@ -97,8 +97,19 @@ def test_the_characteristics_are_constant_through_a_run():
 
 
 def test_the_characteristics_match_the_universe_they_came_from():
-    engine = tradefloor.Engine(seed=3, universe=UNIVERSE)
+    engine = tradefloor.Engine(seed=3, universe=UNIVERSE, model="pt-v20")
     assert column(engine, "beta") == pytest.approx([i.beta for i in UNIVERSE])
+
+
+def test_the_default_divides_every_beta_by_the_rosters_cap_weighted_beta():
+    """pt-v21, the default from 0.10.0, normalises the roster's betas at
+    construction (`market_beta_normalise`): each is the universe's divided
+    by one number, so the ratio is the same for every name. The test above
+    read the default until then and holds on pt-v20."""
+    engine = tradefloor.Engine(seed=3, universe=UNIVERSE)
+    ratios = [b / i.beta for b, i in zip(column(engine, "beta"), UNIVERSE)]
+    assert ratios == pytest.approx([ratios[0]] * len(ratios), rel=1e-12)
+    assert ratios[0] != 1.0
     assert column(engine, "short_interest") == pytest.approx(
         [i.short_interest for i in UNIVERSE])
 

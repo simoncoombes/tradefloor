@@ -1,0 +1,14 @@
+pt-v20 C4b mean_reversion_1step       median  -20.22 pts, beats  1/20, beats oracle  0/20  pass
+pt-v20 C4b mean_reversion_1day        median  -11.00 pts, beats  4/20, beats oracle  2/20  pass
+pt-v20 C4b mean_reversion_5day_daily  median   +0.21 pts, beats 11/20, beats oracle  8/20  pass
+pt-v20 C4b momentum_1step             median  -37.71 pts, beats  0/20, beats oracle  0/20  pass
+pt-v20 C4b momentum_1day              median  -12.25 pts, beats  2/20, beats oracle  2/20  pass
+pt-v20 C4b momentum_5day_daily        median   -0.40 pts, beats  9/20, beats oracle  6/20  pass
+pt-v20 C4b oracle                     median   +1.86 pts, beats 16/20, beats oracle  0/20
+pt-v21 C4b mean_reversion_1step       median  -30.73 pts, beats  1/20, beats oracle  1/20  pass
+pt-v21 C4b mean_reversion_1day        median  -16.20 pts, beats  2/20, beats oracle  1/20  pass
+pt-v21 C4b mean_reversion_5day_daily  median   -4.49 pts, beats  6/20, beats oracle  6/20  pass
+pt-v21 C4b momentum_1step             median  -43.40 pts, beats  0/20, beats oracle  0/20  pass
+pt-v21 C4b momentum_1day              median  -18.31 pts, beats  0/20, beats oracle  0/20  pass
+pt-v21 C4b momentum_5day_daily        median   -1.95 pts, beats  7/20, beats oracle  7/20  pass
+pt-v21 C4b oracle                     median   -0.00 pts, beats 10/20, beats oracle  0/20

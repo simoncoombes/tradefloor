@@ -157,6 +157,13 @@ PAYLOAD_KEYS = {"step", "day", "steps_per_day", "macro", "assets", "portfolio"}
 ASSET_KEYS = {"symbol", "price", "return_1d", "return_5d", "volatility",
               "best_bid", "best_ask", "avg_daily_volume", "max_order_shares",
               "position", "fundamentals"}
+#: Two more per asset on a model that pays dividends (`dividend`) or runs
+#: the earnings calendar (`next_earnings_in_sessions`). Every preset through
+#: pt-v20 does neither; pt-v21, the default from 0.10.0, does both, so the
+#: default's payload carries them. The assertions below on the default read
+#: `ASSET_KEYS` until then.
+MODEL_ASSET_KEYS = {"dividend", "next_earnings_in_sessions"}
+DEFAULT_ASSET_KEYS = ASSET_KEYS | MODEL_ASSET_KEYS
 PORTFOLIO_KEYS = {"cash", "net_worth", "leverage", "max_leverage",
                   "buying_power", "open_orders"}
 OPEN_ORDER_KEYS = {"symbol", "side", "limit_price", "remaining"}
@@ -176,7 +183,7 @@ def check_the_payload_reaches_the_framework(make_agent):
     assert seen, "the framework was never consulted"
     payload = seen[0]
     assert set(payload) == PAYLOAD_KEYS
-    assert set(payload["assets"][0]) == ASSET_KEYS
+    assert set(payload["assets"][0]) == DEFAULT_ASSET_KEYS
     assert set(payload["macro"]) == set(ci.OBSERVABLE_MACRO)
     assert [a["symbol"] for a in payload["assets"]] == [r[0] for r in ROSTER]
     assert payload["step"] == 0 and payload["day"] == 0
@@ -683,6 +690,9 @@ FIXTURE_KINDS = {
     #: 0.8.8, read by `tests/test_state_schema.py`. Engine state, not a
     #: transcript.
     "snapshots": "state-snapshots",
+    #: A run manifest written by the released 0.9.1 wheel, read by
+    #: `tests/test_manifest.py`. A saved run, not a transcript.
+    "manifests": "run-manifests",
 }
 
 _RECORDING_DIRS = {name for name, kind in FIXTURE_KINDS.items()
@@ -906,7 +916,7 @@ def test_the_serializer_emits_exactly_the_allowlisted_keys():
     payload = ci.serialize_observation(_observation(world),
                                        history=agent.history)
     assert set(payload) == PAYLOAD_KEYS
-    assert set(payload["assets"][0]) == ASSET_KEYS
+    assert set(payload["assets"][0]) == DEFAULT_ASSET_KEYS
     assert set(payload["portfolio"]) == PORTFOLIO_KEYS
 
 
@@ -916,7 +926,10 @@ def test_the_payload_is_frozen_for_the_lts_line():
     removes or renames one fails here and has to bump
     OBSERVATION_SCHEMA_VERSION, update SUPPORT.md and re-record every
     fixture, on purpose."""
-    assert ci.OBSERVATION_SCHEMA_VERSION == "1"
+    # 2 from 0.10.0, when the default's payload gained the two conditional
+    # asset keys (docs/SUPPORT.md); "1" through 0.9.x.
+    assert ci.OBSERVATION_SCHEMA_VERSION == "2"
+    assert ci.REPLAYABLE_SCHEMA_VERSIONS == ("1", "2")
     assert ci.DECISION_SCHEMA_VERSION == "2"
     world = World(seed=7, universe=universe(), agent=callable_agent(rest),
                   cash=1_000_000.0, max_leverage=2.0)
@@ -924,12 +937,12 @@ def test_the_payload_is_frozen_for_the_lts_line():
     payload = ci.serialize_observation(_observation(world))
     assert set(payload) == PAYLOAD_KEYS
     assert set(payload["macro"]) == set(ci.OBSERVABLE_MACRO)
-    assert set(payload["assets"][0]) == ASSET_KEYS
+    assert set(payload["assets"][0]) == DEFAULT_ASSET_KEYS
     assert set(payload["portfolio"]) == PORTFOLIO_KEYS
     assert payload["portfolio"]["open_orders"], "the limit order did not rest"
     assert set(payload["portfolio"]["open_orders"][0]) == OPEN_ORDER_KEYS
     support = (ROOT / "docs" / "SUPPORT.md").read_text(encoding="utf-8")
-    for key in sorted(PAYLOAD_KEYS | ASSET_KEYS | PORTFOLIO_KEYS
+    for key in sorted(PAYLOAD_KEYS | DEFAULT_ASSET_KEYS | PORTFOLIO_KEYS
                       | OPEN_ORDER_KEYS):
         assert f"`{key}`" in support, (
             f"docs/SUPPORT.md does not list the frozen payload key {key!r}")
@@ -1956,14 +1969,16 @@ def test_preset_of_reads_the_engine_the_observation_carries():
 #: below, and `DEFAULT_PRESET_NAME` at the commit that recorded them, which
 #: was pt-v16. A blanket value across all seven would write a false
 #: provenance into two of them.
+#: The five on the default were re-recorded live on pt-v21 at 0.10.0, when
+#: it took the default; they read pt-v20 until then.
 FIXTURE_PRESETS = {
-    "callable/five-days.json": "pt-v20",
+    "callable/five-days.json": "pt-v21",
     "finrobot/liquidity-crisis.json": "pt-v16",
     "finrobot/rate-ladder.json": "pt-v16",
-    "finrobot/rate-shock.json": "pt-v20",
-    "langgraph/rate-shock.json": "pt-v20",
-    "openai_agents/five-days.json": "pt-v20",
-    "pydantic_ai/rate-shock.json": "pt-v20",
+    "finrobot/rate-shock.json": "pt-v21",
+    "langgraph/rate-shock.json": "pt-v21",
+    "openai_agents/five-days.json": "pt-v21",
+    "pydantic_ai/rate-shock.json": "pt-v21",
 }
 
 
@@ -2133,6 +2148,27 @@ def test_a_replay_under_another_payload_version_is_refused_by_name():
                                       transcript=recorder))
     world.run(days=1)
     assert world.portfolio.positions["TECH_A"].quantity > 0
+
+
+def test_a_version_1_recording_replays_where_the_payload_is_version_1s():
+    """Version 2 only adds keys, and only on a model with dividends or the
+    earnings calendar. On pt-v20, which has neither, the payload is version
+    1's to the byte, so a recording stamped 1 replays; on the default,
+    pt-v21, the same keys miss, and the lookup says so by step."""
+    def world(agent, model):
+        return World(seed=7, universe=universe(), agent=agent,
+                     cash=1_000_000.0, model=model,
+                     pins={"federal_funds_rate": 0.04,
+                           "corporate_bond_yield": 0.055})
+
+    recorder = ci.Transcript()
+    world(callable_agent(buy, mode="live", recorder=recorder), "pt-v20").run(
+        days=1)
+    recorder.meta["observation_schema_version"] = "1"
+    replay = world(callable_agent(None, mode="replay", transcript=recorder),
+                   "pt-v20")
+    replay.run(days=1)
+    assert replay.portfolio.positions["TECH_A"].quantity > 0
 
 
 def test_evaluate_writes_an_agents_refusals_to_its_errors():
