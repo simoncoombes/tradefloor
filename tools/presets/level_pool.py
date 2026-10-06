@@ -14,9 +14,12 @@ those can be compared seed by seed (`--compare`).
 `record` pools the file by the library's own estimators
 (`facts.aggregate_panels`, `envelope.tail_block`) and writes the result
 into `python/tradefloor/presets/<preset>.json` as
-`level_protocol["pooled"]`. It refuses a file whose seeds are not
-`facts.LEVEL_POOL`'s, whose runs do not carry the preset's own fingerprint,
-or whose preset's coefficients have moved since the record was measured.
+`level_protocol["pooled"]`, stamped with the record's coefficient digest
+so `record.py --level-rows` can carry it while the preset is unchanged
+(`restamp.py` keeps the stamp in step with an inert dial). It refuses a
+file whose seeds are not `facts.LEVEL_POOL`'s, whose runs do not carry the
+preset's own fingerprint, or whose preset's coefficients have moved since
+the record was measured.
 Nothing else in the record is touched.
 
 Memory bounds the pool: a 252-day run holds about 1 GB.
@@ -179,6 +182,19 @@ def compare(panels, path) -> None:
           % (path, len(ours) - len(differ), len(ours)))
 
 
+def place_pooled(level_protocol: dict, block: dict) -> dict:
+    """`level_protocol` with `pooled` set, placed after `certified_crisis`."""
+    out = {}
+    for k, v in level_protocol.items():
+        if k == "pooled":
+            continue
+        out[k] = v
+        if k == "certified_crisis":
+            out["pooled"] = block
+    out.setdefault("pooled", block)
+    return out
+
+
 def record(args) -> int:
     import tradefloor as tf
     from tradefloor import envelope, facts
@@ -211,6 +227,11 @@ def record(args) -> int:
     tail = envelope.tail_block(panels, stationary_opening=None)
     block = {
         "rows": rows,
+        # The vector the runs were measured on, by the record's own digest,
+        # so `record.py --level-rows` can carry the block onto a rewritten
+        # level block while the preset is unchanged and drop it once it is
+        # not.
+        "coefficient_digest": rec["coefficient_digest"],
         "seeds": doc["seeds"],
         "n": len(panels),
         "days": facts.LEVEL_POOL["days"],
@@ -236,13 +257,7 @@ def record(args) -> int:
              rows["index_drift_pct"]["value"], len(panels)))
     if args.check:
         return 1
-    new_lp = {}
-    for k, v in lp.items():
-        new_lp[k] = v
-        if k == "certified_crisis":
-            new_lp["pooled"] = block
-    new_lp["pooled"] = block
-    rec["level_protocol"] = new_lp
+    rec["level_protocol"] = place_pooled(lp, block)
     path.write_text(json.dumps(rec, indent=2, ensure_ascii=False) + "\n",
                     encoding="utf-8", newline="\n")
     print("wrote", path)

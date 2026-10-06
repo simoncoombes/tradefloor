@@ -209,6 +209,9 @@ def test_a_pooled_level_read_rebuilds_from_its_committed_seeds(path):
     block = lp.get("pooled")
     assert block is not None, f"{path.name} has no pooled level read"
     assert block["seeds"] == facts.LEVEL_POOL["seed_list"]
+    assert block["coefficient_digest"] == rec["coefficient_digest"], (
+        f"{path.name}'s pooled read was measured on another vector than "
+        f"the record describes; re-measure with tools/presets/level_pool.py")
     source = RECORDS.parent.parent.parent / block["measured"]["source"]
     doc = load(source)
     panels = doc["panels"]
@@ -626,3 +629,78 @@ def test_the_rust_and_python_digests_agree_on_which_keys_are_silent():
         on = tradefloor.ModelParams.from_preset("pt-v20", **{**companions, name: value})
         assert on.fingerprint != base.fingerprint, name
         assert coefficient_digest(vector(on)) != coefficient_digest(shipped), name
+
+
+# --------------------------------------------------------------------------
+# `record.py --level-rows` and the pooled read
+# --------------------------------------------------------------------------
+
+
+def _level_rows_artefact(rec: dict) -> dict:
+    """A `level_rows.py` artefact that re-measures the record's own block."""
+    lp = rec["level_protocol"]
+    return {
+        "target": rec["preset"],
+        "control": "pt-v20",
+        "control_reproduced": True,
+        "control_values": {},
+        "published_values": {},
+        "target_coefficients": rec["coefficients"],
+        "certified_level": lp["certified_level"],
+        "certified_crisis": lp["certified_crisis"],
+        "certification_record": lp["certification"],
+        "package_version": "test",
+        "commit": "test",
+        "protocol": "facts.LEVEL_PROTOCOL, roster varying with the seed",
+        "seeds": list(range(101, 131)),
+        "days": 252,
+    }
+
+
+@pytest.mark.parametrize("moved", [False, True], ids=["same-vector",
+                                                      "moved-vector"])
+def test_level_rows_carries_the_pooled_read_or_drops_it_by_name(
+        tmp_path, monkeypatch, capsys, moved):
+    """`--level-rows` rewrites the level block from a thirty-seed run, and
+    the 360-seed `pooled` read is not in that run.
+
+    Rebuilt from the run alone, the block would lose it, and
+    `envelope_tables.py` would publish the thirty-seed readings of
+    `index_tail_dn3_pct` and `index_drift_pct` under the same names. So the
+    block is carried while the record's coefficient digest is the one it
+    was measured against, and dropped with a message naming
+    `level_pool.py` once it is not.
+    """
+    import sys
+
+    sys.path.insert(0, str(RECORDS.parent.parent.parent))
+    from tools.presets import record as tool
+
+    rec = load(RECORDS / f"{envelope.PRESET}.json")
+    pooled = rec["level_protocol"]["pooled"]
+    assert pooled["coefficient_digest"] == rec["coefficient_digest"]
+    if moved:
+        rec["coefficient_digest"] = "f" * 64
+    target = tmp_path / f"{rec['preset']}.json"
+    target.write_text(json.dumps(rec, indent=2, ensure_ascii=False) + "\n",
+                      encoding="utf-8")
+    artefact = tmp_path / "level-rows.json"
+    artefact.write_text(json.dumps(_level_rows_artefact(rec)),
+                        encoding="utf-8")
+    monkeypatch.setattr(tool, "OUT", tmp_path)
+    monkeypatch.setattr(tool, "ROOT", tmp_path)
+
+    assert tool.write_level_protocol(str(artefact)) == 0
+    said = capsys.readouterr().out
+    written = load(target)["level_protocol"]
+    assert written["certified_crisis"] == rec["level_protocol"][
+        "certified_crisis"]
+    if moved:
+        assert "pooled" not in written
+        assert "DROPPED level_protocol.pooled" in said
+        assert "level_pool.py" in said
+    else:
+        assert written["pooled"] == pooled
+        assert "carried level_protocol.pooled forward" in said
+        keys = list(written)
+        assert keys.index("pooled") == keys.index("certified_crisis") + 1

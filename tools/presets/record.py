@@ -372,6 +372,47 @@ def build(name: str, panel: dict, values: dict[str, float]) -> dict:
     }
 
 
+def carry_pooled(record: dict, was: dict | None) -> str:
+    """Carry `level_protocol["pooled"]` onto a level block `--level-rows` rewrote.
+
+    THE SAME DEFECT AS `carry_level_protocol`, ONE FIELD DOWN. `pooled` is the
+    360-seed read of `facts.LEVEL_POOL` that the one-year table publishes for
+    `index_tail_dn3_pct` and `index_drift_pct`, written by
+    `tools/presets/level_pool.py` and not by the thirty-seed level run this
+    mode writes from. Rebuilding the block from that run alone would delete
+    it, and `envelope_tables.py` would then publish the thirty-seed readings
+    under the same names.
+
+    So it is carried while the preset has not moved: the block stamps the
+    record's coefficient digest it was measured against, and a block whose
+    digest is the record's is still a measurement of this preset. One whose
+    digest differs describes a different vector and is DROPPED, loudly, with
+    the tool that replaces it named. A block written before the stamp is
+    carried and said to be unchecked.
+    """
+    if not was:
+        return ""
+    stamped = was.get("coefficient_digest")
+    if stamped is not None and stamped != record["coefficient_digest"]:
+        return ("DROPPED level_protocol.pooled: it was measured on "
+                "coefficient digest %s and %s's record is now %s. Re-measure "
+                "with tools/presets/level_pool.py measure, then record."
+                % (stamped[:12], record["preset"],
+                   record["coefficient_digest"][:12]))
+    lp = record["level_protocol"]
+    out = {}
+    for k, v in lp.items():
+        out[k] = v
+        if k == "certified_crisis":
+            out["pooled"] = was
+    out.setdefault("pooled", was)
+    record["level_protocol"] = out
+    return ("carried level_protocol.pooled forward"
+            + ("" if stamped is not None else
+               " UNCHECKED: it was written before the block stamped the "
+               "coefficient digest it was measured on"))
+
+
 def carry_level_protocol(record: dict, path: pathlib.Path) -> str:
     """Carry an existing `level_protocol` block onto a rebuilt record.
 
@@ -1247,6 +1288,7 @@ def write_level_protocol(rows_path: str) -> int:
                   file=sys.stderr)
             return 1
 
+    pooled_was = (record.get("level_protocol") or {}).get("pooled")
     record["level_protocol"] = {
         "certified_level": doc["certified_level"],
         "certified_crisis": doc["certified_crisis"],
@@ -1279,11 +1321,14 @@ def write_level_protocol(rows_path: str) -> int:
     # mode that owns them.
     stamped_note = stamp_band_ruler(record["level_protocol"]["certification"],
                                     "level_protocol.certification")
+    pooled_note = carry_pooled(record, pooled_was)
     ordered = place_level_protocol(record)
     path.write_text(json.dumps(ordered, indent=2, ensure_ascii=False) + "\n",
                     encoding="utf-8", newline="\n")
     if stamped_note:
         print(f" {stamped_note.lstrip(';')}")
+    if pooled_note:
+        print(f"  {pooled_note}")
     rows = dict(doc["certified_level"])
     rows.update(doc["certified_crisis"])
     print(f"  wrote {path.relative_to(ROOT)}  level_protocol: "
