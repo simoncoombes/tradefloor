@@ -88,8 +88,9 @@ PRESET = "pt-v21"
 #: outside it on the 2015-2025 decade bands (`BANDS_504`):
 #: `excess_kurtosis`, 6.6373 against a floor of 7.1 (pt-v19:
 #: `sector_excess_corr`, 0.0906 against a floor of 0.11). On the ruled
-#: bands `score` grades with by default, no row is out at 504 days and
-#: `corr_persistence_acf1` is unreadable there.
+#: bands `score` grades with by default, no row is out at 504 days.
+#: `corr_persistence_acf1` was unreadable there until 2026-10-06 and reads
+#: 0.3411 against -0.38 to 0.88.
 #:
 #: The old reason -- that the thinnest 504-day row cleared its ceiling by
 #: only 0.11 -- no longer applies: `annualised_vol_pct` read 33.89 under
@@ -260,10 +261,19 @@ def certified_panel() -> dict[str, float]:
     """
     return {k: v for k, v in CERTIFIED.items() if v is not None}
 
-#: The LEVEL rows the default preset reads at the certified horizon,
-#: measured as a thirty-seed mean on `facts.LEVEL_PROTOCOL` -- seeds 101 to
-#: 130, 252 days, the roster varying WITH the seed, because a level that
-#: describes the MODEL cannot be measured on one draw (`facts.AGGREGATE`).
+#: The LEVEL rows the default preset reads at the certified horizon, on
+#: `facts.LEVEL_PROTOCOL`'s run -- 252 days, the roster varying WITH the
+#: seed, because a level that describes the MODEL cannot be measured on one
+#: draw (`facts.AGGREGATE`).
+#:
+#: `index_drift_pct` is the mean over the 360 seeds of `facts.LEVEL_POOL`,
+#: as is `CERTIFIED_CRISIS`'s `index_tail_dn3_pct` pooled over them; the
+#: long-run grade reads its D1 on the same seeds by the same estimators.
+#: `tools/presets/envelope_tables.py` writes both from the record's
+#: `level_protocol["pooled"]`. The record's `certified_level` keeps the
+#: certification's thirty-seed mean beside it (pt-v21: 8.8202). The prose
+#: below the next paragraph describes the thirty-seed readings of earlier
+#: defaults.
 #:
 #: Measured 2026-09-23 on the box run `ptv19fifth`, at engine commit
 #: `4d8f9cf`, pt-v19's fifth composition, by `tools/presets/level_panel.py`
@@ -315,7 +325,11 @@ CERTIFIED_LEVEL: dict[str, float] = {
     # here for three eras, and this row exists because of that. The seed
     # spread is wide against the band, so a single seed's first year says
     # almost nothing about the row.
-    "index_drift_pct": 8.8202,
+    #
+    # pt-v21, over the 360 seeds of `facts.LEVEL_POOL`: a mean of 7.0047 on
+    # an across-seed standard error of 0.6677, inside the ruled band of 1.1
+    # to 10.3 (the thirty certification seeds read 8.8202).
+    "index_drift_pct": 7.0047,
 }
 
 #: The CRISIS rows, reserved for the fear gauge and the index tail, measured
@@ -397,7 +411,13 @@ CERTIFIED_CRISIS: dict[str, float] = {
     # which as data beside the verdict. The 504-day reading is NOT measured
     # on this vector: the level run is 252 days only, and the year-two
     # figure that stood here (1.2989 per cent) was the pre-31ef261 vector's.
-    "index_tail_dn3_pct": 0.5976,
+    #
+    # pt-v21, pooled over the 360 seeds of `facts.LEVEL_POOL`: 888 sessions
+    # at or below -3 per cent in 90,360, a rate of 0.9827 on a standard
+    # error of 0.1080, inside the ruled band of 0.64 to 2.34 and below the
+    # tape centre of 1.2132. The record's `certified_crisis` keeps the
+    # thirty certification seeds' 0.5976 (45 in 7,530) beside it.
+    "index_tail_dn3_pct": 0.9827,
 }
 
 #: THE STRUCTURAL ROWS: the fourth certification block, and the only one
@@ -930,22 +950,20 @@ def _shape_rows(*without: str) -> tuple[str, ...]:
 
 
 #: The shape rows each mix held in band on the ruled bands, per horizon.
-#: Every row the bands could grade was in band for every mix. Two rows are
-#: left out where the measurement could not grade them.
-#: `corr_persistence_acf1` has no ruled band at 504 days, for the balanced
-#: roster too. `sector_excess_corr` is undefined on an all-technology
-#: roster: it asks how far a name moves with its own industry beyond the
-#: market, and with one sector the two are the same.
+#: Every row the bands could grade was in band for every mix. One row is
+#: left out where the measurement could not grade it: `sector_excess_corr`
+#: is undefined on an all-technology roster, because it asks how far a name
+#: moves with its own industry beyond the market, and with one sector the
+#: two are the same. `corr_persistence_acf1` was left out at 504 days too
+#: until 2026-10-06, when the ruled table gained its two-year band; the
+#: four mixes of the pt-v19 run read 0.3427 to 0.4287 there, against a band
+#: of -0.38 to 0.88.
 ROSTER_SHAPE_ROWS: dict[str, dict[int, tuple[str, ...]]] = {
-    "sp500_like": {252: _shape_rows(),
-                   504: _shape_rows("corr_persistence_acf1")},
-    "tech_heavy": {252: _shape_rows(),
-                   504: _shape_rows("corr_persistence_acf1")},
+    "sp500_like": {252: _shape_rows(), 504: _shape_rows()},
+    "tech_heavy": {252: _shape_rows(), 504: _shape_rows()},
     "all_technology": {252: _shape_rows("sector_excess_corr"),
-                       504: _shape_rows("sector_excess_corr",
-                                        "corr_persistence_acf1")},
-    "defensive": {252: _shape_rows(),
-                  504: _shape_rows("corr_persistence_acf1")},
+                       504: _shape_rows("sector_excess_corr")},
+    "defensive": {252: _shape_rows(), 504: _shape_rows()},
 }
 
 #: `index_drift_pct` on the held roster, the median over the thirty seeds
@@ -1051,9 +1069,8 @@ GAPS: tuple[Gap, ...] = (
         summary="the certified horizon is 252 days",
         detail=(
             "Against bands re-derived at the matching window, the shipped "
-            "pt-v21 holds all thirteen readable rows at 504 days on the "
-            "ruled band. corr_persistence_acf1 has no ruled "
-            "band there.\n\n"
+            "pt-v21 holds all fourteen shape rows at 504 days on the "
+            "ruled band.\n\n"
             "The certified horizon stays at 252 days because CERTIFIED, the "
             "table this module certifies, is measured at 252 days on thirty "
             "seeds. The 504-day table is measured and not certified. "
@@ -1065,10 +1082,10 @@ GAPS: tuple[Gap, ...] = (
             "decay-shape gap carries it.\n\n"
             "The longer horizons are measured on pt-v21. "
             "tools/calibration/long_horizon.py runs 756, 1260 and 2520 days "
-            "on thirty seeds. At every one of them the panel holds all 13 "
-            "shape rows the ruled 504-day bands can grade, and all 14 on the "
-            "2015-2025 504-day bands. Both rulers are 504-day bands, quoted at ten years only because "
-            "no ten-year bands have been derived. "
+            "on thirty seeds. At every one of them the panel holds all 14 "
+            "shape rows on the ruled 504-day bands and on the 2015-2025 "
+            "504-day bands. Both rulers are 504-day bands, quoted at ten "
+            "years only because no ten-year bands have been derived. "
             "tools/calibration/memory_vs_drift.py reads annualised "
             "volatility year by year over ten years on twenty seeds, and "
             "needs no band: on pt-v21 18.3, 19.1, 20.1, 19.1, 19.2, 19.9, "
@@ -1315,14 +1332,12 @@ GAPS: tuple[Gap, ...] = (
             "mix's shape rows in band and its cross-sectional correlation:"
             "\n\n"
             "                      252d     504d   xs corr 252d / 504d\n"
-            "  balanced           14/14    13/13   0.3063 / 0.2966\n"
-            "  S&P-like           14/14    13/13   0.3085 / 0.3008\n"
-            "  technology-heavy   14/14    13/13   0.3208 / 0.3164\n"
-            "  all-technology     13/13    12/12   0.3751 / 0.3933\n"
-            "  defensive          14/14    13/13   0.3172 / 0.3212\n\n"
-            "The 504-day counts are over thirteen rows because "
-            "corr_persistence_acf1 has no ruled band there. The "
-            "all-technology counts are one lower again because "
+            "  balanced           14/14    14/14   0.3063 / 0.2966\n"
+            "  S&P-like           14/14    14/14   0.3085 / 0.3008\n"
+            "  technology-heavy   14/14    14/14   0.3208 / 0.3164\n"
+            "  all-technology     13/13    13/13   0.3751 / 0.3933\n"
+            "  defensive          14/14    14/14   0.3172 / 0.3212\n\n"
+            "The all-technology counts are one lower because "
             "sector_excess_corr is undefined with one sector: it asks how "
             "far a name moves with its own industry beyond the market, and "
             "with one sector the two are the same. On the 2015-2025 decade "
@@ -1362,9 +1377,8 @@ GAPS: tuple[Gap, ...] = (
             "concentrated mixes at 252 days on pt-v19, against a ruled band "
             "of 1.1 to 10.3 (`ROSTER_INDEX_DRIFT`); on pt-v21 the same "
             "roster reads 10.10 balanced and 6.40 to 9.64 for the mixes. sector_excess_corr on an "
-            "all-technology roster and corr_persistence_acf1 past 252 days "
-            "were not graded, for the reasons above. Neither run went past "
-            "504 days."
+            "all-technology roster was not graded, for the reason above. "
+            "Neither run went past 504 days."
         ),
         forbids=(
             "citing the certification for a concentrated roster on a level "
@@ -1709,10 +1723,6 @@ def _roster_refusal(shape: str | None, horizon_days: int,
                 "sector_excess_corr is undefined on an all-technology "
                 "roster: it asks how far a name moves with its own industry "
                 "beyond the market, and with one sector the two are the same")
-        elif k == "corr_persistence_acf1" and h > 252:
-            why.append(
-                f"corr_persistence_acf1 has no ruled band at {h} days, so "
-                f"the measurement could not grade it past 252")
         else:
             why.append(f"The {shape} mix is not recorded as holding {k} at "
                        f"{h} days (ROSTER_SHAPE_ROWS)")
@@ -2182,9 +2192,9 @@ def check(
             f"the certification does not cover it. At 504 days the model "
             f"{held_ruled}.{decade}{nearest} Beyond 504 days the panel is "
             f"measured but "
-            f"has no ruler of its own: at 2520 days pt-v21 holds all 13 "
-            f"shape rows the ruled 504-day bands can grade and all 14 on "
-            f"the decade bands (tools/calibration/long_horizon.py), and its "
+            f"has no ruler of its own: at 2520 days pt-v21 holds all 14 "
+            f"shape rows on the ruled 504-day bands and on the decade bands "
+            f"(tools/calibration/long_horizon.py), and its "
             f"annualised volatility wanders between 18.2% and 20.1% from "
             f"year to year, ending 1 per cent below year one "
             f"(tools/calibration/memory_vs_drift.py). No bands have been "
@@ -2292,16 +2302,19 @@ def check(
                     f"basis gives it no verdict at the certified horizon")
             else:
                 lo, hi = bands[name]
+                seeds = (len(_facts.LEVEL_POOL["seeds"])
+                         if name in _facts.LEVEL_POOL["rows"]
+                         else len(_facts.LEVEL_PROTOCOL["seeds"]))
                 if band_distance(value, lo, hi) == 0:
                     warnings.append(
                         f"{name} is in band at the certified horizon "
                         f"({value:.4f} in {(lo, hi)} on {ruler_name}, at band "
                         f"position {(value - lo) / (hi - lo):.2f}) -- it is "
                         f"reported apart from the shape rows because it is "
-                        f"certified on facts.LEVEL_PROTOCOL, where the roster "
-                        f"varies with the seed, and a pass close to an edge "
-                        f"is a pass and not a demonstration that the row is "
-                        f"right")
+                        f"read on facts.LEVEL_PROTOCOL's run over {seeds} "
+                        f"seeds, where the roster varies with the seed, and "
+                        f"a pass close to an edge is a pass and not a "
+                        f"demonstration that the row is right")
                 else:
                     warnings.append(
                         f"{name} is held red at the certified horizon "

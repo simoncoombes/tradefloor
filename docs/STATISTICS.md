@@ -14,8 +14,8 @@ The model itself is specified in
 
 | Set | Count | Horizon | pt-v21, the default from 0.10.0 | pt-v20, the default from 0.8.5 to 0.9.1 | pt-v19 |
 |---|---|---|---|---|---|
-| [The one-year table](#the-one-year-table) | 19 statistics | 252 sessions | 18 of 19 in band | 19 of 19 in band | 19 of 19 |
-| [The two-year panel](#the-two-year-panel) | 15 statistics, 14 with a band | 504 sessions | 14 of 14 in band | 14 of 14 in band | 14 of 14 |
+| [The one-year table](#the-one-year-table) | 19 statistics | 252 sessions | 19 of 19 in band | 19 of 19 in band | 19 of 19 |
+| [The two-year panel](#the-two-year-panel) | 15 statistics | 504 sessions | 15 of 15 in band | 15 of 15 in band | 15 of 15 |
 | [The long-run criteria](#the-long-run-criteria) | 40 registered rows; 17 in pt-v19's record, 15 in records up to 0.8.1 | 21 years | 40 of 40 met, on 270 histories | 40 of 40 met | fails 16 of the 40, C9 and D1 not scored; its own record reads 15 of 17 |
 | [The hosted report](#the-hosted-report) | no statistics of its own | | quotes the long-run criteria | | |
 
@@ -27,12 +27,8 @@ rows](#the-index-rows).
 ## The one-year table
 
 **19 statistics, graded over 252 sessions.** This is the set the realism
-envelope publishes, over the one-year horizon it certifies. pt-v21 has 18
-of 19 in band. The one it misses is `index_tail_dn3_pct`: the index falls 3%
-or more on 0.60% of days over the thirty certification seeds, under the band's
-floor of 0.64, where real markets read 1.21. Pooled over 360 seeds of the same
-protocol the rate is 0.98, inside the band. The table above gives the count
-for each preset.
+envelope publishes, over the one-year horizon it certifies. pt-v21 has 19
+of 19 in band. The table above gives the count for each preset.
 
 | Statistic | What it measures | Group |
 |---|---|---|
@@ -72,10 +68,12 @@ with the VIX above the crisis threshold; otherwise `measure()` reports it
 absent and says why. On pt-v21 two of the thirty certification seeds read
 it at one year.
 
-**How it is measured.** Thirty seeds, 101 to 130, of a 252-session run.
+**How it is measured.** Runs of 252 sessions, on thirty seeds (101 to 130)
+or, for two of the index rows, on 360.
 
-- The shape statistics and crisis dispersion are read on one fixed roster, `Universe.random(40, seed=111)`, and each is the median across seeds. Crisis dispersion needs 30 sessions with the VIX above the crisis threshold, so it is the median over the seeds that have them: 2 of 30 at one year on pt-v21.
-- The four index rows are read on a roster that changes with the seed, `Universe.random(40, seed=s)`, because an index level depends on the roster as much as on the model. The index return is a mean across seeds, the 1% fear row a median, the 3% fear row a median of the pooled days, and the tail row a pooled rate.
+- The shape statistics and crisis dispersion are read on one fixed roster, `Universe.random(40, seed=111)`, over seeds 101 to 130, and each is the median across seeds. Crisis dispersion needs 30 sessions with the VIX above the crisis threshold, so it is the median over the seeds that have them: 2 of 30 at one year on pt-v21.
+- The four index rows are read on a roster that changes with the seed, `Universe.random(40, seed=s)`, because an index level depends on the roster as much as on the model. The two fear rows are read over seeds 101 to 130: the 1% row is a median across seeds and the 3% row a median of the pooled days.
+- The index return and the tail row are read over 360 seeds, 101 to 300 and 331 to 490 (`tf.facts.LEVEL_POOL`). The index return is the mean across the seeds. The tail row is a pooled rate: the days the index fell 3% or more on every seed, divided by all the sessions of every seed. A few years with a crash, or a strong or weak start, decide both rows, so thirty seeds read them too coarsely: on pt-v21 the tail rate's standard error is 0.11 over 360 seeds and would be about 0.37 over thirty. The long-run criteria's D1 reads these two rows the same way, on the same seeds.
 
 **What grades it.** Each statistic has a band: the range real markets
 show over a year. Each band comes from the longest record its statistic
@@ -142,24 +140,48 @@ first a level row and the other three crisis rows (`facts.LEVEL`,
 ## The two-year panel
 
 **The fixed-roster panel, measured again over 504 sessions: 15 statistics,
-14 with a two-year band.** `corr_persistence_acf1` has no two-year band,
-because the only band that exists for it was built on a different window
-protocol and describes a different quantity. So the panel is graded on 13
-shape statistics and crisis dispersion. pt-v21, pt-v20 and pt-v19 each have
-14 of 14 in band.
+each with a two-year band.** pt-v21, pt-v20 and pt-v19 each have 15 of 15 in
+band.
+
+The 14 shape statistics' two-year bands come from the same real windows: 32
+of the roster's 40 US large caps, 19 consecutive two-year windows (504
+daily returns each) from June 1987 to July 2025, less the three that hold
+the 1987, 2008 and 2020 crashes. Each band is the median of the 16 windows
+plus or minus 2.42 trimmed standard deviations. Crisis dispersion's band
+comes from the 7 two-year windows of the VIX against the same 32 names that
+hold 30 crisis sessions.
+
+`corr_persistence_acf1`'s two-year band is -0.38 to 0.88. Each real window
+is read with the function that reads a simulated run
+(`tools/calibration/corr_persistence_504_band.py` rebuilds the windows from
+the tape). Three of the 16 real windows read below zero, so the floor is
+below zero too, and the real median is 0.249.
+
+| Preset | `corr_persistence_acf1` at 504 sessions | Band |
+|---|---|---|
+| pt-v21 | 0.341 | -0.38 to 0.88 |
+| pt-v20 | 0.278 | -0.38 to 0.88 |
+| pt-v19 | 0.409 | -0.38 to 0.88 |
+
+Every committed preset record, pt-v1 to pt-v21, reads between 0.13 and
+0.41. A simulated run of 504 sessions has 503 returns and a real window
+504, so the row is read on 23 sub-windows of 21 sessions on one side and 24
+on the other. Cutting the real windows to 503 returns gives a band of -0.42
+to 0.90 or -0.37 to 0.93, depending on where the sub-windows start, and
+changes no preset's verdict.
 
 The index rows have two-year bands, and this count leaves them out because
 they were measured at one year only. The certified horizon is one year, and
 two years is graded as well.
 
 Records of presets before pt-v19 have no crisis dispersion row, so their
-two-year counts are out of 13: pt-v18 has 13 of 13, pt-v10 12 of 13, pt-v3
-7 of 13. The 14 of 14 of pt-v19, pt-v20 and pt-v21 is the same 13 plus
+two-year counts are out of 14: pt-v18 has 14 of 14, pt-v10 13 of 14, pt-v3
+8 of 14. The 15 of 15 of pt-v19, pt-v20 and pt-v21 is the same 14 plus
 crisis dispersion.
 
-**Where it is used.** The Realism envelope and The metrics pages ("14 of 14
-graded rows at 504 days"), the Presets page ("In band, 504d"), and the
-hosted preset list.
+**Where it is used.** The Realism envelope and The metrics pages (graded
+rows at 504 days), the Presets page ("In band, 504d"), and the hosted
+preset list.
 
 ## The long-run criteria
 
@@ -289,7 +311,7 @@ Its one count is the long-run verdict, "passes all 15 of its long-run
 checks", which is the long-run criteria as records up to 0.8.1 hold them;
 with pt-v20's and pt-v21's records the same line counts 40. The hosted preset list quotes the
 fixed-roster panel and the two-year panel: "all 15 checks over one year and
-all 14 over two". Both use the word "checks" for different sets; the names
+all 15 over two". Both use the word "checks" for different sets; the names
 on this page are the ones to use.
 
 ## Other sets you may meet

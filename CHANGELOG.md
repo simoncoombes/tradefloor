@@ -6,24 +6,25 @@ later runs a different market, and one fixed-simulation probe case moves.
 Every other known-answer digest is 0.10.0's.
 
 A repeated pt-v21 build is a copy of the first. `Engine` keeps the last 16
-engines whose build played the market prehistory (2,000 names between them
-at most), and a later build from the same seed, universe and model is
-served as a copy in about 0.2 milliseconds, the same engine to the bit,
-until `Engine.set_opening_cache_capacity(0)` turns the cache off.
+engines whose build played the market prehistory and serves a later build
+from the same seed, universe and model in about 0.2 milliseconds, the same
+engine to the bit.
 
 docs/EMBEDDING.md is a new guide for a program that drives the Rust engine
 itself: how to open a market, the day loop the certification ran, how much
 news and how many shocks of its own the model takes, and which statistics
-stay calibrated where. `Engine::close_day_with_shocks` lets such a host pass
-economic shocks and keep the rest of `close_day`. A browser game's loop,
-rebuilt from its source, read index volatility of 19.5% a year and a 19.9%
-fall over two years on pt-v21, and 14.2% and a 21.3% rise once fixed.
+stay calibrated where. A browser game's loop, rebuilt from its source, read
+index volatility of 19.5% a year and a 19.9% fall over two years on
+pt-v21, and 14.2% and a 21.3% rise once fixed.
 
 Through 0.10.x every day of a `Sim` was day 0, so on pt-v21 its earnings
-and dividend calendars never moved, and from pt-v18 its buyback yield never
-accrued. A `Sim` now runs the days the Python package's `run_days` runs.
-The fixed-simulation probe (`priceDigest`, `_core.fixed_simulation_digest`)
-runs the same days, and its pt-v19 case moved.
+and dividend calendars never moved. A `Sim` now runs the days `run_days`
+runs, and so does the fixed-simulation probe, whose pt-v19 case moved.
+
+Two realism readings change. The two-year panel grades all 15 of its
+statistics, with a new band for how long high correlation lasts. The
+one-year table reads the index's return and its 3% falls over 360 seeds,
+as the long-run criteria do, and pt-v21 reads 19 of 19.
 
 <!-- release-note-ends -->
 
@@ -34,9 +35,12 @@ runs the same days, and its pt-v19 case moved.
   none. The library's own suite runs in 16 minutes on an Apple M5, against
   87 before. Of the 71 minutes it no longer takes, one test file that no
   longer plays the prehistory saves 21 and the cache most of the rest.
-- The opening cache is one per process and shared by every thread. Its
-  key is every argument of the build, to the bit, so a different engine is
-  never served; a build whose arguments hold a NaN is never kept. The Rust
+- The opening cache is one per process and shared by every thread, and
+  holds at most 2,000 names across its engines.
+  `Engine.set_opening_cache_capacity(0)` turns it off and
+  `Engine.opening_cache_info()` reports what it holds. Its key is every
+  argument of the build, to the bit, so a different engine is never
+  served; a build whose arguments hold a NaN is never kept. The Rust
   `Engine` has the same two calls, and `Engine::with_params_from_opening`
   is the one that keeps.
 - The tick reuses its company views and the settlement's fills buffer, so
@@ -109,7 +113,8 @@ save and read the streams by name.
   0, in which case it reported at every session, and the same held for
   ex-dividend dates. On pt-v18 to pt-v20 the buyback yield now accrues.
   Presets before pt-v18 read no day and are unchanged.
-- `fixed_simulation_digest` runs the same day. Its pt-v3 case
+- The fixed-simulation probe (`priceDigest` in the browser build,
+  `_core.fixed_simulation_digest`) runs the same day. Its pt-v3 case
   (`1c5acabf...`) is unchanged, and its pt-v19 case on 64-bit seeds moved
   from `415ebce7...` to `cd73cf3a...`, measured identical on macos-arm64
   native and on wasm32 through node. `tests/test_wasm_parity.py` records
@@ -117,6 +122,41 @@ save and read the streams by name.
   `tools/wasm/check.mjs` pins the same values. `tests/known_answer.json`
   and the other known-answer files run through the Python package, which
   always numbered its days, and none of them moved.
+
+### The two-year panel grades 15 of 15
+
+- `corr_persistence_acf1` has a two-year band, -0.38 to 0.88, and the
+  two-year panel grades all 15 of its statistics. The band uses the same 16
+  real two-year windows and the same rule as the other shape rows, and
+  each window is read with `facts.panel_statistics`, the function that
+  reads a simulated run. `tools/calibration/corr_persistence_504_band.py`
+  rebuilds the windows from the tape and reproduces the recorded readings.
+- `facts.REAL_MARKETS_RULED_504` now carries the row, and
+  `facts.RULED_UNREADABLE[504]` holds only `vix_ar1_debiased`.
+- Every preset reads inside the band, from 0.13 (pt-v2) to 0.41 (pt-v19);
+  pt-v21 reads 0.341 and pt-v20 0.278. The committed records' 504 counts
+  are re-graded from their own panels and each gains one: pt-v21, pt-v20
+  and pt-v19 read 15 of 15. Nothing was re-measured, and no trajectory or
+  digest moves.
+
+### The index's return and 3% falls over 360 seeds
+
+- The one-year table reads `index_tail_dn3_pct` and `index_drift_pct` over
+  the 360 seeds of `facts.LEVEL_POOL` (101 to 300 and 331 to 490), on the
+  same varying-roster run as before: the tail row as the 3% falls on every
+  seed over the sessions of every seed, the drift row as the mean across
+  seeds. The long-run criteria's D1 reads them the same way on the same
+  seeds. The fear rows stay on seeds 101 to 130.
+- pt-v21 reads 0.983 on the tail row (888 falls in 90,360 sessions,
+  standard error 0.108) and 7.00 on the drift row, and the one-year table
+  reads 19 of 19. On seeds 101 to 130 alone the tail row reads 0.598, under
+  the band's floor of 0.64.
+- pt-v20 reads 1.168 and 6.24, pt-v19 1.533 and 6.23, pt-v18 1.263 and
+  5.03, all in band, as they were on 30 seeds.
+- Each record from pt-v18 on carries the read as `level_protocol["pooled"]`
+  with its seeds, estimator and source, `envelope.CERTIFIED_LEVEL` and
+  `CERTIFIED_CRISIS` publish it, and `tools/presets/level_pool.py` measures
+  it and writes it to the record.
 
 ### Corrections
 

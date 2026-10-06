@@ -20,6 +20,11 @@ It touches exactly five things and nothing else:
     CERTIFIED_LEVEL      record["level_protocol"]["certified_level"]
     CERTIFIED_CRISIS     record["level_protocol"]["certified_crisis"]
 
+with the rows `facts.LEVEL_POOL` names, `index_tail_dn3_pct` and
+`index_drift_pct`, taken from `record["level_protocol"]["pooled"]` when the
+record carries it: the one-year table publishes those two on 360 seeds and
+the fear rows on the certification's thirty (`published_level`).
+
 Every `"row": value,` line inside those four dict literals is replaced by
 the record's value at the module's published precision (four places) and
 every other line -- the comments that say what a number means -- is left
@@ -99,6 +104,35 @@ def dig(record: dict, path: tuple[str, ...]) -> dict:
     return node
 
 
+def published_level(record: dict, field: str) -> dict:
+    """A level-protocol table as the one-year table publishes it.
+
+    `field` is `certified_level` or `certified_crisis`. Each row is the
+    certification's thirty-seed reading, except a row `facts.LEVEL_POOL`
+    names, which is the record's pooled read over that set's seeds when the
+    record carries one.
+    """
+    try:
+        from tradefloor import facts
+    except ImportError:
+        sys.path.insert(0, str(ROOT / "python"))
+        from tradefloor import facts
+    lp = record["level_protocol"]
+    values = dict(lp[field])
+    pooled = (lp.get("pooled") or {}).get("rows") or {}
+    for row in facts.LEVEL_POOL["rows"]:
+        if row in values and row in pooled:
+            values[row] = pooled[row]["value"]
+    return values
+
+
+def table_values(record: dict, where: tuple[str, ...]) -> dict:
+    """The values one table is written from."""
+    if where[0] == "level_protocol":
+        return published_level(record, where[1])
+    return dig(record, where)
+
+
 def rewrite(text: str, name: str, values: dict[str, float]) -> tuple[str, list]:
     """Replace the value lines of one `NAME: dict[str, float] = {` literal.
 
@@ -170,8 +204,8 @@ def figures(record: dict) -> list[str]:
 
     lines = []
     lp = record["level_protocol"]
-    rows = dict(lp["certified_level"])
-    rows.update(lp["certified_crisis"])
+    rows = published_level(record, "certified_level")
+    rows.update(published_level(record, "certified_crisis"))
     for row, value in rows.items():
         lo, hi = facts.REAL_MARKETS[row]
         pos = (value - lo) / (hi - lo)
@@ -201,6 +235,12 @@ def figures(record: dict) -> list[str]:
     if tail:
         lines.append(f"  tail block: rate {tail.get('rate', float('nan')):.4f}, hits {tail.get('hits')} "
                      f"in {tail.get('sessions')} sessions, se_m {tail.get('se_m', float('nan')):.4f}")
+    pooled = lp.get("pooled")
+    if pooled:
+        t, d = pooled["rows"]["index_tail_dn3_pct"], pooled["rows"]["index_drift_pct"]
+        lines.append(f"  pooled over {pooled['n']} seeds ({pooled['seeds']}): tail {t['value']:.4f} "
+                     f"({t['hits']} in {t['sessions']}, se {t['se']:.4f}); drift {d['value']:.4f} "
+                     f"(se {d['se']:.4f})")
     return lines
 
 
@@ -232,7 +272,7 @@ def main() -> int:
 
     total = 0
     for name, where in TABLES:
-        text, moved = rewrite(text, name, dig(record, where))
+        text, moved = rewrite(text, name, table_values(record, where))
         total += len(moved)
         print(f"{name}: {len(moved)} row(s) moved")
         for row, old, new in moved:
