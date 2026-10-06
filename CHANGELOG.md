@@ -1,4 +1,4 @@
-## Unreleased
+## 0.10.1
 
 A library and documentation release with no coefficient or default
 changes. The browser `Sim` now numbers its days, so a `Sim` on pt-v18 or
@@ -17,9 +17,9 @@ stay calibrated where. A browser game's loop, rebuilt from its source, read
 index volatility of 19.5% a year and a 19.9% fall over two years on
 pt-v21, and 14.2% and a 21.3% rise once fixed.
 
-Through 0.10.x every day of a `Sim` was day 0, so on pt-v21 its earnings
+Through 0.10.0 every day of a `Sim` was day 0, so on pt-v21 its earnings
 and dividend calendars never moved. A `Sim` now runs the days `run_days`
-runs, and so does the fixed-simulation probe, whose pt-v19 case moved.
+runs. A negative `crisis_epicentre_extra` is now refused.
 
 Two realism readings change. The two-year panel grades all 15 of its
 statistics, with a new band for how long high correlation lasts. The
@@ -107,7 +107,7 @@ save and read the streams by name.
 
 - `Sim::run_day` runs a day loop in the core that calls
   `Engine::set_current_day` before the open, then the session and
-  `close_day`, as `run_days` does. Through 0.10.x it opened the market
+  `close_day`, as `run_days` does. Through 0.10.0 it opened the market
   without numbering the day, so the valuation's clock stayed at 0. On a
   `Sim` on pt-v21 no name reported earnings unless its report fell on day
   0, in which case it reported at every session, and the same held for
