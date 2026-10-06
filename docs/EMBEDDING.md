@@ -1,15 +1,15 @@
 # Embedding the engine in a host
 
-This page is for a program that drives the tradefloor Rust crate's
-`Engine` itself, such as a game or a trading-desk simulator, instead of
-running it through the Python package's `run_days`. It covers how to open
-the market, how to run a day, how much news and how many shocks of your own
-the model can take, and which of its measured statistics still describe the
-market you end up with. Every preset's statistics, and the certification of
-the default, pt-v21, were measured on the library's own day loop with no
-outside input; this page says what moves them and by how much.
+A game or a trading-desk simulator can drive the tradefloor Rust crate's
+`Engine` itself, instead of running it through the Python package's
+`run_days`, and keep the realism pt-v21 was certified on. That takes the
+right opening, a day loop that matches the library's, and a limit on how
+much news and how many shocks of your own you add. Every preset's
+statistics, and pt-v21's certification, were measured on the library's own
+day loop with no outside input. The tables below show how much a host's
+choices move them.
 
-The figures below were measured on pt-v21, over 20 seeds and 504 sessions,
+All of them were measured on pt-v21, over 20 seeds and 504 sessions,
 on a 108-name roster of nine names a sector (one mega cap, two large, three
 mid and three small), with the market opened on the host's economy (a kept
 opening, below) unless a table says otherwise. The host flow in them is a
@@ -113,7 +113,7 @@ Tick only the regular session, the 390 minutes from 09:30. A tick before
 same, and on pt-v21 the open already draws the night's share of each name's
 daily variance. A host that ticked from 07:00 to 20:00 raised index
 volatility from 12.7% to 14.7% a year and the median name's from 19.7% to
-23.4%; on pt-v20 the same ticks took index volatility from 15.7% to 19.2%.
+23.4%. On pt-v20 the same ticks took index volatility from 15.7% to 19.2%.
 To show a price outside the session, show the last close.
 
 Step the economy once a session, which `close_day` does. From pt-v19 the
@@ -224,7 +224,7 @@ lean is too small for one two-year run to tell from sampling noise, so
 `ExternalFlow` flagged it on 1 seed of the 20. Pass news with a mean of
 zero. A host that wants its own headlines to carry the company news can
 switch the preset's off (`endogenous_news_intensity` 0.0) and pass its own
-at the fitted rate and size; the result is a modified preset that the
+at the fitted rate and size. The result is a modified preset that the
 certification does not cover.
 
 ### Earnings and stock splits
@@ -234,7 +234,7 @@ fair value one for one with the earnings it writes. The engine has no stock
 split. A host that splits a stock by dividing its earnings, without dividing
 the engine's price, cuts that name's fair value by the split ratio, and the
 price falls to meet it over the following weeks. The game split a name 2:1
-to 10:1 once its price passed $150 to $2,000, about 43 times in two years.
+to 10:1 once its price passed 150 to 2,000 dollars, about 43 times in two years.
 On their own, those earnings cuts took the two-year index return from
 +24.9% to -10.7%.
 
@@ -249,7 +249,7 @@ sees the split, which is correct, since a split changes no company's value.
 
 A write through `economy_mut` replaces what the macro step computed. A
 written VIX moves the market factor's variance target on a coupled preset,
-as the VIX's own moves do; the tally is outside once written changes
+as the VIX's own moves do. The tally is outside once written changes
 average more than 0.1 points a session. Writing back a value the engine
 already holds changes nothing, so a host that round-trips the whole economy
 each day only needs to count the fields it changed.
@@ -259,7 +259,7 @@ each day only needs to count the fields it changed.
 Each of the game's inputs on its own, then all of them, then all of them
 with the host fixed. Every row but the last leaves the days unnumbered, as
 the game does. The fixed host numbers its days, ticks only the session,
-steps the economy once a session and keeps splits out of the engine; it
+steps the economy once a session and keeps splits out of the engine. It
 still passes the game's news, shocks and VIX writes.
 
 | host input | index volatility | median name volatility | VIX mean | VIX above 30 / above 40 | two-year index return | worst drawdown |
@@ -287,9 +287,9 @@ over 30 seeds: index volatility from 7.8% to 31.9%, two-year returns from
 | configuration | what the certification covers |
 |---|---|
 | library opening, numbered days, the regular session's ticks, one macro step a session, no external flow, a sector-balanced roster | all 40 long-run criteria and the one-year table in [STATISTICS.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/STATISTICS.md), as Python's `tradefloor.preset_record()` states them |
-| the same with a kept opening | the same, after the first quarter; the start-up rows ([STATISTICS.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/STATISTICS.md), B9's start-up ratio and C1) assume the library's opening |
+| the same with a kept opening | the same, after the first quarter. The start-up rows ([STATISTICS.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/STATISTICS.md), B9's start-up ratio and C1) assume the library's opening |
 | a roster of your own | as above, within the roster limit in [REALISM.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/REALISM.md) |
-| any flow `ExternalFlow::assess` finds outside | none of the rows; the findings name the channels |
+| any flow `ExternalFlow::assess` finds outside | none of the rows, and the findings name the channels |
 
 ## Measuring what you get
 
