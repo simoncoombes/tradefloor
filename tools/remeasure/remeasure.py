@@ -265,6 +265,23 @@ def write_report(rows: list[dict], meta: dict, path: Path) -> None:
 # main
 # ---------------------------------------------------------------------------
 
+def lost_anchors(rows: list[dict], docs_root) -> list[str]:
+    """Each row, or repeat, whose anchor is on no line of a page this
+    checkout holds, as `id: file:line 'anchor'`."""
+    import resync
+    roots = register.page_roots(docs_root)
+
+    def text_of(path: str):
+        for base in roots:
+            if (base / path).is_file():
+                return (base / path).read_text(encoding="utf-8")
+        return None
+
+    return [f"{row['id']}: {place['file']}:{place.get('line')} "
+            f"{place.get('anchor')!r}"
+            for row, place, _ in resync.check_lines(rows, text_of)["lost"]]
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--only", help="comma-separated group names")
@@ -309,6 +326,20 @@ def main() -> int:
             "from. Run against a register inside a documentation checkout "
             "(TRADEFLOOR_DOCS), or one copied with tools/docs/learn/*.json "
             "beside it in the same layout.\n  " + "\n  ".join(unreadable))
+
+    # And every row the run will judge must still be on its page. A row
+    # whose anchor no page shows describes a figure no reader can see, so
+    # judging it fills the report with edits nobody can make: 0.10.0's run
+    # flagged three such rows MOVED. A page this checkout does not hold
+    # (a box given the register without the site) is not judged here.
+    gone = lost_anchors([fig for fig in inventory if fig.get("group") is None
+                         or fig["group"] in wanted], docs_root)
+    if gone:
+        raise SystemExit(
+            "rows cite figures no page shows any more. Retire them to the "
+            "register's `retired` list, or re-anchor them where a page "
+            "prints the figure, before measuring; resync.py --lines lists "
+            "every row's line.\n  " + "\n  ".join(gone))
 
     ctx = Ctx(root=ROOT, workers=args.workers)
     results: dict[str, dict] = {}

@@ -166,6 +166,26 @@ save and read the streams by name.
   from 15.7% to 19.2% on pt-v20.
 - rust/README.md said `previous_close` is reset to the day's open. On
   pt-v21 it is the price the night starts from.
+- On pt-v21, twelve dials' refusals stated a range the validator does not
+  keep (#248). `impact_memory_coefficient` said [0, 10] and refused
+  anything above `book_depth_coefficient`, 0.75; `market_day_tail_df`,
+  `overnight_idio_df`, `earnings_surprise_df` and `cycle_nowcast_accuracy`
+  accept 0.0 for off in words the parameter reference did not read;
+  `rate_close_remark` said 0 or 1 and refused 0 while `rate_intraday_live`
+  is on. Each refusal now states the set it accepts beside the other dials,
+  and `tests/test_dial_ranges.py` checks every dial's stated range at its
+  edges. `crisis_epicentre_extra` accepted a negative value, which the
+  solve squares; it is now refused, as the message always said. No
+  preset's values and no digest moved.
+- The 0.10.0 notes gave the one-day reversal's frictionless return as 5.7%
+  isolated and 1.8% populated without a record behind it (#249).
+  Re-measured on the same 30 seeds, it reads 5.69% (standard error 1.34)
+  and 1.82% (1.19), a paired decline of 3.87 points (0.24), and
+  `tf.population.MEASURED["edge_decay_signal"]` carries it, which the MCP
+  server's populated caveat quotes.
+- `tools/remeasure/remeasure.py` stops before measuring when a register
+  row's anchor is on no line of its page, as three rows were at 0.10.0
+  (#250).
 
 ## 0.10.0
 

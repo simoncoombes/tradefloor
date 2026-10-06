@@ -290,3 +290,30 @@ def test_the_report_names_each_repeat_by_its_line():
         "docs/presets.html:68 (also docs/principles.html:119, "
         "docs/index.html:12)")
 
+
+
+def test_remeasure_refuses_rows_whose_figure_no_page_shows(tmp_path):
+    """A row whose anchor is on no line of its page describes a figure a
+    reader cannot see, so the run stops before measuring and names it
+    (issue #250: 0.10.0's run judged three such rows MOVED)."""
+    docs = tmp_path / "docs-repo"
+    page = docs / "site-docs" / "index.html"
+    page.parent.mkdir(parents=True)
+    page.write_text("<p>The grid separates nothing now.</p>\n", encoding="utf-8")
+    path = docs / "tools" / "remeasure" / "inventory.json"
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps({"figures": [{
+        "id": "agents.sep_mom_mr", "file": "site-docs/index.html", "line": 1,
+        "anchor": "'wins_a': 7, 'wins_b': 5", "label": "x", "published": "7-5",
+        "group": "arith", "key": "clean_sweep_p", "compare": {"kind": "exact"},
+    }]}), encoding="utf-8")
+    done = subprocess.run(
+        [sys.executable, str(REPO / "tools" / "remeasure" / "remeasure.py"),
+         "--inventory", str(path), "--only", "arith",
+         "--out", str(tmp_path / "out")],
+        capture_output=True, text=True, cwd=REPO, timeout=300,
+    )
+    assert done.returncode != 0
+    assert "no page shows" in done.stderr, done.stderr[-800:]
+    assert "agents.sep_mom_mr: site-docs/index.html:1" in done.stderr
+    assert not (tmp_path / "out" / "figures.json").exists()

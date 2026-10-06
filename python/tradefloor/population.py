@@ -152,6 +152,13 @@ SHIPPED = ("standard", "crowded")
 #: - ``model``, ``population``, ``seeds``: what the figures were read on.
 #: - ``edge_decay``: the ac3 finding, that an edge decays as other traders
 #:   trade its signal.
+#: - ``edge_decay_signal``: the ac3 figure behind it, from part b. The
+#:   one-day reversal's frictionless return over 60 sessions (its ranked
+#:   book's return on the prices a buy-and-hold agent saw, before any cost of
+#:   trading) in isolated and populated mode, each with its standard error
+#:   across the 30 seeds, and the decline, paired on the seed, with its own.
+#:   ``population_checks.py ac3 --model pt-v21 --population crowded --seeds
+#:   92001-92030 --parts b --rules mean_reversion_1day`` reads it again.
 #: - ``programme_cost_excess``: ac4, what a predictable programme pays in
 #:   populated mode over what it pays in isolated mode, less one.
 #:   ``programme_cost_excess_reported`` is the same excess van Kervel and
@@ -170,6 +177,10 @@ MEASURED: dict[str, Any] = {
               "ac1_ac2": "201-230 by 4 names", "return_acf1": "101-103"},
     "method": "tools/calibration/population_checks.py",
     "edge_decay": "an edge decays as other traders trade its signal",
+    "edge_decay_signal": {"rule": "mean_reversion_1day", "sessions": 60,
+                          "isolated": 0.0569, "isolated_se": 0.0134,
+                          "populated": 0.0182, "populated_se": 0.0119,
+                          "decline": 0.0387, "decline_se": 0.0024},
     "programme_cost_excess": 0.024,
     "programme_cost_excess_reported": 1.69,
     "programme_cost_source": "van Kervel and Menkveld (2019)",
