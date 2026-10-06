@@ -6,11 +6,12 @@
 //! A preset with `market_prehistory_sessions` on plays that many sessions on
 //! a copy of the engine before day zero (`Engine::live_market_prehistory`).
 //! On `pt-v21`, which plays 504, building an engine over 20 names took 1.45 s
-//! on an Apple M-series machine, against about 1 ms on `pt-v20`, and the cost
-//! grows with the roster: 0.44 s for 5 names, 2.9 s for 40. A test suite, a
-//! notebook and a host that rebuilds an engine to restore a snapshot into it
-//! build the same few engines over and over: the library's own suite built
-//! one 20-name engine under one seed hundreds of times.
+//! on an Apple M5, against about 1 ms on `pt-v20`, and the cost grows with
+//! the roster: 0.44 s for 5 names, 2.9 s for 40. A test suite, a notebook
+//! and a host that rebuilds an engine to restore a snapshot into it build
+//! the same few engines over and over. The library's own suite at 0.10.0
+//! built 6,080 such engines from 1,145 distinct sets of arguments, one
+//! 8-name engine 885 times, and the prehistory was 4,733 s of its 5,208.
 //!
 //! # Why it cannot move a result
 //!

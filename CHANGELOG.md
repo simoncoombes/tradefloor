@@ -1,3 +1,34 @@
+## Unreleased
+
+A repeated pt-v21 build is a copy of the first. Building a pt-v21 engine
+plays 504 sessions of market prehistory, about 1.5 seconds over 20 names.
+`Engine` now keeps the last 16 engines whose build played one (2,000
+names between them at most), and a later build from the same seed,
+universe and model is served as a copy in about 0.2 milliseconds. The
+copy is the same engine to the bit, draw counts included, so no result,
+digest or snapshot changes. `Engine.set_opening_cache_capacity(0)` turns
+it off and `Engine.opening_cache_info()` reports what it holds. The
+library's own suite runs in 16 minutes on an Apple M5,
+against 87 before: one test file that no longer plays the prehistory
+saves 21 of them and the cache most of the rest.
+
+<!-- release-note-ends -->
+
+### Faster builds
+
+- The opening cache is one per process and shared by every thread. Its
+  key is every argument of the build, to the bit, so a different engine is
+  never served; a build whose arguments hold a NaN is never kept. The Rust
+  `Engine` has the same two calls, and `Engine::with_params_from_opening`
+  is the one that keeps.
+- The tick reuses its company views and the settlement's fills buffer, so
+  a session allocates about a third as often and a cold 20-name pt-v21
+  build is about 7 per cent faster. No arithmetic moved.
+- The MCP server's `session_rewind` and `session_fork` restore into an
+  engine that plays no opening, as the restore replaces the whole state.
+- `tests/test_stationary_opening.py` holds the prehistory off, since it
+  reads only the opening's phase, age and draws.
+
 ## 0.10.0
 
 pt-v21 is the default model. It is pt-v20 with 104 dials moved. pt-v20
