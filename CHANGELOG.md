@@ -1,26 +1,29 @@
 ## Unreleased
 
-A library and documentation release. No coefficient, default or
-trajectory changes, and every known-answer digest is 0.10.0's.
+A library and documentation release with no coefficient or default
+changes. The browser `Sim` now numbers its days, so a `Sim` on pt-v18 or
+later runs a different market, and one fixed-simulation probe case moves.
+Every other known-answer digest is 0.10.0's.
 
 A repeated pt-v21 build is a copy of the first. `Engine` keeps the last 16
 engines whose build played the market prehistory (2,000 names between them
 at most), and a later build from the same seed, universe and model is
-served as a copy in about 0.2 milliseconds, the same engine to the bit.
-`Engine.set_opening_cache_capacity(0)` turns it off and
-`Engine.opening_cache_info()` reports what it holds. The library's own
-suite runs in 16 minutes on an Apple M5, against 87 before.
+served as a copy in about 0.2 milliseconds, the same engine to the bit,
+until `Engine.set_opening_cache_capacity(0)` turns the cache off.
 
 docs/EMBEDDING.md is a new guide for a program that drives the Rust engine
-itself: the ways to open a market, the day loop the certification ran, how
-much news and how many shocks of its own the model takes, and which
-statistics stay calibrated in which configuration. A browser game's host
-loop, rebuilt from its source, read index volatility of 19.5% a year and a
-19.9% fall over two years on pt-v21, and 14.2% and a 21.3% rise with the
-loop fixed. Most of the fall came from stock splits written into the engine
-as earnings cuts without dividing its price, and most of the extra
-volatility from ticks outside the regular session and from economic
-shocks.
+itself: how to open a market, the day loop the certification ran, how much
+news and how many shocks of its own the model takes, and which statistics
+stay calibrated where. `Engine::close_day_with_shocks` lets such a host pass
+economic shocks and keep the rest of `close_day`. A browser game's loop,
+rebuilt from its source, read index volatility of 19.5% a year and a 19.9%
+fall over two years on pt-v21, and 14.2% and a 21.3% rise once fixed.
+
+Through 0.10.x every day of a `Sim` was day 0, so on pt-v21 its earnings
+and dividend calendars never moved, and from pt-v18 its buyback yield never
+accrued. A `Sim` now runs the days the Python package's `run_days` runs.
+The fixed-simulation probe (`priceDigest`, `_core.fixed_simulation_digest`)
+runs the same days, and its pt-v19 case moved.
 
 <!-- release-note-ends -->
 
@@ -28,7 +31,8 @@ shocks.
 
 - Building a pt-v21 engine plays 504 sessions of market prehistory, about
   1.5 seconds over 20 names. A build served from the opening cache plays
-  none. Of the 71 minutes the suite no longer takes, one test file that no
+  none. The library's own suite runs in 16 minutes on an Apple M5, against
+  87 before. Of the 71 minutes it no longer takes, one test file that no
   longer plays the prehistory saves 21 and the cache most of the rest.
 - The opening cache is one per process and shared by every thread. Its
   key is every argument of the build, to the bit, so a different engine is
@@ -94,6 +98,25 @@ when loading such a state. The order is now stated on the struct, on each
 field, in `widths.rs` and in rust/README.md, and
 `EngineRngState::STREAM_NAMES`, `to_named_words` and `from_named_words`
 save and read the streams by name.
+
+### The browser `Sim` numbers its days
+
+- `Sim::run_day` runs a day loop in the core that calls
+  `Engine::set_current_day` before the open, then the session and
+  `close_day`, as `run_days` does. Through 0.10.x it opened the market
+  without numbering the day, so the valuation's clock stayed at 0. On a
+  `Sim` on pt-v21 no name reported earnings unless its report fell on day
+  0, in which case it reported at every session, and the same held for
+  ex-dividend dates. On pt-v18 to pt-v20 the buyback yield now accrues.
+  Presets before pt-v18 read no day and are unchanged.
+- `fixed_simulation_digest` runs the same day. Its pt-v3 case
+  (`1c5acabf...`) is unchanged, and its pt-v19 case on 64-bit seeds moved
+  from `415ebce7...` to `cd73cf3a...`, measured identical on macos-arm64
+  native and on wasm32 through node. `tests/test_wasm_parity.py` records
+  them under `FIXED_SIMULATION_KAT_VERSION` 2 with a note, and
+  `tools/wasm/check.mjs` pins the same values. `tests/known_answer.json`
+  and the other known-answer files run through the Python package, which
+  always numbered its days, and none of them moved.
 
 ### Corrections
 
