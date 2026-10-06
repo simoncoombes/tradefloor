@@ -4948,9 +4948,10 @@ pub struct ModelParams {
     /// it would be a buyback yield of about 4.2 per cent, but that is the
     /// median name: the index's delivered yield (the cap-weighted log rate
     /// of the buyback factor) is 2.0 per cent on held-out seeds, and decays
-    /// from 3.3 in year 2 to 0.8 in year 21. The shipped preset pays no
-    /// dividends (`dividend_payout_share`), so the term carries the whole
-    /// of the drift that payouts would; that is a reading of the gap, not a
+    /// from 3.3 in year 2 to 0.8 in year 21. pt-v20 pays no dividends
+    /// (`dividend_payout_share` is on in pt-v21 at 1.2 and off on every
+    /// earlier preset), so the term carries the whole of the drift that
+    /// payouts would; that is a reading of the gap, not a
     /// measurement behind the value. Under `dividend_buyback_substitution`
     /// this is the total payout, and a name's buyback share is it less the
     /// name's dividend payout.
@@ -5703,13 +5704,14 @@ pub struct ModelParams {
 
     // ── The agent-facing book (agent_book.rs, engine.rs) ─────────────────
     //
-    // Seven dials, every one 0.0 on every shipped preset, and every one
-    // read only on the path an AGENT's order takes. The market's own flow
-    // settles through the maker's ladder exactly as it always has, so an
-    // untraded run is bit-identical at any setting of any of them: they
-    // change what an agent pays and what it does to the market, never the
-    // market nobody traded. `agent_book.rs` carries the model and its
-    // sources; the notes here say what each dial moves.
+    // Dials 0.0 on every preset through pt-v19, and every one read only
+    // on the path an AGENT's order takes; pt-v20 sets seven of them and
+    // pt-v21 sets all sixteen, at the values each dial's note gives. The
+    // market's own flow settles through the maker's ladder exactly as it
+    // always has, so an untraded run is bit-identical at any setting of any
+    // of them: they change what an agent pays and what it does to the
+    // market, never the market nobody traded. `agent_book.rs` carries the
+    // model and its sources; the notes here say what each dial moves.
 
     /// Coefficient `Y` of the square-root law that sets the latent depth
     /// behind the maker's ladder. pt-v20 ships 0.75; 0.0 turns the latent
@@ -8013,9 +8015,9 @@ impl ModelParams {
     /// persistence rises, which improves every VIX bucket and costs the
     /// crisis lever; a funded `jump_vix_coupling` buys the lever back. The
     /// pair was invisible to a one-dial search because each half fails
-    /// alone. `jump_vix_coupling` starts here: it has shipped inert at 0.0
-    /// in every preset, and §84 designed it to let idiosyncratic news flow
-    /// cluster with the regime.
+    /// alone. `jump_vix_coupling` starts here: it had shipped inert at 0.0
+    /// in every preset before this one, and §84 designed it to let
+    /// idiosyncratic news flow cluster with the regime.
     ///
     /// **The crisis threshold group.** `crisis_vix_threshold` 25.5 to 30.9
     /// moves the VIX 25-30 bucket of the driven window from 1.62 to 1.34,
@@ -8568,8 +8570,8 @@ impl ModelParams {
     /// pin `3d6462a`): `S_252` 54.90 -> 32.90 and `S_504` 47.37 -> 30.05
     /// on the nineteen-row scoring rule. The fourth,
     /// `volume_idio_variance_gain` 0.20, was found by tracing
-    /// `volume_change_acf1` to a per-name channel every preset ships at
-    /// 0.0 and measured on the same 120 seeds
+    /// `volume_change_acf1` to a per-name channel every preset before
+    /// this one shipped at 0.0 and measured on the same 120 seeds
     /// against that three-dial cell (`iterate5`): 32.90 -> 22.69 and
     /// 30.05 -> 26.11. The whole vector reproduces on two later boxes at
     /// `max|delta| = 0` over every numeric field (`gainsweep`,
@@ -11563,8 +11565,8 @@ impl ModelParams {
         // Two guards the audit of 0.8.5 found open. A hard cap at or below
         // zero clamps every price to nothing, and a payout share outside
         // [0, 1] pays out more than the earnings or buys shares back with a
-        // negative budget. Every shipped preset carries 50,000 and a share of
-        // 0.0, 1/3 or 0.75.
+        // negative budget. Every preset through pt-v20 carries 50,000 and a
+        // share of 0.0, 1/3 or 0.75; pt-v21 carries 1e9 and 0.9.
         if !(self.price_hard_cap.is_finite() && self.price_hard_cap > 0.0) {
             return Err(format!(
                 "price_hard_cap is {}. It is the absolute cap on any model price, \
