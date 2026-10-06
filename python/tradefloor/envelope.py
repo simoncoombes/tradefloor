@@ -1392,8 +1392,9 @@ GAPS: tuple[Gap, ...] = (
     Gap(
         id="external-flow",
         summary=("every statistic is measured under the preset's own shock "
-                 "flow, and the news, economic shocks, earnings revisions and "
-                 "VIX levels a host adds are outside it"),
+                 "flow, and the news, economic shocks, earnings revisions, "
+                 "VIX levels and ticks outside the regular session a host "
+                 "adds are outside it"),
         detail=(
             "Every statistic this module states, the two-year panel and the "
             "long-run criteria were measured with the engine making its own "
@@ -1402,8 +1403,10 @@ GAPS: tuple[Gap, ...] = (
             "session with no economic shocks, and only the 390 minutes of "
             "the regular session. CALIBRATED_FLOW states that flow for every "
             "preset. A host that adds its own news, economic shocks, "
-            "earnings revisions or VIX levels is outside it, and "
-            "`external_flow` says which channels and by how much.\n\n"
+            "earnings revisions or VIX levels, or ticks the engine outside "
+            "the regular session, is outside it, and `external_flow` says "
+            "which channels and by how much, including news or revisions "
+            "that move fair value one way.\n\n"
             "Measured on one host-driven embedder over 504 sessions and five "
             "seeds, every channel was outside: company news at 1.9 to 2.6 "
             "times the fitted company news variance, sector and market-wide "
@@ -1422,8 +1425,13 @@ GAPS: tuple[Gap, ...] = (
             "the market factor's variance that follows it. The response "
             "grows about as the square of the flow's size and does not run "
             "away: news and shocks at half, full and double size read 14.9, "
-            "18.9 and 32.4 percent against 12.2 without them. "
-            "docs/REALISM.md gives every arm."
+            "18.9 and 32.4 percent against 12.2 without them. On pt-v21 a "
+            "browser game's flow, rebuilt from its source, took index "
+            "volatility from 12.7 to 19.5 percent a year and the two-year "
+            "index return from +24.9 to -19.9 percent, the fall mostly "
+            "through stock splits written as earnings cuts. "
+            "docs/REALISM.md gives every arm, and docs/EMBEDDING.md how a "
+            "host's loop should call the engine."
         ),
         forbids=(
             "citing the certification, the two-year panel or the long-run "
@@ -1872,6 +1880,7 @@ def external_flow(
     vix_writes: Iterable[float] = (),
     macro_steps: int | None = None,
     macro_shock_loads: Iterable[float] = (),
+    off_session_ticks: int = 0,
     preset: str | None = None,
 ) -> Verdict:
     """Is the news and shock flow a caller adds inside the flow the preset
@@ -1892,7 +1901,17 @@ def external_flow(
     directly. `macro_steps` is how many macro steps ran (the default is one
     a session) and `macro_shock_loads` has one entry for each step that
     carried active economic shocks, the sum of `gdp_impact * severity` over
-    them.
+    them. `off_session_ticks` counts the `Engine.tick` calls made outside
+    09:30 to 16:00 on a weekday, pre-market or after-hours.
+
+    Each move list is signed. Its squares give the channel's variance and
+    its sum the drift it adds to fair value: the fitted news has mean zero,
+    so news or earnings revisions that move fair value one way by more than
+    one per cent a year on average are outside even when their variance is
+    not. Ticks outside the regular session are outside above one per cent of
+    its 390.
+    A stock split written as an earnings cut, without dividing the engine's
+    price, is a revision of `-ln(ratio)`.
 
     Returns a `Verdict`, falsy when any channel is outside, with one reason
     a channel. The arithmetic is the engine's own
@@ -1909,16 +1928,20 @@ def external_flow(
     if sessions < 1 or names < 1:
         raise ValidationError(
             f"sessions and names must be positive, got {sessions} and {names}")
-    def tally(moves: Iterable[float], what: str) -> tuple[int, float]:
+    if int(off_session_ticks) != off_session_ticks or off_session_ticks < 0:
+        raise ValidationError(
+            f"off_session_ticks must be a non-negative integer, got "
+            f"{off_session_ticks!r}")
+    def tally(moves: Iterable[float], what: str) -> tuple[int, float, float]:
         xs = [float(x) for x in moves]
         if any(not math.isfinite(x) for x in xs):
             raise ValidationError(f"{what} holds a value that is not finite")
         xs = [x for x in xs if x != 0.0]
-        return len(xs), ordered_sum(x * x for x in xs)
-    c_n, c_sq = tally(company_news, "company_news")
-    s_n, s_sq = tally(sector_news, "sector_news")
-    m_n, m_sq = tally(market_news, "market_news")
-    f_n, f_sq = tally(fundamental_moves, "fundamental_moves")
+        return len(xs), ordered_sum(x * x for x in xs), ordered_sum(xs)
+    c_n, c_sq, c_sum = tally(company_news, "company_news")
+    s_n, s_sq, s_sum = tally(sector_news, "sector_news")
+    m_n, m_sq, m_sum = tally(market_news, "market_news")
+    f_n, f_sq, f_sum = tally(fundamental_moves, "fundamental_moves")
     vix = [abs(float(x)) for x in vix_writes]
     if any(not math.isfinite(x) for x in vix):
         raise ValidationError("vix_writes holds a value that is not finite")
@@ -1939,21 +1962,27 @@ def external_flow(
         "vix_write_max": max(vix, default=0.0),
         "macro_steps": steps, "macro_shock_steps": len(loads),
         "macro_shock_load": ordered_sum(loads),
+        "company_sum": c_sum, "sector_sum": s_sum, "market_sum": m_sum,
+        "fundamental_sum": f_sum, "off_session_ticks": int(off_session_ticks),
     }, preset)
     fit = CALIBRATED_FLOW[preset]
     summary = (
         f"{preset} is fitted with company news at {fit['company_news_rate']:g} "
         f"events a name a session of log sd {fit['company_news_sigma']:.4f}, "
-        f"no sector or market-wide news, no macro shocks and one macro step "
-        f"a session. The flow passed adds {a['company_news_ratio']:.2f}x the "
-        f"fitted company news variance and {a['common_news_ratio']:.2f} of "
+        f"no sector or market-wide news, no macro shocks, one macro step "
+        f"a session and the regular session's 390 ticks. The flow passed "
+        f"adds {a['company_news_ratio']:.2f}x the fitted company news variance and {a['common_news_ratio']:.2f} of "
         f"the market factor's base daily variance as common news, and "
         f"its fundamental revisions {a['fundamental_ratio']:.2f}x the fitted "
         f"company news variance; it wrote "
         f"{a['vix_write_per_session']:.2f} VIX points a session; "
         f"{100 * a['macro_shock_share']:.0f}% of its macro steps carried a "
         f"shock, and it stepped the economy "
-        f"{a['macro_steps_per_session']:.2f} times a session")
+        f"{a['macro_steps_per_session']:.2f} times a session. Its news moves "
+        f"fair value by {100 * a['news_drift']:+.1f}% a year and its "
+        f"revisions by {100 * a['fundamental_drift']:+.1f}%, and it ran "
+        f"{a['off_session_ticks_per_session']:.0f} ticks a session outside "
+        f"the regular session")
     findings = tuple(a["findings"])
     if findings:
         reasons = tuple(findings) + (
@@ -2039,8 +2068,9 @@ def check(
     verdict on another preset says so in a warning. An unknown name raises.
 
     `external_flow` is for a host that hands the engine its own news,
-    economic shocks, earnings revisions or VIX levels: the keyword arguments of `envelope.external_flow` other
-    than `preset`, as a mapping. A flow outside the one the preset was
+    economic shocks, earnings revisions or VIX levels, or ticks it outside
+    the regular session: the keyword arguments of `envelope.external_flow`
+    other than `preset`, as a mapping. A flow outside the one the preset was
     fitted at (`CALIBRATED_FLOW`) fires the `external-flow` gap, with one
     reason a channel; one inside it adds a warning that says so.
 

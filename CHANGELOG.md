@@ -1,21 +1,39 @@
 ## Unreleased
 
-A repeated pt-v21 build is a copy of the first. Building a pt-v21 engine
-plays 504 sessions of market prehistory, about 1.5 seconds over 20 names.
-`Engine` now keeps the last 16 engines whose build played one (2,000
-names between them at most), and a later build from the same seed,
-universe and model is served as a copy in about 0.2 milliseconds. The
-copy is the same engine to the bit, draw counts included, so no result,
-digest or snapshot changes. `Engine.set_opening_cache_capacity(0)` turns
-it off and `Engine.opening_cache_info()` reports what it holds. The
-library's own suite runs in 16 minutes on an Apple M5,
-against 87 before: one test file that no longer plays the prehistory
-saves 21 of them and the cache most of the rest.
+A library and documentation release. No coefficient, default or
+trajectory changes, and every known-answer digest is 0.10.0's.
+
+A repeated pt-v21 build is a copy of the first. `Engine` keeps the last 16
+engines whose build played the market prehistory (2,000 names between them
+at most), and a later build from the same seed, universe and model is
+served as a copy in about 0.2 milliseconds, the same engine to the bit.
+`Engine.set_opening_cache_capacity(0)` turns it off and
+`Engine.opening_cache_info()` reports what it holds. The library's own
+suite runs in 16 minutes on an Apple M5, against 87 before.
+
+docs/EMBEDDING.md is a new guide for a program that drives the Rust engine
+itself: the ways to open a market, the day loop the certification ran, how
+much news and how many shocks of its own the model takes, and which
+statistics stay calibrated in which configuration. A browser game's host
+loop, rebuilt from its source, read index volatility of 19.5% a year and a
+19.9% fall over two years on pt-v21, and 14.2% and a 21.3% rise with the
+loop fixed. Most of the fall came from stock splits written into the engine
+as earnings cuts without dividing its price, and most of the extra
+volatility from ticks outside the regular session and from economic
+shocks.
+
+The two-year panel grades all 15 of its statistics, and the one-year
+table reads the index's return and 3% falls over 360 seeds, as the long-run
+criteria do: pt-v21 reads 19 of 19.
 
 <!-- release-note-ends -->
 
 ### Faster builds
 
+- Building a pt-v21 engine plays 504 sessions of market prehistory, about
+  1.5 seconds over 20 names. A build served from the opening cache plays
+  none. Of the 71 minutes the suite no longer takes, one test file that no
+  longer plays the prehistory saves 21 and the cache most of the rest.
 - The opening cache is one per process and shared by every thread. Its
   key is every argument of the build, to the bit, so a different engine is
   never served; a build whose arguments hold a NaN is never kept. The Rust
@@ -32,6 +50,54 @@ saves 21 of them and the cache most of the rest.
   engine that plays no opening, as the restore replaces the whole state.
 - `tests/test_stationary_opening.py` holds the prehistory off, since it
   reads only the opening's phase, age and draws.
+
+### A close that takes shocks
+
+`Engine::close_day_with_shocks(game_day, shocks)` is `close_day` with
+economic shocks active in its macro step, and
+`Engine::advance_macro_day_with_shocks` is the step alone. A host that
+passed shocks had to call `close_market` and `advance_day` itself, which
+skips the market P/E, the re-mark of prices to the published macro data
+and the rate indices' close that `close_day` runs. With no shocks both are
+the existing calls, draw for draw.
+
+### The flow check
+
+- `tradefloor::flow::ExternalFlow::record_tick(&request)` records a tick's
+  news and counts the ticks outside 09:30 to 16:00. The tally is outside
+  above one per cent of a session's 390.
+- The tally keeps the signed sums of news and earnings revisions beside
+  their squares. It is outside once either moves fair value by more than
+  one per cent a year on average, beyond three standard errors of the
+  estimate, as a stock split written as an earnings cut does.
+- `FlowAssessment` gains `off_session_ticks_per_session`, `news_drift` and
+  `fundamental_drift`, and `CalibratedFlow` gains
+  `off_session_ticks_per_session` and `news_drift`, both zero.
+- In Python, `envelope.external_flow` takes `off_session_ticks` and reads
+  the drift from the signed moves it is already given. A list of
+  same-signed sizes passed in place of signed moves now reads as drift, so
+  pass each move with its sign.
+
+### Day numbering
+
+`Engine::set_current_day`, `open_market` and `close_day` now say that a
+host numbers its days before each open. Nothing else advances the engine's
+day, and on pt-v21 a host that never calls it runs with its earnings and
+dividend calendars stopped at day zero.
+
+### RNG states saved in field order
+
+`EngineRngState::to_words` and `from_words`, new in 0.10.0, lay out the ten
+streams by stream id, not in the struct's field order. The fields declare
+`volume_idio` before `news`; the words put `news` (stream 5, words 25 to
+29) before `volume_idio` (stream 6, words 30 to 34). A host that packed the
+fields in declaration order before switching to `to_words` has those two
+streams in each other's slots in every state it saved, and `from_words`
+restores them swapped without an error. Swap the two five-word blocks once
+when loading such a state. The order is now stated on the struct, on each
+field, in `widths.rs` and in rust/README.md, and
+`EngineRngState::STREAM_NAMES`, `to_named_words` and `from_named_words`
+save and read the streams by name.
 
 ### The two-year panel grades 15 of 15
 
@@ -67,6 +133,15 @@ saves 21 of them and the cache most of the rest.
   with its seeds, estimator and source, `envelope.CERTIFIED_LEVEL` and
   `CERTIFIED_CRISIS` publish it, and `tools/presets/level_pool.py` measures
   it and writes it to the record.
+
+### Corrections
+
+- REALISM.md said ticks outside the regular session moved index
+  volatility by less than half a point. Called one minute at a time from
+  07:00 to 20:00, they raised it from 12.7% to 14.7% a year on pt-v21 and
+  from 15.7% to 19.2% on pt-v20.
+- rust/README.md said `previous_close` is reset to the day's open. On
+  pt-v21 it is the price the night starts from.
 
 ## 0.10.0
 

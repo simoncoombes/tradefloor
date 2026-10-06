@@ -331,6 +331,9 @@ sections above:
   writing, scoring and comparing agents
 - [docs/SUPPORT.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/SUPPORT.md):
   which release lines get fixes, and for how long
+- [docs/EMBEDDING.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/EMBEDDING.md):
+  driving the Rust engine from a game or another host, and how much flow
+  of its own the model takes
 
 ## Contributing and support
 

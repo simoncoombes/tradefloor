@@ -165,10 +165,18 @@ implementation. A channel is outside when any of these holds for it:
 - the host writes the economy's VIX by more than 0.1 points a session on
   average, about a sixth of the VIX's own mean daily change on pt-v20;
 - the economy steps more than 1.05 times a trading session, as it does when
-  a host steps it on weekends.
+  a host steps it on weekends;
+- the host ticks the engine outside 09:30 to 16:00 more than 3.9 times a
+  session (one per cent of the session's 390 ticks);
+- its news, or its earnings revisions, move fair value one way by more than
+  one per cent a year on average, since the fitted news has mean zero and,
+  from pt-v20, a company's news moves its fair value for good. A stock split
+  written as an earnings cut, without dividing the engine's price, is a
+  revision of `-ln(ratio)`.
 
-The tolerances, a tenth of the factor variance, 0.1 VIX points and 1.05
-steps, are chosen, not fitted.
+The tolerances, a tenth of the factor variance, 0.1 VIX points, 1.05
+steps, one per cent of the session's ticks and one per cent a year, are
+chosen, not fitted.
 
 A host that wants its own headlines to carry the company news can take the
 preset's out, with `ModelParams.from_preset("pt-v21",
@@ -181,8 +189,26 @@ The other channels have no counterpart in the preset to swap out, so the way
 to stay inside them is to pass less.
 
 Pre-market and after-hours ticks are outside the fitted schedule too, and
-`external_flow` does not count them, because in the replay below they moved
-index volatility by less than half a point.
+`external_flow` counts them (`off_session_ticks`). The replay below read
+0.4 points of index volatility for them. Measured directly, with the
+engine ticked one minute at a time from 07:00 to 20:00 on every weekday as
+a host's tick loop calls it, they moved it much more: on a 108-name roster
+over 20 seeds and 504 sessions, index volatility rose from 15.7% to 19.2% a
+year on pt-v20 and from 12.7% to 14.7% on pt-v21, and the median name's
+from 24.5% to 29.6% and from 19.7% to 23.4%.
+
+The host below is a browser game. Its flow, rebuilt from its source and
+run on pt-v21 on a roster built as the game builds its own (108 names, 20
+seeds, 504 sessions), took index volatility from 12.7% to 19.5% a year, the
+share of days with the VIX above 40 from 0.3% to 2.3%, and the two-year
+index return from +24.9% to -19.9%. Most of the fall came from its stock
+splits, written into the engine as earnings cuts without dividing the
+price. With the host's loop fixed as [EMBEDDING.md](EMBEDDING.md)
+describes, the market read 14.2%, 0.7% and +21.3%, and that page gives
+every arm. The rebuild leaves out the game's storylines and its political
+and bankruptcy writes to the VIX, so it writes the VIX less than the
+recording below, and its ranges cover 20 seeds where the recording covers
+five.
 
 A host-driven embedder's flow, recorded over 504 sessions on five seeds,
 was outside on every channel. Its company news added 1.9 to 2.6 times the
