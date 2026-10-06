@@ -87,7 +87,7 @@ jobs:
       # needs the `wasm` feature that the plain run above leaves off.
       - name: The browser binding's own tests
         working-directory: rust
-        run: cargo test --release --features wasm --lib wasm::
+        run: cargo test --release --features wasm --lib "wasm::"
       # Every target and every feature, warnings as errors. Plain
       # `cargo clippy` failed outright on 0.8.5 (a spelled-out sqrt(2) trips
       # `approx_constant`, which clippy denies by default) and `-D warnings`
