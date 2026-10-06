@@ -56,6 +56,8 @@ pub mod market_maker;
 pub mod mathx;
 pub mod microstructure;
 pub mod mispricing;
+/// Engines whose build played a market prehistory, kept per process.
+mod opening_cache;
 pub mod order_book;
 /// The runtime parameter seam: `ModelParams` and the preset table.
 pub mod params;

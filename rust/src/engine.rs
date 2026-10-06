@@ -66,6 +66,7 @@ use crate::market::{
     MarketVarianceState, NewsEvent, NewsImpactEntry, OrderVolume, SettleDrawPolicy, TickCompany,
     TickInputs,
 };
+pub use crate::opening_cache::OpeningCacheInfo;
 use crate::params::ModelParams;
 use crate::rng::{stream, DrawKind, DrawOverlay, DrawRecord, GameRng, Rng, RngState, Site};
 
@@ -1918,7 +1919,75 @@ impl Engine {
     /// produces an engine whose volatility state and VIX disagree. Skipping
     /// is what a caller naming an opening asked for, and it is what every
     /// preset before pt-v18 did.
+    ///
+    /// # A prehistory is played once a process
+    ///
+    /// A build that plays a market prehistory (`market_prehistory_sessions`
+    /// above zero with the opening settled, which is every `pt-v21` build
+    /// that takes the default economy) is kept in a small process-wide
+    /// cache, and a later build from the same arguments, to the bit, is a
+    /// clone of it rather than a second prehistory. It cannot move a result:
+    /// see [`Engine::opening_cache_info`] and
+    /// [`Engine::set_opening_cache_capacity`].
     pub fn with_params_from_opening(
+        seed: u64,
+        companies: Vec<TickCompany>,
+        economy: EconomyState,
+        central_bank: CentralBankState,
+        sector_keys: Vec<String>,
+        params: ModelParams,
+        settle_opening: bool,
+    ) -> Self {
+        if !(settle_opening && params.market_prehistory_sessions > 0.0) {
+            return Self::build_from_opening(seed, companies, economy, central_bank,
+                                            sector_keys, params, settle_opening);
+        }
+        let key = if crate::opening_cache::on() {
+            crate::opening_cache::key(seed, &companies, &economy, &central_bank,
+                                      &sector_keys, &params, settle_opening)
+        } else {
+            None
+        };
+        if let Some(engine) = key.as_ref().and_then(crate::opening_cache::get) {
+            return engine;
+        }
+        let engine = Self::build_from_opening(seed, companies, economy, central_bank,
+                                              sector_keys, params, settle_opening);
+        if let Some(key) = key {
+            crate::opening_cache::put(key, &engine);
+        }
+        engine
+    }
+
+    /// Hold at most `entries` engines in the opening cache, dropping the
+    /// least recently used beyond that; 0 turns it off and empties it. It
+    /// holds 16 until this is called.
+    ///
+    /// The cache keeps engines whose construction played a market
+    /// prehistory, which on `pt-v21` is about 1.45 s of the build over 20
+    /// names, so a second build from the same seed, roster, economy and
+    /// model is a clone of the first. A clone is the same engine to the bit,
+    /// so the setting moves no result, only the time a repeated build takes
+    /// and the memory the kept engines hold: about 160 KB for a 20-name
+    /// engine and 1.9 MB for a 500-name one. The kept engines hold 2,000
+    /// names between them at most, whatever the count, and a build whose
+    /// arguments hold a NaN is never kept.
+    ///
+    /// The cache is one per process and shared by every thread.
+    pub fn set_opening_cache_capacity(entries: usize) {
+        crate::opening_cache::set_capacity(entries);
+    }
+
+    /// What the opening cache holds and how many builds it has served
+    /// (`hits`) or had to play (`misses`) since the process started. See
+    /// [`Engine::set_opening_cache_capacity`].
+    pub fn opening_cache_info() -> OpeningCacheInfo {
+        crate::opening_cache::info()
+    }
+
+    /// [`Engine::with_params_from_opening`] without the opening cache: the
+    /// build itself.
+    pub(crate) fn build_from_opening(
         seed: u64,
         companies: Vec<TickCompany>,
         economy: EconomyState,

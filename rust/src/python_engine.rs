@@ -4335,6 +4335,41 @@ impl PyEngine {
             .map_err(ValidationError::new_err)
     }
 
+    /// Hold at most `entries` engines in the opening cache; 0 turns it off
+    /// and empties it. It holds 16 until this is called.
+    ///
+    /// A build whose model plays a market prehistory (`pt-v21` plays 504
+    /// sessions, about 1.45 s over 20 names) is kept, and a later build from
+    /// the same seed, universe and model, with no `macro_state`, is a copy
+    /// of it. The copy is the same engine to the bit, so this moves no
+    /// result: only how long a repeated build takes and the memory the kept
+    /// engines hold, about 160 KB for a 20-name engine and 1.9 MB for a
+    /// 500-name one. The kept engines hold 2,000 names between them at most,
+    /// whatever the count. The cache is one per process.
+    #[staticmethod]
+    fn set_opening_cache_capacity(entries: i64) -> PyResult<()> {
+        let entries = usize::try_from(entries).map_err(|_| {
+            ValidationError::new_err(format!("entries must be 0 or more, got {entries}"))
+        })?;
+        Engine::set_opening_cache_capacity(entries);
+        Ok(())
+    }
+
+    /// The opening cache as a dict: `capacity`, the `entries` it holds and
+    /// the `names` across them, and the builds since the process started
+    /// that it served (`hits`) or had to play (`misses`).
+    #[staticmethod]
+    fn opening_cache_info<'py>(py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let info = Engine::opening_cache_info();
+        let out = PyDict::new_bound(py);
+        out.set_item("capacity", info.capacity)?;
+        out.set_item("entries", info.entries)?;
+        out.set_item("names", info.names)?;
+        out.set_item("hits", info.hits)?;
+        out.set_item("misses", info.misses)?;
+        Ok(out)
+    }
+
     /// The layout version `state_snapshot` writes as `state_schema` and
     /// the newest `restore_state` reads. See [`STATE_SCHEMA`].
     #[classattr]

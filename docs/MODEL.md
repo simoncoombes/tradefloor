@@ -429,7 +429,12 @@ fair values, the economy's other fields and the run's own draws are the ones
 it would open with. $N$ = 252 costs about 3 seconds a construction on the
 40-name roster; the slow variance component keeps 0.11 of the opening's gap
 after 252 sessions, but the copy's recorded path, not its start, sets where
-it ends (504 sessions read the same on 81 paired histories).
+it ends (504 sessions read the same on 81 paired histories). A process keeps
+the last 16 engines it built this way, 2,000 names between them at most. A
+later build from the same seed, roster, economy and model, to the bit, is
+served as a copy of the kept engine, which is the same engine with the same
+draw counts (`Engine.opening_cache_info`,
+`Engine.set_opening_cache_capacity`).
 
 Measured (sim/r18-opening 8385f016). On R17Bd, 200 held-out histories
 (seeds 300201-300400): a run that opens in an expansion opened with factor
