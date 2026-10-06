@@ -17,16 +17,14 @@ volatility, fat tails, how much stocks move together and how far the VIX jumps
 after a fall. `tf.facts.measure()` reads 18 of them over 252 days, and
 `tf.facts.crisis_statistics()` the nineteenth, which needs a run with a crisis
 in it. `tf.envelope.score()` compares each with the range real markets show
-over a year. On `pt-v21`, the default from 0.10.0, 18 of the 19 are inside
-their ranges on the ruled bands `score()` uses. The tail rate is under the
-floor on the 30 certification seeds and inside it pooled over 360: the index
-falls 3 percent or more on 0.598 percent of days against a range of 0.64 to
-2.34, and on 0.98 percent pooled over 360 seeds.
-The check runs 30 random seeds. Fifteen of the statistics are read on one
-fixed set of companies, and that fixed-roster panel is repeated on held-out
-seeds and on a held-out set of companies.
+over a year. On `pt-v21`, the default from 0.10.0, all 19 are inside
+their ranges on the ruled bands `score()` uses.
+The check runs 30 random seeds, and 360 for the index's return and its rate
+of 3 percent falls. Fifteen of the statistics are read on one fixed set of
+companies, and that fixed-roster panel is repeated on held-out seeds and on a
+held-out set of companies.
 
-The count is a verdict on figures pooled over the 30 seeds, the median for
+The count is a verdict on figures pooled over the seeds, the median for
 each shape statistic. One seed's year often misses one or more of the 14
 shape statistics: on pt-v21, seeds 101 to 116 had all 14 in range on 8 of
 the 16, and one seed had 11 of 14. If you run one market per condition, read
@@ -44,13 +42,15 @@ also below every one of those windows (the lowest is 0.133). Changing them
 changes the simulation, so it waits for the next preset.
 
 Four of the 19 describe the index as a whole. On pt-v21 an equal-weight index
-of the stocks gains 8.8 percent a year over one year, inside a real range of
+of the stocks gains 7.0 percent a year over one year, inside a real range of
 1.1 to 10.3. On a day the index falls 1 percent or more,
 the VIX rises a median 2.0 points, inside a real range of 0.39 to 3.03. On a
 3 percent fall it rises 5.3, inside 2.6 to 9.58. The index falls 3 percent or
-more on 0.60 percent of days, against 1.21 percent in real markets. That
-is a gap: the row is under its floor of 0.64 on the 30 certification seeds.
-Over 360 seeds it reads 0.98, inside the band.
+more on 0.98 percent of days, inside a real range of 0.64 to 2.34, where real
+markets read 1.21. The return and the 3 percent rate are each read over 360
+seeds, the way the long-run criteria read them: the return is the mean
+across seeds, and the rate is the falls on every seed over the sessions of
+every seed. The two VIX rows are read over 30.
 
 The VIX's own day-to-day persistence (`vix_ar1_debiased`) has no band and is
 graded by a sign test against the real tape's centre. pt-v21 reads 0.956

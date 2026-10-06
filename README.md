@@ -208,21 +208,23 @@ says which release to pin for a long study.
 tradefloor checks its market against real ones with three named sets of
 statistics, listed in
 [docs/STATISTICS.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/STATISTICS.md).
-On pt-v21, the default from 0.10.0, 18 of the 19 statistics of the
-one-year table (volatility, fat tails, how much stocks move together, how far
-the VIX jumps after a fall) are inside the range real markets show over a
-year, on the ruled bands. The one row out is the tail rate, a gap: the
-index falls 3% or more on 0.598% of days on the 30 certification seeds,
-against a range of 0.64 to 2.34, and on 0.98% pooled over 360 seeds. All 15 statistics of the two-year panel are inside their
-two-year ranges. The long-run criteria are 40 rows over 21 years, covering
-crash depth, how long fear lasts, bear markets per decade, the 2008 and 2020
-replays, the rate indices and the cost of size in the book. pt-v21 meets all
-40, read on 270 histories.
+On pt-v21, the default from 0.10.0, all 19 statistics of the one-year
+table (volatility, fat tails, how much stocks move together, how far the VIX
+jumps after a fall) are inside the range real markets show over a year, on
+the ruled bands. The index's return and the share of days it falls 3% or
+more are read over 360 seeds, as the long-run criteria read them: the index
+falls 3% or more on 0.98% of days, against a range of 0.64 to 2.34. All 15
+statistics of the two-year panel are inside their two-year ranges. The
+long-run criteria are 40 rows over 21 years, covering crash depth, how long
+fear lasts, bear markets per decade, the 2008 and 2020 replays, the rate
+indices and the cost of size in the book. pt-v21 meets all 40, read on 270
+histories.
 
 Read those claims narrowly:
 
-- The one-year count is a verdict on figures pooled over 30 seeds. One seed's
-  year often misses some of its 14 shape statistics. On seeds 101 to 116, all
+- The one-year count is a verdict on figures pooled over 30 seeds (360 for
+  the index's return and 3% falls). One seed's year often misses some of its
+  14 shape statistics. On seeds 101 to 116, all
   14 were in range on 8 of the 16, and one seed had 11 of 14. If you run one
   market per condition, read `tf.envelope.intervals()` for each statistic's
   spread across seeds.

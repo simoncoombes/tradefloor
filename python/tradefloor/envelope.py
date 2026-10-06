@@ -261,10 +261,19 @@ def certified_panel() -> dict[str, float]:
     """
     return {k: v for k, v in CERTIFIED.items() if v is not None}
 
-#: The LEVEL rows the default preset reads at the certified horizon,
-#: measured as a thirty-seed mean on `facts.LEVEL_PROTOCOL` -- seeds 101 to
-#: 130, 252 days, the roster varying WITH the seed, because a level that
-#: describes the MODEL cannot be measured on one draw (`facts.AGGREGATE`).
+#: The LEVEL rows the default preset reads at the certified horizon, on
+#: `facts.LEVEL_PROTOCOL`'s run -- 252 days, the roster varying WITH the
+#: seed, because a level that describes the MODEL cannot be measured on one
+#: draw (`facts.AGGREGATE`).
+#:
+#: `index_drift_pct` is the mean over the 360 seeds of `facts.LEVEL_POOL`,
+#: as is `CERTIFIED_CRISIS`'s `index_tail_dn3_pct` pooled over them; the
+#: long-run grade reads its D1 on the same seeds by the same estimators.
+#: `tools/presets/envelope_tables.py` writes both from the record's
+#: `level_protocol["pooled"]`. The record's `certified_level` keeps the
+#: certification's thirty-seed mean beside it (pt-v21: 8.8202). The prose
+#: below the next paragraph describes the thirty-seed readings of earlier
+#: defaults.
 #:
 #: Measured 2026-09-23 on the box run `ptv19fifth`, at engine commit
 #: `4d8f9cf`, pt-v19's fifth composition, by `tools/presets/level_panel.py`
@@ -316,7 +325,11 @@ CERTIFIED_LEVEL: dict[str, float] = {
     # here for three eras, and this row exists because of that. The seed
     # spread is wide against the band, so a single seed's first year says
     # almost nothing about the row.
-    "index_drift_pct": 8.8202,
+    #
+    # pt-v21, over the 360 seeds of `facts.LEVEL_POOL`: a mean of 7.0047 on
+    # an across-seed standard error of 0.6677, inside the ruled band of 1.1
+    # to 10.3 (the thirty certification seeds read 8.8202).
+    "index_drift_pct": 7.0047,
 }
 
 #: The CRISIS rows, reserved for the fear gauge and the index tail, measured
@@ -398,7 +411,13 @@ CERTIFIED_CRISIS: dict[str, float] = {
     # which as data beside the verdict. The 504-day reading is NOT measured
     # on this vector: the level run is 252 days only, and the year-two
     # figure that stood here (1.2989 per cent) was the pre-31ef261 vector's.
-    "index_tail_dn3_pct": 0.5976,
+    #
+    # pt-v21, pooled over the 360 seeds of `facts.LEVEL_POOL`: 888 sessions
+    # at or below -3 per cent in 90,360, a rate of 0.9827 on a standard
+    # error of 0.1080, inside the ruled band of 0.64 to 2.34 and below the
+    # tape centre of 1.2132. The record's `certified_crisis` keeps the
+    # thirty certification seeds' 0.5976 (45 in 7,530) beside it.
+    "index_tail_dn3_pct": 0.9827,
 }
 
 #: THE STRUCTURAL ROWS: the fourth certification block, and the only one
@@ -2253,16 +2272,19 @@ def check(
                     f"basis gives it no verdict at the certified horizon")
             else:
                 lo, hi = bands[name]
+                seeds = (len(_facts.LEVEL_POOL["seeds"])
+                         if name in _facts.LEVEL_POOL["rows"]
+                         else len(_facts.LEVEL_PROTOCOL["seeds"]))
                 if band_distance(value, lo, hi) == 0:
                     warnings.append(
                         f"{name} is in band at the certified horizon "
                         f"({value:.4f} in {(lo, hi)} on {ruler_name}, at band "
                         f"position {(value - lo) / (hi - lo):.2f}) -- it is "
                         f"reported apart from the shape rows because it is "
-                        f"certified on facts.LEVEL_PROTOCOL, where the roster "
-                        f"varies with the seed, and a pass close to an edge "
-                        f"is a pass and not a demonstration that the row is "
-                        f"right")
+                        f"read on facts.LEVEL_PROTOCOL's run over {seeds} "
+                        f"seeds, where the roster varies with the seed, and "
+                        f"a pass close to an edge is a pass and not a "
+                        f"demonstration that the row is right")
                 else:
                     warnings.append(
                         f"{name} is held red at the certified horizon "

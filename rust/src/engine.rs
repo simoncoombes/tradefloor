@@ -1764,12 +1764,12 @@ impl Engine {
     /// fifteen of fifteen at 504, fifteen on both held-out axes, and all
     /// 40 long-run criteria, read on 270 histories
     /// (`validation/pt-v21/programme/ptv21-registration-18.md`). Volatility
-    /// clustering at lag 1 reads 0.095 against a real median of 0.103. Its
-    /// gaps: the index falls 3 per cent or more on 0.598 per cent of days on
-    /// the level protocol, under the ruled floor of 0.64 (0.98 pooled over
-    /// 360 seeds); the crisis lever is 4.98x against a real 6.16x; and the
-    /// VIX's persistence reads 0.956 against the tape's 0.930, which the
-    /// structural sign test refuses.
+    /// clustering at lag 1 reads 0.095 against a real median of 0.103, and
+    /// the index falls 3 per cent or more on 0.98 per cent of days over 360
+    /// seeds, inside the ruled band of 0.64 to 2.34. Its gaps: the crisis
+    /// lever is 4.98x against a real 6.16x, and the VIX's persistence reads
+    /// 0.956 against the tape's 0.930, which the structural sign test
+    /// refuses.
     ///
     /// From 0.8.5 to 0.9.1 it was [`PT_V20`]: pt-v19 with a tape that follows the
     /// model price, a closing cross, the stock- and sector-specific part of

@@ -49,6 +49,25 @@ saves 21 of them and the cache most of the rest.
   and pt-v19 read 15 of 15. Nothing was re-measured, and no trajectory or
   digest moves.
 
+### The index's return and 3% falls over 360 seeds
+
+- The one-year table reads `index_tail_dn3_pct` and `index_drift_pct` over
+  the 360 seeds of `facts.LEVEL_POOL` (101 to 300 and 331 to 490), on the
+  same varying-roster run as before: the tail row as the 3% falls on every
+  seed over the sessions of every seed, the drift row as the mean across
+  seeds. The long-run criteria's D1 reads them the same way on the same
+  seeds. The fear rows stay on seeds 101 to 130.
+- pt-v21 reads 0.983 on the tail row (888 falls in 90,360 sessions,
+  standard error 0.108) and 7.00 on the drift row, and the one-year table
+  reads 19 of 19. On seeds 101 to 130 alone the tail row reads 0.598, under
+  the band's floor of 0.64.
+- pt-v20 reads 1.168 and 6.24, pt-v19 1.533 and 6.23, pt-v18 1.263 and
+  5.03, all in band, as they were on 30 seeds.
+- Each record from pt-v18 on carries the read as `level_protocol["pooled"]`
+  with its seeds, estimator and source, `envelope.CERTIFIED_LEVEL` and
+  `CERTIFIED_CRISIS` publish it, and `tools/presets/level_pool.py` measures
+  it and writes it to the record.
+
 ## 0.10.0
 
 pt-v21 is the default model. It is pt-v20 with 104 dials moved. pt-v20

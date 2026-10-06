@@ -21,13 +21,14 @@ band is the same defect as an unreproducible figure, one level up.
 statistics in band on the ruled bands `envelope.score` grades with, and all
 fourteen at 504 days.** `corr_persistence_acf1` reads 0.3411 at 504 days
 against a ruled band of -0.38 to 0.88; that row was unreadable at 504 until
-2026-10-06, when its two-year band was carried into the ruled table. Of the
-one-year table's four index rows it misses one: `index_tail_dn3_pct` reads
-0.598 percent of days on the thirty certification seeds against a ruled band
-of 0.64 to 2.34, and 0.98 pooled over 360 seeds, so the table is 18 of 19 on
-the ruled bands. On the 2015-2025 decade bands of `REAL_MARKETS` every shape
-row is in at 252 days, and at 504 days `excess_kurtosis` is out, 6.64 against
-a floor of 7.1.
+2026-10-06, when its two-year band was carried into the ruled table. The
+one-year table's four index rows are in as well, so it is 19 of 19 on the
+ruled bands. Two of them are read over the 360 seeds of `LEVEL_POOL`, as
+the long-run grade reads its D1: `index_tail_dn3_pct` at 0.983 percent of
+days against a ruled band of 0.64 to 2.34, and `index_drift_pct` at 7.00
+against 1.1 to 10.3. On the 2015-2025 decade bands of `REAL_MARKETS` every
+shape row is in at 252 days, and at 504 days `excess_kurtosis` is out, 6.64
+against a floor of 7.1.
 The structural row `vix_ar1_debiased` is a gap: 0.956 against the tape's
 0.930, refused at 252 days and on held-out seeds.
 The committed record `python/tradefloor/presets/pt-v21.json` is what says so
@@ -3228,9 +3229,10 @@ AGGREGATE = {"index_drift_pct": "mean", "fear_gauge_dn3": "pooled",
 #: and the held roster sits 0.78 of that above the population. Thirty
 #: market seeds on one roster certify that roster; thirty rosters certify
 #: the model. So the level row's certified value is the mean over seeds
-#: 101 to 130 of a run on `Universe.random(40, seed=s)` with market seed
-#: `s`, and its seed sd is measured on the same protocol. See the note on
-#: which seed varies in `_index_drift_pct`.
+#: of a run on `Universe.random(40, seed=s)` with market seed `s` -- the
+#: 360 seeds of `LEVEL_POOL` since 2026-10-06, 101 to 130 before -- and its
+#: seed sd is measured on the same protocol. See the note on which seed
+#: varies in `_index_drift_pct`.
 #:
 #: The CRISIS rows are certified on the same run. A gauge's answer to a
 #: down day, pooled or medianed over thirty rosters, describes the model

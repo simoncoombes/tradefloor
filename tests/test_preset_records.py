@@ -160,9 +160,24 @@ def test_the_envelope_agrees_with_the_record_on_the_level_and_crisis_rows():
         "the level measurement's control arm did not reproduce, so the "
         "published rows are not on the ruler they replaced")
 
+    # The two rows `facts.LEVEL_POOL` names are published as the record's
+    # pooled read over that set's seeds, and the fear rows as the thirty-seed
+    # certification's; `published_level` is the one statement of that rule,
+    # and it is what `envelope_tables.py` writes the two tables with.
+    from tools.presets.envelope_tables import published_level  # noqa: PLC0415
+
+    from tradefloor import facts
+
+    pooled = (block.get("pooled") or {}).get("rows") or {}
+    assert set(facts.LEVEL_POOL["rows"]) <= set(pooled), (
+        f"{envelope.PRESET}.json carries no pooled read of "
+        f"{list(facts.LEVEL_POOL['rows'])}, so the one-year table would "
+        f"publish their thirty-seed readings. Write one with "
+        f"tools/presets/level_pool.py")
+    assert block["pooled"]["seeds"] == facts.LEVEL_POOL["seed_list"]
     for field, published in (("certified_level", envelope.CERTIFIED_LEVEL),
                              ("certified_crisis", envelope.CERTIFIED_CRISIS)):
-        measured = block[field]
+        measured = published_level(rec, field)
         assert set(measured) == set(published), (
             f"{field} and the envelope disagree on WHICH rows the block holds")
         for stat, value in published.items():

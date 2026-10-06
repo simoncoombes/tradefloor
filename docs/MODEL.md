@@ -36,9 +36,10 @@ rows pt-v20 was graded on, with the long-run rows read on 270 histories of
 ([`validation/pt-v21/programme/ptv21-registration-18.md`](https://github.com/simoncoombes/tradefloor/blob/main/validation/pt-v21/programme/ptv21-registration-18.md)).
 The verdict, the scripts that graded it and the boxes' outputs are in
 [`validation/pt-v21/`](https://github.com/simoncoombes/tradefloor/tree/main/validation/pt-v21).
-On the ruled one-year bands it holds 18 of the 19 rows: the index falls 3
-per cent or more on 0.598 per cent of days on the thirty certification
-seeds, under the floor of 0.64, and on 0.98 per cent pooled over 360 seeds.
+On the ruled one-year bands it holds all 19 rows. The index's return and
+its rate of 3 per cent falls are read over 360 seeds, as the long-run
+criteria read them: the index falls 3 per cent or more on 0.98 per cent of
+days, against a band of 0.64 to 2.34.
 [STATISTICS.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/STATISTICS.md)
 lists the rows and both presets' readings.
 

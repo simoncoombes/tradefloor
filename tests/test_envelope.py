@@ -114,15 +114,14 @@ def test_all_fourteen_are_in_band_at_the_certified_horizon():
     # protocol, inside both tables (2015-2025 position 0.53, ruled 0.72);
     # the set held {"index_drift_pct"} at the +1.1446 above.
     #
-    # pt-v21 (0.10.0) is in on the 2015-2025 table and reads one row OUT on
-    # the ruled one: `index_tail_dn3_pct`, 0.5976 on the level protocol's
-    # thirty seeds against the ruled 1928-2025 floor of 0.64. Pooled over
-    # 360 seeds, as the eighteenth registration grades its D1, it reads 0.98,
-    # inside both tables (validation/pt-v21/, reg18-c1.json). Named here so
-    # the row is held red on the ruled table until its thirty-seed reading
-    # moves, and fails here if it starts passing in silence.
+    # pt-v21 (0.10.0) is in on both tables. `index_tail_dn3_pct` and
+    # `index_drift_pct` are published as their reads over the 360 seeds of
+    # `facts.LEVEL_POOL`, 0.9827 and 7.0047, which is how the long-run grade
+    # reads its D1 (validation/pt-v21/, reg18-c1.json). On the thirty
+    # certification seeds alone the tail row read 0.5976, under the ruled
+    # floor of 0.64, and was held red here on that reading.
     EXPECTED_RED: set[str] = set()
-    EXPECTED_RED_RULED: set[str] = {"index_tail_dn3_pct"}
+    EXPECTED_RED_RULED: set[str] = set()
     ruled, _, _ = env.RULERS_BY_BASIS[env.DEFAULT_BAND_BASIS][
         env.CERTIFIED_HORIZON_DAYS]
     for k, v in list(env.CERTIFIED_LEVEL.items()) + list(env.CERTIFIED_CRISIS.items()):
@@ -1234,19 +1233,20 @@ def test_a_floor_that_cannot_bind_is_said_to():
 
 
 def test_the_grade_did_not_move():
-    """None of the above may change a band, a count or a verdict. pt-v20
-    read 19 of 19 here; pt-v21 reads 18 of 19, the miss being
-    `index_tail_dn3_pct` on thirty seeds (see the fourteen test above)."""
+    """None of the above may change a band, a count or a verdict. pt-v21
+    reads 19 of 19 here, with `index_tail_dn3_pct` and `index_drift_pct`
+    read over the 360 seeds of `facts.LEVEL_POOL` (see the fourteen test
+    above)."""
     from tradefloor import facts
     scored = env.score(dict(env.certified_panel(), **env.CERTIFIED_LEVEL,
                             **env.CERTIFIED_CRISIS))
     assert (scored["shape_in_band"], scored["shape_of"]) == (14, 14)
-    assert (scored["in_band"], scored["of"]) == (18, 19)
+    assert (scored["in_band"], scored["of"]) == (19, 19)
     assert [k for k, r in scored["statistics"].items()
-            if not r["in_band"]] == ["index_tail_dn3_pct"]
+            if not r["in_band"]] == []
     for name, row in scored["statistics"].items():
         assert row["band"] == tuple(facts.REAL_MARKETS_RULED[name]), name
     cert = env.certified()
     assert cert["band_basis"] == env.DEFAULT_BAND_BASIS == "ruled"
     assert [k for k, s in cert["statistics"].items()
-            if not s["in_band"]] == ["index_tail_dn3_pct"]
+            if not s["in_band"]] == []
