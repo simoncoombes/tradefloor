@@ -1,10 +1,13 @@
 # Embedding the engine in a host
 
-This page is for a program that drives the Rust engine itself, such as a
-game or a trading-desk simulator, instead of running it through the Python
-package's `run_days`. It covers how to open the market, how to run a day,
-how much news and how many shocks of your own the model can take, and which
-of its measured statistics still describe the market you end up with.
+This page is for a program that drives the tradefloor Rust crate's
+`Engine` itself, such as a game or a trading-desk simulator, instead of
+running it through the Python package's `run_days`. It covers how to open
+the market, how to run a day, how much news and how many shocks of your own
+the model can take, and which of its measured statistics still describe the
+market you end up with. Every preset's statistics, and the certification of
+the default, pt-v21, were measured on the library's own day loop with no
+outside input; this page says what moves them and by how much.
 
 The figures below were measured on pt-v21, over 20 seeds and 504 sessions,
 on a 108-name roster of nine names a sector (one mega cap, two large, three
@@ -51,9 +54,7 @@ Which to use:
   use `with_params`. Settling that economy is what the burn-in is for, and
   keeping it gains nothing. Read the settled economy back with
   `engine.economy()` rather than writing yours over it, since a write after
-  construction undoes the settling. Building the engine this way plays the
-  prehistory first, which took 8.3 seconds for 108 names in a native release
-  build on a laptop; a kept opening builds in milliseconds.
+  construction undoes the settling.
 - A market restored from a save: `Engine::restore` from what
   `Engine::snapshot` wrote. It brings the volatility state back with
   everything else, where a kept opening rebuilds only the economy.
@@ -65,12 +66,27 @@ Which to use:
 
 No constructor keeps a host's economy and plays the prehistory inside it.
 
+The prehistory makes a library opening slow to build. On an Apple M5, a
+native release build of 108 names took 7.6 to 9.6 seconds cold (six runs,
+median 8.7) and 20 names about 1.9. A kept opening builds in under a
+tenth of a millisecond. The engine keeps the last 16 engines whose build
+played a prehistory, so building the same seed, roster, economy and model
+again is a copy of the first, the same engine to the bit, in about half a
+millisecond. A game that starts each new game on a new seed pays the cold
+build every time, so build it off the thread that draws the screen.
+`Engine::set_opening_cache_capacity` sizes the cache (0 turns it off) and
+`Engine::opening_cache_info` reports what it holds.
+
 ## Running a day
 
 The day loop the certification ran, which the Python package's `run_days`
 also runs:
 
 ```rust
+use tradefloor::engine::{Engine, SessionBuffer, SessionRequest};
+use tradefloor::market::GameTime;
+
+let mut buffer = SessionBuffer::new();
 for day in 0..days {
     engine.set_current_day(day as i64);
     engine.open_market();
@@ -112,6 +128,9 @@ A host that passes economic shocks closes the day with
 step:
 
 ```rust
+use tradefloor::economy::{EconomicShock, ShockKind};
+
+let shocks = [EconomicShock::new(ShockKind::Other, 0.6, -1.5)];
 engine.close_day_with_shocks(day as i64 + 1, &shocks);
 ```
 
@@ -144,13 +163,14 @@ what you add to it:
 
 `tally.assess(engine.params())` says which channels are outside the fitted
 flow, by how much, and why each one matters. The tally takes no draws, so
-keeping one changes nothing. In Python, `tf.envelope.external_flow(...)`
-runs the same check. The rebuilt game flow was outside on every channel it
-uses: its company news carried 1.8 to 3.2 times the fitted variance,
-economic shocks were active on up to 91% of its macro steps, it wrote the
-VIX, it stepped the economy 1.39 times a session, it ticked 390 times a
-session outside the regular session, and its split-driven earnings
-revisions moved fair value down by 9% to 21% a year.
+keeping one changes nothing. In Python,
+`tradefloor.envelope.external_flow(...)` runs the same check. The rebuilt
+game flow was outside on every channel it uses: its company news carried
+1.8 to 3.2 times the fitted variance, economic shocks were active on up to
+91% of its macro steps, it wrote the VIX, it stepped the economy 1.39 times
+a session, it ticked 390 times a session outside the regular session, and
+its split-driven earnings revisions moved fair value down by 9% to 21% a
+year.
 
 ### Economic shocks
 
@@ -258,7 +278,7 @@ step. The splits written as earnings cuts account for most of the fall in
 the index, and the ticks outside the session and the shocks for most of the
 rise in volatility. Together the inputs add up to roughly the sum of each
 one alone. With the host fixed, every figure sits inside the spread
-pt-v21 shows on its own over two years on `Universe.random(108, seed=7)`
+pt-v21 shows on its own over two years on `random_universe(108, 7)`
 over 30 seeds: index volatility from 7.8% to 31.9%, two-year returns from
 -45% to +66%.
 
@@ -266,16 +286,16 @@ over 30 seeds: index volatility from 7.8% to 31.9%, two-year returns from
 
 | configuration | what the certification covers |
 |---|---|
-| library opening, numbered days, the regular session's ticks, one macro step a session, no external flow, a sector-balanced roster | all 40 long-run criteria and the one-year table, as `tf.preset_record()` states them |
-| the same with a kept opening | the same, after the first quarter; the start-up rows ([STATISTICS.md](STATISTICS.md), B9's start-up ratio and C1) assume the library's opening |
-| a roster of your own | as above, within the roster limit in [REALISM.md](REALISM.md) |
+| library opening, numbered days, the regular session's ticks, one macro step a session, no external flow, a sector-balanced roster | all 40 long-run criteria and the one-year table in [STATISTICS.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/STATISTICS.md), as Python's `tradefloor.preset_record()` states them |
+| the same with a kept opening | the same, after the first quarter; the start-up rows ([STATISTICS.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/STATISTICS.md), B9's start-up ratio and C1) assume the library's opening |
+| a roster of your own | as above, within the roster limit in [REALISM.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/REALISM.md) |
 | any flow `ExternalFlow::assess` finds outside | none of the rows; the findings name the channels |
 
 ## Measuring what you get
 
 On pt-v21 most companies with positive earnings pay a dividend, and the
 price drops by the amount at the ex-date open. An index of prices at fixed
-share counts leaves the dividends out: on `Universe.random(108, seed=7)` it
+share counts leaves the dividends out: on `random_universe(108, 7)` it
 returned +19.5% over two years on average over 30 seeds, against +25.3%
 with the dividends reinvested. A market model whose prices do not drop at
 the ex-date shows no such gap, so set its price index against pt-v21's
@@ -290,10 +310,12 @@ overnight move, and on pt-v21 the price the night started from.
 ## Saving and restoring
 
 `Engine::snapshot` and `Engine::restore` save and restore the whole engine.
-A host that keeps its own flat arrays sizes them from the width constants at
-the crate root, and saves the random streams with
+A host that keeps its own flat arrays sizes them from the width constants
+at the crate root, and saves the random streams with
 `EngineRngState::to_words`. The words run in stream-id order
 (`EngineRngState::STREAM_NAMES`), which puts `news` before `volume_idio`,
 the reverse of the struct's field order. `to_named_words` and
 `from_named_words` save and read the streams by name, so their order cannot
-be mixed up. The crate's README has the word layout.
+be mixed up. The crate's
+[README](https://github.com/simoncoombes/tradefloor/blob/main/rust/README.md)
+has the word layout.

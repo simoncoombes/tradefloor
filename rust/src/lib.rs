@@ -29,6 +29,12 @@
 //! [`engine::Engine::close_day`], so a day in Python and a day in a browser
 //! run the same code.
 //!
+//! A program that runs its own day loop, such as a game, should read
+//! [Embedding the engine in a host](https://github.com/simoncoombes/tradefloor/blob/main/docs/EMBEDDING.md)
+//! first: which constructor to open with, the day loop the presets were
+//! certified on, and how much news and how many shocks of its own a preset
+//! takes before its measured statistics stop describing the market.
+//!
 //! Many modules began as line-for-line ports of an earlier reference
 //! implementation, and their comments still cite it. The crate has since
 //! changed the model on purpose and is now its only definition.
