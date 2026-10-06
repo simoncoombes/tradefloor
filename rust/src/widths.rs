@@ -47,9 +47,12 @@ pub const NOISE_PART_COUNT: usize = 3;
 /// values above 2^53; split each into two 32-bit halves instead.
 pub const RNG_STREAM_WIDTH: usize = 5;
 
-/// The streams an [`crate::engine::EngineRngState`] carries, in its field
-/// order: market, economy, external, jumps, volume, volume_idio, news,
-/// overnight, market_vol_level, crisis_epicentre. Equal to
+/// The streams an [`crate::engine::EngineRngState`] carries. Its words
+/// ([`crate::engine::EngineRngState::to_words`]) run in stream-id order,
+/// [`crate::engine::EngineRngState::STREAM_NAMES`]: market, economy,
+/// external, jumps, volume, news, volume_idio, overnight, market_vol_level,
+/// crisis_epicentre. Its fields declare volume_idio before news, so the
+/// two orders differ in streams 5 and 6. Equal to
 /// [`crate::rng::stream::COUNT`]. The one-shot opening stream
 /// ([`crate::rng::stream::OPENING`]) is spent at construction and is not
 /// carried. Seven before 0.7.0, eight in 0.7.x and ten from 0.8.0.
@@ -259,5 +262,82 @@ mod tests {
         assert!(RngState::from_words(&count).is_err());
         count[3] = -1.0;
         assert!(RngState::from_words(&count).is_err());
+    }
+
+    #[test]
+    fn rng_streams_read_back_by_name_in_any_order() {
+        use crate::engine::{SessionBuffer, SessionRequest};
+        use crate::rng::stream;
+
+        let companies = crate::universe::random_universe(4, 5)
+            .iter()
+            .enumerate()
+            .map(|(i, g)| g.to_init().to_tick_company(i))
+            .collect();
+        let mut engine = crate::engine::Engine::new(
+            5,
+            companies,
+            crate::economy::create_initial_economy_state(&Default::default()),
+            crate::economy::create_initial_central_bank_state(0),
+            crate::sectors::keys().iter().map(|s| s.to_string()).collect(),
+        );
+        engine.open_market();
+        let bell = crate::market::GameTime::new(9, 30, 3);
+        engine.run_session(&SessionRequest::new(bell, 7), &mut SessionBuffer::new());
+        engine.close_day(1);
+        let state = engine.rng_state();
+
+        // The names follow the stream ids, and name the fields they hold.
+        let ids = [
+            ("market", stream::MARKET),
+            ("economy", stream::ECONOMY),
+            ("external", stream::EXTERNAL),
+            ("jumps", stream::JUMPS),
+            ("volume", stream::VOLUME),
+            ("news", stream::NEWS),
+            ("volume_idio", stream::VOLUME_IDIO),
+            ("overnight", stream::OVERNIGHT),
+            ("market_vol_level", stream::MARKET_VOL_LEVEL),
+            ("crisis_epicentre", stream::CRISIS_EPICENTRE),
+        ];
+        assert_eq!(ids.len(), ENGINE_RNG_STREAMS);
+        for (name, id) in ids {
+            assert_eq!(EngineRngState::STREAM_NAMES[id as usize], name);
+        }
+        let named = state.to_named_words();
+        let words = state.to_words();
+        let w = RNG_STREAM_WIDTH;
+        for (k, (name, block)) in named.iter().enumerate() {
+            assert_eq!(*name, EngineRngState::STREAM_NAMES[k]);
+            let a: Vec<u64> = block.iter().map(|x| x.to_bits()).collect();
+            let b: Vec<u64> = words[k * w..(k + 1) * w].iter().map(|x| x.to_bits()).collect();
+            assert_eq!(a, b, "{name}");
+        }
+        let field = |name: &str| match name {
+            "news" => state.news,
+            "volume_idio" => state.volume_idio,
+            "market" => state.market,
+            _ => unreachable!(),
+        };
+        for name in ["news", "volume_idio", "market"] {
+            let k = EngineRngState::STREAM_NAMES.iter().position(|n| *n == name).unwrap();
+            assert_eq!(named[k].1.map(f64::to_bits), field(name).to_words().map(f64::to_bits));
+        }
+        assert_ne!(state.news, state.volume_idio, "the test needs the two to differ");
+
+        // Any order reads back the same state.
+        let mut pairs: Vec<(&str, &[f64])> =
+            named.iter().map(|(n, b)| (*n, b.as_slice())).collect();
+        pairs.reverse();
+        assert_eq!(EngineRngState::from_named_words(&pairs), Ok(state));
+
+        // Refusals: an unknown name, a repeat, a stream left out.
+        let mut unknown = pairs.clone();
+        unknown[0].0 = "volume-idio";
+        assert!(EngineRngState::from_named_words(&unknown).unwrap_err().contains("unknown"));
+        let mut twice = pairs.clone();
+        twice[1] = twice[0];
+        assert!(EngineRngState::from_named_words(&twice).unwrap_err().contains("twice"));
+        assert!(EngineRngState::from_named_words(&pairs[1..]).unwrap_err().contains("missing"));
     }
 }
