@@ -130,42 +130,81 @@ pub const DRAWDOWN_WINDOW: usize = 252;
 /// longer than any hold the dial allows, and the ceiling the clock ages to.
 pub const STRESS_HOLD_NEVER: f64 = 1.0e9;
 
-/// The exact position of all three engine streams — the checkpoint half
-/// that cannot be reconstructed from the columns.
+/// The exact position of the engine's ten random streams, the checkpoint
+/// half that cannot be reconstructed from the columns.
 ///
 /// One [`RngState`] per stream, because each stream has its own LCG
 /// position AND its own Box-Muller spare. A checkpoint that carried only
-/// one of the three would restore a market whose untouched domains replay
-/// correctly and whose missing one silently starts a different sequence.
+/// some of them would restore a market whose untouched domains replay
+/// correctly and whose missing ones silently start a different sequence.
+///
+/// # Word order is not field order
+///
+/// [`EngineRngState::to_words`] and [`EngineRngState::from_words`] lay the
+/// streams out by stream id ([`crate::rng::stream`]), which is the order of
+/// [`EngineRngState::STREAM_NAMES`]:
+///
+/// | words | stream | id |
+/// |---|---|---|
+/// | 0..5 | `market` | 0 |
+/// | 5..10 | `economy` | 1 |
+/// | 10..15 | `external` | 2 |
+/// | 15..20 | `jumps` | 3 |
+/// | 20..25 | `volume` | 4 |
+/// | 25..30 | `news` | 5 |
+/// | 30..35 | `volume_idio` | 6 |
+/// | 35..40 | `overnight` | 7 |
+/// | 40..45 | `market_vol_level` | 8 |
+/// | 45..50 | `crisis_epicentre` | 9 |
+///
+/// The fields below are declared with `volume_idio` before `news`, so a
+/// host that packs the fields in declaration order puts those two streams
+/// in each other's slots, and `from_words` restores them swapped without
+/// complaint: both are valid streams. Pack with `to_words`, or by name with
+/// [`EngineRngState::to_named_words`] and
+/// [`EngineRngState::from_named_words`], which match streams by name and
+/// cannot swap them.
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[non_exhaustive]
 pub struct EngineRngState {
+    /// Stream 0, words 0..5 of [`EngineRngState::to_words`].
     pub market: RngState,
+    /// Stream 1, words 5..10.
     pub economy: RngState,
+    /// Stream 2, words 10..15.
     pub external: RngState,
-    /// The jump stream. Carried here for the reason this type's own
-    /// documentation gives: a stream left out of a checkpoint restores to a
-    /// DIFFERENT sequence while looking correct. That is harmless while
-    /// jumps are inert and silently wrong the day they are not.
+    /// The jump stream, stream 3, words 15..20. Carried here for the reason
+    /// this type's own documentation gives: a stream left out of a
+    /// checkpoint restores to a DIFFERENT sequence while looking correct.
+    /// That is harmless while jumps are inert and silently wrong the day
+    /// they are not.
     pub jumps: RngState,
-    /// The persistent-volume stream, carried for the same reason.
+    /// The persistent-volume stream, stream 4, words 20..25, carried for
+    /// the same reason.
     pub volume: RngState,
-    /// The per-name volume stream, carried for the same reason.
+    /// The per-name volume stream, carried for the same reason. Stream 6,
+    /// words 30..35: AFTER `news` in [`EngineRngState::to_words`], though
+    /// declared before it here.
     pub volume_idio: RngState,
     /// The endogenous-news stream, carried for the same reason. Left out,
     /// a restored engine would draw a different news sequence from the one
     /// it was checkpointed on, which is invisible while news is inert and
-    /// silently wrong the day a preset switches it on.
+    /// silently wrong the day a preset switches it on. Stream 5, words
+    /// 25..30: BEFORE `volume_idio` in [`EngineRngState::to_words`], though
+    /// declared after it here.
     pub news: RngState,
-    /// The overnight stream, carried for the same reason.
+    /// The overnight stream, stream 7, words 35..40, carried for the same
+    /// reason.
     pub overnight: RngState,
-    /// The market factor's slow-level stream, carried for the same reason.
+    /// The market factor's slow-level stream, stream 8, words 40..45,
+    /// carried for the same reason.
     pub market_vol_level: RngState,
-    /// The crisis epicentre's stream, carried for the same reason. It draws
-    /// only on the session an unpinned episode starts, so a restore that
-    /// dropped it would give the NEXT crisis a different epicentre from the
-    /// one the parent would have drawn -- invisible while
-    /// `crisis_epicentre_extra` is 0.0 and silently wrong the day it is not.
+    /// The crisis epicentre's stream, stream 9, words 45..50, carried for
+    /// the same reason. It draws only on the session an unpinned episode
+    /// starts, so a restore that dropped it would give the NEXT crisis a
+    /// different epicentre from the one the parent would have drawn --
+    /// invisible while `crisis_epicentre_extra` is 0.0 and silently wrong
+    /// the day it is not.
     pub crisis_epicentre: RngState,
 }
 
@@ -177,7 +216,9 @@ impl EngineRngState {
     /// market_vol_level 8, crisis_epicentre 9) at words `k * W .. (k + 1) *
     /// W`, each as [`RngState::to_words`] writes it, where `W` is
     /// [`RNG_STREAM_WIDTH`](crate::RNG_STREAM_WIDTH). The order is the stream
-    /// ids', not the fields', and a stream added later goes on the end.
+    /// ids', [`EngineRngState::STREAM_NAMES`], not the fields': `news` (5)
+    /// comes before `volume_idio` (6), which is declared first. A stream
+    /// added later goes on the end.
     pub fn to_words(&self) -> [f64; crate::widths::ENGINE_RNG_STATE_WIDTH] {
         const W: usize = crate::widths::RNG_STREAM_WIDTH;
         let mut out = [0.0; crate::widths::ENGINE_RNG_STATE_WIDTH];
@@ -216,6 +257,80 @@ impl EngineRngState {
             overnight: read(stream::OVERNIGHT)?,
             market_vol_level: read(stream::MARKET_VOL_LEVEL)?,
             crisis_epicentre: read(stream::CRISIS_EPICENTRE)?,
+        })
+    }
+
+    /// The streams' names in word order: entry `k` is the field whose
+    /// stream [`EngineRngState::to_words`] writes at words
+    /// `k * RNG_STREAM_WIDTH ..`. `news` comes before `volume_idio` here,
+    /// the reverse of the fields' declaration order.
+    pub const STREAM_NAMES: [&'static str; crate::widths::ENGINE_RNG_STREAMS] = [
+        "market",
+        "economy",
+        "external",
+        "jumps",
+        "volume",
+        "news",
+        "volume_idio",
+        "overnight",
+        "market_vol_level",
+        "crisis_epicentre",
+    ];
+
+    /// Every stream with its field's name, in word order: the same words as
+    /// [`EngineRngState::to_words`], one block a stream. A host that saves
+    /// the blocks under their names, in a map or a keyed record, and reads
+    /// them back with [`EngineRngState::from_named_words`] never depends on
+    /// the order.
+    pub fn to_named_words(
+        &self,
+    ) -> [(&'static str, [f64; crate::widths::RNG_STREAM_WIDTH]); crate::widths::ENGINE_RNG_STREAMS]
+    {
+        let streams = self.streams();
+        std::array::from_fn(|k| (Self::STREAM_NAMES[k], streams[k].to_words()))
+    }
+
+    /// Read streams back by name, in any order: each entry is a field's name
+    /// from [`EngineRngState::STREAM_NAMES`] and the stream's words as
+    /// [`RngState::to_words`] writes them. Refuses an unknown name, a name
+    /// given twice, a stream left out, and any words
+    /// [`RngState::from_words`] refuses, naming the stream.
+    pub fn from_named_words(streams: &[(&str, &[f64])]) -> Result<Self, String> {
+        const N: usize = crate::widths::ENGINE_RNG_STREAMS;
+        let mut found: [Option<RngState>; N] = [None; N];
+        for (name, words) in streams {
+            let Some(k) = Self::STREAM_NAMES.iter().position(|n| n == name) else {
+                return Err(format!(
+                    "unknown RNG stream {name:?}; the streams are {:?}",
+                    Self::STREAM_NAMES
+                ));
+            };
+            if found[k].is_some() {
+                return Err(format!("RNG stream {name:?} is given twice"));
+            }
+            found[k] = Some(
+                RngState::from_words(words).map_err(|e| format!("stream {name}: {e}"))?,
+            );
+        }
+        let missing: Vec<&str> = (0..N)
+            .filter(|&k| found[k].is_none())
+            .map(|k| Self::STREAM_NAMES[k])
+            .collect();
+        if !missing.is_empty() {
+            return Err(format!("the RNG state is missing stream(s) {missing:?}"));
+        }
+        let s = |k: usize| found[k].expect("checked above");
+        Ok(EngineRngState {
+            market: s(stream::MARKET as usize),
+            economy: s(stream::ECONOMY as usize),
+            external: s(stream::EXTERNAL as usize),
+            jumps: s(stream::JUMPS as usize),
+            volume: s(stream::VOLUME as usize),
+            news: s(stream::NEWS as usize),
+            volume_idio: s(stream::VOLUME_IDIO as usize),
+            overnight: s(stream::OVERNIGHT as usize),
+            market_vol_level: s(stream::MARKET_VOL_LEVEL as usize),
+            crisis_epicentre: s(stream::CRISIS_EPICENTRE as usize),
         })
     }
 
@@ -3972,6 +4087,21 @@ impl Engine {
     /// taken, because the day mark and the day's news draws are taken
     /// there, and `PyEngine::restore_state` sets both numbers for the
     /// mid-day case that no open follows.
+    ///
+    /// # A host numbers its days
+    ///
+    /// Nothing else advances the clock: not `open_market`, not a session
+    /// and not `close_day`. A host that runs its own day loop calls this
+    /// with the trading day, counted from zero, before each `open_market`,
+    /// as the Python package's `run_days` does. Without it the valuation's
+    /// clock stays at day zero for the whole run. On a preset with an
+    /// earnings calendar, dividends or buybacks (pt-v21) the calendars stop
+    /// there: a name whose report or ex-dividend date falls on day zero
+    /// reports, or goes ex, at every session, every other name never does,
+    /// and the buyback yield never accrues. Measured on pt-v21, 108 names,
+    /// 20 seeds, 504 sessions: the median name's volatility reads 19.7 per
+    /// cent a year with the clock left at zero and 20.8 with the days
+    /// numbered.
     pub fn set_current_day(&mut self, day: i64) {
         self.set_day_label(day);
         self.elapsed_days = day;
@@ -6590,6 +6720,10 @@ impl Engine {
     /// in each name's `s`, the day's endogenous news), resets the day's
     /// attribution and anchors the daily open. [`Engine::run_session`] with
     /// `reopen: true` calls this itself.
+    ///
+    /// It does not advance the day: a host calls
+    /// [`Engine::set_current_day`] first, with the trading day counted from
+    /// zero.
     pub fn open_market(&mut self) {
         // The live mark belongs to a session; this one's is computed below.
         self.rate_live = None;
@@ -9819,9 +9953,29 @@ impl Engine {
     ///
     /// It does not trade and draws no prices. Called on its own, with no
     /// session since the last close, it leaves every price where it was. A
-    /// day that moves the market is [`Engine::open_market`], then
-    /// [`Engine::run_session`] (or [`Engine::tick`] in a loop), then this.
+    /// day that moves the market is [`Engine::set_current_day`], then
+    /// [`Engine::open_market`], then [`Engine::run_session`] (or
+    /// [`Engine::tick`] over the session's 390 minutes), then this.
     pub fn close_day(&mut self, game_day: i64) {
+        self.close_day_with_shocks(game_day, &[]);
+    }
+
+    /// [`Engine::close_day`] with economic shocks active in tonight's macro
+    /// step: the close a host that passes shocks runs.
+    ///
+    /// The shocks reach the step as
+    /// [`DayAdvanceRequest::active_shocks`] would, and everything else is
+    /// `close_day`'s: the GARCH innovations and sector variances the engine
+    /// holds, the market P/E written before the step, the re-mark of each
+    /// price to the macro data the step publishes, and the rate indices'
+    /// close. A host that instead calls [`Engine::close_market`] and
+    /// [`Engine::advance_day`] itself gets none of those last three. With
+    /// no shocks this is `close_day`, draw for draw.
+    ///
+    /// Every preset was fitted with no shocks, so any shock passed here is
+    /// outside the fitted flow; [`crate::flow::ExternalFlow`] measures how
+    /// far.
+    pub fn close_day_with_shocks(&mut self, game_day: i64, active_shocks: &[EconomicShock]) {
         let noise = self.daily_innovation_column();
         let innovations: Vec<Option<f64>> = noise.into_iter().map(Some).collect();
         let variances = self.sector_base_variances();
@@ -9830,7 +9984,7 @@ impl Engine {
             sector_base_variances: &variances,
             avg_volume: crate::market::AvgVolumePolicy::Hold,
         });
-        self.advance_macro_day(game_day);
+        self.advance_macro_day_with_shocks(game_day, active_shocks);
     }
 
     /// Step the macro chain into the next day.
@@ -9852,8 +10006,19 @@ impl Engine {
     /// - `volatility`: 1.0, `update_economy_daily`'s own default. The game
     ///   scales this by difficulty (0.3 to 0.9); the library has no
     ///   difficulty setting and takes the function's default.
-    /// - no active shocks: the shock system is not part of this surface.
+    /// - no active shocks: [`Engine::advance_macro_day_with_shocks`] takes
+    ///   them.
     pub fn advance_macro_day(&mut self, game_day: i64) -> DayAdvanceOutcome {
+        self.advance_macro_day_with_shocks(game_day, &[])
+    }
+
+    /// [`Engine::advance_macro_day`] with economic shocks active in the
+    /// step. With none it is `advance_macro_day`, draw for draw.
+    pub fn advance_macro_day_with_shocks(
+        &mut self,
+        game_day: i64,
+        active_shocks: &[EconomicShock],
+    ) -> DayAdvanceOutcome {
         let mut total_mcap = 0.0;
         let mut weighted_pe = 0.0;
         let mut last_tick_mcap = 0.0;
@@ -9937,7 +10102,7 @@ impl Engine {
         let level_before = self.economy.earnings_cycle + self.economy.earnings_anticipation;
         let outcome = self.advance_day(&DayAdvanceRequest {
             volatility: 1.0,
-            active_shocks: &[],
+            active_shocks,
             market_return_pct,
             game_day,
             timestamp: game_day * 24 * 60,
