@@ -2027,6 +2027,7 @@ impl PyEngine {
         text_signature = "(*, seed, universe, macro_state=None, model=None, population=None)"
     )]
     fn new(
+        py: Python<'_>,
         args: &Bound<'_, pyo3::types::PyTuple>,
         seed: crate::python::Given<'_>,
         universe: crate::python::Given<'_>,
@@ -2088,16 +2089,27 @@ impl PyEngine {
             .collect();
         let tickers = universe.iter().map(|i| i.ticker.clone()).collect();
 
-        let mut engine = Self {
-            inner: Engine::with_params_from_opening(
+        // The GIL is released for the build, as it is for a session
+        // (`run_session`), and for the same reason: on pt-v21 the build plays
+        // a 504-session prehistory, about 1.5 s over 20 names, and holding
+        // the GIL through it ran a threaded sweep's builds one at a time and
+        // stopped every other thread of the host. Nothing Python is touched
+        // inside: every argument is a Rust value by now.
+        let sector_keys: Vec<String> =
+            crate::sectors::keys().iter().map(|s| s.to_string()).collect();
+        let inner = py.allow_threads(move || {
+            Engine::with_params_from_opening(
                 seed.0,
                 companies,
                 economy,
                 create_initial_central_bank_state(0),
-                crate::sectors::keys().iter().map(|s| s.to_string()).collect(),
+                sector_keys,
                 params,
                 settle_opening,
-            ),
+            )
+        });
+        let mut engine = Self {
+            inner,
             buffer: SessionBuffer::new(),
             pending_jump: Vec::new(),
             pending_overnight: Vec::new(),

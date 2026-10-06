@@ -24,6 +24,10 @@ saves 21 of them and the cache most of the rest.
 - The tick reuses its company views and the settlement's fills buffer, so
   a session allocates about a third as often and a cold 20-name pt-v21
   build is about 7 per cent faster. No arithmetic moved.
+- `Engine(...)` and `EngineBatch(...)` release the GIL while they build,
+  as a session already did. A threaded sweep (`run_many` and `sweep` with
+  `workers`) builds its engines side by side, and a host's other threads
+  keep running through a prehistory.
 - The MCP server's `session_rewind` and `session_fork` restore into an
   engine that plays no opening, as the restore replaces the whole state.
 - `tests/test_stationary_opening.py` holds the prehistory off, since it

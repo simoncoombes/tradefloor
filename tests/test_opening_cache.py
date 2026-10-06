@@ -19,6 +19,7 @@ import json
 import math
 import sys
 import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -245,3 +246,72 @@ def test_threads_that_build_one_engine_build_the_same_one(emptied):
     assert len(hashes) == 6
     assert len(set(hashes)) == 1
     assert hashes[0] == cold(seed=77, universe=universe, model=model).state_hash()
+
+
+def test_a_build_lets_other_threads_run(emptied):
+    """The build releases the GIL, as a session does, so a threaded sweep
+    builds its engines side by side and a host's other threads keep running
+    through a prehistory. Measured as the rate another thread counts at
+    during a cold build against its rate during a sleep: 0.7 to 0.85 with
+    the GIL released, 0.01 with it held."""
+    universe = tf.Universe.random(3, seed=2)
+    count, stop = [0], [False]
+
+    def spin():
+        while not stop[0]:
+            count[0] += 1
+
+    def rate(fn):
+        before, start = count[0], time.perf_counter()
+        fn()
+        return (count[0] - before) / (time.perf_counter() - start)
+
+    spinner = threading.Thread(target=spin)
+    spinner.start()
+    try:
+        idle = rate(lambda: time.sleep(0.2))
+        building = rate(lambda: cold(seed=91, universe=universe))
+    finally:
+        stop[0] = True
+        spinner.join()
+    assert building > 0.2 * idle, (building, idle)
+
+
+def test_engines_built_on_threads_are_the_engines_built_in_turn(emptied):
+    universe = tf.Universe.random(3, seed=8)
+    model = tf.ModelParams.from_preset("pt-v21", market_prehistory_sessions=21.0)
+    seeds = range(40, 46)
+    Engine.set_opening_cache_capacity(0)
+    in_turn = {s: Engine(seed=s, universe=universe, model=model).state_hash()
+               for s in seeds}
+    built = {}
+
+    def build(seed):
+        built[seed] = Engine(seed=seed, universe=universe, model=model).state_hash()
+
+    threads = [threading.Thread(target=build, args=(s,)) for s in seeds]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert built == in_turn
+
+
+def test_a_batch_served_from_the_cache_is_the_batch_built_cold(emptied):
+    universe = tf.Universe.random(3, seed=8)
+    model = tf.ModelParams.from_preset("pt-v21", market_prehistory_sessions=21.0)
+    seeds = [50, 51, 52]
+
+    def batch():
+        b = tf.EngineBatch(seeds=seeds, universe=universe, model=model)
+        b.open_market()
+        b.run_session(9, 30, 3, 120)
+        return b.prices(), b.draws_consumed
+
+    Engine.set_opening_cache_capacity(0)
+    built_cold = batch()
+    Engine.set_opening_cache_capacity(16)
+    batch()
+    before = info()["hits"]
+    assert batch() == built_cold
+    assert info()["hits"] == before + len(seeds)
