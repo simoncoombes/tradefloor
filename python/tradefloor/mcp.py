@@ -557,6 +557,7 @@ def _population_summary(pop: Any) -> dict[str, Any]:
 def _population_caveat(pop: Any) -> str:
     """The caveat a populated result earns, from the measured record."""
     m = _population.MEASURED
+    d = m["edge_decay_signal"]
     return (
         f"POPULATION {pop.name} ({pop.fingerprint}): this run is in "
         f"populated mode, with {len(pop.participants)} background traders "
@@ -566,7 +567,10 @@ def _population_caveat(pop: Any) -> str:
         f"strategy and reaction; rank_strategies, which runs isolated, "
         f"compares strategies. Measured on {m['model']}, with the "
         f"{m['population']} population ({m['method']}): "
-        f"{m['edge_decay']}; a predictable programme costs about "
+        f"{m['edge_decay']} (the one-day reversal's frictionless return "
+        f"over {d['sessions']} sessions falls from {d['isolated']:.1%} "
+        f"isolated to {d['populated']:.1%} populated); a predictable "
+        f"programme costs about "
         f"{m['programme_cost_excess']:.1%} more than in isolated mode, far "
         f"below the {m['programme_cost_excess_reported']:.0%} "
         f"{m['programme_cost_source']} report from real markets, because "

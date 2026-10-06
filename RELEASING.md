@@ -216,7 +216,10 @@ python tools/remeasure/resync.py --apply       # write what it can re-point
 ```
 
 Run `--lines` whenever the site has been rebuilt, and `--report` before
-believing a MOVED row. `--apply` writes the register in the docs checkout,
+believing a MOVED row. `remeasure.py` runs the same line check before it
+measures and stops on a row whose anchor is on no line of its page, because
+that row describes a figure no reader can see: retire it or re-anchor it.
+0.10.0's run judged three such rows MOVED. `--apply` writes the register in the docs checkout,
 so the change is committed there, on the docs branch.
 
 Each row cites a built page, `docs/<slug>.html`, by line, because that is
