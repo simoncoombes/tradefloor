@@ -87,6 +87,7 @@ impl PyEngineBatch {
     #[new]
     #[pyo3(signature = (*, seeds, universe, macro_state = None, model = None))]
     fn new(
+        py: Python<'_>,
         seeds: Vec<crate::python::Seed>,
         universe: Vec<crate::python_engine::PyInstrument>,
         macro_state: Option<crate::python_engine::PyMacro>,
@@ -139,20 +140,23 @@ impl PyEngineBatch {
         let sector_keys: Vec<String> =
             crate::sectors::keys().iter().map(|s| s.to_string()).collect();
 
-        let engines = seeds
-            .iter()
-            .map(|seed| {
-                Engine::with_params_from_opening(
-                    *seed,
-                    companies.clone(),
-                    economy.clone(),
-                    create_initial_central_bank_state(0),
-                    sector_keys.clone(),
-                    params.clone(),
-                    settle_opening,
-                )
-            })
-            .collect::<Vec<_>>();
+        // Without the GIL, as `Engine` builds: see `PyEngine::new`.
+        let engines = py.allow_threads(|| {
+            seeds
+                .iter()
+                .map(|seed| {
+                    Engine::with_params_from_opening(
+                        *seed,
+                        companies.clone(),
+                        economy.clone(),
+                        create_initial_central_bank_state(0),
+                        sector_keys.clone(),
+                        params.clone(),
+                        settle_opening,
+                    )
+                })
+                .collect::<Vec<_>>()
+        });
         let buffers = (0..engines.len()).map(|_| SessionBuffer::new()).collect();
 
         Ok(Self {

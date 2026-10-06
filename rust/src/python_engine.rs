@@ -2027,6 +2027,7 @@ impl PyEngine {
         text_signature = "(*, seed, universe, macro_state=None, model=None, population=None)"
     )]
     fn new(
+        py: Python<'_>,
         args: &Bound<'_, pyo3::types::PyTuple>,
         seed: crate::python::Given<'_>,
         universe: crate::python::Given<'_>,
@@ -2088,16 +2089,27 @@ impl PyEngine {
             .collect();
         let tickers = universe.iter().map(|i| i.ticker.clone()).collect();
 
-        let mut engine = Self {
-            inner: Engine::with_params_from_opening(
+        // The GIL is released for the build, as it is for a session
+        // (`run_session`), and for the same reason: on pt-v21 the build plays
+        // a 504-session prehistory, about 1.5 s over 20 names, and holding
+        // the GIL through it ran a threaded sweep's builds one at a time and
+        // stopped every other thread of the host. Nothing Python is touched
+        // inside: every argument is a Rust value by now.
+        let sector_keys: Vec<String> =
+            crate::sectors::keys().iter().map(|s| s.to_string()).collect();
+        let inner = py.allow_threads(move || {
+            Engine::with_params_from_opening(
                 seed.0,
                 companies,
                 economy,
                 create_initial_central_bank_state(0),
-                crate::sectors::keys().iter().map(|s| s.to_string()).collect(),
+                sector_keys,
                 params,
                 settle_opening,
-            ),
+            )
+        });
+        let mut engine = Self {
+            inner,
             buffer: SessionBuffer::new(),
             pending_jump: Vec::new(),
             pending_overnight: Vec::new(),
@@ -4333,6 +4345,41 @@ impl PyEngine {
         self.inner
             .set_column(PriceField::AvgVolume, &values[..equities])
             .map_err(ValidationError::new_err)
+    }
+
+    /// Hold at most `entries` engines in the opening cache; 0 turns it off
+    /// and empties it. It holds 16 until this is called.
+    ///
+    /// A build whose model plays a market prehistory (`pt-v21` plays 504
+    /// sessions, about 1.45 s over 20 names) is kept, and a later build from
+    /// the same seed, universe and model, with no `macro_state`, is a copy
+    /// of it. The copy is the same engine to the bit, so this moves no
+    /// result: only how long a repeated build takes and the memory the kept
+    /// engines hold, about 160 KB for a 20-name engine and 1.9 MB for a
+    /// 500-name one. The kept engines hold 2,000 names between them at most,
+    /// whatever the count. The cache is one per process.
+    #[staticmethod]
+    fn set_opening_cache_capacity(entries: i64) -> PyResult<()> {
+        let entries = usize::try_from(entries).map_err(|_| {
+            ValidationError::new_err(format!("entries must be 0 or more, got {entries}"))
+        })?;
+        Engine::set_opening_cache_capacity(entries);
+        Ok(())
+    }
+
+    /// The opening cache as a dict: `capacity`, the `entries` it holds and
+    /// the `names` across them, and the builds since the process started
+    /// that it served (`hits`) or had to play (`misses`).
+    #[staticmethod]
+    fn opening_cache_info<'py>(py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let info = Engine::opening_cache_info();
+        let out = PyDict::new_bound(py);
+        out.set_item("capacity", info.capacity)?;
+        out.set_item("entries", info.entries)?;
+        out.set_item("names", info.names)?;
+        out.set_item("hits", info.hits)?;
+        out.set_item("misses", info.misses)?;
+        Ok(out)
     }
 
     /// The layout version `state_snapshot` writes as `state_schema` and

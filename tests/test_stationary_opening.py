@@ -93,9 +93,19 @@ BASE_PANEL_PRESET = "pt-v16"
 #: `opening` below converts the age at 30 days to the month. Held at the
 #: values every preset through pt-v18 ships, so the tables stay the law of
 #: the shipped table on the calendar they were measured in.
+#:
+#: And the MARKET PREHISTORY, off, since pt-v21 became the default
+#: (0.10.0). It plays 504 sessions on a copy of the engine after the
+#: opening is drawn and hands back volatility and valuation state, never
+#: the phase, its age or the run's draws, which is all `opening` reads: on
+#: 120 seed-models the three were the same with it on and off. On, this
+#: file built 1,370 engines, 670 of them distinct, at about 0.9 s each, and
+#: took 21 minutes of an 87-minute suite; off, it takes 9 seconds.
 IDENTITY_CLOCK = {"macro_burn_in_days": 0.0, "cycle_hazard_per_month": 0.0,
                   "cycle_us_calibration": 0.0,
-                  "macro_calendar_days_per_year": 365.0}
+                  "macro_calendar_days_per_year": 365.0,
+                  "market_prehistory_sessions": 0.0,
+                  "market_prehistory_valuation": 0.0}
 
 
 def panel_digest(model=None, seeds=SEEDS, days=DAYS):

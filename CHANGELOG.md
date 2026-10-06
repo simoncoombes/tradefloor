@@ -1,24 +1,51 @@
 ## Unreleased
 
-A documentation and host-API release for programs that drive the Rust
-engine themselves. No coefficient, default or trajectory changes, and every
-known-answer digest is 0.10.0's.
+A library and documentation release. No coefficient, default or
+trajectory changes, and every known-answer digest is 0.10.0's.
 
-docs/EMBEDDING.md is a new guide for a host that runs its own day loop: the
-three ways to open a market and what each does on pt-v21, the day loop the
-certification ran, how much news and how many shocks of its own the model
-takes, and which statistics stay calibrated in which configuration. Its
-figures come from a browser game's host loop, rebuilt from its source, over
-20 seeds and 504 sessions on pt-v21. With every input the game passes,
-index volatility read 19.5% a year, the VIX was above 40 on 2.3% of days
-and the index fell 19.9% over two years. With the host fixed, they read
-14.2%, 0.7% and +21.3%. Most of the fall came from stock splits written
-into the engine as earnings cuts without dividing its price, and most of
-the extra volatility from ticks outside the regular session and from
-economic shocks, which on pt-v21 raise the VIX's target and, through
-`market_vol_vix_coupling`, the market's realised variance.
+A repeated pt-v21 build is a copy of the first. `Engine` keeps the last 16
+engines whose build played the market prehistory (2,000 names between them
+at most), and a later build from the same seed, universe and model is
+served as a copy in about 0.2 milliseconds, the same engine to the bit.
+`Engine.set_opening_cache_capacity(0)` turns it off and
+`Engine.opening_cache_info()` reports what it holds. The library's own
+suite runs in 16 minutes on an Apple M5, against 87 before.
+
+docs/EMBEDDING.md is a new guide for a program that drives the Rust engine
+itself: the ways to open a market, the day loop the certification ran, how
+much news and how many shocks of its own the model takes, and which
+statistics stay calibrated in which configuration. A browser game's host
+loop, rebuilt from its source, read index volatility of 19.5% a year and a
+19.9% fall over two years on pt-v21, and 14.2% and a 21.3% rise with the
+loop fixed. Most of the fall came from stock splits written into the engine
+as earnings cuts without dividing its price, and most of the extra
+volatility from ticks outside the regular session and from economic
+shocks.
 
 <!-- release-note-ends -->
+
+### Faster builds
+
+- Building a pt-v21 engine plays 504 sessions of market prehistory, about
+  1.5 seconds over 20 names. A build served from the opening cache plays
+  none. Of the 71 minutes the suite no longer takes, one test file that no
+  longer plays the prehistory saves 21 and the cache most of the rest.
+- The opening cache is one per process and shared by every thread. Its
+  key is every argument of the build, to the bit, so a different engine is
+  never served; a build whose arguments hold a NaN is never kept. The Rust
+  `Engine` has the same two calls, and `Engine::with_params_from_opening`
+  is the one that keeps.
+- The tick reuses its company views and the settlement's fills buffer, so
+  a session allocates about a third as often and a cold 20-name pt-v21
+  build is about 7 per cent faster. No arithmetic moved.
+- Building an `Engine` or an `EngineBatch` releases the GIL, as a
+  session already did. A threaded sweep (`run_many` and `sweep` with
+  `workers`) builds its engines side by side, and a host's other threads
+  keep running through a prehistory.
+- The MCP server's `session_rewind` and `session_fork` restore into an
+  engine that plays no opening, as the restore replaces the whole state.
+- `tests/test_stationary_opening.py` holds the prehistory off, since it
+  reads only the opening's phase, age and draws.
 
 ### A close that takes shocks
 
