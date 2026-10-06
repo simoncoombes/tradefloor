@@ -1094,6 +1094,42 @@
       "fear_gauge_dn3": 3.2472857097953636,
       "index_tail_dn3_pct": 1.5803452855245683
     },
+    "pooled": {
+      "rows": {
+        "index_tail_dn3_pct": {
+          "value": 1.2627268702965915,
+          "hits": 1141,
+          "sessions": 90360,
+          "se": 0.12110955510363954
+        },
+        "index_drift_pct": {
+          "value": 5.028940726329658,
+          "sd": 8.846676694403055,
+          "se": 0.46626080129071706
+        }
+      },
+      "seeds": "101-300,331-490",
+      "n": 360,
+      "days": 252,
+      "roster": "Universe.random(40, seed=<seed>)",
+      "estimator": "index_tail_dn3_pct: 100 x the hits over every seed divided by the sessions over every seed; index_drift_pct: the mean across seeds",
+      "tail": {
+        "zero_share": 0.3888888888888889,
+        "five_or_more_share": 0.2111111111111111,
+        "max_hits": 39,
+        "se_m": 0.12110955510363955,
+        "real_centre": 1.2131519274376419,
+        "se_real": 0.3991338938844757,
+        "z_r": 0.11885523456047854
+      },
+      "measured": {
+        "package_version": "0.10.0",
+        "commit": "161ac62a45c04034b5d04db116835bf81054f0f1",
+        "date": "2026-10-06",
+        "protocol": "facts.LEVEL_POOL: facts.LEVEL_PROTOCOL's run, Universe.random(40, seed=s), market seed s, 252 days",
+        "source": "tools/presets/results/level-pool-2026-10-06/pt-v18.json"
+      }
+    },
     "certification": {
       "horizon_days": 252,
       "seeds": 30,

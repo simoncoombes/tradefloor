@@ -171,6 +171,46 @@ def test_the_envelope_agrees_with_the_record_on_the_level_and_crisis_rows():
                 f"the record measured {measured[stat]}")
 
 
+@pytest.mark.parametrize(
+    "path", [p for p in records() if "level_protocol" in load(p)],
+    ids=lambda p: p.stem)
+def test_a_pooled_level_read_rebuilds_from_its_committed_seeds(path):
+    """`level_protocol["pooled"]` against the per-seed file it names.
+
+    The block is what the one-year table publishes for the two rows
+    `facts.LEVEL_POOL` names, so it is checked the way a band is: rebuilt
+    from the committed per-seed readings by the library's own estimator,
+    not compared with itself. The thirty certification seeds sit inside
+    the pooled set, and they must give back the record's thirty-seed
+    readings exactly, which ties the 360 runs to the run the rest of the
+    level block came from.
+    """
+    import statistics
+
+    from tradefloor import facts
+
+    rec = load(path)
+    lp = rec["level_protocol"]
+    block = lp.get("pooled")
+    assert block is not None, f"{path.name} has no pooled level read"
+    assert block["seeds"] == facts.LEVEL_POOL["seed_list"]
+    source = RECORDS.parent.parent.parent / block["measured"]["source"]
+    doc = load(source)
+    panels = doc["panels"]
+    assert [p["seed"] for p in panels] == list(facts.LEVEL_POOL["seeds"])
+    assert {p["model_fingerprint"] for p in panels} == {rec["preset"]}
+    agg = facts.aggregate_panels(panels, facts.LEVEL_POOL["rows"])
+    for row in facts.LEVEL_POOL["rows"]:
+        assert block["rows"][row]["value"] == agg[row], row
+    cert = [p for p in panels if p["seed"] in facts.LEVEL_PROTOCOL["seeds"]]
+    assert len(cert) == len(facts.LEVEL_PROTOCOL["seeds"])
+    assert (100.0 * sum(p["index_tail_dn3_hits"] for p in cert)
+            / sum(p["index_tail_dn3_sessions"] for p in cert)
+            == lp["certified_crisis"]["index_tail_dn3_pct"])
+    assert (statistics.fmean(p["index_drift_pct"] for p in cert)
+            == lp["certified_level"]["index_drift_pct"])
+
+
 def test_the_level_block_was_measured_on_the_preset_the_record_describes():
     """The block's own vector against the record's, name by name.
 

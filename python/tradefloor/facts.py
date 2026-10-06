@@ -3258,6 +3258,35 @@ LEVEL_PROTOCOL = {
     "days": 252,
 }
 
+#: The read the one-year table publishes for its two noisiest level rows:
+#: `LEVEL_PROTOCOL`'s run on 360 seeds rather than 30.
+#:
+#: Both rows are dominated by a few seeds. MEASURED on pt-v21's 360 seeds,
+#: the per-seed spread puts a thirty-seed standard error at about 0.37 on
+#: the tail row, a fifth of its band's width of 1.70, and about 2.3 points
+#: on the drift row; at 360 seeds they are 0.108 and 0.668. Each row is
+#: read by its own estimator over every seed of this set: the tail row as
+#: 100 times the hits over every seed divided by the sessions over every
+#: seed, the drift row as the mean across seeds. The long-run grade reads
+#: its D1 rows on exactly this set
+#: (`validation/pt-v21/programme/results/ptv21/cert_reg18.py`), so the
+#: one-year table and the grade read one number. The fear rows stay on
+#: `LEVEL_PROTOCOL`'s thirty seeds.
+#:
+#: `tools/presets/level_pool.py` measures it and writes it to a record's
+#: `level_protocol["pooled"]`, from which `tools/presets/envelope_tables.py`
+#: writes the two rows of `envelope.CERTIFIED_LEVEL` and `CERTIFIED_CRISIS`.
+LEVEL_POOL = {
+    "rows": ("index_tail_dn3_pct", "index_drift_pct"),
+    "seeds": tuple(range(101, 301)) + tuple(range(331, 491)),
+    "seed_list": "101-300,331-490",
+    "roster": LEVEL_PROTOCOL["roster"],
+    "days": LEVEL_PROTOCOL["days"],
+    "estimator": "index_tail_dn3_pct: 100 x the hits over every seed "
+                 "divided by the sessions over every seed; "
+                 "index_drift_pct: the mean across seeds",
+}
+
 
 def aggregate_value(key: str, values: Sequence[float]) -> float:
     """One graded value for `key` from its per-seed readings.
