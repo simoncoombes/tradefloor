@@ -148,6 +148,10 @@ def test_the_populated_caveat_says_what_changes_and_what_was_measured():
     assert m["programme_cost_source"] in line
     assert "mostly transient" in line
     assert m["edge_decay"] in line and m["crowded_exit"] in line
+    d = m["edge_decay_signal"]
+    assert (f"frictionless return over {d['sessions']} sessions falls from "
+            f"{d['isolated']:.1%} isolated to {d['populated']:.1%} "
+            f"populated") in line
     assert f"{m['return_acf1_shift']:+.3f}" in line
     assert f"{m['runtime_ratio']:.1f} times" in line
     # Right after the model caveat, and the closing caveat no longer says
@@ -161,9 +165,27 @@ def test_the_populated_caveat_is_read_from_the_measured_record(monkeypatch):
     monkeypatch.setitem(population_module.MEASURED, "runtime_ratio", 9.9)
     monkeypatch.setitem(population_module.MEASURED, "return_acf1_shift",
                         -0.042)
+    monkeypatch.setitem(population_module.MEASURED, "edge_decay_signal",
+                        {**population_module.MEASURED["edge_decay_signal"],
+                         "isolated": 0.0912, "populated": 0.0034})
     [line] = population_caveats(mcp.evaluate_strategies(
         {"m": MOMENTUM}, days=1, universe_size=8, population="standard"))
     assert "9.9 times" in line and "-0.042" in line
+    assert "from 9.1% isolated to 0.3% populated" in line
+
+
+def test_the_edge_decay_figure_is_one_paired_reading():
+    """The one-day reversal's ac3 figure (#249): the decline is the
+    isolated return less the populated one, measured paired on the seed,
+    and it stands well clear of its standard error."""
+    d = population_module.MEASURED["edge_decay_signal"]
+    assert d["rule"] == "mean_reversion_1day" and d["sessions"] == 60
+    assert population_module.MEASURED["seeds"]["ac3"] == "92001-92030"
+    assert d["populated"] < d["isolated"]
+    assert d["decline"] == pytest.approx(d["isolated"] - d["populated"],
+                                         abs=1e-4)
+    assert d["decline"] > 3 * d["decline_se"]
+    assert all(d[k] > 0 for k in ("isolated_se", "populated_se", "decline_se"))
 
 
 def test_a_preset_and_a_population_each_say_so_in_order():

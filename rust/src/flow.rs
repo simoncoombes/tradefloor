@@ -53,9 +53,25 @@
 //!   every calendar day, weekends included, runs the macro clock about 1.45
 //!   times fast and applies its shocks that much more often, and is outside
 //!   above [`MACRO_STEP_TOLERANCE`] steps a session.
+//! - Every preset is fitted on the 390 ticks of the regular session, 09:30
+//!   to 16:00. A tick outside it, pre-market or after-hours, draws noise at
+//!   the session's per-minute scale all the same, so it adds variance the
+//!   preset was not fitted with; on pt-v21 the open already applies the
+//!   night's share of the day's move. [`ExternalFlow::record_tick`] counts
+//!   them, and the tally is outside above [`OFF_SESSION_TOLERANCE`] of a
+//!   session's ticks.
+//! - The fitted news has mean zero, and from pt-v20 a company's news moves
+//!   its fair value for good (`fair_value_news_share`). News or earnings
+//!   revisions that lean one way move fair value by their sum, so beside
+//!   their variance the tally keeps their signed sum, and is outside once
+//!   either moves fair value by more than [`DRIFT_TOLERANCE`] a year on
+//!   average, beyond [`DRIFT_STANDARD_ERRORS`] standard errors of the
+//!   estimate, so a flow of mean zero is not flagged for its sampling noise.
+//!   A stock split written as an earnings cut, without dividing the
+//!   engine's price, is a revision of `-ln(ratio)`.
 
 use crate::economy::EconomicShock;
-use crate::market::NewsEvent;
+use crate::market::{GameTime, NewsEvent};
 use crate::params::ModelParams;
 
 /// Ticks in a regular session: what [`crate::engine::Engine::tick`] divides a
@@ -78,6 +94,31 @@ pub const VIX_WRITE_TOLERANCE: f64 = 0.1;
 /// the fitted flow. One step a session is the fitted rate; the tolerance
 /// leaves room for a host that steps once on a holiday it does not trade.
 pub const MACRO_STEP_TOLERANCE: f64 = 1.05;
+
+/// Ticks outside the regular session, as a share of the session's 390, above
+/// which the tally is outside. Chosen, not fitted: one per cent of the
+/// session's ticks adds about one per cent to a name's daily noise variance.
+/// A host that ticks from 07:00 to 20:00, 150 pre-market and 240
+/// after-hours ticks a weekday, is at 1.0, and on a 108-name roster over 20
+/// seeds and 504 sessions those ticks raised index volatility from 12.7 to
+/// 14.7 per cent a year on pt-v21 and from 15.7 to 19.2 on pt-v20.
+pub const OFF_SESSION_TOLERANCE: f64 = 0.01;
+
+/// Mean log move a year, per name, that news or earnings revisions may add
+/// to fair value before the tally is outside. Chosen, not fitted: the fitted
+/// news has mean zero, and one per cent a year is a sixth of pt-v21's
+/// long-run index return.
+pub const DRIFT_TOLERANCE: f64 = 0.01;
+
+/// Standard errors of the drift's estimate that it must clear beyond
+/// [`DRIFT_TOLERANCE`] before the tally is outside. A tally of a few
+/// hundred news events of mean zero reads a drift of a few per cent a year
+/// from sampling alone; the estimate's standard error is the square root of
+/// the moves' sum of squares, scaled as the drift is.
+pub const DRIFT_STANDARD_ERRORS: f64 = 3.0;
+
+/// Trading sessions a year, for the drift's annual rate.
+const SESSIONS_A_YEAR: f64 = 252.0;
 
 /// The shocks a preset generates for itself, which is the flow its fitted
 /// statistics were measured under.
@@ -113,6 +154,12 @@ pub struct CalibratedFlow {
     /// Macro steps a trading session. One: the library steps the economy at
     /// each close.
     pub macro_steps_per_session: f64,
+    /// Ticks a session outside 09:30 to 16:00. Zero: the preset is fitted on
+    /// the regular session's 390.
+    pub off_session_ticks_per_session: f64,
+    /// Mean log move a year the fitted news adds to a name's fair value.
+    /// Zero: each event's size is a draw of mean zero.
+    pub news_drift: f64,
 }
 
 impl CalibratedFlow {
@@ -133,6 +180,8 @@ impl CalibratedFlow {
             market_factor_sigma: params.market_factor_sigma,
             macro_shock_share: 0.0,
             macro_steps_per_session: 1.0,
+            off_session_ticks_per_session: 0.0,
+            news_drift: 0.0,
         }
     }
 
@@ -152,11 +201,15 @@ impl CalibratedFlow {
 /// A tally of the shocks a caller supplied, kept by the caller.
 ///
 /// Feed it what the engine is handed, in the units the engine is handed it:
-/// [`ExternalFlow::record_tick_news`] with the slice given to one
-/// [`crate::engine::Engine::tick`], [`ExternalFlow::record_session_news`]
-/// with the slice given to a whole [`crate::engine::Engine::run_session`],
-/// [`ExternalFlow::record_macro_step`] with the shocks given to each
-/// [`crate::engine::Engine::advance_day`], and
+/// [`ExternalFlow::record_tick`] with each request given to
+/// [`crate::engine::Engine::tick`], which records its news and its clock,
+/// [`ExternalFlow::record_session_news`] with the slice given to a whole
+/// [`crate::engine::Engine::run_session`],
+/// [`ExternalFlow::record_macro_step`] with the shocks given to each macro
+/// step ([`crate::engine::Engine::advance_day`] or
+/// [`crate::engine::Engine::close_day_with_shocks`]),
+/// [`ExternalFlow::record_fundamental_move`] for each earnings figure a host
+/// rewrites, [`ExternalFlow::record_vix_write`] for each VIX it writes, and
 /// [`ExternalFlow::record_session`] once per trading session. The tally then
 /// holds rates and sizes [`ExternalFlow::assess`] can compare with the
 /// fitted flow.
@@ -191,6 +244,18 @@ pub struct ExternalFlow {
     /// Sum over macro steps of `|sum of gdp_impact x severity|`, the
     /// quantity the VIX target reads.
     pub macro_shock_load: f64,
+    /// The signed sum of the company news's log moves: what it adds to fair
+    /// value on average, where `company_sum_sq` gives its variance.
+    pub company_sum: f64,
+    /// The signed sum of the sector news's log moves.
+    pub sector_sum: f64,
+    /// The signed sum of the market-wide news's log moves.
+    pub market_sum: f64,
+    /// The signed sum of the fundamental revisions' log changes.
+    pub fundamental_sum: f64,
+    /// Ticks recorded outside the regular session, 09:30 to 16:00 on a
+    /// weekday.
+    pub off_session_ticks: u64,
 }
 
 impl ExternalFlow {
@@ -211,12 +276,15 @@ impl ExternalFlow {
         if company_id.is_some() {
             self.company_events += 1;
             self.company_sum_sq += sq;
+            self.company_sum += size;
         } else if sector.is_some() {
             self.sector_events += 1;
             self.sector_sum_sq += sq;
+            self.sector_sum += size;
         } else {
             self.market_events += 1;
             self.market_sum_sq += sq;
+            self.market_sum += size;
         }
     }
 
@@ -227,6 +295,22 @@ impl ExternalFlow {
         for e in news {
             let x = e.price_impact.unwrap_or(0.0) / SESSION_TICKS;
             self.record_news_move(e.company_id.as_deref(), e.sector.as_deref(), x);
+        }
+    }
+
+    /// One [`crate::engine::Engine::tick`] call: the news it was handed, as
+    /// [`ExternalFlow::record_tick_news`] takes it, and whether its clock
+    /// lies outside the regular session.
+    pub fn record_tick(&mut self, request: &crate::engine::TickRequest) {
+        self.record_tick_news(request.news);
+        self.record_tick_time(request.time);
+    }
+
+    /// A tick at `time`, counted when it lies outside the regular session
+    /// (09:30 to 16:00 on a weekday, [`crate::market::is_market_open`]).
+    pub fn record_tick_time(&mut self, time: GameTime) {
+        if !crate::market::is_market_open(time) {
+            self.off_session_ticks += 1;
         }
     }
 
@@ -250,6 +334,7 @@ impl ExternalFlow {
         }
         self.fundamental_events += 1;
         self.fundamental_sum_sq += size * size;
+        self.fundamental_sum += size;
     }
 
     /// The host wrote the economy's VIX, changing it by `delta` points.
@@ -309,6 +394,16 @@ pub struct FlowAssessment {
     pub macro_shock_load: f64,
     /// Macro steps a session.
     pub macro_steps_per_session: f64,
+    /// Ticks a session outside the regular session.
+    pub off_session_ticks_per_session: f64,
+    /// Mean log move a year the host's news adds to a name's fair value:
+    /// its company news spread over the roster, its sector news at
+    /// `news_sector_weight` over the twelve sectors, its market-wide news at
+    /// `news_market_weight`.
+    pub news_drift: f64,
+    /// Mean log move a year the host's earnings revisions add to a name's
+    /// fair value.
+    pub fundamental_drift: f64,
     /// One sentence per channel outside the fitted flow.
     pub findings: Vec<String>,
 }
@@ -366,6 +461,25 @@ fn assess(fit: &CalibratedFlow, obs: &ExternalFlow) -> FlowAssessment {
     } else {
         0.0
     };
+    let off_session_ticks_per_session = obs.off_session_ticks as f64 / sessions;
+    let year = SESSIONS_A_YEAR / sessions;
+    let sectors = crate::sectors::keys().len() as f64;
+    let news_drift = year
+        * (obs.company_sum / names
+            + obs.sector_sum * fit.news_sector_weight / sectors
+            + obs.market_sum * fit.news_market_weight)
+        - fit.news_drift;
+    let fundamental_drift = year * obs.fundamental_sum / names;
+    // The drift's standard error under a mean of zero: each scope's sum has
+    // the variance of its sum of squares, scaled as the drift scales it.
+    let sector_scale = fit.news_sector_weight / sectors;
+    let news_se = year
+        * crate::mathx::sqrt(
+            obs.company_sum_sq / (names * names)
+                + obs.sector_sum_sq * sector_scale * sector_scale
+                + obs.market_sum_sq * fit.news_market_weight * fit.news_market_weight,
+        );
+    let fundamental_se = year * crate::mathx::sqrt(obs.fundamental_sum_sq) / names;
 
     let mut findings = Vec::new();
     if company_news_ratio > 1.0 {
@@ -435,6 +549,38 @@ fn assess(fit: &CalibratedFlow, obs: &ExternalFlow) -> FlowAssessment {
             macro_steps_per_session, macro_steps_per_session,
         ));
     }
+    if off_session_ticks_per_session > OFF_SESSION_TOLERANCE * SESSION_TICKS {
+        findings.push(format!(
+            "the host ran {:.0} ticks a session outside 09:30 to 16:00; the preset is fitted on \
+             the regular session's 390, each tick outside it draws noise at the session's \
+             per-minute scale, and on a preset with an overnight move the open already \
+             carries the night",
+            off_session_ticks_per_session,
+        ));
+    }
+    if news_drift.abs() > DRIFT_TOLERANCE + DRIFT_STANDARD_ERRORS * news_se {
+        findings.push(format!(
+            "the host's news leans {:+.1}% a year a name on average (standard error {:.1}%); \
+             the preset's own news has mean zero, and on a preset with \
+             `fair_value_news_share` a company's news moves its fair value for good, so the \
+             market drifts by about that much",
+            100.0 * news_drift,
+            100.0 * news_se,
+        ));
+    }
+    if fundamental_drift.abs() > DRIFT_TOLERANCE + DRIFT_STANDARD_ERRORS * fundamental_se {
+        findings.push(format!(
+            "the host's earnings revisions move each name's fair value by {:+.1}% a year on \
+             average (standard error {:.1}%; log changes summing to {:+.4} over {} revisions \
+             across all names); fair value moves one for one with earnings, and a stock split \
+             written as an earnings cut without dividing the engine's price is a revision of \
+             -ln(ratio)",
+            100.0 * fundamental_drift,
+            100.0 * fundamental_se,
+            obs.fundamental_sum,
+            obs.fundamental_events,
+        ));
+    }
     FlowAssessment {
         inside: findings.is_empty(),
         company_news_ratio,
@@ -444,6 +590,9 @@ fn assess(fit: &CalibratedFlow, obs: &ExternalFlow) -> FlowAssessment {
         macro_shock_share,
         macro_shock_load,
         macro_steps_per_session,
+        off_session_ticks_per_session,
+        news_drift,
+        fundamental_drift,
         findings,
     }
 }
@@ -596,5 +745,118 @@ mod tests {
         let a = t.assess(&p);
         assert!(!a.inside);
         assert!(a.fundamental_ratio > 50.0, "{}", a.fundamental_ratio);
+    }
+
+    #[test]
+    fn ticks_outside_the_session_are_counted_and_outside_past_the_tolerance() {
+        use crate::engine::TickRequest;
+        let p = v20();
+        let mut t = ExternalFlow::new(10);
+        for _ in 0..10 {
+            t.record_session();
+            t.record_macro_step(&[]);
+            // The regular session is inside, 09:30 to 15:59 on a weekday.
+            for m in 0..390i64 {
+                let at = 9 * 60 + 30 + m;
+                t.record_tick(&TickRequest::new(GameTime::new(at / 60, at % 60, 3)));
+            }
+        }
+        assert_eq!(t.off_session_ticks, 0);
+        assert!(t.assess(&p).inside);
+        // Three ticks a session pre-market is under one per cent of 390.
+        for _ in 0..30 {
+            t.record_tick_time(GameTime::new(9, 0, 3));
+        }
+        assert!(t.assess(&p).inside);
+        // A host that ticks from 07:00 to 20:00: 150 pre-market and 240
+        // after-hours ticks.
+        for _ in 0..10 {
+            for m in 0..150i64 {
+                let at = 7 * 60 + m;
+                t.record_tick_time(GameTime::new(at / 60, at % 60, 3));
+            }
+            for m in 0..240i64 {
+                let at = 16 * 60 + m;
+                t.record_tick_time(GameTime::new(at / 60, at % 60, 3));
+            }
+        }
+        let a = t.assess(&p);
+        assert!(!a.inside);
+        assert!((a.off_session_ticks_per_session - 393.0).abs() < 1e-9);
+        assert!(a.findings.iter().any(|f| f.contains("outside 09:30 to 16:00")));
+    }
+
+    #[test]
+    fn news_and_revisions_that_lean_one_way_are_outside_as_drift() {
+        let p = ModelParams::preset("pt-v21").unwrap();
+        let fit = CalibratedFlow::of(&p);
+        assert_eq!(fit.news_drift, 0.0);
+        assert_eq!(fit.off_session_ticks_per_session, 0.0);
+        let names = 100usize;
+        // Company news at the fitted rate and size, half up and half down,
+        // is inside; the same events all down move fair value by about
+        // 0.05 x 0.0175 x 252 = 22% a year.
+        let at = |sign: &dyn Fn(usize) -> f64| {
+            let mut t = ExternalFlow::new(names);
+            for d in 0..252 {
+                t.record_session();
+                t.record_macro_step(&[]);
+                for i in 0..5 {
+                    let x = sign(d * 5 + i) * fit.company_news_sigma;
+                    t.record_session_news(&[company(x)]);
+                }
+            }
+            t.assess(&p)
+        };
+        let even = at(&|k| if k % 2 == 0 { 1.0 } else { -1.0 });
+        assert!(even.inside, "{:?}", even.findings);
+        assert!(even.news_drift.abs() < 1e-12);
+        let down = at(&|_| -1.0);
+        assert!(!down.inside);
+        let want = -0.05 * fit.company_news_sigma * 252.0;
+        assert!((down.news_drift - want).abs() < 1e-9, "{}", down.news_drift);
+        assert!(down.findings.iter().any(|f| f.contains("-22.1% a year")), "{:?}", down.findings);
+
+        // One 2:1 split a name over two years, written as an earnings cut.
+        let mut t = ExternalFlow::new(names);
+        for _ in 0..504 {
+            t.record_session();
+            t.record_macro_step(&[]);
+        }
+        for _ in 0..names {
+            t.record_fundamental_move(-(2.0f64).ln());
+        }
+        let a = t.assess(&p);
+        assert!(!a.inside);
+        assert!((a.fundamental_drift + 0.5 * (2.0f64).ln()).abs() < 1e-12);
+        assert!(a.findings.iter().any(|f| f.contains("-ln(ratio)")));
+    }
+
+    #[test]
+    fn news_of_mean_zero_is_not_flagged_for_its_sampling_noise() {
+        // The fitted company news, drawn, on a small roster over a year: the
+        // sum of a few hundred draws reads a drift of several per cent a
+        // year from sampling alone, which the standard error absorbs.
+        let p = ModelParams::preset("pt-v21").unwrap();
+        let fit = CalibratedFlow::of(&p);
+        let mut g = crate::rng::GameRng::new(11, 3);
+        let mut largest: f64 = 0.0;
+        for _ in 0..20 {
+            let mut t = ExternalFlow::new(40);
+            for _ in 0..252 {
+                t.record_session();
+                t.record_macro_step(&[]);
+                for _ in 0..40 {
+                    if g.next_f64() < fit.company_news_rate {
+                        let x = fit.company_news_sigma * g.next_normal();
+                        t.record_session_news(&[company(x)]);
+                    }
+                }
+            }
+            let a = t.assess(&p);
+            largest = largest.max(a.news_drift.abs());
+            assert!(!a.findings.iter().any(|f| f.contains("leans")), "{:?}", a.findings);
+        }
+        assert!(largest > DRIFT_TOLERANCE, "the test should draw a drift past the tolerance: {largest}");
     }
 }

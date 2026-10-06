@@ -500,10 +500,10 @@ def summarise(kind: str, rows: list[dict]) -> str:
     sc = scored["statistics"]
     # `is False`, not `not ... `. A row the basis cannot read carries
     # `in_band` None, and `not None` is True, so the old test scored an
-    # UNREADABLE row as a miss. At the ruled basis that is
-    # `corr_persistence_acf1` at 504, and this line would have printed 13 of
-    # 14 where the truth is 13 of 13. The unreadable rows leave the
-    # denominator instead, and are named beside it.
+    # UNREADABLE row as a miss. At the ruled basis that was
+    # `corr_persistence_acf1` at 504 until 2026-10-06, and this line would
+    # have printed 13 of 14 where the truth was 13 of 13. The unreadable rows
+    # leave the denominator instead, and are named beside it.
     out = [k for k, v in sc.items()
            if v.get("in_band") is False and k in facts.SHAPE]
     blind = [k for k, v in sc.items()

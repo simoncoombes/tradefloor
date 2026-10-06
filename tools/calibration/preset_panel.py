@@ -514,13 +514,13 @@ def _count_in_band(panel: dict, bands: dict
     which were not read.
 
     THE THIRD LIST IS THE ONE THAT MATTERS AND IT USED TO BE A `KeyError`.
-    A basis does not carry every row: `facts.REAL_MARKETS_RULED_504` holds
-    thirteen of `PANEL`'s fourteen shape rows, because `corr_persistence_acf1`
-    is held out of the ruled band at 504 on two recorded grounds
-    (`facts.RULED_UNREADABLE[504]`). A row the basis cannot read is named
-    here and taken OUT of the denominator, so `in_band` plus `misses` plus
-    `unreadable` is the panel and a count of "13" is never printed against a
-    fourteen that was not tested.
+    A basis does not carry every row: until 2026-10-06
+    `facts.REAL_MARKETS_RULED_504` held thirteen of `PANEL`'s fourteen shape
+    rows, because `corr_persistence_acf1` was held out of the ruled band at
+    504 (`facts.RULED_UNREADABLE` names any row held out now). A row the
+    basis cannot read is named here and taken OUT of the denominator, so
+    `in_band` plus `misses` plus `unreadable` is the panel and a count of
+    "13" is never printed against a fourteen that was not tested.
 
     THE FOURTH LIST IS THE SAME IDEA ABOUT THE OTHER SIDE OF THE COMPARISON,
     and it landed with `crisis_sector_dispersion` on 2026-09-22. `unreadable`
@@ -574,12 +574,12 @@ def _count_in_band(panel: dict, bands: dict
 #: `envelope.RULERS_BY_BASIS['ruled']` returns, so grading here and grading
 #: in the library read the same object.
 #:
-#: The two differ on `PANEL` at 504 and only there. `universal` grades
-#: `corr_persistence_acf1` against (-0.38, 0.88), a band carried on the
-#: WALKED six-window protocol rather than the shipped sub-window one, so it
-#: is a band for a different quantity; `ruled` drops the row and
-#: `_count_in_band` names it unreadable. A count taken on `universal` at 504
-#: therefore includes one cell the ruled band refuses to grade.
+#: The two grade `PANEL` the same at both horizons since 2026-10-06. Until
+#: then `ruled` held `corr_persistence_acf1` out at 504, on the ground that
+#: its universal band, (-0.38, 0.88), was on a different window protocol;
+#: `tools/calibration/corr_persistence_504_band.py` measured that it is on
+#: the same windows and estimator as the other shape rows, and the ruled
+#: table now carries it.
 BAND_BASES = {
     "shipped": ("facts.REAL_MARKETS", "facts.REAL_MARKETS_504"),
     "universal": ("facts.REAL_MARKETS_UNIVERSAL",

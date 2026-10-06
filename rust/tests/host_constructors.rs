@@ -121,3 +121,53 @@ fn a_host_saves_and_restores_the_streams_as_words() {
     // The market stream is stream 0, so it is the first RNG_STREAM_WIDTH words.
     assert_eq!(RngState::from_words(&saved[..RNG_STREAM_WIDTH]), Ok(before.market));
 }
+
+#[test]
+fn a_close_with_shocks_is_the_library_close_with_the_shocks_in_its_step() {
+    // A host that passes economic shocks closes with close_day_with_shocks
+    // and keeps everything close_day does. With none it is close_day.
+    let build = || {
+        let companies: Vec<TickCompany> = random_universe(12, 4)
+            .iter()
+            .enumerate()
+            .map(|(i, g)| g.to_init().to_tick_company(i))
+            .collect();
+        Engine::with_params_keeping_opening(
+            9,
+            companies,
+            create_initial_economy_state(&InitialEconomyOptions::default()),
+            create_initial_central_bank_state(0),
+            sectors(),
+            tradefloor::params::ModelParams::preset("pt-v21").unwrap(),
+        )
+    };
+    let shock = [EconomicShock::new(ShockKind::Other, 0.8, -2.0)];
+    let run = |shocks: &[EconomicShock], with: bool| {
+        let mut e = build();
+        let mut buffer = tradefloor::engine::SessionBuffer::new();
+        for day in 0..5i64 {
+            e.set_current_day(day);
+            e.open_market();
+            e.run_session(
+                &tradefloor::engine::SessionRequest::new(GameTime::new(9, 30, 3), 390),
+                &mut buffer,
+            );
+            if with {
+                e.close_day_with_shocks(day + 1, shocks);
+            } else {
+                e.close_day(day + 1);
+            }
+        }
+        e
+    };
+    let plain = run(&[], false);
+    let none = run(&[], true);
+    assert_eq!(plain.state_hash(5, false), none.state_hash(5, false));
+    let shocked = run(&shock, true);
+    assert!(
+        shocked.economy().vix > plain.economy().vix,
+        "{} against {}",
+        shocked.economy().vix,
+        plain.economy().vix
+    );
+}

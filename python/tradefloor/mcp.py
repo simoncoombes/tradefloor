@@ -557,6 +557,7 @@ def _population_summary(pop: Any) -> dict[str, Any]:
 def _population_caveat(pop: Any) -> str:
     """The caveat a populated result earns, from the measured record."""
     m = _population.MEASURED
+    d = m["edge_decay_signal"]
     return (
         f"POPULATION {pop.name} ({pop.fingerprint}): this run is in "
         f"populated mode, with {len(pop.participants)} background traders "
@@ -566,7 +567,10 @@ def _population_caveat(pop: Any) -> str:
         f"strategy and reaction; rank_strategies, which runs isolated, "
         f"compares strategies. Measured on {m['model']}, with the "
         f"{m['population']} population ({m['method']}): "
-        f"{m['edge_decay']}; a predictable programme costs about "
+        f"{m['edge_decay']} (the one-day reversal's frictionless return "
+        f"over {d['sessions']} sessions falls from {d['isolated']:.1%} "
+        f"isolated to {d['populated']:.1%} populated); a predictable "
+        f"programme costs about "
         f"{m['programme_cost_excess']:.1%} more than in isolated mode, far "
         f"below the {m['programme_cost_excess_reported']:.0%} "
         f"{m['programme_cost_source']} report from real markets, because "
@@ -3531,14 +3535,22 @@ class _Session:
         self.touched = time.monotonic()
         self.keep()
 
-    def _fresh_engine(self) -> Any:
+    def _fresh_engine(self, *, to_restore: bool = False) -> Any:
         # With the session's population, which a checkpoint's snapshot
         # carries the state of and restores only into an engine built with
         # it; none in isolated mode, where the engine is the one it was.
         populated = ({} if self.population is None
                      else {"population": self.population})
+        # An engine a snapshot is about to be restored into keeps a named
+        # opening, so it plays no burn-in and no market prehistory: on
+        # pt-v21 that is about 1.5 s a build over 20 names, for a state the
+        # restore then replaces whole. The restore refuses a snapshot that
+        # lacks a block, so whatever it accepts it puts back entire, and
+        # tests/test_mcp_sessions.py holds a fork and a rewind to the
+        # session they came from, bit for bit.
+        opening = {"macro_state": tf.Macro()} if to_restore else {}
         return tf.Engine(seed=self.seed, universe=self.roster,
-                         model=self.preset, **populated)
+                         model=self.preset, **populated, **opening)
 
     # -- the clock --------------------------------------------------------
 
@@ -3571,7 +3583,7 @@ class _Session:
         """Put the checkpoint at `step` back, on a fresh engine, and drop
         every checkpoint after it: they were a future of this line."""
         snapshot, live = self.checkpoints[step]
-        engine = self._fresh_engine()
+        engine = self._fresh_engine(to_restore=True)
         engine.restore_state(snapshot)
         self.engine = engine
         self.live = _copy_live(live)
@@ -3587,7 +3599,7 @@ class _Session:
         """
         child = copy.copy(self)
         child.id = sid
-        child.engine = self._fresh_engine()
+        child.engine = self._fresh_engine(to_restore=True)
         child.engine.restore_state(self.engine.state_snapshot())
         child.live = _copy_live(self.live)
         child.checkpoints = dict(self.checkpoints)

@@ -588,19 +588,35 @@ impl TickCompany {
         }
     }
 
-    fn factor_view(&self) -> FactorCompany {
-        FactorCompany {
-            id: self.id.clone(),
-            sector: self.sector.clone(),
-            beta: self.stock.beta,
-            market_cap: self.stock.market_cap,
-            avg_volume: self.stock.avg_volume,
-            shares_outstanding: self.stock.shares_outstanding,
-            short_interest: self.stock.short_interest,
-            float: self.stock.float,
-            garch_variance: self.stock.garch_variance,
-            last_daily_return: self.stock.last_daily_return,
-        }
+    /// Write the factor model's view of this company into `view`, every
+    /// field of it, so a field added to the view fails to compile here
+    /// until it is written. The tick reuses one view from name to name:
+    /// building one per name per tick cloned two strings each time, 33 per
+    /// cent of a pt-v21 session's allocations over 20 names, and
+    /// `clone_from` keeps the strings' buffers. Allocation only.
+    fn write_factor_view(&self, view: &mut FactorCompany) {
+        let FactorCompany {
+            id,
+            sector,
+            beta,
+            market_cap,
+            avg_volume,
+            shares_outstanding,
+            short_interest,
+            float,
+            garch_variance,
+            last_daily_return,
+        } = view;
+        id.clone_from(&self.id);
+        sector.clone_from(&self.sector);
+        *beta = self.stock.beta;
+        *market_cap = self.stock.market_cap;
+        *avg_volume = self.stock.avg_volume;
+        *shares_outstanding = self.stock.shares_outstanding;
+        *short_interest = self.stock.short_interest;
+        *float = self.stock.float;
+        *garch_variance = self.stock.garch_variance;
+        *last_daily_return = self.stock.last_daily_return;
     }
 
     /// The microstructure view of this company at a given price.
@@ -610,19 +626,39 @@ impl TickCompany {
     /// the tick settles through -- displayed depth IS executable depth, which
     /// is the property that makes slippage emergent rather than modelled.
     pub fn micro_view(&self, price: f64) -> CompanyMicrostructure {
-        CompanyMicrostructure {
-            id: self.id.clone(),
-            sector_volatility: self.sector_volatility,
-            price,
-            market_cap: self.stock.market_cap,
-            beta: self.stock.beta,
-            float: Some(self.stock.float),
-            short_interest: Some(self.stock.short_interest),
-            avg_volume: Some(self.stock.avg_volume),
-            volume: Some(self.stock.volume),
-            shares_outstanding: Some(self.stock.shares_outstanding),
-            maker_inventory: self.stock.maker_inventory,
-        }
+        let mut view = CompanyMicrostructure::new(String::new(), price, 0.0);
+        self.write_micro_view(price, &mut view);
+        view
+    }
+
+    /// [`TickCompany::micro_view`] written into a view the tick reuses from
+    /// name to name, for the reason [`TickCompany::write_factor_view`]
+    /// gives: one string a name a tick, 18 per cent of the allocations.
+    fn write_micro_view(&self, price: f64, view: &mut CompanyMicrostructure) {
+        let CompanyMicrostructure {
+            id,
+            sector_volatility,
+            price: at,
+            market_cap,
+            beta,
+            float,
+            short_interest,
+            avg_volume,
+            volume,
+            shares_outstanding,
+            maker_inventory,
+        } = view;
+        id.clone_from(&self.id);
+        *sector_volatility = self.sector_volatility;
+        *at = price;
+        *market_cap = self.stock.market_cap;
+        *beta = self.stock.beta;
+        *float = Some(self.stock.float);
+        *short_interest = Some(self.stock.short_interest);
+        *avg_volume = Some(self.stock.avg_volume);
+        *volume = Some(self.stock.volume);
+        *shares_outstanding = Some(self.stock.shares_outstanding);
+        *maker_inventory = self.stock.maker_inventory;
     }
 }
 
@@ -1231,6 +1267,8 @@ pub fn simulate_market_tick(
     let mut all_noises: Vec<f64> = Vec::with_capacity(roster);
     let mut all_news_vol_mults: Vec<f64> = Vec::with_capacity(roster);
     let mut all_randoms: Vec<f64> = Vec::with_capacity(roster);
+    // One view for the whole roster, rewritten for each name.
+    let mut view = FactorCompany::new(String::new(), String::new());
 
     for (idx, company) in companies.iter().enumerate() {
         if company.is_bankrupt || !company.is_public {
@@ -1262,8 +1300,9 @@ pub fn simulate_market_tick(
             Some(&r) => volatility_multiplier * mathx::sqrt(r),
             None => volatility_multiplier,
         };
+        company.write_factor_view(&mut view);
         let factors = calculate_live_factors(
-            &company.factor_view(),
+            &view,
             inputs.news,
             imbalance,
             volatility_multiplier,
@@ -1719,6 +1758,9 @@ pub fn simulate_market_tick(
     let mut unbounded_col = if depth_arm { vec![0.0; active_count] } else { Vec::new() };
     let mut share_col = if depth_arm { vec![0.0; active_count] } else { Vec::new() };
     let mut agent_fills: Vec<(usize, crate::microstructure::SettledAgentFill)> = Vec::new();
+    // One view for the whole roster, rewritten for each name before it
+    // settles.
+    let mut micro = CompanyMicrostructure::new(String::new(), 0.0, 0.0);
 
     for i in 0..active_count {
         let idx = active_indices[i];
@@ -1791,7 +1833,7 @@ pub fn simulate_market_tick(
             } else {
                 companies[idx].stock.price * mathx::exp(s_components[i][3])
             };
-            let micro = companies[idx].micro_view(quote_from);
+            companies[idx].write_micro_view(quote_from, &mut micro);
             let options = SettleOptions {
                 // From the params, so a preset that smooths the size curve
                 // smooths it in settlement too rather than only in the book.

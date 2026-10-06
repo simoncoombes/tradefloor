@@ -24,10 +24,12 @@ decade band, and counting that as reach would call the defect its own repair.
 WHAT THIS FILE DOES NOT DO. It asserts no band EDGE. Every number it reads
 comes out of the tables themselves, so a band that is re-derived moves here
 without an edit and a band that is edited under an unchanged name does not
-pass as unchanged. The one count it does assert is 37 of 40 cells, which is
+pass as unchanged. The one count it does assert is 38 of 40 cells, which is
 the claim under review and which changes only when a ruling lands. It read
 35 of 38 until 2026-09-22, when `crisis_sector_dispersion` landed with a
-ruled band at both horizons: two more cells, both readable. The module
+ruled band at both horizons: two more cells, both readable. It read 37 of 40
+until 2026-10-06, when `corr_persistence_acf1`'s 504 cell was carried into
+the ruled table. The module
 docstring said 31 for longer than that and was simply stale against its own
 test.
 """
@@ -81,9 +83,14 @@ HORIZONS = (facts.CERTIFIED_HORIZON_DAYS, 504)
 #: the performance, not the measurement") and it was composed in as
 #: `facts.RULED_FEAR_DN3_BAND`. The blocker four-level-rows-unbanded holds
 #: no cell any more; the three left are each behind a table entry owed.
-THREE = (
+#:
+#: THREE BECAME TWO ON 2026-10-06. `corr_persistence_acf1`'s 504 cell,
+#: blocker corr-persistence-504-unbanded, left when its universal band was
+#: carried into `REAL_MARKETS_RULED_504`: its readings were measured to be
+#: the simulated side's estimator on the same windows as the other shape
+#: rows (tools/calibration/corr_persistence_504_band.py).
+TWO = (
     (252, "vix_ar1_debiased", "vix-ar1-ruled-band-not-in-the-tables"),
-    (504, "corr_persistence_acf1", "corr-persistence-504-unbanded"),
     (504, "vix_ar1_debiased", "vix-ar1-ruled-band-not-in-the-tables"),
 )
 
@@ -92,7 +99,7 @@ def mid_band_panel(days: int) -> dict[str, float]:
     """A reading for all nineteen rows, mid-band on whichever ruler has one.
 
     Built from the DECADE table where the ruled table has no band, so the
-    three unreadable cells carry a value that the decade ruler would grade as
+    unreadable cells carry a value that the decade ruler would grade as
     IN. A fallback from the ruled basis to the decade one therefore shows up
     here as a verdict rather than as an error, which is the failure mode the
     absent-band tests below are written against.
@@ -261,34 +268,36 @@ def test_reach_is_band_for_band_and_not_key_for_key():
 
 
 # --------------------------------------------------------------------------
-# 2. Thirty-seven of forty, and the three by name
+# 2. Thirty-eight of forty, and the two by name
 # --------------------------------------------------------------------------
 
-def test_the_ruled_band_reaches_thirty_seven_of_the_forty_cells():
+def test_the_ruled_band_reaches_thirty_eight_of_the_forty_cells():
     """The count the blocker turns on, walked through the library.
 
     35 OF 38 UNTIL 2026-09-22. `crisis_sector_dispersion` landed with its
     own whole-tape window table and a band derived from it at both
     horizons, so the row set is twenty and both of its cells are readable.
-    The THREE tuple does not move: the row added no unreadable cell.
+    The tuple of unreadable cells did not move: the row added none.
+    37 OF 40 UNTIL 2026-10-06, when `corr_persistence_acf1`'s 504 cell
+    became readable.
     """
     readable = [(d, r) for d in HORIZONS for r in GRADED
                 if facts.ruled_band(r, d) is not None]
     unreadable = [(d, r) for d in HORIZONS for r in GRADED
                   if facts.ruled_band(r, d) is None]
     assert len(readable) + len(unreadable) == 40
-    assert len(readable) == 37, (
-        f"the ruled band reaches {len(readable)} of 40 cells, not 37. If a "
-        f"ruling landed, the THREE tuple in this file moves in the same "
+    assert len(readable) == 38, (
+        f"the ruled band reaches {len(readable)} of 40 cells, not 38. If a "
+        f"ruling landed, the TWO tuple in this file moves in the same "
         f"commit; unreadable today: {sorted(unreadable)}")
 
 
-@pytest.mark.parametrize("days,row,blocker", THREE)
+@pytest.mark.parametrize("days,row,blocker", TWO)
 def test_each_unreachable_cell_is_named_with_a_reason(days, row, blocker):
     """Absence with a reason, not a missing key a reader has to infer."""
     assert facts.ruled_band(row, days) is None, (
         f"{row} at {days}d now has a ruled band. The blocker {blocker} has "
-        f"moved and this file's THREE tuple has not")
+        f"moved and this file's TWO tuple has not")
     reason = facts.RULED_UNREADABLE.get(days, {}).get(row)
     assert reason, (
         f"{row} at {days}d has no ruled band and RULED_UNREADABLE[{days}] "
@@ -298,11 +307,12 @@ def test_each_unreachable_cell_is_named_with_a_reason(days, row, blocker):
 
 
 def test_no_graded_row_is_dropped_from_the_ruled_table_in_silence():
-    """The 504 control: one line out of `RULED_UNREADABLE` has to fail here.
+    """The control: one line out of `RULED_UNREADABLE` has to fail here.
 
-    `facts.py` names `RULED_UNREADABLE[504]['corr_persistence_acf1']` as the
-    single line that changes when the row-definition ruling lands. Delete it
-    without adding the band and this test is what refuses.
+    `RULED_UNREADABLE[504]['corr_persistence_acf1']` was removed on
+    2026-10-06 in the same commit that carried the row's band into
+    `REAL_MARKETS_RULED_504`. Deleting such a line without adding the band
+    is what this test refuses.
     """
     for days in HORIZONS:
         absent = {r for r in GRADED if facts.ruled_band(r, days) is None}
@@ -336,15 +346,14 @@ def test_score_grades_against_the_ruled_table_when_asked_for_it(days):
             f"is {want}")
 
 
-@pytest.mark.parametrize("days,row,blocker", THREE)
+@pytest.mark.parametrize("days,row,blocker", TWO)
 def test_an_unreadable_cell_is_never_filled_from_the_decade_table(
         days, row, blocker):
     """The fallback that would make a blocker disappear without a ruling.
 
-    One of the three cells HAS a decade band, so a producer that fell back
-    would print a verdict rather than raise, and the ship blocker would read
-    as cleared. The cell has to come back with no band, no verdict and the
-    reason attached.
+    The cell has to come back with no band, no verdict and the reason
+    attached. Neither cell left has a decade band, so a fallback would find
+    nothing to fill from here; the test below keeps the case that has one.
     """
     scored = envelope.score(mid_band_panel(days), horizon_days=days,
                             basis="ruled")
@@ -357,12 +366,33 @@ def test_an_unreadable_cell_is_never_filled_from_the_decade_table(
     assert row in scored["unreadable"]
 
 
+def test_a_held_row_with_a_decade_band_is_not_filled_from_it(monkeypatch):
+    """The same guard on a row that HAS a decade band to fall back to.
+
+    Until 2026-10-06 `corr_persistence_acf1` at 504 was such a cell for real:
+    held out of the ruled table, with the decade band (0.19, 0.49) beside it.
+    It is held out again here by hand, so a producer that fell back to the
+    decade table would print a verdict rather than name the row unreadable.
+    """
+    row, days = "corr_persistence_acf1", 504
+    assert envelope.BANDS_504.get(row) is not None
+    monkeypatch.delitem(facts.REAL_MARKETS_RULED_504, row)
+    monkeypatch.setitem(facts.RULED_UNREADABLE[days], row,
+                        "held out by this test to check the fallback")
+    scored = envelope.score(mid_band_panel(days), horizon_days=days,
+                            basis="ruled")
+    cell = scored["statistics"][row]
+    assert cell["band"] is None and cell["in_band"] is None
+    assert cell["unreadable"] == "held out by this test to check the fallback"
+    assert row in scored["unreadable"]
+
+
 @pytest.mark.parametrize("days", HORIZONS)
 def test_the_unreadable_cells_are_named_and_never_folded_into_the_total(days):
     """`of` counts what was graded. `unreadable_of` counts what was not."""
     scored = envelope.score(mid_band_panel(days), horizon_days=days,
                             basis="ruled")
-    expected = sorted(r for d, r, _ in THREE if d == days)
+    expected = sorted(r for d, r, _ in TWO if d == days)
     assert sorted(scored["unreadable"]) == expected
     assert scored["unreadable_of"] == len(expected)
     assert scored["of"] == len(GRADED) - len(expected), (
@@ -471,11 +501,12 @@ def test_an_unnamed_basis_is_the_ruled_one_and_they_are_not_the_same(days):
     assert default == ruled
     assert default["ruler"] != shipped["ruler"]
     assert default["basis_detail"] != shipped["basis_detail"]
-    # The 504 table is a row short and says which, rather than printing a
-    # count against a denominator nobody tested.
+    # The 504 table was a row short until 2026-10-06, when
+    # corr_persistence_acf1 was carried into it; both bases now grade all
+    # fourteen shape rows there.
     if days == 504:
-        assert "corr_persistence_acf1" in default["unreadable"]
-        assert default["shape_of"] == shipped["shape_of"] - 1
+        assert "corr_persistence_acf1" not in default["unreadable"]
+        assert default["shape_of"] == shipped["shape_of"]
 
 
 def test_a_basis_nobody_derived_is_refused_rather_than_guessed():

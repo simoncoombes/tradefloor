@@ -105,19 +105,44 @@ suitable for, is at <https://docs.tradefloor.dev/>.
 ## Driving the engine from a host
 
 A host that owns the economy (a game, a trading desk simulator, anything
-that feeds the engine its own macro state and news) needs four things from
+that feeds the engine its own macro state and news) needs these things from
 this crate that the example above does not show.
+[docs/EMBEDDING.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/EMBEDDING.md)
+has the measurements behind each one, and how much news and how many
+shocks of your own the model can take.
 
-**Keep your opening.** `Engine::new` and `Engine::with_params` run the
-preset's own opening over the economy you pass: on `pt-v20` that is 755
-days of the macro step before day 1 and a draw of the business cycle's
-phase. That is right for the library's default economy, which would
-otherwise open every run in expansion, and wrong for yours: an economy
-passed in at a VIX of 45 in a contraction opens at 22.28 in an expansion.
-Build with `Engine::with_params_keeping_opening` to keep exactly what you
-pass, and check `engine.opening_settled()` once after construction if you
-want a refactor that swaps the constructor to fail loudly. The burn-in
-arrived with `pt-v18` in 0.7.0; presets before it have none.
+**Choose your opening.** `Engine::new` and `Engine::with_params` run the
+preset's own opening over the economy you pass: on `pt-v21` that is 755
+days of the macro step before day 1, a draw of the business cycle's phase,
+and 504 sessions of market prehistory that set the volatility state. That
+is right for the library's default economy, which would otherwise open
+every run in expansion at age zero, and wrong for yours: on `pt-v20` an
+economy passed in at a VIX of 45 in a contraction opens at 22.28 in an
+expansion. Build
+with `Engine::with_params_keeping_opening` to keep exactly what you pass,
+and check `engine.opening_settled()` once after construction if you want a
+refactor that swaps the constructor to fail loudly. A kept opening runs no
+prehistory, so its volatility state starts at the constructor's baseline
+and its first quarter runs hot. A host whose new market starts on the
+default economy should take the library's opening and read the economy
+back. The burn-in arrived with `pt-v18` in 0.7.0; presets before it have
+none.
+
+**Number your days and tick the session.** Call
+`engine.set_current_day(day)` with the trading day, counted from zero,
+before each `open_market`. Nothing else advances the day, and pt-v21's
+earnings and dividend calendars and its buyback yield read it. Tick only
+the 390 minutes from 09:30 and step the economy once a session, which
+`close_day` does; ticks outside the session add noise the preset was not
+fitted with, and weekend macro steps run the macro calendar fast. A host
+that passes economic shocks closes with `close_day_with_shocks`, which
+keeps the rest of `close_day`.
+
+**Keep splits out of the engine.** The engine has no stock split.
+`set_fundamentals` moves fair value one for one with the earnings it
+writes, so dividing a name's earnings by a split ratio without dividing
+its price cuts its fair value by that ratio. Keep a split factor on your
+side and send the engine earnings in its own units.
 
 **Size buffers from the width constants.** A host that saves state into
 flat arrays takes every width from the crate root: `COMPONENT_COUNT` (12
@@ -130,11 +155,14 @@ the engine gains a slot and under-sizes the buffer. A test pins every
 value, and a change to one is a breaking change with its own CHANGELOG
 line.
 
-**Measure a day change from `prior_closes`.** Each stock's
-`previous_close` is reset at `open_market` to the day's opening price,
-after the overnight gap and after the close re-marks prices to newly
-published macro data. It anchors the session's 25 per cent circuit-breaker
-band and the daily return GARCH reads, so it measures open to now. For a
+**Measure a day change from `prior_closes`.** On a preset without an
+overnight move (`pt-v20` and earlier) each stock's `previous_close` is
+reset at `open_market` to the day's opening price, after the close
+re-marks prices to newly published macro data, so it measures open to now.
+On `pt-v21` it is reset to the price the night started from, after that
+re-mark and before the overnight move. Either way it is the anchor the
+engine reads the day's return from, and not the previous session's last
+print. For a
 close-to-close change use `engine.prior_closes()`, the previous session's
 last print, and `engine.last_closes()` for the session just closed. On
 `pt-v20` the two anchors differ on every name every day, by a median of
@@ -318,17 +346,31 @@ engine.set_rng_state(EngineRngState::from_words(&saved)?);
 # Ok::<(), String>(())
 ```
 
-The words run in stream-id order (`rng::stream`: market, economy, external,
-jumps, volume, news, volume_idio, overnight, market_vol_level,
-crisis_epicentre), five per stream: the LCG state and increment as the raw
-bits of an `f64`, the Box-Muller spare or NaN for none, and the two draw
-counts. The fields are declared with volume_idio before news, so the
-order differs from theirs in those two streams. A host that packed the fields in declaration order
-and switches to `to_words` swaps those two streams in any state it saved
-before the switch, once, when it loads it. The first two words are bit
-patterns and some are NaNs, so move them as bytes: JavaScript may rewrite a
-NaN's bits and JSON has no NaN. A rewritten NaN has an even increment
-word, and `from_words` refuses one.
+The words run in stream-id order, five per stream:
+
+| words | stream | words | stream |
+|---|---|---|---|
+| 0 to 4 | market | 25 to 29 | news |
+| 5 to 9 | economy | 30 to 34 | volume_idio |
+| 10 to 14 | external | 35 to 39 | overnight |
+| 15 to 19 | jumps | 40 to 44 | market_vol_level |
+| 20 to 24 | volume | 45 to 49 | crisis_epicentre |
+
+`EngineRngState::STREAM_NAMES` lists the same order. The struct declares
+its `volume_idio` field before `news`, the reverse of the words, so a host
+that packs the fields as declared puts those two streams in each other's
+slots, and `from_words` restores them swapped without an
+error, because both are valid streams. A host that already saved states
+that way swaps the two blocks once when it loads one. To stay clear of the
+order, save the streams under their names with `to_named_words` and read
+them back with `from_named_words`, which matches by name and refuses an
+unknown, repeated or missing stream.
+
+Each stream is the LCG state and increment as the raw bits of an `f64`,
+the Box-Muller spare or NaN for none, and the two draw counts. The first
+two words are bit patterns and some are NaNs, so move them as bytes:
+JavaScript may rewrite a NaN's bits and JSON has no NaN. A rewritten NaN
+has an even increment word, and `from_words` refuses one.
 
 ## Scope of this crate
 

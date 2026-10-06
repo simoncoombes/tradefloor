@@ -67,9 +67,8 @@
 
 use wasm_bindgen::prelude::*;
 
-use crate::engine::{Engine, SessionBuffer, SessionRequest};
+use crate::engine::{Engine, SessionBuffer};
 use crate::economy::{create_initial_economy_state, create_initial_central_bank_state, InitialEconomyOptions};
-use crate::market::GameTime;
 use crate::market::TickCompany;
 
 /// Read a seed from JavaScript: a Number that is a safe integer, or a BigInt.
@@ -150,37 +149,7 @@ impl Sim {
                -> Result<Sim, JsError> {
         let universe_seed = seed_from_js(&universe_seed, "universe_seed")?;
         let seed = seed_from_js(&seed, "seed")?;
-        if size < 2 {
-            return Err(JsError::new(
-                "a universe needs at least two instruments"));
-        }
-        let params = crate::params::ModelParams::preset(preset).ok_or_else(
-            || JsError::new(&format!(
-                "unknown preset {preset:?}; this build has {:?}",
-                crate::params::ModelParams::preset_names())))?;
-
-        let generated = crate::universe::random_universe(size, universe_seed);
-        let tickers: Vec<String> =
-            generated.iter().map(|g| g.ticker.clone()).collect();
-        let companies: Vec<TickCompany> = generated
-            .iter()
-            .enumerate()
-            .map(|(i, g)| g.to_init().to_tick_company(i))
-            .collect();
-
-        Ok(Sim {
-            inner: Engine::with_params(
-                seed,
-                companies,
-                create_initial_economy_state(&InitialEconomyOptions::default()),
-                create_initial_central_bank_state(0),
-                crate::sectors::keys().iter().map(|s| s.to_string()).collect(),
-                params,
-            ),
-            buffer: SessionBuffer::new(),
-            tickers,
-            day_count: 0,
-        })
+        Sim::build(size, universe_seed, seed, preset).map_err(|e| JsError::new(&e))
     }
 
     /// Roster order, which is contractual: the engine draws in index order,
@@ -217,45 +186,23 @@ impl Sim {
         self.inner.published_vix()
     }
 
-    /// Advance one trading day: open, trade, close, step the macro chain.
+    /// Advance one trading day: number it, open, trade, close, step the
+    /// macro chain.
     ///
-    /// The close is `Engine::close_day` — the same call the Python binding
-    /// makes — so a day here and a day there are the same day.
+    /// The day is the core's numbered day, which calls
+    /// [`Engine::set_current_day`] before the open as the Python binding's
+    /// `run_days` does. The
+    /// close is `Engine::close_day`, the same call the Python binding makes,
+    /// so a day here and a day there are the same day. Through 0.10.x this
+    /// opened the market without numbering the day, so on pt-v21 the
+    /// earnings and dividend calendars never moved off day zero.
     #[wasm_bindgen(js_name = runDay)]
     pub fn run_day(&mut self, ticks: usize) -> Result<(), JsError> {
         if ticks == 0 {
             return Err(JsError::new("ticks must be greater than zero"));
         }
-        self.inner.open_market();
-        self.inner.run_session(
-            &SessionRequest {
-                // The reference's opening bell. `day_of_week: 3` matches the
-                // Python surface's default, so the same (size, seed, days)
-                // is the same market on both.
-                start: GameTime { hour: 9, minute: 30, day_of_week: 3 },
-                ticks,
-                volatility_multiplier: 1.0,
-                news: &[],
-                news_impact_queue: &[],
-                order_volumes: &[],
-                fills: &[],
-                // The close is `Engine::close_day` below, which also steps
-                // the macro chain. Letting the session close would settle
-                // the day without that step.
-                close_at_end: false,
-                // The day is opened above, once. `reopen: true` would reset
-                // the attribution accumulator and re-anchor the daily open
-                // mid-day, which is what agent stepping wants and a
-                // one-session day does not.
-                reopen: false,
-                daily_innovations: &[],
-                sector_base_variances: &[],
-                stop: None,
-            },
-            &mut self.buffer,
-        );
+        self.inner.run_numbered_day(i64::from(self.day_count), ticks, &mut self.buffer);
         self.day_count += 1;
-        self.inner.close_day(i64::from(self.day_count));
         Ok(())
     }
 
@@ -288,4 +235,103 @@ pub fn price_digest(size: usize,
     crate::engine::fixed_simulation_digest(
         size, universe_seed, seed, days, ticks, preset)
         .ok_or_else(|| JsError::new(&format!("unknown preset {preset:?}")))
+}
+
+impl Sim {
+    /// The constructor's work in plain Rust, with the seeds already read, so
+    /// a native test can build a `Sim`: `JsError` and the `JsValue` seeds
+    /// call into JavaScript, which panics off wasm.
+    fn build(size: usize, universe_seed: u64, seed: u64, preset: &str) -> Result<Sim, String> {
+        if size < 2 {
+            return Err("a universe needs at least two instruments".to_string());
+        }
+        let params = crate::params::ModelParams::preset(preset).ok_or_else(|| {
+            format!(
+                "unknown preset {preset:?}; this build has {:?}",
+                crate::params::ModelParams::preset_names()
+            )
+        })?;
+
+        let generated = crate::universe::random_universe(size, universe_seed);
+        let tickers: Vec<String> =
+            generated.iter().map(|g| g.ticker.clone()).collect();
+        let companies: Vec<TickCompany> = generated
+            .iter()
+            .enumerate()
+            .map(|(i, g)| g.to_init().to_tick_company(i))
+            .collect();
+
+        Ok(Sim {
+            inner: Engine::with_params(
+                seed,
+                companies,
+                create_initial_economy_state(&InitialEconomyOptions::default()),
+                create_initial_central_bank_state(0),
+                crate::sectors::keys().iter().map(|s| s.to_string()).collect(),
+                params,
+            ),
+            buffer: SessionBuffer::new(),
+            tickers,
+            day_count: 0,
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A `Sim` numbers its days, so pt-v21's calendars move: through 0.10.x
+    /// it never did, every day was day zero, and a name whose report or
+    /// ex-dividend date fell on it reported or went ex at every session
+    /// while every other name never did.
+    #[test]
+    fn a_sim_numbers_its_days_and_its_calendars_advance() {
+        let mut sim = Sim::build(24, 7, 11, "pt-v21").unwrap();
+        let days = 130usize;
+        let n = sim.tickers().len();
+        let mut reports = vec![0usize; n];
+        let mut report_days = std::collections::BTreeSet::new();
+        let mut ex = vec![0usize; n];
+        let mut ex_days = std::collections::BTreeSet::new();
+        for d in 0..days {
+            sim.run_day(390).unwrap();
+            assert_eq!(sim.day(), d as u32 + 1);
+            assert_eq!(sim.inner.elapsed_days(), d as i64);
+            for (i, m) in sim.inner.earnings_moves().iter().enumerate() {
+                if *m != 0.0 {
+                    reports[i] += 1;
+                    report_days.insert(d);
+                }
+            }
+            for (i, x) in sim.inner.dividends_today().iter().enumerate() {
+                if *x != 0.0 {
+                    ex[i] += 1;
+                    ex_days.insert(d);
+                }
+            }
+        }
+        // Every name reports once a quarter of 63 sessions: two or three
+        // times in 130 sessions, on days spread over the quarter.
+        assert!(reports.iter().all(|&r| (2..=3).contains(&r)), "{reports:?}");
+        assert!(report_days.len() > 10, "{report_days:?}");
+        // A dividend payer goes ex once a quarter as well, never daily.
+        assert!(ex.iter().any(|&k| k > 0), "{ex:?}");
+        assert!(ex.iter().all(|&k| k <= 3), "{ex:?}");
+        assert!(ex_days.len() > 5, "{ex_days:?}");
+    }
+
+    /// The day the core numbers is the one the digest probe numbers, so the
+    /// browser's `Sim` and `priceDigest` run the same loop.
+    #[test]
+    fn a_sim_and_the_digest_run_the_same_days() {
+        let mut sim = Sim::build(12, 7, 3, "pt-v21").unwrap();
+        sim.run_days(3, 65).unwrap();
+        let mut engine = Sim::build(12, 7, 3, "pt-v21").unwrap().inner;
+        let mut buffer = SessionBuffer::new();
+        for day in 0..3 {
+            engine.run_numbered_day(day, 65, &mut buffer);
+        }
+        assert_eq!(sim.inner.state_hash(3, false), engine.state_hash(3, false));
+    }
 }

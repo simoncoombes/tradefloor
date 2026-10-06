@@ -208,21 +208,23 @@ says which release to pin for a long study.
 tradefloor checks its market against real ones with three named sets of
 statistics, listed in
 [docs/STATISTICS.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/STATISTICS.md).
-On pt-v21, the default from 0.10.0, 18 of the 19 statistics of the
-one-year table (volatility, fat tails, how much stocks move together, how far
-the VIX jumps after a fall) are inside the range real markets show over a
-year, on the ruled bands. The one row out is the tail rate, a gap: the
-index falls 3% or more on 0.598% of days on the 30 certification seeds,
-against a range of 0.64 to 2.34, and on 0.98% pooled over 360 seeds. All 14 graded statistics of the two-year panel are inside their
-two-year ranges. The long-run criteria are 40 rows over 21 years, covering
-crash depth, how long fear lasts, bear markets per decade, the 2008 and 2020
-replays, the rate indices and the cost of size in the book. pt-v21 meets all
-40, read on 270 histories.
+On pt-v21, the default from 0.10.0, all 19 statistics of the one-year
+table (volatility, fat tails, how much stocks move together, how far the VIX
+jumps after a fall) are inside the range real markets show over a year, on
+the ruled bands. The index's return and the share of days it falls 3% or
+more are read over 360 seeds, as the long-run criteria read them: the index
+falls 3% or more on 0.98% of days, against a range of 0.64 to 2.34. All 15
+statistics of the two-year panel are inside their two-year ranges. The
+long-run criteria are 40 rows over 21 years, covering crash depth, how long
+fear lasts, bear markets per decade, the 2008 and 2020 replays, the rate
+indices and the cost of size in the book. pt-v21 meets all 40, read on 270
+histories.
 
 Read those claims narrowly:
 
-- The one-year count is a verdict on figures pooled over 30 seeds. One seed's
-  year often misses some of its 14 shape statistics. On seeds 101 to 116, all
+- The one-year count is a verdict on figures pooled over 30 seeds (360 for
+  the index's return and 3% falls). One seed's year often misses some of its
+  14 shape statistics. On seeds 101 to 116, all
   14 were in range on 8 of the 16, and one seed had 11 of 14. If you run one
   market per condition, read `tf.envelope.intervals()` for each statistic's
   spread across seeds.
@@ -329,6 +331,9 @@ sections above:
   writing, scoring and comparing agents
 - [docs/SUPPORT.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/SUPPORT.md):
   which release lines get fixes, and for how long
+- [docs/EMBEDDING.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/EMBEDDING.md):
+  driving the Rust engine from a game or another host, and how much flow
+  of its own the model takes
 
 ## Contributing and support
 
@@ -360,7 +365,7 @@ several presets, and results depend on the preset.
 @software{tradefloor,
   author  = {Coombes, Simon},
   title   = {tradefloor: a deterministic market simulator with a limit order book},
-  version = {0.10.0},
+  version = {0.10.1},
   year    = {2026},
   url     = {https://github.com/simoncoombes/tradefloor},
   note    = {Model preset pt-v21}
@@ -371,7 +376,7 @@ several presets, and results depend on the preset.
 carries the same details, and GitHub's "Cite this repository" button reads
 it.
 
-In the text, say which model you used, for example: "tradefloor 0.10.0,
+In the text, say which model you used, for example: "tradefloor 0.10.1,
 preset pt-v21, specified in its docs/MODEL.md".
 [docs/REPRODUCIBILITY.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/REPRODUCIBILITY.md)
 says how to publish a result so a reader can rerun it, and how to show a

@@ -48,13 +48,56 @@ def test_company_news_at_the_fitted_size_is_inside_and_past_it_is_not() -> None:
     names, sessions = 100, 500
     events = int(fit["company_news_rate"] * names * sessions)
     sigma = fit["company_news_sigma"]
+    # Half up and half down, as the preset's own draws are on average.
+    signs = [1.0 if k % 2 == 0 else -1.0 for k in range(events)]
     assert env.external_flow(sessions=sessions, names=names,
-                             company_news=[sigma] * events)
+                             company_news=[sigma * x for x in signs])
     v = env.external_flow(sessions=sessions, names=names,
-                          company_news=[1.5 * sigma] * events)
+                          company_news=[1.5 * sigma * x for x in signs])
     assert not v
     assert [g.id for g in v.gaps] == ["external-flow"]
     assert "company news" in v.reasons[0]
+
+
+def test_news_that_leans_one_way_is_outside_as_drift() -> None:
+    # The fitted size and rate, every event down: inside on variance, but it
+    # moves fair value by 0.05 x 0.0175 x 252, about 22% a year.
+    fit = env.CALIBRATED_FLOW["pt-v21"]
+    assert fit["news_drift"] == 0.0
+    names, sessions = 100, 500
+    events = int(fit["company_news_rate"] * names * sessions)
+    sigma = fit["company_news_sigma"]
+    v = env.external_flow(sessions=sessions, names=names, preset="pt-v21",
+                          company_news=[-sigma] * events)
+    assert not v
+    assert len(v.reasons) == 2, v.reasons
+    assert "-22.1% a year" in v.reasons[0]
+
+
+def test_a_split_written_as_an_earnings_cut_is_outside_as_drift() -> None:
+    # One 2:1 split a name over two years, the engine's price left whole:
+    # fair value falls by ln 2 over the two years.
+    import math
+    v = env.external_flow(sessions=504, names=108, preset="pt-v21",
+                          fundamental_moves=[-math.log(2.0)] * 108)
+    assert not v
+    text = " ".join(v.reasons)
+    assert "-34.7% a year" in text and "-ln(ratio)" in text
+
+
+def test_ticks_outside_the_session_are_outside() -> None:
+    fit = env.CALIBRATED_FLOW["pt-v21"]
+    assert fit["off_session_ticks_per_session"] == 0.0
+    assert env.external_flow(sessions=100, names=40, preset="pt-v21",
+                             off_session_ticks=300)
+    # A host that ticks from 07:00 to 20:00: 150 pre-market and 240
+    # after-hours ticks a session.
+    v = env.external_flow(sessions=100, names=40, preset="pt-v21",
+                          off_session_ticks=390 * 100)
+    assert not v
+    assert "390 ticks a session outside 09:30 to 16:00" in v.reasons[0]
+    with pytest.raises(tf.ValidationError):
+        env.external_flow(sessions=100, names=40, off_session_ticks=-1)
 
 
 def test_a_measured_host_flow_is_outside_on_every_channel() -> None:
