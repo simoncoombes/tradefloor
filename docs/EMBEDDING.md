@@ -6,8 +6,8 @@ A game or a trading-desk simulator can drive the tradefloor Rust crate's
 right opening, a day loop that matches the library's, and a limit on how
 much news and how many shocks of your own you add. Every preset's
 statistics, and pt-v21's certification, were measured on the library's own
-day loop with no outside input. The figures here show what a host's
-choices move, and by how much.
+day loop with no outside input. The tables below show how much a host's
+choices move them.
 
 The figures below were measured on pt-v21, over 20 seeds and 504 sessions,
 on a 108-name roster of nine names a sector (one mega cap, two large, three
