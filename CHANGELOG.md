@@ -33,6 +33,22 @@ saves 21 of them and the cache most of the rest.
 - `tests/test_stationary_opening.py` holds the prehistory off, since it
   reads only the opening's phase, age and draws.
 
+### The two-year panel grades 15 of 15
+
+- `corr_persistence_acf1` has a two-year band, -0.38 to 0.88, and the
+  two-year panel grades all 15 of its statistics. The band uses the same 16
+  real two-year windows and the same rule as the other shape rows, and
+  each window is read with `facts.panel_statistics`, the function that
+  reads a simulated run. `tools/calibration/corr_persistence_504_band.py`
+  rebuilds the windows from the tape and reproduces the recorded readings.
+- `facts.REAL_MARKETS_RULED_504` now carries the row, and
+  `facts.RULED_UNREADABLE[504]` holds only `vix_ar1_debiased`.
+- Every preset reads inside the band, from 0.13 (pt-v2) to 0.41 (pt-v19);
+  pt-v21 reads 0.341 and pt-v20 0.278. The committed records' 504 counts
+  are re-graded from their own panels and each gains one: pt-v21, pt-v20
+  and pt-v19 read 15 of 15. Nothing was re-measured, and no trajectory or
+  digest moves.
+
 ## 0.10.0
 
 pt-v21 is the default model. It is pt-v20 with 104 dials moved. pt-v20

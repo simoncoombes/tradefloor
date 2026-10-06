@@ -18,14 +18,16 @@ band is the same defect as an unreproducible figure, one level up.
 ## The headline
 
 **At 252 days pt-v21, the default preset from 0.10.0, holds all fourteen shape
-statistics in band on the ruled bands `envelope.score` grades with, and at
-504 days all thirteen the ruled 504-day table can read**
-(`corr_persistence_acf1` is unreadable there). Of the one-year table's four
-index rows it misses one: `index_tail_dn3_pct` reads 0.598 percent of days
-on the thirty certification seeds against a ruled band of 0.64 to 2.34, and
-0.98 pooled over 360 seeds, so the table is 18 of 19 on the ruled bands. On
-the 2015-2025 decade bands of `REAL_MARKETS` every shape row is in at 252
-days, and at 504 days `excess_kurtosis` is out, 6.64 against a floor of 7.1.
+statistics in band on the ruled bands `envelope.score` grades with, and all
+fourteen at 504 days.** `corr_persistence_acf1` reads 0.3411 at 504 days
+against a ruled band of -0.38 to 0.88; that row was unreadable at 504 until
+2026-10-06, when its two-year band was carried into the ruled table. Of the
+one-year table's four index rows it misses one: `index_tail_dn3_pct` reads
+0.598 percent of days on the thirty certification seeds against a ruled band
+of 0.64 to 2.34, and 0.98 pooled over 360 seeds, so the table is 18 of 19 on
+the ruled bands. On the 2015-2025 decade bands of `REAL_MARKETS` every shape
+row is in at 252 days, and at 504 days `excess_kurtosis` is out, 6.64 against
+a floor of 7.1.
 The structural row `vix_ar1_debiased` is a gap: 0.956 against the tape's
 0.930, refused at 252 days and on held-out seeds.
 The committed record `python/tradefloor/presets/pt-v21.json` is what says so
@@ -1977,6 +1979,13 @@ REAL_MARKETS_WINDOWS_504 = {
 #: four-window band for this row at this horizon. Reading it out of
 #: `REAL_MARKETS_WINDOWS_504` would take a dispersion across six windows of a
 #: quantity measured on five.
+#:
+#: The construction is the panel's own, MEASURED 2026-10-06:
+#: `tools/calibration/corr_persistence_504_band.py` reads the forty names on
+#: `REAL_MARKETS_WINDOWS_504`'s six windows with `panel_statistics` and
+#: reproduces all five readings below to 1e-6. What differs is the window
+#: set: the sixth window, 2013-07-16..2015-07-16, reads -0.178 and is not
+#: here.
 REAL_PERSISTENCE_WINDOWS_504 = {
     "windows": (
         "2015-07-17..2017-07-18", "2017-07-19..2019-07-22",
@@ -5144,14 +5153,21 @@ REAL_MARKETS_UNIVERSAL_ADJUSTMENTS: dict[int, _Adjustments] = {
 #: 4.8 per cent rejection against a designed 6.5; and this band still TAKES
 #: count away from four presets the decade band passed.
 #:
-#: Four rows carry a caveat and `BAND_BASIS` states each one:
+#: Three rows carry a caveat and `BAND_BASIS` states each one:
 #: `excess_kurtosis`'s floor of -13.0 is below the theoretical minimum of -2
-#: and the row is roster-limited rather than era-limited;
-#: `corr_persistence_acf1` at 504 is on a protocol the 32-name pull does not
-#: reproduce; `abs_return_acf5` replaces a band whose window set no file
-#: holds; and the five level rows have NO universal band at either horizon,
-#: because the 32-name panel carries equities and four of the five are read
-#: off ^VIX, ^GSPC and RSP.
+#: and the row is roster-limited rather than era-limited; `abs_return_acf5`
+#: replaces a band whose window set no file holds; and the five level rows
+#: have NO universal band at either horizon, because the 32-name panel
+#: carries equities and four of the five are read off ^VIX, ^GSPC and RSP.
+#:
+#: `corr_persistence_acf1` at 504 carried a fourth caveat until 2026-10-06:
+#: that its readings were on a protocol the decade table's were not.
+#: MEASURED, they are not. `tools/calibration/corr_persistence_504_band.py`
+#: reads the forty names on the walked 505-close windows with
+#: `panel_statistics` and reproduces `REAL_PERSISTENCE_WINDOWS_504` to 1e-6
+#: on all five of its windows; the decade table starts one window later, and
+#: the window it leaves out, 2013-07..2015-07, reads -0.178. That gap, and
+#: not a protocol, is the 0.2656 against 0.3112 the caveat was built on.
 REAL_MARKETS_UNIVERSAL: dict[str, tuple[float, float]] = {
     "annualised_vol_pct": (12.0, 41.0),
     "excess_kurtosis": (-13.0, 24.0),
@@ -5253,10 +5269,11 @@ BAND_BASIS: dict[str, dict[str, Any]] = {
         "rows": 14,
         "adjustments": "none, the same as REAL_MARKETS_ADJUSTMENTS_504",
         "note": "admits 64 of 65 forty-name real year-rows. "
-                "corr_persistence_acf1 is carried here on the walked "
-                "six-window protocol and NOT on the shipped sub-window one, "
-                "so its universal band is a band for a different quantity "
-                "until the row's definition at 504 is settled",
+                "corr_persistence_acf1's readings are the simulated side's "
+                "estimator, facts.panel_statistics, on the same 19 windows "
+                "as the other thirteen rows; "
+                "tools/calibration/corr_persistence_504_band.py reproduces "
+                "all fourteen rows from the tape to 5.8e-5",
     },
 }
 
@@ -5809,17 +5826,25 @@ REAL_MARKETS_RULED: dict[str, tuple[float, float]] = dict(
 REAL_MARKETS_RULED[CRISIS_DISPERSION_ROW] = (
     RULED_CRISIS_DISPERSION_BAND[CERTIFIED_HORIZON_DAYS])
 
-#: The composed ruled band at 504 bars. `corr_persistence_acf1` is HELD OUT
-#: here and not carried: `BAND_BASIS` records that its universal 504 band
-#: is on the walked six-window protocol and not the shipped sub-window one,
-#: so it is a band for a different quantity until the row-definition ruling
-#: is made. A row graded against a band for a different quantity is the
-#: defect this whole block exists to end, so the row is absent and
-#: `RULED_UNREADABLE` says why.
-REAL_MARKETS_RULED_504: dict[str, tuple[float, float]] = {
-    key: band for key, band in REAL_MARKETS_UNIVERSAL_504.items()
-    if key != "corr_persistence_acf1"
-}
+#: The composed ruled band at 504 bars: the fourteen shape rows on the
+#: universal table, plus the five off-panel rows below.
+#:
+#: `corr_persistence_acf1` was HELD OUT of this table until 2026-10-06, on
+#: the ground that its universal readings were on a different window
+#: protocol from the decade table's and so described a different quantity.
+#: MEASURED, `tools/calibration/corr_persistence_504_band.py`
+#: (`tools/calibration/results/corr-persistence-504-band-2026-10-06.json`):
+#: its 19 readings are `panel_statistics`, the function `measure` runs on a
+#: simulated run, on the same walked 505-close windows as the other thirteen
+#: shape rows, and a fresh pull reproduces them to 1.3e-5. Its band is the
+#: same rule at the same t(16): (-0.38, 0.88), unrounded (-0.3788, 0.8764).
+#: The one difference from the simulated side is every shape row's: a
+#: 504-session run has 503 returns and a tape window 504, which for this row
+#: is 23 sub-windows against 24. Cutting the tape windows to 504 closes
+#: gives (-0.42, 0.90) with the sub-window boundaries kept and (-0.37, 0.93)
+#: with them moved by a session.
+REAL_MARKETS_RULED_504: dict[str, tuple[float, float]] = dict(
+    REAL_MARKETS_UNIVERSAL_504)
 REAL_MARKETS_RULED_504["index_drift_pct"] = RULED_DRIFT_BAND
 REAL_MARKETS_RULED_504["index_tail_dn3_pct"] = RULED_TAIL_BAND
 REAL_MARKETS_RULED_504["fear_gauge_dn1"] = RULED_FEAR_DN1_BAND[504]
@@ -5852,30 +5877,19 @@ RULED_UNREADABLE: dict[int, dict[str, str]] = {
             "tables yet. NO BAND IS INVENTED HERE AND NONE IS READ: until "
             "the table entry lands, the row is ungraded",
     },
+    # `corr_persistence_acf1` was held here until 2026-10-06 on two
+    # grounds, open item corr-persistence-504-unbanded. The first, that its
+    # universal band was on a different window protocol, was MEASURED false:
+    # see `REAL_MARKETS_RULED_504`. The second was that the band's floor is
+    # negative, -0.38, on a row whose question is whether persistence is
+    # positive. That floor is the tape's: three of the sixteen non-crisis
+    # two-year windows read below zero (-0.264 in 1989-91, -0.342 in
+    # 2003-05, -0.111 in 2013-15), and the one-year band of the same row
+    # has a floor of -0.48. Whether the model's persistence is present at
+    # all is the mechanism gate's question (`NULLS`, `mechanism_verdict`),
+    # not the band's, as it is for the four other rows whose band admits
+    # the null reading.
     504: {
-        "corr_persistence_acf1":
-            "TWO independent grounds, either of which alone holds this row "
-            "out. First, the universal 504 band is carried on the walked "
-            "six-window protocol and not the shipped sub-window one, so it "
-            "is a band for a different quantity. Second, and the stronger: "
-            "its floor would go NEGATIVE at -0.38 on a statistic whose "
-            "whole question is whether persistence is positive, and the "
-            "band is 1.260 wide against the decade band's 0.300, a factor "
-            "of 4.2. A floor below zero is also one no reading on the "
-            "record comes near, and that is an EMPIRICAL statement: an "
-            "autocorrelation is bounded in [-1, 1], so -0.38 "
-            "is attainable in principle and the floor is NOT dead the way "
-            "vix_ar1_debiased's ceiling is dead, where debias_ar1's own "
-            "bound of 1 + 4/n puts the ceiling out of reach by arithmetic. "
-            # The top of the range read 0.32927 (pt-v19 at 504) until the
-            # fifth composition moved pt-v19's record on 2026-09-23.
-            "MEASURED over all 36 committed preset record cells the "
-            "readings run -0.00039 (pt-v2 at 252) to 0.40881 (pt-v19 at "
-            "504), and the lowest clears -0.38 by 0.3796. So switching "
-            "this row's constant would not make any preset on the record "
-            "pass. The FIRST ground above holds on its own. Open item "
-            "corr-persistence-504-unbanded: the row stays unbanded at 504 "
-            "until its definition at that horizon is settled",
         VIX_AR1_ROW: AS_AT_252,
     },
 }
@@ -6087,7 +6101,7 @@ BAND_BASIS["facts.REAL_MARKETS_RULED"] = {
 }
 
 BAND_BASIS["facts.REAL_MARKETS_RULED_504"] = {
-    "era": "1987-06..2025-07 on the thirteen shape rows carried, 1928-2025 "
+    "era": "1987-06..2025-07 on the fourteen shape rows, 1928-2025 "
            "on index_drift_pct and index_tail_dn3_pct, 1990-01..2025-07 on "
            "fear_gauge_dn1 and on crisis_sector_dispersion, "
            "1990-01..2026-09 on fear_gauge_dn3",
@@ -6132,9 +6146,11 @@ BAND_BASIS["facts.REAL_MARKETS_RULED_504"] = {
     "adjustments": "none on the shape rows, the same as "
                    "REAL_MARKETS_ADJUSTMENTS_504",
     "unreadable": sorted(RULED_UNREADABLE[504]),
-    "note": "corr_persistence_acf1 is HELD OUT here rather than carried: "
-            "its universal 504 band is on the walked six-window protocol "
-            "and not the shipped sub-window one",
+    "note": "the composed band each row is graded against under "
+            "ruling-longest-tape-per-row. corr_persistence_acf1 is carried "
+            "since 2026-10-06, its readings measured on the same windows "
+            "and with the same estimator as the simulated side "
+            "(tools/calibration/corr_persistence_504_band.py)",
 }
 
 register_ruler_table(REAL_MARKETS_RULED, CERTIFIED_HORIZON_DAYS,

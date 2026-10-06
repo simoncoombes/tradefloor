@@ -213,7 +213,7 @@ one-year table (volatility, fat tails, how much stocks move together, how far
 the VIX jumps after a fall) are inside the range real markets show over a
 year, on the ruled bands. The one row out is the tail rate, a gap: the
 index falls 3% or more on 0.598% of days on the 30 certification seeds,
-against a range of 0.64 to 2.34, and on 0.98% pooled over 360 seeds. All 14 graded statistics of the two-year panel are inside their
+against a range of 0.64 to 2.34, and on 0.98% pooled over 360 seeds. All 15 statistics of the two-year panel are inside their
 two-year ranges. The long-run criteria are 40 rows over 21 years, covering
 crash depth, how long fear lasts, bear markets per decade, the 2008 and 2020
 replays, the rate indices and the cost of size in the book. pt-v21 meets all

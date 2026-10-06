@@ -290,13 +290,14 @@
       },
       "bands_504": "facts.REAL_MARKETS_RULED_504",
       "bands_504_basis": {
-        "era": "1987-06..2025-07 on the thirteen shape rows carried, 1928-2025 on index_drift_pct and index_tail_dn3_pct",
-        "roster": "32 of the certified forty on the shape rows; ^GSPC and RSP on the two whole-record rows",
+        "era": "1987-06..2025-07 on the fourteen shape rows, 1928-2025 on index_drift_pct and index_tail_dn3_pct, 1990-01..2025-07 on fear_gauge_dn1 and on crisis_sector_dispersion, 1990-01..2026-09 on fear_gauge_dn3",
+        "roster": "32 of the certified forty on the shape rows; ^GSPC and RSP on the two whole-record rows; ^VIX against ^GSPC on the two fear rows",
         "n_windows": 16,
         "rule": "fixed",
         "tolerance": 0.06486,
-        "rows": 15
+        "rows": 19
       },
+      "bands_504_regraded": "2026-10-06: the 504 counts (in_band, misses, unreadable) were re-graded from this record's own panel_504 against facts.REAL_MARKETS_RULED_504, which gained corr_persistence_acf1's two-year band that day (tools/calibration/corr_persistence_504_band.py). Nothing was re-measured; bands_504_basis is the table they were re-graded on",
       "band_basis": "ruled",
       "index_tail_not_measured": "index_tail_dn3_pct is NOT measured by this tool. It is certified on facts.LEVEL_PROTOCOL, where the roster varies with the seed, and this tool holds Universe.random(40, seed=111); the two protocols differ by 13.4 percent on pt-v16 (1.2749 varying against 1.124 held). A held-roster figure under this row's name would be compared with the certified one, so none is emitted. What would fill it: a level-protocol arm in this tool, which is a box job and a Phase 1 follow-on rather than part of the row's own branch.",
       "crisis_lever": "annualised vol at held VIX 65 over held VIX 5, certified roster, 252 days, thirty seeds, after 252 discarded sessions at the pin. The burn repairs the eighth measurement defect logged in the project's unpublished design notes. Without it each pin's window averages the factor variance's walk toward the pinned target, the two pins walk in opposite directions, and the ratio reads 4 to 8 per cent low by an amount that is a property of the preset",
@@ -1225,7 +1226,7 @@
   },
   "in_band": {
     "252": 13,
-    "504": 12,
+    "504": 13,
     "heldout_universe": 13,
     "heldout_seeds": 13
   },
@@ -1245,9 +1246,7 @@
   },
   "unreadable": {
     "252": [],
-    "504": [
-      "corr_persistence_acf1"
-    ],
+    "504": [],
     "heldout_universe": [],
     "heldout_seeds": []
   },

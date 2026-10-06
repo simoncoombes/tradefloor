@@ -1761,7 +1761,7 @@ impl Engine {
     /// Since 0.10.0 this is [`PT_V21`]: pt-v20 with 104 dials moved, each
     /// inert on every earlier preset (see [`crate::params::ModelParams::pt_v21`]).
     /// It holds all fifteen rows of the fixed-roster panel at 252 days,
-    /// fourteen of fourteen at 504, fifteen on both held-out axes, and all
+    /// fifteen of fifteen at 504, fifteen on both held-out axes, and all
     /// 40 long-run criteria, read on 270 histories
     /// (`validation/pt-v21/programme/ptv21-registration-18.md`). Volatility
     /// clustering at lag 1 reads 0.095 against a real median of 0.103. Its
@@ -1775,7 +1775,7 @@ impl Engine {
     /// model price, a closing cross, the stock- and sector-specific part of
     /// every shock in fair value, the agent-facing book on, the curve dials
     /// and the aggregate earnings cycle. It holds all fifteen rows of the
-    /// fixed-roster panel at 252 days, fourteen of fourteen at 504, fifteen
+    /// fixed-roster panel at 252 days, fifteen of fifteen at 504, fifteen
     /// on both held-out axes, and all 28 long-run criteria registered for
     /// it (`validation/pt-v20/programme/ptv20-registration.md`). It reads further
     /// from real on two rows: the crisis lever is 3.60x against a real

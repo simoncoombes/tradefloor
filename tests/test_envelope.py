@@ -288,11 +288,14 @@ def test_a_measured_mix_is_still_refused_where_the_measurement_stops(mix):
     assert refused(horizon_days=252)
     # Nothing was measured past 504 days.
     assert refused(horizon_days=505, statistics=["return_acf1"])
-    # corr_persistence_acf1 has no ruled band at 504, so it is held at 252
-    # only.
+    # corr_persistence_acf1 has had a ruled band at 504 since 2026-10-06
+    # and every mix held it there, so the grant covers it at both horizons
+    # and stops at 505 like every other shape row.
     assert not refused(horizon_days=252,
                        statistics=["corr_persistence_acf1"])
-    assert refused(horizon_days=253, statistics=["corr_persistence_acf1"])
+    assert not refused(horizon_days=504,
+                       statistics=["corr_persistence_acf1"])
+    assert refused(horizon_days=505, statistics=["corr_persistence_acf1"])
 
 
 def test_sector_excess_corr_is_refused_on_an_all_technology_roster():

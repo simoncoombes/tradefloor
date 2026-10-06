@@ -322,11 +322,12 @@ def build(name: str, panel: dict, values: dict[str, float]) -> dict:
             "heldout_seeds": p["misses_heldout_seeds"],
         },
         # THE DENOMINATOR, WHICH `in_band` ABOVE DOES NOT CARRY. A basis does
-        # not band every row: `facts.REAL_MARKETS_RULED_504` holds thirteen of
-        # the fourteen, because `corr_persistence_acf1` is held out of the
-        # ruled band at 504. So pt-v19 under that basis reads 14 at 252 and 13
-        # at 504 with NO miss at either -- 13 of 13, not 13 of 14 -- and a
-        # bare 13 beside a bare 14 in the same dict reads as one short.
+        # not band every row: until 2026-10-06 `facts.REAL_MARKETS_RULED_504`
+        # held thirteen of the fourteen shape rows, because
+        # `corr_persistence_acf1` was held out of the ruled band at 504. So
+        # pt-v19 under that basis read 14 at 252 and 13 at 504 with NO miss
+        # at either -- 13 of 13, not 13 of 14 -- and a bare 13 beside a bare
+        # 14 in the same dict reads as one short.
         # `preset_panel._count_in_band` names the rows it could not read and
         # this is where they reach the record; without it the count cannot be
         # told from a failure. Additive, so schema 1 stays 1.

@@ -60,8 +60,8 @@ one.
 
 ### The two-year panel
 
-The two-year panel is the fixed-roster panel run for 504 days. Fourteen
-of its 15 statistics have a two-year range, and pt-v21 has all 14 inside.
+The two-year panel is the fixed-roster panel run for 504 days. All 15 of
+its statistics have a two-year range, and pt-v21 has all 15 inside.
 
 ### The long-run criteria
 

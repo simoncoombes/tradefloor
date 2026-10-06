@@ -88,8 +88,9 @@ PRESET = "pt-v21"
 #: outside it on the 2015-2025 decade bands (`BANDS_504`):
 #: `excess_kurtosis`, 6.6373 against a floor of 7.1 (pt-v19:
 #: `sector_excess_corr`, 0.0906 against a floor of 0.11). On the ruled
-#: bands `score` grades with by default, no row is out at 504 days and
-#: `corr_persistence_acf1` is unreadable there.
+#: bands `score` grades with by default, no row is out at 504 days.
+#: `corr_persistence_acf1` was unreadable there until 2026-10-06 and reads
+#: 0.3411 against -0.38 to 0.88.
 #:
 #: The old reason -- that the thinnest 504-day row cleared its ceiling by
 #: only 0.11 -- no longer applies: `annualised_vol_pct` read 33.89 under
@@ -930,22 +931,20 @@ def _shape_rows(*without: str) -> tuple[str, ...]:
 
 
 #: The shape rows each mix held in band on the ruled bands, per horizon.
-#: Every row the bands could grade was in band for every mix. Two rows are
-#: left out where the measurement could not grade them.
-#: `corr_persistence_acf1` has no ruled band at 504 days, for the balanced
-#: roster too. `sector_excess_corr` is undefined on an all-technology
-#: roster: it asks how far a name moves with its own industry beyond the
-#: market, and with one sector the two are the same.
+#: Every row the bands could grade was in band for every mix. One row is
+#: left out where the measurement could not grade it: `sector_excess_corr`
+#: is undefined on an all-technology roster, because it asks how far a name
+#: moves with its own industry beyond the market, and with one sector the
+#: two are the same. `corr_persistence_acf1` was left out at 504 days too
+#: until 2026-10-06, when the ruled table gained its two-year band; the
+#: four mixes of the pt-v19 run read 0.3427 to 0.4287 there, against a band
+#: of -0.38 to 0.88.
 ROSTER_SHAPE_ROWS: dict[str, dict[int, tuple[str, ...]]] = {
-    "sp500_like": {252: _shape_rows(),
-                   504: _shape_rows("corr_persistence_acf1")},
-    "tech_heavy": {252: _shape_rows(),
-                   504: _shape_rows("corr_persistence_acf1")},
+    "sp500_like": {252: _shape_rows(), 504: _shape_rows()},
+    "tech_heavy": {252: _shape_rows(), 504: _shape_rows()},
     "all_technology": {252: _shape_rows("sector_excess_corr"),
-                       504: _shape_rows("sector_excess_corr",
-                                        "corr_persistence_acf1")},
-    "defensive": {252: _shape_rows(),
-                  504: _shape_rows("corr_persistence_acf1")},
+                       504: _shape_rows("sector_excess_corr")},
+    "defensive": {252: _shape_rows(), 504: _shape_rows()},
 }
 
 #: `index_drift_pct` on the held roster, the median over the thirty seeds
@@ -1051,9 +1050,8 @@ GAPS: tuple[Gap, ...] = (
         summary="the certified horizon is 252 days",
         detail=(
             "Against bands re-derived at the matching window, the shipped "
-            "pt-v21 holds all thirteen readable rows at 504 days on the "
-            "ruled band. corr_persistence_acf1 has no ruled "
-            "band there.\n\n"
+            "pt-v21 holds all fourteen shape rows at 504 days on the "
+            "ruled band.\n\n"
             "The certified horizon stays at 252 days because CERTIFIED, the "
             "table this module certifies, is measured at 252 days on thirty "
             "seeds. The 504-day table is measured and not certified. "
@@ -1065,10 +1063,10 @@ GAPS: tuple[Gap, ...] = (
             "decay-shape gap carries it.\n\n"
             "The longer horizons are measured on pt-v21. "
             "tools/calibration/long_horizon.py runs 756, 1260 and 2520 days "
-            "on thirty seeds. At every one of them the panel holds all 13 "
-            "shape rows the ruled 504-day bands can grade, and all 14 on the "
-            "2015-2025 504-day bands. Both rulers are 504-day bands, quoted at ten years only because "
-            "no ten-year bands have been derived. "
+            "on thirty seeds. At every one of them the panel holds all 14 "
+            "shape rows on the ruled 504-day bands and on the 2015-2025 "
+            "504-day bands. Both rulers are 504-day bands, quoted at ten "
+            "years only because no ten-year bands have been derived. "
             "tools/calibration/memory_vs_drift.py reads annualised "
             "volatility year by year over ten years on twenty seeds, and "
             "needs no band: on pt-v21 18.3, 19.1, 20.1, 19.1, 19.2, 19.9, "
@@ -1315,14 +1313,12 @@ GAPS: tuple[Gap, ...] = (
             "mix's shape rows in band and its cross-sectional correlation:"
             "\n\n"
             "                      252d     504d   xs corr 252d / 504d\n"
-            "  balanced           14/14    13/13   0.3063 / 0.2966\n"
-            "  S&P-like           14/14    13/13   0.3085 / 0.3008\n"
-            "  technology-heavy   14/14    13/13   0.3208 / 0.3164\n"
-            "  all-technology     13/13    12/12   0.3751 / 0.3933\n"
-            "  defensive          14/14    13/13   0.3172 / 0.3212\n\n"
-            "The 504-day counts are over thirteen rows because "
-            "corr_persistence_acf1 has no ruled band there. The "
-            "all-technology counts are one lower again because "
+            "  balanced           14/14    14/14   0.3063 / 0.2966\n"
+            "  S&P-like           14/14    14/14   0.3085 / 0.3008\n"
+            "  technology-heavy   14/14    14/14   0.3208 / 0.3164\n"
+            "  all-technology     13/13    13/13   0.3751 / 0.3933\n"
+            "  defensive          14/14    14/14   0.3172 / 0.3212\n\n"
+            "The all-technology counts are one lower because "
             "sector_excess_corr is undefined with one sector: it asks how "
             "far a name moves with its own industry beyond the market, and "
             "with one sector the two are the same. On the 2015-2025 decade "
@@ -1362,9 +1358,8 @@ GAPS: tuple[Gap, ...] = (
             "concentrated mixes at 252 days on pt-v19, against a ruled band "
             "of 1.1 to 10.3 (`ROSTER_INDEX_DRIFT`); on pt-v21 the same "
             "roster reads 10.10 balanced and 6.40 to 9.64 for the mixes. sector_excess_corr on an "
-            "all-technology roster and corr_persistence_acf1 past 252 days "
-            "were not graded, for the reasons above. Neither run went past "
-            "504 days."
+            "all-technology roster was not graded, for the reason above. "
+            "Neither run went past 504 days."
         ),
         forbids=(
             "citing the certification for a concentrated roster on a level "
@@ -1701,10 +1696,6 @@ def _roster_refusal(shape: str | None, horizon_days: int,
                 "sector_excess_corr is undefined on an all-technology "
                 "roster: it asks how far a name moves with its own industry "
                 "beyond the market, and with one sector the two are the same")
-        elif k == "corr_persistence_acf1" and h > 252:
-            why.append(
-                f"corr_persistence_acf1 has no ruled band at {h} days, so "
-                f"the measurement could not grade it past 252")
         else:
             why.append(f"The {shape} mix is not recorded as holding {k} at "
                        f"{h} days (ROSTER_SHAPE_ROWS)")
@@ -2152,9 +2143,9 @@ def check(
             f"the certification does not cover it. At 504 days the model "
             f"{held_ruled}.{decade}{nearest} Beyond 504 days the panel is "
             f"measured but "
-            f"has no ruler of its own: at 2520 days pt-v21 holds all 13 "
-            f"shape rows the ruled 504-day bands can grade and all 14 on "
-            f"the decade bands (tools/calibration/long_horizon.py), and its "
+            f"has no ruler of its own: at 2520 days pt-v21 holds all 14 "
+            f"shape rows on the ruled 504-day bands and on the decade bands "
+            f"(tools/calibration/long_horizon.py), and its "
             f"annualised volatility wanders between 18.2% and 20.1% from "
             f"year to year, ending 1 per cent below year one "
             f"(tools/calibration/memory_vs_drift.py). No bands have been "
