@@ -12,6 +12,14 @@ library's own suite runs in 16 minutes on an Apple M5,
 against 87 before: one test file that no longer plays the prehistory
 saves 21 of them and the cache most of the rest.
 
+The browser `Sim` numbers its days. Through 0.10.x every day of a `Sim`
+was day 0, so on pt-v21 its earnings and dividend calendars never moved
+and on pt-v18 onward its buyback yield never accrued. A `Sim` on those
+presets now runs the market the Python package's `run_days` runs. The
+fixed-simulation probe (`priceDigest`, `_core.fixed_simulation_digest`)
+runs the same days, and its pt-v19 case moved. Every other known-answer
+digest is unchanged.
+
 <!-- release-note-ends -->
 
 ### Faster builds
@@ -32,6 +40,25 @@ saves 21 of them and the cache most of the rest.
   engine that plays no opening, as the restore replaces the whole state.
 - `tests/test_stationary_opening.py` holds the prehistory off, since it
   reads only the opening's phase, age and draws.
+
+### The browser `Sim` numbers its days
+
+- `Sim::run_day` runs a day loop in the core that calls
+  `Engine::set_current_day` before the open, then the session and
+  `close_day`, as `run_days` does. Through 0.10.x it opened the market
+  without numbering the day, so the valuation's clock stayed at 0. On a
+  `Sim` on pt-v21 no name reported earnings unless its report fell on day
+  0, in which case it reported at every session, and the same held for
+  ex-dividend dates. On pt-v18 to pt-v20 the buyback yield now accrues.
+  Presets before pt-v18 read no day and are unchanged.
+- `fixed_simulation_digest` runs the same day. Its pt-v3 case
+  (`1c5acabf...`) is unchanged, and its pt-v19 case on 64-bit seeds moved
+  from `415ebce7...` to `cd73cf3a...`, measured identical on macos-arm64
+  native and on wasm32 through node. `tests/test_wasm_parity.py` records
+  them under `FIXED_SIMULATION_KAT_VERSION` 2 with a note, and
+  `tools/wasm/check.mjs` pins the same values. `tests/known_answer.json`
+  and the other known-answer files run through the Python package, which
+  always numbered its days, and none of them moved.
 
 ## 0.10.0
 

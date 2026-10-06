@@ -9790,6 +9790,26 @@ impl Engine {
         self.nominal_output_base = base;
     }
 
+    /// One day of the library's own loop, numbered: the trading day `day`,
+    /// counted from zero, as one session of `ticks` minutes from 09:30, then
+    /// the close and the macro step into `day + 1`. It is
+    /// [`Engine::set_current_day`], [`Engine::open_market`],
+    /// [`Engine::run_session`] and [`Engine::close_day`] in that order, the
+    /// loop the Python package's `run_days` runs, and what the WebAssembly
+    /// `Sim` and [`fixed_simulation_digest`] call, so neither numbers its
+    /// days differently from the other.
+    pub(crate) fn run_numbered_day(&mut self, day: i64, ticks: usize, buffer: &mut SessionBuffer) {
+        self.set_current_day(day);
+        self.open_market();
+        // `reopen: false`, since the day is opened above, once, and
+        // `close_at_end: false`, since `close_day` below settles the day and
+        // steps the macro chain; a session that closed itself would settle
+        // the day without that step. `day_of_week: 3` is the Python
+        // surface's default.
+        self.run_session(&SessionRequest::new(crate::market::GameTime::new(9, 30, 3), ticks), buffer);
+        self.close_day(day + 1);
+    }
+
     /// Close the trading day and step the economy to the next one.
     ///
     /// This settles the day the ticks just traded: it feeds each name's
@@ -12751,6 +12771,14 @@ impl SessionBuffer {
 /// precision and sits downstream of the whole day chain, so it is the part
 /// of this probe that can see a low-bit difference.
 ///
+/// Each day runs the core's numbered day, the loop the WebAssembly `Sim`
+/// runs: [`Engine::set_current_day`] with the day counted from zero,
+/// [`Engine::open_market`], one session and [`Engine::close_day`]. Through
+/// 0.10.x
+/// the days were not numbered, so on a preset that reads the day (the
+/// buyback yield from pt-v18, the earnings and dividend calendars on pt-v21)
+/// a run of more than one day hashes differently from those releases.
+///
 /// Returns `None` for an unknown preset.
 pub fn fixed_simulation_digest(
     size: usize,
@@ -12779,26 +12807,8 @@ pub fn fixed_simulation_digest(
         params,
     );
     let mut buffer = SessionBuffer::new();
-    for day in 1..=days {
-        engine.open_market();
-        engine.run_session(
-            &SessionRequest {
-                start: crate::market::GameTime::new(9, 30, 3),
-                ticks,
-                volatility_multiplier: 1.0,
-                news: &[],
-                news_impact_queue: &[],
-                order_volumes: &[],
-                fills: &[],
-                close_at_end: false,
-                reopen: false,
-                daily_innovations: &[],
-                sector_base_variances: &[],
-                stop: None,
-            },
-            &mut buffer,
-        );
-        engine.close_day(day as i64);
+    for day in 0..days {
+        engine.run_numbered_day(day as i64, ticks, &mut buffer);
     }
 
     // NaN IS THE ONE PLACE WEBASSEMBLY IS LOOSE.
