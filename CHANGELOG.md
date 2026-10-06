@@ -1,3 +1,192 @@
+## Unreleased
+
+A library and documentation release with no coefficient or default
+changes. The browser `Sim` now numbers its days, so a `Sim` on pt-v18 or
+later runs a different market, and one fixed-simulation probe case moves.
+Every other known-answer digest is 0.10.0's.
+
+A repeated pt-v21 build is a copy of the first. `Engine` keeps the last 16
+engines whose build played the market prehistory and serves a later build
+from the same seed, universe and model in about 0.2 milliseconds, the same
+engine to the bit.
+
+docs/EMBEDDING.md is a new guide for a program that drives the Rust engine
+itself: how to open a market, the day loop the certification ran, how much
+news and how many shocks of its own the model takes, and which statistics
+stay calibrated where. A browser game's loop, rebuilt from its source, read
+index volatility of 19.5% a year and a 19.9% fall over two years on
+pt-v21, and 14.2% and a 21.3% rise once fixed.
+
+Through 0.10.x every day of a `Sim` was day 0, so on pt-v21 its earnings
+and dividend calendars never moved. A `Sim` now runs the days `run_days`
+runs, and so does the fixed-simulation probe, whose pt-v19 case moved.
+
+Two realism readings change. The two-year panel grades all 15 of its
+statistics, with a new band for how long high correlation lasts. The
+one-year table reads the index's return and its 3% falls over 360 seeds,
+as the long-run criteria do, and pt-v21 reads 19 of 19.
+
+<!-- release-note-ends -->
+
+### Faster builds
+
+- Building a pt-v21 engine plays 504 sessions of market prehistory, about
+  1.5 seconds over 20 names. A build served from the opening cache plays
+  none. The library's own suite runs in 16 minutes on an Apple M5, against
+  87 before. Of the 71 minutes it no longer takes, one test file that no
+  longer plays the prehistory saves 21 and the cache most of the rest.
+- The opening cache is one per process and shared by every thread, and
+  holds at most 2,000 names across its engines.
+  `Engine.set_opening_cache_capacity(0)` turns it off and
+  `Engine.opening_cache_info()` reports what it holds. Its key is every
+  argument of the build, to the bit, so a different engine is never
+  served; a build whose arguments hold a NaN is never kept. The Rust
+  `Engine` has the same two calls, and `Engine::with_params_from_opening`
+  is the one that keeps.
+- The tick reuses its company views and the settlement's fills buffer, so
+  a session allocates about a third as often and a cold 20-name pt-v21
+  build is about 7 per cent faster. No arithmetic moved.
+- Building an `Engine` or an `EngineBatch` releases the GIL, as a
+  session already did. A threaded sweep (`run_many` and `sweep` with
+  `workers`) builds its engines side by side, and a host's other threads
+  keep running through a prehistory.
+- The MCP server's `session_rewind` and `session_fork` restore into an
+  engine that plays no opening, as the restore replaces the whole state.
+- `tests/test_stationary_opening.py` holds the prehistory off, since it
+  reads only the opening's phase, age and draws.
+
+### A close that takes shocks
+
+`Engine::close_day_with_shocks(game_day, shocks)` is `close_day` with
+economic shocks active in its macro step, and
+`Engine::advance_macro_day_with_shocks` is the step alone. A host that
+passed shocks had to call `close_market` and `advance_day` itself, which
+skips the market P/E, the re-mark of prices to the published macro data
+and the rate indices' close that `close_day` runs. With no shocks both are
+the existing calls, draw for draw.
+
+### The flow check
+
+- `tradefloor::flow::ExternalFlow::record_tick(&request)` records a tick's
+  news and counts the ticks outside 09:30 to 16:00. The tally is outside
+  above one per cent of a session's 390.
+- The tally keeps the signed sums of news and earnings revisions beside
+  their squares. It is outside once either moves fair value by more than
+  one per cent a year on average, beyond three standard errors of the
+  estimate, as a stock split written as an earnings cut does.
+- `FlowAssessment` gains `off_session_ticks_per_session`, `news_drift` and
+  `fundamental_drift`, and `CalibratedFlow` gains
+  `off_session_ticks_per_session` and `news_drift`, both zero.
+- In Python, `envelope.external_flow` takes `off_session_ticks` and reads
+  the drift from the signed moves it is already given. A list of
+  same-signed sizes passed in place of signed moves now reads as drift, so
+  pass each move with its sign.
+
+### Day numbering
+
+`Engine::set_current_day`, `open_market` and `close_day` now say that a
+host numbers its days before each open. Nothing else advances the engine's
+day, and on pt-v21 a host that never calls it runs with its earnings and
+dividend calendars stopped at day zero.
+
+### RNG states saved in field order
+
+`EngineRngState::to_words` and `from_words`, new in 0.10.0, lay out the ten
+streams by stream id, not in the struct's field order. The fields declare
+`volume_idio` before `news`; the words put `news` (stream 5, words 25 to
+29) before `volume_idio` (stream 6, words 30 to 34). A host that packed the
+fields in declaration order before switching to `to_words` has those two
+streams in each other's slots in every state it saved, and `from_words`
+restores them swapped without an error. Swap the two five-word blocks once
+when loading such a state. The order is now stated on the struct, on each
+field, in `widths.rs` and in rust/README.md, and
+`EngineRngState::STREAM_NAMES`, `to_named_words` and `from_named_words`
+save and read the streams by name.
+
+### The browser `Sim` numbers its days
+
+- `Sim::run_day` runs a day loop in the core that calls
+  `Engine::set_current_day` before the open, then the session and
+  `close_day`, as `run_days` does. Through 0.10.x it opened the market
+  without numbering the day, so the valuation's clock stayed at 0. On a
+  `Sim` on pt-v21 no name reported earnings unless its report fell on day
+  0, in which case it reported at every session, and the same held for
+  ex-dividend dates. On pt-v18 to pt-v20 the buyback yield now accrues.
+  Presets before pt-v18 read no day and are unchanged.
+- The fixed-simulation probe (`priceDigest` in the browser build,
+  `_core.fixed_simulation_digest`) runs the same day. Its pt-v3 case
+  (`1c5acabf...`) is unchanged, and its pt-v19 case on 64-bit seeds moved
+  from `415ebce7...` to `cd73cf3a...`, measured identical on macos-arm64
+  native and on wasm32 through node. `tests/test_wasm_parity.py` records
+  them under `FIXED_SIMULATION_KAT_VERSION` 2 with a note, and
+  `tools/wasm/check.mjs` pins the same values. `tests/known_answer.json`
+  and the other known-answer files run through the Python package, which
+  always numbered its days, and none of them moved.
+
+### The two-year panel grades 15 of 15
+
+- `corr_persistence_acf1` has a two-year band, -0.38 to 0.88, and the
+  two-year panel grades all 15 of its statistics. The band uses the same 16
+  real two-year windows and the same rule as the other shape rows, and
+  each window is read with `facts.panel_statistics`, the function that
+  reads a simulated run. `tools/calibration/corr_persistence_504_band.py`
+  rebuilds the windows from the tape and reproduces the recorded readings.
+- `facts.REAL_MARKETS_RULED_504` now carries the row, and
+  `facts.RULED_UNREADABLE[504]` holds only `vix_ar1_debiased`.
+- Every preset reads inside the band, from 0.13 (pt-v2) to 0.41 (pt-v19);
+  pt-v21 reads 0.341 and pt-v20 0.278. The committed records' 504 counts
+  are re-graded from their own panels and each gains one: pt-v21, pt-v20
+  and pt-v19 read 15 of 15. Nothing was re-measured, and no trajectory or
+  digest moves.
+
+### The index's return and 3% falls over 360 seeds
+
+- The one-year table reads `index_tail_dn3_pct` and `index_drift_pct` over
+  the 360 seeds of `facts.LEVEL_POOL` (101 to 300 and 331 to 490), on the
+  same varying-roster run as before: the tail row as the 3% falls on every
+  seed over the sessions of every seed, the drift row as the mean across
+  seeds. The long-run criteria's D1 reads them the same way on the same
+  seeds. The fear rows stay on seeds 101 to 130.
+- pt-v21 reads 0.983 on the tail row (888 falls in 90,360 sessions,
+  standard error 0.108) and 7.00 on the drift row, and the one-year table
+  reads 19 of 19. On seeds 101 to 130 alone the tail row reads 0.598, under
+  the band's floor of 0.64.
+- pt-v20 reads 1.168 and 6.24, pt-v19 1.533 and 6.23, pt-v18 1.263 and
+  5.03, all in band, as they were on 30 seeds.
+- Each record from pt-v18 on carries the read as `level_protocol["pooled"]`
+  with its seeds, estimator and source, `envelope.CERTIFIED_LEVEL` and
+  `CERTIFIED_CRISIS` publish it, and `tools/presets/level_pool.py` measures
+  it and writes it to the record.
+
+### Corrections
+
+- REALISM.md said ticks outside the regular session moved index
+  volatility by less than half a point. Called one minute at a time from
+  07:00 to 20:00, they raised it from 12.7% to 14.7% a year on pt-v21 and
+  from 15.7% to 19.2% on pt-v20.
+- rust/README.md said `previous_close` is reset to the day's open. On
+  pt-v21 it is the price the night starts from.
+- On pt-v21, twelve dials' refusals stated a range the validator does not
+  keep (#248). `impact_memory_coefficient` said [0, 10] and refused
+  anything above `book_depth_coefficient`, 0.75; `market_day_tail_df`,
+  `overnight_idio_df`, `earnings_surprise_df` and `cycle_nowcast_accuracy`
+  accept 0.0 for off in words the parameter reference did not read;
+  `rate_close_remark` said 0 or 1 and refused 0 while `rate_intraday_live`
+  is on. Each refusal now states the set it accepts beside the other dials,
+  and `tests/test_dial_ranges.py` checks every dial's stated range at its
+  edges. `crisis_epicentre_extra` accepted a negative value, which the
+  solve squares; it is now refused, as the message always said. No
+  preset's values and no digest moved.
+- The 0.10.0 notes gave the one-day reversal's frictionless return as 5.7%
+  isolated and 1.8% populated without a record behind it (#249).
+  Re-measured on the same 30 seeds, it reads 5.69% (standard error 1.34)
+  and 1.82% (1.19), a paired decline of 3.87 points (0.24), and
+  `tf.population.MEASURED["edge_decay_signal"]` carries it, which the MCP
+  server's populated caveat quotes.
+- `tools/remeasure/remeasure.py` stops before measuring when a register
+  row's anchor is on no line of its page, as three rows were at 0.10.0
+  (#250).
+
 ## 0.10.0
 
 pt-v21 is the default model. It is pt-v20 with 104 dials moved. pt-v20

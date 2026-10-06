@@ -251,7 +251,8 @@ def test_a_60_day_run_cannot_be_compared_to_real_markets():
         facts.report(short)
 
 
-def test_compare_to_real_markets_reads_the_horizon_off_the_panel():
+def test_compare_to_real_markets_reads_the_horizon_off_the_panel(
+        monkeypatch):
     """The horizon comes from `facts["days"]`, which this never read.
 
     Checked on a row whose two bands disagree, so a function that swapped the
@@ -282,9 +283,7 @@ def test_compare_to_real_markets_reads_the_horizon_off_the_panel():
             "excess_kurtosis"])
 
     # The same at the default basis, which is `ruled`, on the row the ruled
-    # tables separate. The ruler name moves with the horizon here too, and a
-    # row the ruled table cannot read at 504 is PRESENT and says so rather
-    # than being dropped, which is what keeps 13 of 13 from printing as 13.
+    # tables separate. The ruler name moves with the horizon here too.
     near_r = facts.compare_to_real_markets(panel_at(252, corr_asymmetry=0.22))
     far_r = facts.compare_to_real_markets(panel_at(504, corr_asymmetry=0.22))
     assert near_r["corr_asymmetry"]["matches"]
@@ -292,12 +291,23 @@ def test_compare_to_real_markets_reads_the_horizon_off_the_panel():
     assert near_r["corr_asymmetry"]["ruler"] == "facts.REAL_MARKETS_RULED"
     assert far_r["corr_asymmetry"]["ruler"] == "facts.REAL_MARKETS_RULED_504"
     assert near_r["corr_asymmetry"]["basis"] == "ruled"
-    held_out = far_r["corr_persistence_acf1"]
+    # corr_persistence_acf1 has been graded at 504 on the ruled table since
+    # 2026-10-06. Before that it was held out, and a row the ruled table
+    # cannot read is PRESENT and says so rather than being dropped, which
+    # is what keeps 13 of 13 from printing as 13. That case is held out by
+    # hand below so the behaviour stays tested.
+    graded = far_r["corr_persistence_acf1"]
+    assert graded["ruler"] == "facts.REAL_MARKETS_RULED_504"
+    assert graded["matches"] is not None
+    monkeypatch.delitem(facts.REAL_MARKETS_RULED_504, "corr_persistence_acf1")
+    monkeypatch.setitem(facts.RULED_UNREADABLE[504], "corr_persistence_acf1",
+                        "held out by this test")
+    held_out = facts.compare_to_real_markets(
+        panel_at(504, corr_asymmetry=0.22))["corr_persistence_acf1"]
     assert held_out["matches"] is None
     assert held_out["verdict"] == "unreadable"
     assert held_out["real_range"] is None
-    assert "corr-persistence-504-unbanded" in held_out["unreadable"]
-    assert "corr_persistence_acf1" not in facts.REAL_MARKETS_RULED_504
+    assert held_out["unreadable"] == "held out by this test"
 
 
 def test_a_panel_that_does_not_say_its_horizon_is_refused():
@@ -313,7 +323,7 @@ def test_a_panel_that_does_not_say_its_horizon_is_refused():
     assert "does not record" in str(exc.value)
 
 
-def test_report_names_the_ruler_that_graded_it():
+def test_report_names_the_ruler_that_graded_it(monkeypatch):
     """A table headed "real markets" over a horizon line said nothing about
     which of the two band sets produced the verdicts.
     """
@@ -336,9 +346,16 @@ def test_report_names_the_ruler_that_graded_it():
     assert "on the ruled basis" in ruled
     # And a row the ruled table holds out is printed as UNREADABLE with its
     # reason, in the table rather than quietly moved to "reporting only".
-    assert "UNREADABLE" in ruled
-    assert "unreadable on the ruled basis" in ruled
-    assert "corr-persistence-504-unbanded" in ruled
+    # No shape row is held out at 504 since 2026-10-06, so one is held out
+    # by hand.
+    assert "UNREADABLE" not in ruled
+    monkeypatch.delitem(facts.REAL_MARKETS_RULED_504, "corr_persistence_acf1")
+    monkeypatch.setitem(facts.RULED_UNREADABLE[504], "corr_persistence_acf1",
+                        "held out by this test")
+    held = facts.report(panel_at(504, instruments=40, observations=20_160))
+    assert "UNREADABLE" in held
+    assert "unreadable on the ruled basis" in held
+    assert "held out by this test" in held
 
 
 # --------------------------------------------------------------------------

@@ -57,10 +57,29 @@ EXPECTED = "1c5acabf07692228c840518b51240abe0e379fdd5272b9a4575206e8f93159ea"
 #: `2n ** 63n + 12345n` and compares against this value.
 #:
 #: Measured on macos-arm64 native and on wasm32-unknown-unknown through
-#: node, wasm-bindgen 0.2.129, identical, on 2026-09-25.
+#: node, wasm-bindgen 0.2.129, identical, on 2026-10-06. See
+#: FIXED_SIMULATION_KAT_NOTE for why it moved from
+#: `415ebce7634bff21c3c903f57f6a7b4c728b48d2379b2cb5eeea5f7bc9a16675`.
 HIGH_CASE = dict(size=12, universe_seed=2**64 - 1, seed=2**63 + 12345,
                  days=5, ticks=65, preset="pt-v19")
-HIGH_EXPECTED = "415ebce7634bff21c3c903f57f6a7b4c728b48d2379b2cb5eeea5f7bc9a16675"
+HIGH_EXPECTED = "cd73cf3a2a637c4fbf353eb36c2fe74d5513d4985be4c2362eeab65544000aba"
+
+#: The fixed simulation's version, raised whenever a digest pinned in this
+#: file moves on purpose, with FIXED_SIMULATION_KAT_NOTE saying why.
+#: `tools/wasm/check.mjs` pins the same digests under the same version.
+#: Version 1 is every digest this file pinned through 0.10.x.
+FIXED_SIMULATION_KAT_VERSION = 2
+
+#: Why the version last moved.
+FIXED_SIMULATION_KAT_NOTE = (
+    "The fixed simulation numbers its days: each day calls "
+    "Engine::set_current_day before the open, as the Python binding's "
+    "run_days does, in the same core day loop the WebAssembly Sim runs. "
+    "Through 0.10.x every day of the probe was "
+    "day 0. HIGH_CASE runs pt-v19, whose buyback yield accrues over the "
+    "elapsed days, so its digest moved. CASE runs pt-v3, which reads no "
+    "day, and is unchanged."
+)
 
 
 def test_the_fixed_simulation_digest_is_stable():
@@ -128,3 +147,17 @@ def test_the_probe_on_64_bit_seeds_is_stable():
     # Its low halves alone are a different market: the high bits count.
     low = dict(HIGH_CASE, universe_seed=2**32 - 1, seed=12345)
     assert _core.fixed_simulation_digest(**low) != HIGH_EXPECTED
+
+
+def test_the_browser_check_pins_the_same_digests():
+    """`tools/wasm/check.mjs` needs node and a wasm build, so CI does not
+    run it. It must still compare against the digests pinned here, under
+    the same version, or a moved digest re-based on one side would leave the
+    browser check failing, or passing on a stale value, unnoticed."""
+    import pathlib
+    text = (pathlib.Path(__file__).resolve().parents[1]
+            / "tools" / "wasm" / "check.mjs").read_text(encoding="utf-8")
+    assert f"const EXPECTED = '{EXPECTED}';" in text
+    assert f"const HIGH_EXPECTED = '{HIGH_EXPECTED}';" in text
+    assert (f"const FIXED_SIMULATION_KAT_VERSION = "
+            f"{FIXED_SIMULATION_KAT_VERSION};") in text

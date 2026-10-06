@@ -4948,9 +4948,10 @@ pub struct ModelParams {
     /// it would be a buyback yield of about 4.2 per cent, but that is the
     /// median name: the index's delivered yield (the cap-weighted log rate
     /// of the buyback factor) is 2.0 per cent on held-out seeds, and decays
-    /// from 3.3 in year 2 to 0.8 in year 21. The shipped preset pays no
-    /// dividends (`dividend_payout_share`), so the term carries the whole
-    /// of the drift that payouts would; that is a reading of the gap, not a
+    /// from 3.3 in year 2 to 0.8 in year 21. pt-v20 pays no dividends
+    /// (`dividend_payout_share` is on in pt-v21 at 1.2 and off on every
+    /// earlier preset), so the term carries the whole of the drift that
+    /// payouts would; that is a reading of the gap, not a
     /// measurement behind the value. Under `dividend_buyback_substitution`
     /// this is the total payout, and a name's buyback share is it less the
     /// name's dividend payout.
@@ -5703,13 +5704,14 @@ pub struct ModelParams {
 
     // ── The agent-facing book (agent_book.rs, engine.rs) ─────────────────
     //
-    // Seven dials, every one 0.0 on every shipped preset, and every one
-    // read only on the path an AGENT's order takes. The market's own flow
-    // settles through the maker's ladder exactly as it always has, so an
-    // untraded run is bit-identical at any setting of any of them: they
-    // change what an agent pays and what it does to the market, never the
-    // market nobody traded. `agent_book.rs` carries the model and its
-    // sources; the notes here say what each dial moves.
+    // Dials 0.0 on every preset through pt-v19, and every one read only
+    // on the path an AGENT's order takes; pt-v20 sets seven of them and
+    // pt-v21 sets all sixteen, at the values each dial's note gives. The
+    // market's own flow settles through the maker's ladder exactly as it
+    // always has, so an untraded run is bit-identical at any setting of any
+    // of them: they change what an agent pays and what it does to the
+    // market, never the market nobody traded. `agent_book.rs` carries the
+    // model and its sources; the notes here say what each dial moves.
 
     /// Coefficient `Y` of the square-root law that sets the latent depth
     /// behind the maker's ladder. pt-v20 ships 0.75; 0.0 turns the latent
@@ -8013,9 +8015,9 @@ impl ModelParams {
     /// persistence rises, which improves every VIX bucket and costs the
     /// crisis lever; a funded `jump_vix_coupling` buys the lever back. The
     /// pair was invisible to a one-dial search because each half fails
-    /// alone. `jump_vix_coupling` starts here: it has shipped inert at 0.0
-    /// in every preset, and §84 designed it to let idiosyncratic news flow
-    /// cluster with the regime.
+    /// alone. `jump_vix_coupling` starts here: it had shipped inert at 0.0
+    /// in every preset before this one, and §84 designed it to let
+    /// idiosyncratic news flow cluster with the regime.
     ///
     /// **The crisis threshold group.** `crisis_vix_threshold` 25.5 to 30.9
     /// moves the VIX 25-30 bucket of the driven window from 1.62 to 1.34,
@@ -8568,8 +8570,8 @@ impl ModelParams {
     /// pin `3d6462a`): `S_252` 54.90 -> 32.90 and `S_504` 47.37 -> 30.05
     /// on the nineteen-row scoring rule. The fourth,
     /// `volume_idio_variance_gain` 0.20, was found by tracing
-    /// `volume_change_acf1` to a per-name channel every preset ships at
-    /// 0.0 and measured on the same 120 seeds
+    /// `volume_change_acf1` to a per-name channel every preset before
+    /// this one shipped at 0.0 and measured on the same 120 seeds
     /// against that three-dial cell (`iterate5`): 32.90 -> 22.69 and
     /// 30.05 -> 26.11. The whole vector reproduces on two later boxes at
     /// `max|delta| = 0` over every numeric field (`gainsweep`,
@@ -10598,19 +10600,37 @@ impl ModelParams {
         let y = self.impact_memory_coefficient;
         let (h1, h2, w, m) = (self.impact_memory_half_life, self.impact_memory_slow_half_life,
                               self.impact_memory_slow_weight, self.impact_memory_crossover);
+        // Each refusal states the set the dial accepts beside the others, so
+        // a range read from the text is the range the validator keeps
+        // (tests/test_dial_ranges.py). A refusal that two dials' values
+        // cause together names first the dial whose set it states.
+        let bdc = self.book_depth_coefficient;
+        let can_run = self.book_shared == 1.0 && bdc > 0.0 && h1 > 0.0;
+        let y_hi = if can_run { crate::mathx::min(bdc, 10.0) } else { 0.0 };
         if !(0.0..=10.0).contains(&y) {
             return Err(format!(
                 "impact_memory_coefficient is {y}. It is the metaorder memory's Y in \
-                 Y sigma (M)^delta, in [0, 10] and at most book_depth_coefficient; 0.0 \
-                 is off."));
+                 Y sigma (M)^delta, in [0, {y_hi}] here; 0.0 is off. On, it is at most \
+                 10 and at most book_depth_coefficient ({bdc}), and it needs book_shared \
+                 on and impact_memory_half_life above 0."));
         }
         // The shape dials are range-checked always and read only with the
         // coefficient on, so a vector may carry them at the coefficient's
         // 0.0 (the perturbation table's base does).
+        let h1_hi = if h2 > 0.0 && h2 <= 98280.0 { crate::mathx::min(h2, 39000.0) } else { 39000.0 };
+        let h1_lo = if y != 0.0 { "(0" } else { "[0" };
         if !(0.0..=39000.0).contains(&h1) {
             return Err(format!(
                 "impact_memory_half_life is {h1}. It is a half-life in open ticks, in \
-                 (0, 39000], and required with the memory on."));
+                 {h1_lo}, {h1_hi}] here: at most 39000, at most \
+                 impact_memory_slow_half_life when the slow part is on, and above 0 \
+                 with the memory on."));
+        }
+        if h2 > 0.0 && h2 <= 98280.0 && h2 < h1 {
+            return Err(format!(
+                "impact_memory_half_life is {h1} but impact_memory_slow_half_life is \
+                 {h2}: the slow part's half-life is at least the fast part's, so \
+                 impact_memory_half_life is in {h1_lo}, {h1_hi}] here."));
         }
         if !(h2 == 0.0 || (h2 >= h1 && h2 <= 98280.0)) {
             return Err(format!(
@@ -10639,23 +10659,25 @@ impl ModelParams {
         if y == 0.0 {
             return Ok(());
         }
-        if self.book_shared != 1.0 || !(self.book_depth_coefficient > 0.0) {
+        if self.book_shared != 1.0 || !(bdc > 0.0) {
             return Err(format!(
                 "impact_memory_coefficient is {y} but the memory needs book_shared on \
                  and book_depth_coefficient off zero: it continues the latent depth's \
-                 curve and is fed by the flow the shared book records."));
+                 curve and is fed by the flow the shared book records. Here it is in \
+                 [0, {y_hi}], off."));
         }
-        if y > self.book_depth_coefficient {
+        if y > bdc {
             return Err(format!(
-                "impact_memory_coefficient is {y}, above book_depth_coefficient {}. The \
+                "impact_memory_coefficient is {y} but book_depth_coefficient is {bdc}. The \
                  memory's Y must not exceed the latent book's, or a fill could be priced \
-                 better than the displacement it leaves (Alfonsi, Fruth and Schied 2010).",
-                self.book_depth_coefficient));
+                 better than the displacement it leaves (Alfonsi, Fruth and Schied 2010), \
+                 so here it is in [0, {y_hi}]."));
         }
         if !(h1 > 0.0) {
             return Err(format!(
                 "impact_memory_coefficient is {y} but impact_memory_half_life is 0: the \
-                 memory needs a half-life, in open ticks, in (0, 39000]."));
+                 memory needs a half-life, in open ticks, in (0, 39000], so here it is \
+                 in [0, {y_hi}], off."));
         }
         Ok(())
     }
@@ -10687,7 +10709,10 @@ impl ModelParams {
             let (up2, down2) = crate::market::factors::crisis_epicentre_gain_squares(
                 self.crisis_epicentre_extra);
             let (lo, hi) = crate::market::factors::crisis_epicentre_extra_bounds();
-            if !(up2 > 0.0 && down2 > 0.0) {
+            // The solve reads the extra's square, so a negative extra would
+            // run as its own magnitude; the interval is the one stated.
+            let x = self.crisis_epicentre_extra;
+            if !(x > lo && x < hi && up2 > 0.0 && down2 > 0.0) {
                 return Err(format!(
                     "crisis_epicentre_extra is {}. It is a multiple on the epicentre \
                      names' TOTAL volatility, the market factor carries {} of a name's \
@@ -10787,7 +10812,7 @@ impl ModelParams {
         {
             return Err(format!(
                 "cycle_nowcast_accuracy is {}. It is the probability a session's report names \
-                 the true phase: 0.0 prices the true phase, otherwise in (0.2, 1].",
+                 the true phase, in (0.2, 1], or 0.0 to price the true phase.",
                 self.cycle_nowcast_accuracy));
         }
         if !(self.corporate_spread_cycle >= 0.0 && self.corporate_spread_cycle <= 1.0) {
@@ -10876,20 +10901,23 @@ impl ModelParams {
         }
         if !(self.rate_close_remark == 0.0 || self.rate_close_remark == 1.0) {
             return Err(format!(
-                "rate_close_remark is {}. It is a switch: 0.0 as shipped, 1.0 on.",
+                "rate_close_remark is {}. It is a switch, 0.0 off or 1.0 on, and 1.0 \
+                 while rate_intraday_live is on.",
                 self.rate_close_remark));
         }
         if !(self.rate_intraday_live == 0.0 || self.rate_intraday_live == 1.0) {
             return Err(format!(
-                "rate_intraday_live is {}. It is a switch: 0.0 as shipped, 1.0 on.",
+                "rate_intraday_live is {}. It is a switch, 0.0 off or 1.0 on, and on \
+                 only with rate_close_remark on.",
                 self.rate_intraday_live));
         }
         if self.rate_intraday_live != 0.0 && self.rate_close_remark == 0.0 {
-            return Err(
-                "rate_intraday_live is on and rate_close_remark is off. The live mark commits \
+            return Err(format!(
+                "rate_intraday_live is {} but rate_close_remark is 0. The live mark commits \
                  nothing, so without the close's re-mark the curve it anticipated would reach \
-                 the rate indices only at the next open: set rate_close_remark to 1.0 too."
-                    .to_string());
+                 the rate indices only at the next open: with rate_intraday_live on, \
+                 rate_close_remark is 1.0.",
+                self.rate_intraday_live));
         }
         if !(self.fed_stress_cut >= 0.0 && self.fed_stress_cut <= 1.0) {
             return Err(format!(
@@ -10929,8 +10957,8 @@ impl ModelParams {
                           ("earnings_surprise_df", self.earnings_surprise_df)] {
             if !(v == 0.0 || ((3.0..=30.0).contains(&v) && v == v.floor())) {
                 return Err(format!(
-                    "{name} is {v}. It is a student t's degrees of freedom, an integer \
-                     in [3, 30], or 0 for a normal."));
+                    "{name} is {v}. It is a student t's degrees of freedom, a whole \
+                     number in [3, 30], or 0.0 for a normal."));
             }
         }
         for (name, v, hi) in [("earnings_surprise_sigma", self.earnings_surprise_sigma, 20.0),
@@ -11042,7 +11070,7 @@ impl ModelParams {
             || (self.market_day_tail_df >= 3.0 && self.market_day_tail_df <= 200.0))
         {
             return Err(format!(
-                "market_day_tail_df is {}. It is the degrees of freedom of the day's market draw, 0 (a normal day) or in [3, 200].",
+                "market_day_tail_df is {}. It is the degrees of freedom of the day's market draw, in [3, 200], or 0.0 for a normal day.",
                 self.market_day_tail_df));
         }
         if !(self.market_day_tail_state_share >= 0.0 && self.market_day_tail_state_share <= 1.0) {
@@ -11377,15 +11405,34 @@ impl ModelParams {
                 "fair_value_vix_discount is {}. It is a log discount per log VIX above the knee, in [0, 1].",
                 self.fair_value_vix_discount));
         }
-        if !(self.idio_vol_alpha >= 0.0 && self.idio_vol_beta >= 0.0
-            && self.idio_vol_alpha + self.idio_vol_beta < 1.0)
-        {
+        // The per-name idiosyncratic variance state's shock share and
+        // persistence: each at least 0 and their sum under 1, or the state
+        // has no mean of one to revert to. Each refusal states the dial's
+        // own interval beside the other's value.
+        let (a, b) = (self.idio_vol_alpha, self.idio_vol_beta);
+        let b_set = if (0.0..1.0).contains(&b) { b } else { 0.0 };
+        if !(0.0..1.0).contains(&a) {
             return Err(format!(
-                "idio_vol_alpha is {} and idio_vol_beta is {}. They are the per-name \
-                 idiosyncratic variance state's shock share and persistence: each at \
-                 least 0 and their sum under 1, or the state has no mean of one to \
+                "idio_vol_alpha is {a}. It is the idiosyncratic variance state's shock \
+                 share, in [0, {}) beside idio_vol_beta {b}: at least 0, and under 1 \
+                 less the persistence, or the state has no mean of one to revert to.",
+                1.0 - b_set));
+        }
+        if !(0.0..1.0).contains(&b) {
+            return Err(format!(
+                "idio_vol_beta is {b}. It is the idiosyncratic variance state's \
+                 persistence, in [0, {}) beside idio_vol_alpha {a}: at least 0, and \
+                 under 1 less the shock share, or the state has no mean of one to \
                  revert to.",
-                self.idio_vol_alpha, self.idio_vol_beta));
+                1.0 - a));
+        }
+        if !(a + b < 1.0) {
+            return Err(format!(
+                "idio_vol_alpha is {a}, and idio_vol_beta is {b}. Their sum must be \
+                 under 1, or the idiosyncratic variance state has no mean of one to \
+                 revert to, so idio_vol_alpha is in [0, {}) here and idio_vol_beta in \
+                 [0, {}).",
+                1.0 - b, 1.0 - a));
         }
         if !(self.idio_vol_jump_bump >= 0.0 && self.idio_vol_jump_bump <= 4.0) {
             return Err(format!(
@@ -11410,12 +11457,12 @@ impl ModelParams {
         }
         if !(self.fair_value_relative_half_life >= 0.0 && self.fair_value_relative_half_life <= 25200.0) {
             return Err(format!(
-                "fair_value_relative_half_life is {}. It is a half-life in sessions, in [0, 25200].",
+                "fair_value_relative_half_life is {}. It is a half-life in sessions, in [0, 25200], and above 0 while fair_value_relative_knee is set.",
                 self.fair_value_relative_half_life));
         }
         if self.fair_value_relative_knee != 0.0 && self.fair_value_relative_half_life == 0.0 {
             return Err(format!(
-                "fair_value_relative_knee is {} and fair_value_relative_half_life is 0. The knee pulls at that half-life, so set it (in sessions, above 0).",
+                "fair_value_relative_knee is {} but fair_value_relative_half_life is 0. The knee pulls at that half-life, so set it (in sessions, above 0).",
                 self.fair_value_relative_knee));
         }
         if !(self.fair_value_vix_knee > 0.0 && self.fair_value_vix_knee <= 200.0) {
@@ -11563,8 +11610,8 @@ impl ModelParams {
         // Two guards the audit of 0.8.5 found open. A hard cap at or below
         // zero clamps every price to nothing, and a payout share outside
         // [0, 1] pays out more than the earnings or buys shares back with a
-        // negative budget. Every shipped preset carries 50,000 and a share of
-        // 0.0, 1/3 or 0.75.
+        // negative budget. Every preset through pt-v20 carries 50,000 and a
+        // share of 0.0, 1/3 or 0.75; pt-v21 carries 1e9 and 0.9.
         if !(self.price_hard_cap.is_finite() && self.price_hard_cap > 0.0) {
             return Err(format!(
                 "price_hard_cap is {}. It is the absolute cap on any model price, \

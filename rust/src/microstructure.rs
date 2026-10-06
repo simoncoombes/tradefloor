@@ -437,6 +437,11 @@ std::thread_local! {
     /// allocations (see [`settle_inner`]). Reset before every use.
     static SETTLE_BOOK: std::cell::RefCell<Option<OrderBook>> =
         const { std::cell::RefCell::new(None) };
+    /// The flow slices' fills buffer, kept for its allocation as the book
+    /// is: one a settlement was 14 per cent of a pt-v21 session's
+    /// allocations over 20 names. Cleared before every slice.
+    static SETTLE_FILLS: std::cell::RefCell<Vec<crate::order_book::Fill>> =
+        const { std::cell::RefCell::new(Vec::new()) };
 }
 
 /// A settlement's book, handed back to [`SETTLE_BOOK`] when the settlement
@@ -847,8 +852,10 @@ fn settle_inner(
     let mut traded = 0.0;
     let mut maker_inventory_delta = 0.0;
 
-    // One fills buffer for the slices, cleared before each: allocation only.
-    let mut fills: Vec<crate::order_book::Fill> = Vec::new();
+    // One fills buffer for the slices, cleared before each, and the one the
+    // last settlement on this thread used: allocation only. Handed back
+    // below, after the slices.
+    let mut fills = SETTLE_FILLS.with(|cell| std::mem::take(&mut *cell.borrow_mut()));
     // Exactly FLOW_SLICES iterations, unconditionally. There is deliberately
     // no early break: a slice that fills nothing must still cost its draw.
     for _ in 0..FLOW_SLICES {
@@ -898,6 +905,8 @@ fn settle_inner(
             }
         }
     }
+    fills.clear();
+    SETTLE_FILLS.with(|cell| *cell.borrow_mut() = fills);
     // Added after the flow, and only when there were orders, so the
     // shipped path's two sums are the ones it always computed.
     if !resting.is_empty() {

@@ -29,6 +29,12 @@
 //! [`engine::Engine::close_day`], so a day in Python and a day in a browser
 //! run the same code.
 //!
+//! A program that runs its own day loop, such as a game, should read
+//! [Embedding the engine in a host](https://github.com/simoncoombes/tradefloor/blob/main/docs/EMBEDDING.md)
+//! first: which constructor to open with, the day loop the presets were
+//! certified on, and how much news and how many shocks of its own a preset
+//! takes before its measured statistics stop describing the market.
+//!
 //! Many modules began as line-for-line ports of an earlier reference
 //! implementation, and their comments still cite it. The crate has since
 //! changed the model on purpose and is now its only definition.
@@ -56,6 +62,8 @@ pub mod market_maker;
 pub mod mathx;
 pub mod microstructure;
 pub mod mispricing;
+/// Engines whose build played a market prehistory, kept per process.
+mod opening_cache;
 pub mod order_book;
 /// The runtime parameter seam: `ModelParams` and the preset table.
 pub mod params;

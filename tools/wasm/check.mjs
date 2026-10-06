@@ -18,7 +18,11 @@ const got = pt.priceDigest(12, 7, 3, 5, 65, 'pt-v3');
 // The same probe on 64-bit seeds (0.8.5), pinned as HIGH_EXPECTED in
 // tests/test_wasm_parity.py. A seed past Number.MAX_SAFE_INTEGER is a BigInt,
 // since a Number cannot hold it exactly; a small seed may be either.
-const HIGH_EXPECTED = '415ebce7634bff21c3c903f57f6a7b4c728b48d2379b2cb5eeea5f7bc9a16675';
+const HIGH_EXPECTED = 'cd73cf3a2a637c4fbf353eb36c2fe74d5513d4985be4c2362eeab65544000aba';
+
+// The version both pins are recorded under, FIXED_SIMULATION_KAT_VERSION in
+// tests/test_wasm_parity.py, whose note says why the digests last moved.
+const FIXED_SIMULATION_KAT_VERSION = 2;
 const high = pt.priceDigest(12, 2n ** 64n - 1n, 2n ** 63n + 12345n, 5, 65, 'pt-v19');
 const sameAsNumber = pt.priceDigest(12, 7n, 3n, 5, 65, 'pt-v3') === got;
 let refusedUnsafe = false;
@@ -28,7 +32,7 @@ try {
   refusedUnsafe = String(e.message ?? e).includes('2**64 - 1');
 }
 
-console.log(`  tradefloor ${pt.version()}`);
+console.log(`  tradefloor ${pt.version()}, fixed simulation v${FIXED_SIMULATION_KAT_VERSION}`);
 console.log(`  presets   ${pt.preset_names().join(', ')}`);
 console.log(`  wasm      ${got}`);
 console.log(`  expected  ${EXPECTED}`);

@@ -22,6 +22,10 @@ dials must not move a trajectory. Run `python tests/known_answer.py` first and
 confirm the `sim` digest has not moved. If it HAS moved, this tool is the
 wrong one and `record.py` with a fresh panel is the right one.
 
+The one other field it touches is `level_protocol["pooled"]["coefficient_digest"]`,
+the stamp of the 360-seed level read, which follows the record's digest when
+it matched it.
+
 `--check` reports what would change and writes nothing.
 """
 
@@ -77,6 +81,12 @@ def main() -> int:
             "  -%d dropped %s" % (len(dropped), ", ".join(dropped)) if dropped else ""))
         if check:
             continue
+        # The pooled level read stamps the digest it was measured against
+        # (`record.py`'s `carry_pooled` reads it), and an inert dial does not
+        # move what it measured, so its stamp follows the record's.
+        pooled = (rec.get("level_protocol") or {}).get("pooled") or {}
+        if pooled.get("coefficient_digest") == rec["coefficient_digest"]:
+            pooled["coefficient_digest"] = digest
         rec["coefficient_digest"] = digest
         rec["coefficients"] = {k: values[k] for k in sorted(values)}
         rec["mechanisms"] = mechanism_set(values)
