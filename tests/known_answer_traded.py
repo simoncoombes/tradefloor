@@ -97,8 +97,9 @@ SCORECARD_FIELDS = (
 
 #: The scorecard fields hashed by value after the others, and only where
 #: they are not zero: the dividends a card received are 0.0 on every model
-#: without dividends (`dividend_payout_share`), which is every preset, so
-#: the digest of a run on one is the one it was before the field existed.
+#: without dividends (`dividend_payout_share`), which is every preset before
+#: pt-v21, so the digest of a run on one is the one it was before the field
+#: existed.
 #: `population_fingerprint` likewise: "" on every isolated run, which is
 #: every run this script makes.
 SCORECARD_NONZERO = ("dividends", "population_fingerprint")

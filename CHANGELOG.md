@@ -1,3 +1,23 @@
+## Unreleased
+
+An MCP market session now pays dividends. On pt-v21 a holder in a session
+took the ex-date price drop and was never paid, so its net worth and P&L
+read low; the session now collects them at each open, reinvested in the
+paying name as `evaluate` does, and a portfolio shows `dividends` once any
+are paid. A holder through an ex-date is paid what `evaluate` pays it on
+the same market, and a fork, a rewind or a replay of the session's orders
+pays each ex-date once, with every known-answer digest where it was.
+
+<!-- release-note-ends -->
+
+### Dividends in sessions
+
+- MCP sessions never called `Portfolio.collect_dividends` (#260). Every
+  other host that keeps a portfolio (`evaluate`, a `World`, the Gym
+  environment and the TCA run) already did.
+- RELEASING.md said the traded known answer runs on pt-v20 (#261). From
+  0.10.0 it runs on the default preset, pt-v21.
+
 ## 0.10.1
 
 A library and documentation release with no coefficient or default

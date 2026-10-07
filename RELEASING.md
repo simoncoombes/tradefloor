@@ -427,14 +427,16 @@ baseline to regenerate. The combined `sha256` in that file moves with the
 new row.
 
 `tests/known_answer_traded.json` runs the reference agents through
-`evaluate` on pt-v20 by name, so a new preset leaves it where it was. It
-moves when pt-v20 changes before it ships, when a reference agent changes,
-or when `evaluate` scores differently, and `test_known_answer.py` names the
+`evaluate` on the default preset by name, pt-v21 from 0.10.0
+(`TRADED_KAT_VERSION` 2) and pt-v20 before it, so adding a preset leaves it
+where it was until that preset becomes the default. It moves when the
+default preset changes before it ships, when a reference agent changes, or
+when `evaluate` scores differently, and `test_known_answer.py` names the
 agent and the part (orders, fills or scorecard). Re-base it by bumping
 `TRADED_KAT_VERSION`, running `python tests/known_answer_traded.py --write`
 and adding a sentence to its note saying what moved. Its `presetRow` must
-equal pt-v20's row in `known_answer_presets.json`, so re-basing that row
-fails this test until the traded run is re-based too.
+equal the default preset's row in `known_answer_presets.json`, so re-basing
+that row fails this test until the traded run is re-based too.
 
 Every pull request compares the five baselines with the newest release tag
 (`tools/ci/kat_history.py`, the `known-answers` job in `suite.yml`). A
