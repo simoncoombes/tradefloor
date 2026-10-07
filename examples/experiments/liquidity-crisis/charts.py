@@ -1,9 +1,8 @@
-"""The three figures, drawn once.
+"""The study's four figures, drawn once.
 
-The notebook shows them inline. The study repository this came from also
-writes them as standalone files for a page that is not a notebook, through
-these same functions, so a chart cannot say one thing in the notebook and
-another in a published figure.
+The notebook shows them inline. Anything that draws them for a page that
+is not a notebook calls these same functions, so a chart cannot say one
+thing in the notebook and another in a published figure.
 
 Each function takes the frozen artifacts and returns a matplotlib figure.
 None of them runs a market, calls a model or reads anything but JSON, so a
@@ -22,13 +21,14 @@ from __future__ import annotations
 from typing import Any
 
 #: One colour per arm, everywhere. A reader who learns the pairing on the
-#: first figure keeps it on the next two.
+#: first figure keeps it on the rest.
 COLOURS = {
     "control": "#5A6864",
     "+200bps": "#3C6E8F",
     "vix": "#7A5C2E",
     "cycle": "#5B7A3C",
     "crisis": "#8A3A3A",
+    "rate+regime": "#6B2F5A",
 }
 INK = "#101A18"
 GRID = "#8A9895"
@@ -41,31 +41,31 @@ ALT = {
     "exposure-bands": (
         "Gross exposure per day for two arms of one experiment. A single "
         "grey line of shared history runs from day 14 to day 19 between "
-        "0.74 and 0.79, then splits at the fork. Control climbs and stays "
-        "high, between 0.82 and 0.94, ending at 0.91. The crisis arm falls "
-        "from 0.77 to 0.57 over the nine days after the fork, holds near "
-        "0.58, then drifts back up to 0.66 by day 39. After day 21 the two "
-        "lines never meet again."),
+        "0.52 and 0.57, then splits at the fork. Control holds between "
+        "0.53 and 0.61 until day 34, jumps to 0.75 on day 35 and ends at "
+        "0.71. The crisis arm falls from 0.54 to 0.44 by day 25, holds "
+        "between 0.47 and 0.49 to day 34, rises to 0.52 and ends at 0.50. The crisis line is below "
+        "control on every day after the fork."),
     "agent-actions": (
         "Paired bars per day showing the change in gross exposure caused "
-        "by the agent's own fills, with prices held still. In the first "
-        "week after the fork the crisis bars are large and negative -- "
-        "-0.083 on day 22, -0.056 on day 26 -- while control's are mostly "
-        "positive. From day 30 the pattern reverses: the crisis bars turn "
-        "small and positive while control swings both ways. Totals over "
-        "the window: control +0.122, crisis -0.128."),
+        "by the agent's own fills, with prices held still. Most bars in "
+        "both arms are small, under 0.035 either way. The crisis arm's "
+        "largest is -0.055 on day 21, in a first week of mostly negative "
+        "bars. Control's largest, and the largest on the chart, is +0.158 "
+        "on day 35. Totals over the window: control +0.149, crisis "
+        "-0.056."),
     "replications": (
         "Slope chart of the live replications. Each run is one line "
         "joining its control value on the left to its paired crisis value "
         "on the right, and every line is drawn in the same colour and "
-        "weight, so a run that moved the other way is as visible as the "
-        "rest."),
+        "weight. All four lines slope down, by between 0.018 and 0.084, "
+        "and the runs' starting levels spread from 0.415 to 0.689."),
     "decomposition": (
-        "Mean gross exposure per replication across five arms of the "
-        "earlier rate-and-regime ladder. Crisis is the tightest cluster "
-        "and the lowest. The vix and cycle arms scatter widely across each "
-        "other and across control, with one vix replication above every "
-        "control point."),
+        "Mean gross exposure per replication across five arms: control, "
+        "+200bps, vix, cycle and rate+regime. The arm means lie between "
+        "0.511 and 0.598, and every arm's four points spread across a "
+        "range wider than the distance between any arm's mean and "
+        "control's. The cycle arm's mean sits above control's."),
 }
 
 
@@ -98,7 +98,7 @@ def _tidy(ax) -> None:
 
 def exposure_bands(series: list[dict], bands: dict, shared: list[dict],
                    warmup_days: int, figsize=(9.5, 4.8), dpi=140):
-    """The recorded run: one line becomes three at the fork.
+    """The recorded run: one line becomes one per arm at the fork.
 
     `shared` is the pre-fork daily exposure, which every arm inherits
     identically. Drawing it makes the counterfactual structure visible:
@@ -289,7 +289,7 @@ def decomposition(summary: dict, figsize=(8.5, 4.2), dpi=140):
     """The same, split into five arms."""
     names = list(summary["arms"])
     return _strip(summary["rows"], names, summary["per_arm"],
-                  "Splitting the crisis into its parts",
+                  "Splitting the rate-and-regime arm into its parts",
                   summary["per_arm"]["control"]["mean_of_means"], False,
                   figsize, dpi)
 

@@ -143,13 +143,12 @@ reproduces only on the release that made it.
 They are now applied once, on the next tick, where 0.8.1 fed them in as order
 flow on every tick of the next step. So a traded run recorded before 0.8.5
 replays up to its first trade and differs after it, even on a preset that
-0.8.5 did not change. For this reason the liquidity-crisis study's
-canonical run was recorded again, live, on 0.8.5: 60 model calls, in
-`tests/fixtures/finrobot/liquidity-crisis.json`. Its notebook replays that
-recording on 0.8.5 with no model call. The study's four replications, its
-resample and its five-arm decomposition are summaries in
-`examples/experiments/liquidity-crisis/data/` from runs made before 0.8.5,
-and were not recorded again.
+0.8.5 did not change. The liquidity-crisis study was recorded again, live,
+on pt-v21 at 0.10.1: its canonical run is 60 model calls, in
+`tests/fixtures/finrobot/liquidity-crisis.json`, and its notebook replays
+that recording with no model call. The study's four replications, its
+resample and its five-arm decomposition were recorded in the same session,
+and their summaries are in `examples/experiments/liquidity-crisis/data/`.
 
 ## Before the first LTS tag
 

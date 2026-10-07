@@ -42,58 +42,39 @@ def C(text, alt=None):
 
 
 M("""
-# Will a financial AI agent reduce risk in a market crisis?
+# A financial AI agent in a market crisis
 
-> **Two harnesses on one page.** The canonical run, the one this notebook
-> replays, was recorded again live on 0.8.5 (60 calls to
-> `claude-sonnet-4-5-20250929`, 2026-10-01), so every number the notebook
-> computes from it describes the 0.8.5 harness. The resample, the four
-> replications and the five-arm decomposition are recorded summaries in
-> `data/`, from runs made before 0.8.5, when Tradefloor counted an agent's own
-> orders on every minute of a step instead of once. They were not recorded
-> again and are not re-measured here. Read them as the 0.8.x study's
-> evidence, not as checks on the canonical run: under 0.8.5 the agent holds
-> about half the gross exposure it held in any of them.
-
-This runs [FinRobot](https://github.com/AI4Finance-Foundation/FinRobot)
+This study asks whether a financial AI agent reduces risk when its market
+goes into a crisis. It runs [FinRobot](https://github.com/AI4Finance-Foundation/FinRobot)
 inside [Tradefloor](https://tradefloor.dev), copies the market it is
 trading, and drops a liquidity crisis on one copy.
 
 Twenty-four real companies loaded from SEC filings, fifty million dollars,
 twenty shared trading days, then one checkpoint and two arms. One arm
-continues unchanged. The other runs under `liquidity_crisis`, a scenario
-that ships in the Tradefloor wheel: quoted depth to 40%, volatility
+continues unchanged. The other runs under `liquidity_crisis`, the scenario
+as Tradefloor shipped it through 0.8.1: quoted depth to 40%, volatility
 doubled, and a stated assumption that credit widens fifty basis points.
 Both arms run twenty more days under the same agent and the same cadence.
 
 The agent is never told there is a crisis. No word in its observation says
-so. It reads a volatility number, a credit spread, and a book with 40% of
-its usual depth.
+so. It reads a volatility number, a credit spread, prices that have
+fallen, and volume and order limits at 40% of their usual size.
 
-**What it did.** Mean gross exposure of 0.333 in the crisis arm against
-0.359 in control, a small gap. The agent's own contribution -- exposure
-measured immediately before and after its fills, at the same prices -- is
--0.09 in the crisis arm and +0.03 in control. The sign flips, so this is
-the agent trading and not prices moving.
+**What it did.** In the recorded run the crisis arm held less gross
+exposure than control on all twenty days, 0.486 against 0.615 on average.
+The agent's own contribution, exposure measured immediately before and
+after its fills at the same prices, is -0.056 in the crisis arm and +0.149
+in control. Most of control's figure is one decision on day 35.
 
-**Check one, the resample**, from the 0.8.x runs. Ask each arm the same fork-step question eight
-times. Eight identical calls per arm, with every byte of the input the
-same, so the spread between the answers is the agent's own. Re-asking the
-exact same fork-step question produced substantial variation. The first
-decision alone did not give us a clean answer, and the ratios it produces
-are in the notebook rather than in the headline.
+**Check one, the resample.** Ask each arm the same fork-step question eight
+more times, with every byte of the input the same. The crisis arm's answers
+are not distinguishable from control's: the gaps read 0.00 and -0.20 times
+the within-arm spread.
 
-**Check two, replication**, from the 0.8.x runs. Run the whole experiment
-four times. The crisis
-arm carried less exposure in three of them. The gap averages 1.21 times the
-between-run spread.
-
-Two observations about the fourth run, without reading more into them. The
-crisis values occupy a narrower range than the control values, 0.627 to
-0.725 against 0.637 to 0.916. And run 4's crisis figure of 0.646 sits among
-the other crisis figures, while its control figure of 0.637 sits well below
-the other three controls. We do not know why the model produced that
-trajectory.
+**Check two, replication.** Run the whole experiment four more times. The
+crisis arm carried less exposure in all four. The gap averages 0.055, which
+is 0.46 times the spread between runs, and the agent's own trades reduced
+exposure more in the crisis arm than in control in two of the four.
 
 Getting to that needs a deterministic market, a fork that leaves the arms
 verifiably identical, a way to re-ask one question, and a way to re-run the
@@ -107,13 +88,12 @@ M("""
 Real company fundamentals are the initial conditions. EPS, book value per
 share, revenue growth, share count and sector come from SEC EDGAR filings.
 Every price, spread, fill and order-book state after step zero is generated
-by Tradefloor under the `pt-v16` preset.
+by Tradefloor under the `pt-v21` preset.
 
-`experiment.py` pins `pt-v16`. The shipped default has moved on since the
-recording was made (it is `pt-v21` from 0.10.0), and a replay is keyed to
-the exact text the agent was sent, so it only replays in the market it was
-recorded in. Every earlier preset stays selectable, which is what lets this
-run reproduce. The numbers below describe `pt-v16`.
+`experiment.py` pins `pt-v21`, the shipped default from 0.10.0. A replay is
+keyed to the exact text the agent was sent, so it only replays in the
+market it was recorded in, and the pin keeps it there when the default
+moves on, and the numbers below describe `pt-v21`.
 
 Nothing here predicts or describes the behaviour of any real security. The
 tickers are real companies and the market is not.
@@ -123,7 +103,8 @@ questions. One canonical recorded trajectory per arm carries the detailed
 path analysis. Eight identical fork-step calls per arm measure how much the
 agent varies when asked one question repeatedly. Four complete live
 replications of the whole experiment provide separate model trajectories
-for checking the direction.
+for checking the direction. All of them were recorded live on pt-v21 with
+the same model.
 
 The days inside one trajectory are not independent samples of anything.
 Where a number cannot carry a claim, the notebook says so rather than
@@ -222,28 +203,24 @@ print(sample[:sample.index("Assets")].rstrip())
 """)
 
 M("""
-### When a model answer is not a decision
+### Refused decisions
 
 At temperature 0 a model still sometimes returns output the market cannot
-execute. The earlier recording of this experiment contains one: a
-`rationale` attached to an individual action, which Tradefloor refuses
-rather than dropping the unknown field and executing a trade the agent
-believed was conditioned on something else.
+execute. An older recording of this agent, on a three-arm rate ladder,
+contains one: a `rationale` attached to an individual action, which
+Tradefloor refuses rather than dropping the unknown field and executing a
+trade the agent believed was conditioned on something else.
 
-Since 0.8.5 an action like that is refused on its own, and the rest of the
-decision trades. An answer with no decision in it at all, with no JSON
-object or no `actions` list, still costs the agent the step:
-`World(on_refusal="skip")` counts it and moves on. No repair, no retry, no
-trade. The count is kept apart from the market-side
-`refused`, because an agent that could not format an answer and a market
-that rejected an order are different failures.
+An action like that is refused on its own, and the rest of the decision
+trades. An answer with no decision in it at all, with no JSON object or no
+`actions` list, costs the agent the step: `World(on_refusal="skip")`
+counts it and moves on. No repair, no retry, no trade. The count is kept
+apart from the market-side `refused`, because an agent that could not
+format an answer and a market that rejected an order are different
+failures.
 
 The counts are published either way, so a reader can tell an agent that
 never stumbled from a report that never counted.
-
-This experiment is where `on_refusal` came from: the first live run of it
-died on call 36 of 60, and everything paid for up to that point went with
-it.
 """)
 
 C("""
@@ -317,9 +294,9 @@ columns, the prices, the order book, the generator position, the macro
 chain, the whole engine state, the portfolio, the agent's own state and the
 shared history.
 
-Every pair is checked, not one. Two arms make one pair; a five-arm
-decomposition later in this notebook makes ten, and checking one of them
-would leave nine unverified.
+Every pair is checked, not one. Two arms make one pair; the six-arm fork
+`record.py` makes for each replication makes fifteen, and it checks all of
+them.
 """)
 
 C("""
@@ -340,33 +317,33 @@ for i, left in enumerate(names):
 M("""
 ## The scenario
 
-One branch gets a Tradefloor scenario. The other gets nothing.
+One branch gets a Tradefloor scenario, read off disk, and the other gets
+nothing.
 
 A scenario is a small, explicit description of what changes in the market,
 read off disk rather than written into the experiment. It separates what it
 asserts happened from what it merely assumes followed, and it carries a
 fingerprint, so two people can check they ran the same one.
 
-This one is `liquidity_crisis`, which ships in the Tradefloor wheel. Quoted
-depth falls to 40% and volatility doubles for twenty-five days; alongside
-them the file states one ASSUMPTION, that credit widens fifty basis points.
-Nothing in the simulator derives that third number, which is exactly why it
-sits under a different heading.
+This one is `liquidity_crisis` as the Tradefloor wheel shipped it through
+0.8.1. Quoted depth falls to 40% and volatility doubles for twenty-five
+days; alongside them the file states one ASSUMPTION, that credit widens
+fifty basis points. Nothing in the simulator derives that third number,
+which is why it sits under a different heading.
 
-The file here is the packaged one as 0.8.1 shipped it, with a single field
-changed. Every
-packaged scenario fires `at: 50`, because they are written for a single
-market with fifty days of warmup, and `World.apply` rebases `at` onto the
-day it is applied on -- so handing the packaged file to an arm forked on day
-20 would fire it on day 70. Fifty post-fork days before the shock means
-fifty days of the two arms drifting apart on nothing but the agent
-answering the same question two ways, and the crisis would then land on two
-markets that are no longer comparable. So `at: 0`, and nothing else.
+The file here is that one with a single field changed. Every packaged
+scenario fires `at: 50`, because they are written for a single market with
+fifty days of warmup, and `World.apply` rebases `at` onto the day it is
+applied on -- so handing the packaged file to an arm forked on day 20 would
+fire it on day 70. Fifty post-fork days before the shock means fifty days
+of the two arms drifting apart on nothing but the agent answering the same
+question two ways, and the crisis would then land on two markets that are
+no longer comparable. So `at: 0`, and nothing else.
 
-0.8.5 recalibrated the packaged file: the VIX goes three and a half times
-rather than two, and earnings fall 15% and recover. Against the package in
-this wheel the check below therefore reads False. The study keeps the file
-it was recorded under, and the shocks it prints are that file's.
+The packaged file has since been recalibrated: the VIX goes three and a
+half times rather than two, and earnings fall 15% and recover. So the check
+below, against the package in this wheel, reads False. This study runs the
+0.8.1 shocks, and the shocks it prints are this file's.
 """)
 
 C("""
@@ -391,16 +368,14 @@ for item in scenario.interventions:
 """)
 
 M("""
-`market.liquidity` is the one target here that is not a macro field, and it
+`market.liquidity` is the one target here outside the macro fields, and it
 is the only lever in Tradefloor that touches execution. It scales the volume
 column the market maker quotes off, so every ladder level thins and the same
 trade costs more to put on.
 
-It also reaches the agent, which took a fix to be true: the volume figure in
-the observation and the order cap the agent is clipped against were read
-once at construction and never again, so under a depth shock the book
-thinned and the agent went on seeing -- and being allowed -- the pre-crisis
-size. In a market with 40% of the depth.
+It also reaches the agent. The volume figure in the observation and the
+order cap the agent is held to are read from the same column, so under the
+shock the agent sees, and is allowed, 40% of the size.
 """)
 
 M("""
@@ -426,10 +401,15 @@ print(f"\\nboth arms ran {ex.BRANCH_DAYS} days")
 """)
 
 M("""
-### The size of the manipulation
+### The difference in the prompt
 
-This is the whole experimental manipulation, and it is small enough to
-print. Every other line of the prompt is byte-identical across the arms.
+This is the whole difference between the two prompts at the first decision
+after the fork, grouped by the line it falls on.
+
+The two macro lines are the scenario itself. Everything else is the crisis
+market having already traded: by the time the agent is asked, every price,
+return, volatility and spread differs, the volume and order-size lines sit
+at 40%, and the portfolio is worth less.
 
 Compare it with experiment 001, which moved a policy rate by 200 basis
 points over 421 companies: two lines of 376, and the agent barely moved. A
@@ -439,22 +419,42 @@ After that the only trace is two decimal places.
 """)
 
 C("""
+import re
+from collections import Counter
+
 step = worlds[ex.CONTROL_ARM].fork_step
 prompts = {n: next(e["prompt"] for e in worlds[n].agent.record
                    if e["step"] == step) for n in names}
 base = prompts[ex.CONTROL_ARM].splitlines()
+tickers = set(worlds[ex.CONTROL_ARM].engine.tickers)
+
+
+def kind(line):
+    label = re.split(r"\\s{2,}", line.strip())[0]
+    return "a holding's value" if label in tickers else label
+
+
+def day_returns(prompt):
+    return [float(v) for v in
+            re.findall(r"return, 1 day\\s+([-+0-9.]+)%", prompt)]
+
 
 for name in ex.TREATMENTS:
     lines = prompts[name].splitlines()
     diff = [(a, b) for a, b in zip(base, lines) if a != b]
     print(f"{name}: {len(diff)} of {len(base)} lines differ")
-    for a, b in diff[:6]:
-        print(f"    - {a.strip()}")
-        print(f"    + {b.strip()}")
-    if len(diff) > 6:
-        print(f"    ... and {len(diff) - 6} more, all bid/ask, one cent "
-              "wider from the VIX move")
+    for a, b in diff:
+        if kind(a) in ("vix", "corporate_bond_yield"):
+            print(f"    - {a.strip()}")
+            print(f"    + {b.strip()}")
     print()
+    for label, count in Counter(kind(a) for a, _ in diff).most_common():
+        print(f"  {count:>4}  {label}")
+    print()
+    for arm in (ex.CONTROL_ARM, name):
+        r = day_returns(prompts[arm])
+        print(f"{arm:>9}: one-day return, mean {sum(r) / len(r):+.2f}%, "
+              f"{sum(1 for v in r if v < 0)} of {len(r)} names down")
 """)
 
 M("""
@@ -465,7 +465,7 @@ after the fork the arms trade different markets, so comparing their returns
 measures the market as much as the agent.
 
 Read this as one run rather than as the result, because two checks follow
-it and one of them takes half of it away.
+it and they qualify it.
 """)
 
 C("""
@@ -499,7 +499,7 @@ plt.show()
   alt=charts.ALT["exposure-bands"])
 
 M("""
-### What the agent did, with the market held still
+### The agent's own trades
 
 Gross exposure moves for two reasons: the agent trades, and prices move
 under a portfolio nobody touched. After the fork the arms trade different
@@ -514,10 +514,12 @@ arrival prices. The market is held still and what is left is behaviour.
 C("""
 for name in names:
     row = bands[name]
+    largest = max(series, key=lambda i: abs(i[f"agent_change_{name}"]))
     print(f"{name:>9}  agent moved exposure "
           f"{row['agent_change_total']:+.3f} over {row['decisions']} "
           f"decisions   ({row['agent_reductions']} down, "
-          f"{row['agent_additions']} up)")
+          f"{row['agent_additions']} up); largest single decision "
+          f"{largest[f'agent_change_{name}']:+.3f} on day {largest['day']}")
 """)
 
 C("""
@@ -536,7 +538,7 @@ print(order["note"])
 """)
 
 M("""
-### What the market did, print by print
+### The market's side of each print
 
 The exposure numbers above are the agent's side of the crisis. This is the
 market's side, on the same ticks.
@@ -552,14 +554,13 @@ state, so the two prints differ only where the flow reached the end of the
 quoted depth. `liquidity_share` is `log(print / unbounded_print)` over the
 print's own move.
 
-That share is normally NEGATIVE, and the sign is the finding rather than a
-convention. The depth bound truncates a walk: an order that exhausts a
-shallow book stops there, while against every resting level it keeps
-filling and prints further from where it started. So the real print sits
-between the last print and the unbounded print. Read it through the
-identity the column satisfies, that the unbounded book's move is
-`1 - share` times the printed move, so a share of -1 means the deeper book
-would have moved the price twice as far.
+Read the share through the identity the column satisfies: the unbounded
+book's move is `1 - share` times the printed move. A NEGATIVE share is a
+truncated walk. An order that exhausts a shallow book stops there, while
+against every resting level it keeps filling and prints further from where
+it started, so a share of -1 means the deeper book would have moved the
+price twice as far. A positive share is the other case, where the deeper
+book would have absorbed part of the move.
 
 `market.liquidity` at 40% is a claim about depth, and this is the column
 that reads it back off the tape rather than off the scenario file.
@@ -583,6 +584,15 @@ print(f"day {depth[names[0]]['day']}, the last of the post-fork window, "
       f"{depth[names[0]]['instruments']} names over 390 ticks")
 print("median share is signed; mean |absorbed| is a distance, because the "
       "signed mean cancels across up and down ticks")
+print()
+
+import pyarrow as pa
+for name in names:
+    tape = pa.table(worlds[name].engine.prints()).to_pydict()
+    signed = 1e4 * sum(tape["absorbed"]) / len(tape["absorbed"])
+    halted = sum(1 for v in tape["clamp"] if v)
+    print(f"{name:<10}signed mean absorbed {signed:+.1f} bps, "
+          f"clamp nonzero on {halted} of {len(tape['clamp']):,} rows")
 """)
 
 M("""
@@ -591,14 +601,17 @@ both arms, which is what the book is built for: it quotes the depth this
 tick's flow can reach, and ordinary flow does not leave the top level or
 two.
 
-The crisis changes the FREQUENCY and not the size. Flow runs out of book
-2.6 times as often in the crisis arm, and the median share is the same in
-both, so each event is the same shape and there are more of them. The mean
-distance from the model price to the print rises with the count.
+Flow runs out of book about twice as often in the crisis arm, 51 prints
+against 25. In the crisis arm two in three of those prints carry a
+negative share, where the depth bound cut a walk short and a deeper book
+would have moved the price further. In control about half do, and the
+other half are prints a deeper book would have moved less. With 25 and 51
+events on one day, the two medians are a description of these prints and
+not a measured property of either book.
 
-A share of -1.0 says the deeper book would have moved the price twice as
-far as it actually moved, since the unbounded move is `1 - share` times the
-printed one. Nothing bounds the ratio by one.
+The mean distance from the model price to the print is 3.0 basis points in
+control and 3.8 in the crisis arm. The circuit breaker plays no part: the
+`clamp` column is zero on every row of both arms.
 
 One day of one recorded run, and one tick at a time. The counterfactual
 prints from the real state and stops there: the inventory a deeper book
@@ -645,34 +658,29 @@ for name in ex.TREATMENTS:
 """)
 
 M("""
-Every one of those ratios is inside the noise. Asked once, at the moment
-the intervention lands, the crisis arm is not distinguishable from control.
+Neither ratio is above one. Asked once, at the moment the intervention
+lands, the crisis arm is not distinguishable from control: both arms'
+answers buy two more names than they sell on average, and the crisis arm's
+answers vary more, six distinct answers in eight against two.
 
-The caution is concrete. An earlier pilot for this experiment produced a
-first post-fork pair that read as a textbook result: on prompts
-differing in two lines, the control arm bought a dip and the shocked arm
-wrote *"reducing exposure ... to manage downside risk"*. Resampling showed
-the split sat inside the control arm's own variance across eight identical
-calls. It was one of four answers that arm gives to the same question.
-
-That finding was on its way into a writeup. The resample is what stopped
-it.
+A single decision pair could have read as a response in either direction.
+This is the yardstick it has to be read against.
 """)
 
 M("""
 ## Check two: run the whole thing again
 
 The resample bounds one decision. It says nothing about the path, and the
-bands are a property of the path.
+exposure gap is a property of the path.
 
-So run the experiment again. The seed, the universe, the interventions and
-the cadence are identical every time, which means the only thing that
-varies between replications is the agent. That is the sample the "one
-trajectory per arm" limit was asking for, and the determinism keeps it
-clean: two replications differ by the agent and by nothing else.
+So run the experiment again. The seed, the universe, the scenario and the
+cadence are identical every time, which means the only thing that varies
+between replications is the agent. Two replications differ by the agent
+and by nothing else, from the first shared day on, so each one builds its
+own book in the twenty shared days before the fork.
 
-Four replications, each a full twenty shared days and two twenty-day
-arms, recorded live.
+Four replications, each a full twenty shared days and twenty days per arm,
+recorded live.
 """)
 
 C("""
@@ -683,12 +691,15 @@ print(f"{replications['replications']} replications, "
       f"ordering holds on the means in "
       f"{replications['ordering_holds_on_means']}")
 print()
-print(f"{'run':>4}" + "".join(f"{n:>12}" for n in names) + "   ordering")
+print(f"{'run':>4}" + "".join(f"{n:>10}" for n in names)
+      + "       gap   ordering   agent's own change")
 for row in replications["rows"]:
+    gap = row["mean_exposure"][names[0]] - row["mean_exposure"][names[1]]
     print(f"{row['index']:>4}"
-          + "".join(f"{row['mean_exposure'][n]:>12.3f}" for n in names)
-          + f"   {row['ordering_strict']:>2}/{row['ordering_days']}"
-          + ("  holds" if row["holds_on_means"] else "  FAILS"))
+          + "".join(f"{row['mean_exposure'][n]:>10.3f}" for n in names)
+          + f"{gap:>+10.3f}"
+          + f"   {row['ordering_strict']:>2}/{row['ordering_days']} days"
+          + "".join(f"{row['agent_change'][n]:>+10.3f}" for n in names))
 print()
 for name in names:
     row = replications["per_arm"][name]
@@ -715,52 +726,41 @@ plt.show()
   alt=charts.ALT["replications"])
 
 M("""
-Crisis exposure was lower than its paired control in three of four runs.
+Crisis exposure was lower than its paired control in all four runs, by
+0.018 to 0.084.
 
-Two observations about the fourth, without reading more into them. The
-crisis values occupy a narrower range than the control values. And run 4's
-crisis figure sits among the other crisis figures, while its control figure
-sits below the other three controls.
+The levels move far more than the gap. Control ranges from 0.415 to 0.689
+across runs, because each run's agent built a different book in the shared
+days, and the gap averages 0.46 times that spread. Read against the
+between-run spread, the direction is consistent and the size is small.
+
+The agent's own trades do not carry the gap in every run. They reduced
+exposure more in the crisis arm than in control in runs 2 and 4, and less
+in runs 1 and 3. Where they did not, the crisis arm's lower exposure came
+from prices: the crisis market falls at the open, which shrinks a long
+book's gross exposure without a trade.
 """)
 
 M("""
-## The rate shock that did not reproduce
+## The rate shock in parts
 
-Before the scenario, this experiment asked a narrower question with
-hand-written macro moves: how much of the observation an intervention has
-to change before the agent acts on it. Three arms -- control, a +200bps
-move in the policy rate and the corporate yield, and that plus VIX 17 to 45
-with the cycle phase moved to `contraction`.
+The same four replications carry a second comparison, which asks how much
+of the observation an intervention has to change before the agent acts on
+it. It uses hand-written macro moves instead of a scenario:
 
-The first run produced three cleanly separated exposure bands, ordered by
-how loud the intervention was. It looked like a dose curve.
+    +200bps      the policy rate and the corporate yield up 200 bps
+    vix          VIX to 45, and nothing else
+    cycle        the cycle phase expansion -> contraction, and nothing else
+    rate+regime  all four together
 
-Four replications kept half of it. The rate-only arm reads 0.29 times the
-between-replication spread and its sign flips: in one of four runs it
-carried MORE exposure than control. The loud arm reads 1.85 times, with the
-same sign every time.
+Every arm of a fork is bit-identical at the fork whatever the arm count,
+so these four arms were forked from the same shared histories as the two
+above, and `control` is the same arm in both comparisons.
 
-That is the whole of the supporting story, and it is here for one reason: a
-single convincing run is not a result. The numbers below are from those
-recordings, replayed, not re-bought.
-
-### Which part of the loud arm carried it
-
-The loud arm moved four macro fields at once, so it cannot say which the
-agent responded to. Two more arms split the regime half:
-
-    vix      VIX 17 -> 45, and nothing else
-    cycle    the cycle phase expansion -> contraction, and nothing else
-
-Five arms from one fork. Every arm of a fork is bit-identical at the fork
-whatever the arm count, so the recorded replications already cover the
-shared history, control, +200bps and crisis, and only the two new arms
-needed calling.
-
-The two arms differ in a second way the numbers cannot separate. `cycle` is
-a word and changes nothing else in the observation. `vix` is a number that
-also widens spreads immediately, so that arm trades a rougher market as
-well as reading a higher figure.
+The arms differ in a way the numbers cannot separate. `cycle` is a word
+and changes nothing else in the observation. `vix` is a number that also
+widens spreads immediately, so that arm trades a rougher market as well as
+reading a higher figure.
 """)
 
 C("""
@@ -772,7 +772,7 @@ print(f"{decomp['replications']} replications, five arms")
 print()
 for name in arms5:
     row = decomp["per_arm"][name]
-    print(f"  {name:<10} {row['mean_of_means']:.3f} "
+    print(f"  {name:<12} {row['mean_of_means']:.3f} "
           f"+/- {row['stdev_of_means']:.3f}   "
           f"range {row['min']:.3f} to {row['max']:.3f}")
 
@@ -781,7 +781,7 @@ print("against control, in units of the larger spread:")
 print()
 for name, row in decomp["against_control"].items():
     ratio = "n/a" if row["ratio"] is None else f"{row['ratio']:+.2f}x"
-    print(f"  {name:<10} gap {row['gap']:+.3f}   "
+    print(f"  {name:<12} gap {row['gap']:+.3f}   "
           f"spread {row['spread']:.3f}   {ratio:>7}   "
           f"lower than control in {row['lower_in']}/"
           f"{decomp['replications']}")
@@ -794,21 +794,16 @@ plt.show()
   alt=charts.ALT["decomposition"])
 
 M("""
-Neither half reproduces the whole. `vix` reads 0.94 times its spread and is
-lower than control in three replications of four. `cycle` reads 1.11 times
-and is lower in four of four. Both spreads are about the size of their own
-gaps, and in one replication the `vix` arm sat above control.
+No arm separates from control. Every gap is under half its spread.
+`rate+regime` reads 0.46 times and `vix` 0.41 times, each lower than
+control in three replications of four. `+200bps` reads 0.18 times. `cycle`
+sits above control on average, at -0.18 times, and is lower in one
+replication of four.
 
-The combination reads 3.02 times, is lower in four of four, and has the
-smallest spread of any arm at 0.044.
-
-So the effect does not decompose at four replications. That is the finding,
-and it is not an interaction claim: showing that two fields together do
-something neither does alone needs more runs than this, and the numbers
-above do not support it.
-
-Two replications said something else. `vix` read 1.79 times there and
-looked like the whole story. It was on its way into this notebook as one.
+So at four replications none of these interventions moves mean exposure by
+more than the agent's own variation between runs, and the parts cannot be
+compared with the whole. Telling an interaction from noise here would need
+more runs than this.
 """)
 
 M("""
@@ -816,31 +811,30 @@ M("""
 
 | | one decision | four replications |
 |---|---|---|
-| crisis, net direction | 1.08x the within-arm spread | |
-| crisis, gross size | 1.94x | |
-| mean exposure | | 1.21x, lower in 3 of 4 |
+| crisis, net direction | 0.00x the within-arm spread | |
+| crisis, gross size | -0.20x | |
+| mean exposure | | 0.46x the between-run spread, lower in 4 of 4 |
+| agent's own change | | more negative than control in 2 of 4 |
 
-Every number here is above one and none is far above it.
+The three checks answer different questions. Asked the same fork-step
+question again, the agent gives answers the crisis arm cannot be told
+apart from control by. The canonical trajectory separates on all 20 days,
+by 0.129 of gross exposure on average, and its days are not independent
+samples. The four live replications are the strongest check here: the
+direction held in all four, and the size of the gap is small against how
+far the runs differ from each other.
 
-The three checks answer different questions. Re-asking the exact same
-fork-step question produced substantial variation, and the first decision
-alone did not give us a clean answer. The canonical trajectory, recorded
-on 0.8.5, separates on 17 of 20 days, by 0.026 of gross exposure on
-average, and its days are not independent samples. The four live
-replications are the strongest check here, and the direction held in three
-of them, but they were recorded under the 0.8.x harness and their agent
-held about twice the exposure, so they are not a sample this run belongs
-to.
-
-What the run supports: in the canonical trajectory the agent reduced gross
-exposure in the crisis branch and increased it in control, the agent-only
-measure attributes that to its trades rather than to prices, and across
-four live repeats under the 0.8.x harness the crisis branch was lower in
-three.
+What the runs support: under this scenario the crisis arm carried less
+gross exposure than its paired control in five runs out of five. What they
+do not settle is how much of that is the agent. The agent-only measure
+attributes the canonical gap to trades in the direction of the result, and
+in the replications it does so in two runs of four; the rest is the
+crisis market repricing a long book.
 
 The paths suggest why the first decision did not tell the whole story. The
 agent adjusts at each decision rather than reacting once and holding, so a
-single decision is a small step and twenty of them are the separation.
+single decision is a small step and twenty of them, on a market that has
+already fallen, are the separation.
 """)
 
 M("""
@@ -868,14 +862,15 @@ M("""
   envelope.
 - **Risk language is counted, not read.** A regular expression counts
   decisions whose rationale contains one of a fixed list of words. In the
-  canonical run that is 16 of 20 decisions in the crisis branch and 13 of
-  20 in control. It is a difference in how often those words appear, and
-  nothing about what the agent meant by them.
+  canonical run that is 16 of 20 decisions in the crisis branch and 14 of
+  20 in control; across the replications the crisis arm used them more
+  often in two runs of four. It is a count of words, and nothing about
+  what the agent meant by them.
 - **The scenario moves three targets at once.** Depth, volatility and the
   credit spread all change together, so which of them the agent responded
-  to is unmeasured here. The supporting story above splits the older
-  rate-and-regime arm and finds that neither half reproduces the whole,
-  which is the same problem measured on a different treatment.
+  to is unmeasured here. The decomposition above splits the rate-and-regime
+  arm and finds no part that separates, which is the same problem measured
+  on a different treatment.
 - **The credit widening is an assumption.** The scenario file labels it as
   one. Nothing in Tradefloor derives fifty basis points from a depth
   collapse, and a reader who disagrees can change the number and re-run.
@@ -905,15 +900,18 @@ API key and reaches no network. Every decision the agent took was recorded
 once, live, and is replayed from
 `tests/fixtures/finrobot/liquidity-crisis.json`.
 
-## What is not here
+## Recording it again
 
-This directory is the notebook and the module it imports. The runner, the
-validator, the replication driver and the publication figures live in the
-study repository this came from, along with the recorded runs of the
-earlier +200bps experiment over 421 companies that this one grew out of.
+`record.py` makes the recordings, and every command in it except
+`summarise` calls the model and costs money. `canonical` writes the run
+this notebook replays (60 calls), `replication N` one replication with all
+six arms (140 calls), and `resample` the sixteen re-asks; `summarise`
+rebuilds the three files in `data/` from what they wrote. On this study
+the full set came to 636 calls. It needs the FinRobot extra, which installs
+on Python 3.11 only, and `ANTHROPIC_API_KEY`.
 
-What is here is enough to read the experiment, re-execute it, and check
-every number in it against the recording.
+What is here is enough to read the experiment, re-execute it, record it
+again, and check every number in it against the recording.
 """)
 
 nb = nbformat.v4.new_notebook(cells=cells)
