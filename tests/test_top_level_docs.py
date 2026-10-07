@@ -231,16 +231,21 @@ def test_the_readme_states_cpu_time_as_the_examples_pages_do():
 
 def test_support_says_the_liquidity_crisis_run_was_recorded_again():
     """SUPPORT.md said the study's recordings stopped replaying at the first
-    decision, after the canonical run had been recorded again and replayed."""
+    decision, after the canonical run had been recorded again and replayed.
+    It names the preset and the call count the committed recording carries,
+    read off the recording rather than restated."""
     from tradefloor.integrations.common import Transcript
 
     text = flat(read("docs/SUPPORT.md"))
     assert "stop replaying" not in text
-    calls = len(Transcript.load(
-        ROOT / "tests/fixtures/finrobot/liquidity-crisis.json"))
-    assert (f"recorded again, live, on 0.8.5: {calls} model calls, in "
+    recording = Transcript.load(
+        ROOT / "tests/fixtures/finrobot/liquidity-crisis.json")
+    preset = recording.meta["model_preset"]
+    version = recording.meta["tradefloor_version"]
+    assert (f"recorded again, live, on {preset} at {version}: its canonical "
+            f"run is {len(recording)} model calls, in "
             "`tests/fixtures/finrobot/liquidity-crisis.json`") in text
-    assert "were not recorded again" in text
+    assert "were not recorded again" not in text
 
 
 def test_the_manifest_docs_name_the_result_block_it_writes():

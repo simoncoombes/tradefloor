@@ -1953,27 +1953,27 @@ def test_preset_of_reads_the_engine_the_observation_carries():
 #: rather than assumed. The day-zero macro block a recording carries is a
 #: function of the preset and of nothing else on this path -- day-zero
 #: PRICES are identical across every shipped preset, so they say nothing.
-#: The five integration recordings open at a derived VIX where the two
-#: pt-v16 ones open at the declared 15.0000 with inflation 0.0200; one of
-#: the five, `openai_agents/five-days.json`, prints no macro block at all
-#: and is dated by its replay instead.
+#: The six recordings on pt-v21 open at a derived VIX where the pt-v16 one
+#: opens at the declared 15.0000 with inflation 0.0200; one of the six,
+#: `openai_agents/five-days.json`, prints no macro block at all and is
+#: dated by its replay instead.
 #:
 #: The set is NOT uniform, so this table is written out per file. Five
 #: of the seven belong to the integration examples and were re-recorded
 #: live against pt-v19 at 0.8.0, on the shipped default rather than on a
 #: pin; each replays green under it, which a recording made in another
 #: market could not do. The other two belong to
-#: `examples/experiments/liquidity-crisis/`, which pins `PRESET = "pt-v16"`
-#: deliberately and is a pinned historical study rather than notebook
-#: material. Three readings agree on that pair: the pin, the macro opening
-#: below, and `DEFAULT_PRESET_NAME` at the commit that recorded them, which
-#: was pt-v16. A blanket value across all seven would write a false
-#: provenance into two of them.
+#: `examples/experiments/liquidity-crisis/`. `rate-ladder.json` is an older
+#: recording of that study made on pt-v16, which the notebook only parses
+#: and never replays. `liquidity-crisis.json` was recorded again live on
+#: pt-v21 at 0.10.1, and the study pins `PRESET = "pt-v21"` so it keeps
+#: replaying when the default moves. A blanket value across all seven would
+#: write a false provenance into one of them.
 #: The five on the default were re-recorded live on pt-v21 at 0.10.0, when
 #: it took the default; they read pt-v20 until then.
 FIXTURE_PRESETS = {
     "callable/five-days.json": "pt-v21",
-    "finrobot/liquidity-crisis.json": "pt-v16",
+    "finrobot/liquidity-crisis.json": "pt-v21",
     "finrobot/rate-ladder.json": "pt-v16",
     "finrobot/rate-shock.json": "pt-v21",
     "langgraph/rate-shock.json": "pt-v21",

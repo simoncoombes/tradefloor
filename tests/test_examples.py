@@ -80,8 +80,8 @@ def test_there_are_notebooks_to_check():
 #: replay is keyed to the exact text the agent was sent, so from the first
 #: trade on the prompts differ and the replay misses. Each entry is a
 #: follow-up, not a pass: it names what has to be re-recorded to remove it.
-#: Empty since 2026-10-01, when the liquidity-crisis study's canonical run
-#: was recorded again live on 0.8.5 and its notebook executes again.
+#: Empty since the liquidity-crisis study was recorded again live on
+#: pt-v21, the preset it pins.
 STALE_RECORDINGS: dict = {}
 
 
@@ -289,6 +289,10 @@ NOT_RUN: dict[str, str] = {
         "same cells without writing",
     "experiments/liquidity-crisis/charts.py":
         "a module of figures the study notebook imports",
+    "experiments/liquidity-crisis/record.py":
+        "records the study live, and every command but `summarise` calls "
+        "a paid model; the data it writes is checked by "
+        "test_the_liquidity_crisis_data_agrees_with_itself",
     "rate-shock/agent.py":
         "the agent counterfactual.py imports and runs",
 }
@@ -692,27 +696,95 @@ def _flat(page: str) -> str:
     return " ".join((EXAMPLES.parent / page).read_text(encoding="utf-8").split())
 
 
-def test_the_liquidity_crisis_study_names_the_default_it_is_not_on():
-    """The study pins pt-v16, and says which preset it is NOT on.
+def test_the_liquidity_crisis_study_names_the_preset_it_was_recorded_on():
+    """The study names one preset, and it is the one its recording was made
+    in and the one `experiment.py` pins.
 
-    It said the shipped default was pt-v19 through 0.8.5, a release whose
-    default is pt-v20. The sentence exists to tell a reader why the study's
-    numbers differ from a fresh run, so a stale name sends them to the wrong
-    preset to compare against.
+    Through 0.10.0 the study pinned pt-v16 while the pages named the shipped
+    default it was not on. It was recorded again on pt-v21, and a page that
+    went on naming an earlier preset would send a reader comparing numbers
+    to the wrong market.
     """
+    import importlib.util
     import re
-    import tradefloor as tf
-    default = tf.ModelParams.from_preset().fingerprint
-    for page, pattern in (
-            ("examples/experiments/liquidity-crisis/README.md",
-             r"shipped default from [0-9.]+ is `(pt-v\d+)`"),
-            ("examples/experiments/liquidity-crisis/build_notebook.py",
-             r"it is `(pt-v\d+)` from [0-9.]+"),
-            ("examples/experiments/liquidity-crisis/notebook.ipynb",
-             r"it is `(pt-v\d+)` from [0-9.]+")):
-        named = re.findall(pattern, _flat(page))
-        assert named == [default], (
-            f"{page} names the shipped default as {named}; it is {default}")
+
+    from tradefloor.integrations.finrobot import Transcript
+
+    study = EXAMPLES / "experiments" / "liquidity-crisis"
+    spec = importlib.util.spec_from_file_location(
+        "liquidity_crisis_pin", study / "experiment.py")
+    ex = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(ex)
+
+    assert Transcript.load(ex.FIXTURE).meta["model_preset"] == ex.PRESET
+    for page in ("README.md", "build_notebook.py", "notebook.ipynb"):
+        named = set(re.findall(r"`(pt-v\d+)`", _flat(
+            f"examples/experiments/liquidity-crisis/{page}")))
+        assert named == {ex.PRESET}, (
+            f"{page} names {sorted(named)}; the study is on {ex.PRESET}")
+
+
+def test_the_liquidity_crisis_data_agrees_with_itself():
+    """`data/` is written by `record.py summarise` from transcripts that are
+    not committed, so what can be checked offline is checked: each summary
+    against its own rows, the resample against its recorded orders and the
+    canonical recording's fork-step prompts, and every file against the
+    preset the study pins.
+    """
+    import importlib.util
+    import json
+    import statistics
+
+    study = EXAMPLES / "experiments" / "liquidity-crisis"
+    data = study / "data"
+    reps = json.loads((data / "replications.json").read_text("utf-8"))
+    decomp = json.loads((data / "decomposition.json").read_text("utf-8"))
+    for summary, names in ((reps, ["control", "crisis"]),
+                           (decomp, list(decomp["arms"]))):
+        assert summary["replications"] == len(summary["rows"]) == 4
+        for name in names:
+            values = [r["mean_exposure"][name] for r in summary["rows"]]
+            row = summary["per_arm"][name]
+            assert row["mean_of_means"] == pytest.approx(
+                statistics.mean(values))
+            assert row["stdev_of_means"] == pytest.approx(
+                statistics.stdev(values))
+    gap = reps["gaps"]["control - crisis"]
+    assert gap["positive_in"] == sum(
+        r["mean_exposure"]["control"] > r["mean_exposure"]["crisis"]
+        for r in reps["rows"])
+    # The decomposition's control arm is the replications' control arm.
+    assert [r["mean_exposure"]["control"] for r in decomp["rows"]] == [
+        r["mean_exposure"]["control"] for r in reps["rows"]]
+
+    resample = json.loads((data / "resample-fork.json").read_text("utf-8"))
+    for name, rows in resample["runs"].items():
+        stats = resample["stats"][name]
+        nets = [r["net"] for r in rows]
+        assert stats["calls"] == resample["n"] == len(rows) + stats["refusals"]
+        assert stats["distinct"] == len(
+            {json.dumps(r["orders"], sort_keys=True) for r in rows})
+        assert stats["mean_net"] == pytest.approx(statistics.mean(nets))
+        assert stats["stdev_net"] == pytest.approx(statistics.stdev(nets))
+        assert all(r["net"] == sum((q > 0) - (q < 0)
+                                   for q in r["orders"].values())
+                   for r in rows)
+
+    spec = importlib.util.spec_from_file_location(
+        "liquidity_crisis_record", study / "record.py")
+    record = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(record)
+    from tradefloor.integrations.finrobot import Transcript
+    entries = {e["arm"]: e for e in Transcript.load(record.ex.FIXTURE).entries
+               if e["step"] == resample["step"]}
+    base = entries["control"]["prompt"].splitlines()
+    for name, stats in resample["stats"].items():
+        lines = entries[name]["prompt"].splitlines()
+        assert stats["prompt_lines"] == len(lines)
+        assert stats["differing_lines"] == sum(
+            a != b for a, b in zip(base, lines))
+    assert record.ex.PRESET == reps["preset"] == decomp["preset"]
+
 
 
 #: What each page says a run costs: CPU time, user plus system, measured with
