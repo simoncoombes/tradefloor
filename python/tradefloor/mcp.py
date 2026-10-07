@@ -1604,7 +1604,10 @@ def describe_simulator() -> dict[str, Any]:
                 "What a trader sees: prices, the day's bars so far, the "
                 "book's best bid and ask, the published macro figures, which "
                 "names have news, and your own portfolios. Nothing of the "
-                "simulator's own state."),
+                "simulator's own state. On a preset that pays dividends a "
+                "holder is paid at each ex-date open, reinvested in the "
+                "paying name as evaluate_strategies does, and a portfolio "
+                "shows `dividends` once any are paid."),
             "not_a_score": (
                 "A session can be forked, rewound and reopened from the same "
                 "seed, so its P&L can use knowledge of the market's future. "
@@ -3693,6 +3696,15 @@ class _Session:
             day, of_day = divmod(step, spd)
             if of_day == 0:
                 engine.open_market()
+                # The cash dividends this open made payable, into each
+                # portfolio in label order before any agent is asked, as
+                # `evaluate` and a World collect them. The open is the only
+                # place they are paid, so a fork or a rewind restores a
+                # portfolio that either has today's or has not yet opened
+                # today, and none is paid twice or skipped. Nothing on a
+                # model without dividends.
+                for label in self.labels:
+                    books[label].collect_dividends(engine)
             prices = _f64(engine.prices())
             observed: dict[str, Any] = {}
             for label in self.labels:
@@ -3901,6 +3913,10 @@ def _portfolio_view(view: Any) -> dict[str, Any]:
                                    "limit_price", "quantity", "remaining")
              if k in order}
             for order in view.open_orders()],
+        # Only when any were paid, as a scorecard row shows them: a model
+        # without dividends pays none and its view is the view it was.
+        **({"dividends": round(view.dividends, 2)} if view.dividends
+           else {}),
     }
 
 
