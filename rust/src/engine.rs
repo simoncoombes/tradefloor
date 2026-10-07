@@ -920,6 +920,12 @@ pub struct Engine {
     /// by the snapshot and the state hash only then. See
     /// `ModelParams::vix_stress_premium` and [`Engine::published_vix`].
     vix_stress_memory: f64,
+    /// The VIX's fear memory, in log units: the share of the VIX's
+    /// excursion over its target that the target carries. Moves only with
+    /// `vix_fear_uptake` non-zero, which no preset sets, and is carried by
+    /// the snapshot and the state hash only then. See
+    /// `ModelParams::vix_fear_uptake`.
+    vix_fear: f64,
     /// Whether a crisis EPISODE is running. The episode starts at the open
     /// of the first session whose VIX is above `crisis_vix_threshold` with
     /// no episode running, and ends after `crisis_epicentre_end_sessions`
@@ -2228,6 +2234,7 @@ impl Engine {
             vix_anchor_slow: 0.0,
             market_vol_cycle_log: None,
             vix_stress_memory: 0.0,
+            vix_fear: 0.0,
             crisis_in_episode: false,
             crisis_sessions_under: 0,
             crisis_epicentre: -1,
@@ -2455,6 +2462,7 @@ impl Engine {
         self.market_vol_log_level = pre.market_vol_log_level;
         self.vix_anchor_slow = pre.vix_anchor_slow;
         self.vix_stress_memory = pre.vix_stress_memory;
+        self.vix_fear = pre.vix_fear;
         self.market_vol_cycle_log = pre.market_vol_cycle_log;
         self.sector_variance = pre.sector_variance.clone();
         self.idio_variance = pre.idio_variance.clone();
@@ -8962,6 +8970,14 @@ impl Engine {
         let mut inputs =
             self.daily_inputs(request, market_day_return_pct, index_variance, self.vix_anchor_slow,
                               self.market_vol_cycle_vix_scale());
+        // THE FEAR MEMORY, advanced to today on the close's own inputs before
+        // the step reads it. Arithmetic on the day's state, no draw, and not
+        // run at all with `vix_fear_uptake` at 0.0.
+        if self.params.vix_fear_uptake != 0.0 {
+            self.vix_fear = crate::economy::daily::advance_vix_fear(
+                self.vix_fear, &inputs, self.economy.vix, self.params.vix_fear_half_life);
+            inputs.vix_fear = self.vix_fear;
+        }
         // The priced spread multiplier at the session's start and after
         // tonight's report (`cycle_nowcast_accuracy`,
         // `corporate_spread_cycle`), which `daily_inputs` cannot know: it
@@ -9250,6 +9266,8 @@ impl Engine {
             vix_anchor_weight_level_knee_fixed: self.params.vix_anchor_weight_level_knee_fixed,
             vix_anchor_level_fixed: self.vix_anchor,
             vix_anchor_slow,
+            vix_fear_uptake: self.params.vix_fear_uptake,
+            vix_fear: self.vix_fear,
             vix_jump_intensity: self.params.vix_jump_intensity,
             vix_jump_scale: self.params.vix_jump_scale,
             vix_return_level_exponent: self.params.vix_return_level_exponent,
@@ -9635,6 +9653,23 @@ impl Engine {
 
     pub fn set_vix_stress_memory(&mut self, value: f64) {
         self.vix_stress_memory = value;
+    }
+
+    /// Whether this engine's model carries the VIX's fear memory, which is
+    /// when the snapshot and the state hash carry it: only with
+    /// `vix_fear_uptake` non-zero, which no preset sets.
+    pub fn carries_vix_fear(&self) -> bool {
+        self.params.vix_fear_uptake != 0.0
+    }
+
+    /// The VIX's fear memory in log units (`vix_fear_uptake`); 0.0 with the
+    /// switch off.
+    pub fn vix_fear(&self) -> f64 {
+        self.vix_fear
+    }
+
+    pub fn set_vix_fear(&mut self, value: f64) {
+        self.vix_fear = value;
     }
 
     /// A caller wrote the VIX: the stress memory restarts from 0.0, so the
@@ -10692,7 +10727,12 @@ impl Engine {
             game_day: self.elapsed_days + 1,
             timestamp: (self.elapsed_days + 1) * 24 * 60,
         };
-        let inputs = self.daily_inputs(&request, session_pct, index_variance, slow, cycle_vix_scale);
+        let mut inputs = self.daily_inputs(&request, session_pct, index_variance, slow, cycle_vix_scale);
+        // The fear memory as the close will advance it (`vix_fear_uptake`).
+        if self.params.vix_fear_uptake != 0.0 {
+            inputs.vix_fear = crate::economy::daily::advance_vix_fear(
+                self.vix_fear, &inputs, self.economy.vix, self.params.vix_fear_half_life);
+        }
         if !yields {
             // The VIX alone (`vix_intraday_live` without rate indices): the
             // same step's VIX half, with the yields left at 0.0.
@@ -12078,6 +12118,12 @@ impl Engine {
             for value in words {
                 hash_f64(&mut buf, value);
             }
+        }
+        // The VIX's fear memory, only while `vix_fear_uptake` is set, behind
+        // its own tag.
+        if self.carries_vix_fear() {
+            hash_f64(&mut buf, 44.0);
+            hash_f64(&mut buf, self.vix_fear);
         }
         // LENGTH-PREFIXED, because these two are EMPTY between the tape row
         // that consumes them and the close that fills them again, where

@@ -411,6 +411,17 @@ OUT_OF_SCOPE = {
         "unread while `forecast_policy_reversion` is 0.0, as every preset "
         "ships it; at its default of 2.5 it is also left out of the model's "
         "digest",
+    # The VIX's fear memory (pt-v22 phase 1, the VIX law), inert on every
+    # shipped preset.
+    "vix_fear_uptake":
+        "inert at 0.0: `vix_close` takes the identity's target as the anchor "
+        "makes it (a branch on the dial), the close and the forecast do not "
+        "call `advance_vix_fear`, and nothing is snapshotted or hashed; at "
+        "0.0 it is also left out of the model's digest",
+    "vix_fear_half_life":
+        "unread while `vix_fear_uptake` is 0.0, as every preset ships it: "
+        "only `advance_vix_fear` reads it; at 0.0 it is also left out of the "
+        "model's digest",
     # The thirteenth registration's bond timing (r13), inert on every
     # preset. When pt-v20 takes them they leave this table: the two switches
     # derived, the cut and its start and gap fitted to FRED's target rate

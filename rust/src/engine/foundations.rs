@@ -602,6 +602,7 @@ impl Engine {
         let mut faces_e = faces;
         let mut slow = self.vix_anchor_slow;
         let mut stress = self.vix_stress_memory;
+        let mut fear = self.vix_fear;
         let mut universe_stress = self.universe_stress;
         let mut down = Some(self.market_vol.prev_day_down());
         let (mut var_oil, mut var_inventory) = (0.0, 0.0);
@@ -755,6 +756,12 @@ impl Engine {
             } else {
                 p.market_vol_vix_anchor * mv.sigma_daily() / p.market_factor_sigma
             };
+            // The fear memory, advanced on the step's inputs at the expected
+            // VIX, as the close advances it (`vix_fear_uptake`).
+            if p.vix_fear_uptake != 0.0 {
+                fear = crate::economy::daily::advance_vix_fear(fear, &inputs, vix, p.vix_fear_half_life);
+                inputs.vix_fear = fear;
+            }
             let sd_ret = 100.0 * crate::mathx::sqrt(crate::mathx::max(0.0, v_session));
             let mut vix_next = 0.0;
             for &z in live_mark_nodes().iter() {

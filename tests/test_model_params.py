@@ -1158,6 +1158,14 @@ PERTURBATIONS = [
     ("forecast_policy_persistence", 0.5, False),
     ("forecast_policy_reversion", 0.1, False),
     ("forecast_policy_neutral", 1.7, False),
+    # The VIX's fear memory (pt-v22 phase 1). LIVE: the first close's VIX
+    # sits off its target, the memory takes up a share of the gap, and the
+    # target the step reverts to moves, which the factor's VIX-coupled
+    # variance carries into prices. Carries its half-life as the companion,
+    # without which it is refused.
+    ("vix_fear_uptake", 0.2, True),
+    # INERT: read only with vix_fear_uptake non-zero.
+    ("vix_fear_half_life", 20.0, False),
     # LIVE with the companion start of 15: at pt-v20's 30 no meeting in the
     # probe's burn-in or its three sessions reads a VIX of 30 (measured: the
     # row at 0.25 alone is inert), and at 15 the first meeting cuts a
@@ -2026,6 +2034,10 @@ COMPANIONS: dict[str, dict[str, float]] = {
     # The anchor weight blends the read-back with the derived anchor, and
     # both exist only under the identity.
     "vix_anchor_weight": {"vix_level_identity": 1.0},
+    # The fear memory decays at its half-life, so the uptake is refused
+    # without one; the half-life alone is unread, so both arms are the
+    # default's.
+    "vix_fear_uptake": {"vix_fear_half_life": 20.0},
     # The memory is what the weight pulls against, so it is refused without one.
     # The weight is the default's 0.375 since the fifth composition (it was
     # 0.45, the route-1 cell's, while the default shipped none).

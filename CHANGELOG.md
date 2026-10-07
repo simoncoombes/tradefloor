@@ -16,6 +16,18 @@ each close from public state. None of them moves a price.
 
 <!-- release-note-ends -->
 
+### The VIX's fear memory
+
+- `vix_fear_uptake` and `vix_fear_half_life` are new dials, 0.0 on every
+  preset and left out of the digest there. Off zero, the VIX's target
+  carries a memory of the VIX's own excursions over it, taken up at the
+  uptake each session and decaying at the half-life, so a move the VIX holds
+  lasts longer than the step's 0.27 a session. The forecast and the live VIX
+  advance it as the close does.
+- A snapshot carries `vix_fear` only under the uptake, and the state hash
+  and `manifest.state_hash` cover it only then. Every known-answer digest is
+  where it was.
+
 ### Inputs for derivatives
 
 - `index_level_listed`, `vix_intraday_live` and `forecast_horizon_sessions`

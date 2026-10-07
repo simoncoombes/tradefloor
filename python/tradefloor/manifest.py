@@ -561,6 +561,8 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          # the forecast, only while `forecast_horizon_sessions` is set and a
          # close has computed one.
          "index_divisor", "vix_live", "forecast",
+         # The VIX's fear memory, only while `vix_fear_uptake` is set.
+         "vix_fear",
          # The dividend states, on a model that pays dividends, and an
          # ex-date's move in `s` waiting for its tape row.
          "dividend", "pending_dividend",
@@ -914,6 +916,11 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         _u32(buf, len(values))
         for value in values:
             _f64(buf, value)
+    # The VIX's fear memory, only while `vix_fear_uptake` is set, behind its
+    # own tag: `Engine::state_hash`'s order and rule.
+    if "vix_fear" in snapshot:
+        _f64(buf, 44.0)
+        _f64(buf, float(snapshot["vix_fear"]))
     # LENGTH-PREFIXED, because these two are empty between the tape row that
     # consumes them and the close that fills them again -- unlike every
     # per-slot array above, which always follows the roster. An empty buffer

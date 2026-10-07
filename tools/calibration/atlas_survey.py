@@ -536,6 +536,10 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "vix_stress_premium_knee": (0.0, 1.5),
     # The largest log premium of the quote over the state; 0.5 is 1.65x.
     "vix_stress_premium_cap": (0.0, 0.5),
+    # The VIX's fear memory: the uptake up to half the excursion a session,
+    # and the half-life from a week to a year of sessions.
+    "vix_fear_uptake": (0.0, 0.5),
+    "vix_fear_half_life": (0.0, 252.0),
     # The Fed put: pp of cut per unit of intermeeting log fall. 10 cuts a
     # point on a 10 per cent fall, over three times Cieslak and
     # Vissing-Jorgensen's 30bp.

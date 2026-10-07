@@ -2972,6 +2972,40 @@ the pin back.
 | $k$ | `vix_stress_premium_knee` | 0 | 0.6 | fitted | on $M_d$'s log scale |
 | $P$ | `vix_stress_premium_cap` | 0 | 0.35 | chosen | the largest log premium; the quote is at most $e^{P}$ times the state |
 
+### The fear memory
+
+**Timescale:** once a day, at the close, before the step. **Draws:** none.
+**State:** a fear memory $f_d$ in log units, carried only while the uptake
+is set.
+
+The step above reverts the VIX to $T_d$ at $\kappa_X$ = 0.27 a session, so a
+move of the VIX that the variance read-back does not share is gone in a few
+sessions. The tape's moves last longer. A day's change in ^VIX is still 0.67
+of itself 11 sessions later, 0.47 at 32 and 0.31 at 74 (local projections
+on the day's change with the previous close held, 2004 to 2025), where
+pt-v21 reads 0.60, 0.38 and 0.21. CBOE's term structure prices the same
+persistence: VIX3M moves 0.64 of a VIX point, VIX6M 0.45 and VIX1Y 0.30.
+Two dials, 0 on every preset, keep a memory of the VIX's own excursion over
+its target (`economy/daily.rs`, `advance_vix_fear`):
+
+```math
+f_d = 2^{-1/H} f_{d-1} + k \ln\frac{X_d}{T^{\ast}_d\, e^{f_{d-1}}},
+\qquad
+T_d = T^{\ast}_d\, e^{f_d} + \min\Big(C,\ \Phi(r_d, X_d) + 0.2\,(\pi - 3)^{+}\Big) - \bar\Phi_d
+```
+
+where $T^{\ast}_d = \Xi_d I_d e^{-a(X_d) M_d}$ is the target's level, so the
+step reverts to a level that carries a share $k$ of each excursion the VIX
+held and lets it go at the half-life $H$. The forecast
+(`forecast_horizon_sessions`) and the live VIX (`vix_intraday_live`) advance
+the memory as the close does. The memory reads the VIX state, so a pinned
+VIX is an excursion like any other.
+
+| Symbol | Dial | pt-v20 | pt-v21 | Kind | Source |
+|---|---|---|---|---|---|
+| $k$ | `vix_fear_uptake` | 0 (off) | 0 (off) | chosen | the share of the excursion taken up a session; in $[0, 1)$ |
+| $H$ | `vix_fear_half_life` | 0 | 0 | chosen | the memory's half-life in sessions; read only with $k$ set |
+
 ## Crisis regimes
 
 A crisis is a state of the VIX. There is no separate regime switch: every
@@ -3999,6 +4033,7 @@ x = \max\Big(\ln\frac{\mathrm{VIX}}{K},\ c\,\ln\frac{\mathrm{VIX}}{K_c}\Big)
   and the close's pull on an unpinned session still reads the knee alone, since a VIX the market itself reached comes with the fall that raised it. $K_c = 17.6$ is the real median VIX (1990-2025); at $c = 0.2$ a pin under the knee moves the index $g\,w\,c = 0.056$ log points per log point of VIX the day it lands, against the S&P 500's 0.05 on one-day spikes of 16 per cent or more from under 20 (1990-2025; -0.110 on every session closing under 40).
 - **A held pin priced once** (`pinned_vix_priced_cap`, a switch; read only with `pinned_vix_feedback` on). Off, a VIX held at one pinned level keeps closing the gap: $w$ of it on the day, then $w$ of the rest each pinned session, a fall an agent reading the VIX can sell ahead of, and SF1 reads near $w$ even where the pin prices a large move. On, the step is capped at $\max(e, w\,x)$, so a held pin prices once and holds; a pin below the exposure steps down as before. Screen r17sf1s1 (R16A with $K_c = 17.6$, $c = 0.2$ and the cap): SF1 1.06 / 1.03 on the graded 12 seeds of held-out sets A and B, the driven 2022 P/E per 100 bp of Baa -7.1 / -7.2 (real -5.2), the driven 2020 sessions back to the high 97.5 / 71 (real 126).
 - **Published VIX premium** (`vix_stress_premium`, `vix_stress_premium_knee`, `vix_stress_premium_cap`): `macro_fields["vix"]` is the VIX state.
+- **The fear memory** (`vix_fear_uptake`, `vix_fear_half_life`): the VIX reverts to the anchor's target with no memory of its own excursions.
 
 - **The Fed put and the Treasury haven** (`fed_put_gain`, `fed_put_threshold`, `fed_put_half_life`, `fed_put_emergency_vix`, `treasury_put_pricing`, `treasury_haven_gain`): the ladder alone sets the policy rate, and the 10-year's term premium does not read the VIX.
 - **The stress hold and the priced path** (`fed_stress_hold`, `treasury_path_pricing`, `treasury_path_half_life`, `treasury_policy_damping`): the bank may raise the rate at any meeting the ladder asks, and the curve reads the policy rate as it stands.
