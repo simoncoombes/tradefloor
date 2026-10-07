@@ -3812,8 +3812,8 @@ A future is priced at `F = (S - PV(D)) * exp(r * tau) + b`:
   `basis_sd` and close-to-close persistence `basis_persistence`, stepped on
   every open tick and every night step, plus each contract's mark of
   agents' net flow against the house, `0.15 * sigma * flow / V`, decaying at
-  a 30-step half-life. Both are scaled by `min(1, sessions to expiry / 6)`,
-  so a future converges on the index over its roll.
+  a 30-step half-life. Both are scaled by `min(1, n / 6)`, with `n` the
+  sessions to expiry, so a future converges on the index over its roll.
 
 Each close marks every contract at `F` on the close's index. At its expiry
 session's open a contract settles in cash on the index of the opening

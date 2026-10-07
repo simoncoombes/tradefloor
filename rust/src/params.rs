@@ -11825,7 +11825,7 @@ impl ModelParams {
         }
         if self.futures_index_listed != 0.0 && self.index_level_listed == 0.0 {
             return Err(format!(
-                "futures_index_listed is {} but index_level_listed is 0. An index future \
+                "index_level_listed is 0 but futures_index_listed is {}. An index future \
                  settles on the price index, which only index_level_listed keeps: with \
                  futures_index_listed on, index_level_listed is 1.0.",
                 self.futures_index_listed));
@@ -11853,7 +11853,7 @@ impl ModelParams {
         }
         if self.night_session_steps != 0.0 && self.futures_index_listed == 0.0 {
             return Err(format!(
-                "night_session_steps is {} but futures_index_listed is 0. The night session \
+                "futures_index_listed is 0 but night_session_steps is {}. The night session \
                  walks the index futures, which only futures_index_listed lists: with \
                  night_session_steps set, futures_index_listed is 1.0.",
                 self.night_session_steps));

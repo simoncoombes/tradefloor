@@ -141,6 +141,18 @@ def test_ns3_an_untraded_run_prints_the_same_prices_with_every_switch_on(seed):
     assert engine.quote(engine.contracts()[0]["symbol"])["mark"] is not None
 
 
+def test_ns3_holds_across_a_roll_and_an_expiry():
+    """The front's roll at session 50 and its settlement and the next
+    listing at session 56 write nothing a stock price reads."""
+    off, _ = _untraded(model(), 9001, days=60, steps=2)
+    on, engine = _untraded(model(**ON), 9001, days=60, steps=2)
+    assert len(off) == len(on)
+    for i, (a, b) in enumerate(zip(off, on)):
+        assert a == b, f"print {i} differs with the switches on"
+    assert [s["symbol"] for s in engine.settlements()] == ["IDX.F0056"]
+    assert [c["symbol"] for c in engine.contracts()] == ["IDX.F0119", "IDX.F0182"]
+
+
 def test_ns3_holds_across_a_pin_between_sessions_and_the_pin_moves_the_futures():
     pins = {4: dict(vix=38.0), 7: dict(federal_funds_rate=0.04, oil_price=95.0)}
     off, _ = _untraded(model(), 17, days=9, pins=pins)
