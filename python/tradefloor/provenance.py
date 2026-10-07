@@ -364,6 +364,53 @@ RETURNED_TO_BASELINE = {
 #: where it sits. Move the partner and this entry becomes false -- which is
 #: why each one names the partner rather than saying "inert".
 OUT_OF_SCOPE = {
+    # What derivatives read (pt-v22 phase 1), inert on every shipped preset.
+    # None of them writes anything a price reads, so off zero they leave every
+    # price where it was as well.
+    "index_level_listed":
+        "inert at 0.0: `Engine::index_open`, `index_mark_close`, "
+        "`index_before_change` and `index_rebase` in engine/foundations.rs "
+        "return at once with the switch off, `Engine::index_level` returns "
+        "None, and nothing is snapshotted or hashed; at 0.0 it is also left "
+        "out of the model's digest",
+    "vix_intraday_live":
+        "inert at 0.0: `Engine::tick` and `open_market` pass `vix` false to "
+        "`refresh_live_marks`, so no projection is made or kept, "
+        "`Engine::live_vix` returns None, and nothing is snapshotted or "
+        "hashed; at 0.0 it is also left out of the model's digest",
+    "forecast_horizon_sessions":
+        "inert at 0.0: `Engine::refresh_forecast` in engine/foundations.rs "
+        "returns at once, so no forecast is computed or kept, "
+        "`Engine::forecast` returns None, and nothing is snapshotted or "
+        "hashed; at 0.0 it is also left out of the model's digest",
+    # The forecast's derived dials, read only by `Engine::compute_forecast`,
+    # which runs only with `forecast_horizon_sessions` set.
+    "forecast_vix_dispersion":
+        "unread while `forecast_horizon_sessions` is 0.0, as every preset "
+        "ships it: `compute_forecast` does not run. Off zero it is the log "
+        "VIX's sd about the forecast, measured on held-out histories; at 0.0 "
+        "it is also left out of the model's digest",
+    "forecast_vix_dispersion_half_life":
+        "unread while `forecast_horizon_sessions` is 0.0, and while "
+        "`forecast_vix_dispersion` is 0.0; at 0.0 it is also left out of the "
+        "model's digest",
+    "forecast_policy_shadow_discount":
+        "unread while `forecast_horizon_sessions` is 0.0: "
+        "`forecast_policy_path` does not run. A projection fitted on the "
+        "model's held-out histories; at 0.0 it is also left out of the "
+        "model's digest",
+    "forecast_policy_persistence":
+        "unread while `forecast_horizon_sessions` is 0.0: "
+        "`forecast_policy_path` does not run, and at 0.0 it is a branch; at "
+        "0.0 it is also left out of the model's digest",
+    "forecast_policy_reversion":
+        "unread while `forecast_horizon_sessions` is 0.0: "
+        "`forecast_policy_path` does not run, and at 0.0 it is a branch; at "
+        "0.0 it is also left out of the model's digest",
+    "forecast_policy_neutral":
+        "unread while `forecast_policy_reversion` is 0.0, as every preset "
+        "ships it; at its default of 2.5 it is also left out of the model's "
+        "digest",
     # The thirteenth registration's bond timing (r13), inert on every
     # preset. When pt-v20 takes them they leave this table: the two switches
     # derived, the cut and its start and gap fitted to FRED's target rate

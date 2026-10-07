@@ -4645,6 +4645,64 @@ impl PyEngine {
         Ok(d)
     }
 
+    /// The price index (`index_level_listed`), or None with the switch off:
+    /// `level`, `sum(price * shares_outstanding) / divisor` over the public,
+    /// solvent names on the prices as they stand (1000 before the first
+    /// session opens); `close`, the level on the last close's prints (None
+    /// before the first close); `divisor` (None before the first open); and
+    /// `constituents`, the names in it. A listing, a delisting or a change of
+    /// status resets the divisor so the level does not move.
+    #[getter]
+    fn index_level<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyDict>>> {
+        let Some(index) = self.inner.index_level() else {
+            return Ok(None);
+        };
+        let d = PyDict::new_bound(py);
+        d.set_item("level", index.level)?;
+        d.set_item("close", index.close)?;
+        d.set_item("divisor", index.divisor)?;
+        d.set_item("constituents", index.constituents)?;
+        Ok(Some(d))
+    }
+
+    /// The live VIX (`vix_intraday_live`), or None with the switch off: within
+    /// a session the projection of the VIX tonight's close will publish,
+    /// given the session so far, refreshed every five session minutes;
+    /// outside one, the published VIX.
+    #[getter]
+    fn live_vix(&self) -> Option<f64> {
+        self.inner.live_vix()
+    }
+
+    /// The forecast the last close computed (`forecast_horizon_sessions`), or
+    /// None with the dial at 0 and before the first close. Entry `h - 1` of
+    /// each list is the expectation `h` sessions ahead: `vix`, the published
+    /// VIX; `index_variance`, the index's one-session variance for session
+    /// `t + h` (fraction squared); `policy_rate`, fractional; `oil`; and
+    /// `name_variance`, each equity's one-session variance by ticker (an
+    /// empty list for a name outside the index). `day` is the day count of
+    /// the close that computed it and `horizon` the number of sessions.
+    fn forecast<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyDict>>> {
+        let Some(f) = self.inner.forecast() else {
+            return Ok(None);
+        };
+        let d = PyDict::new_bound(py);
+        d.set_item("day", f.day)?;
+        d.set_item("horizon", f.horizon())?;
+        d.set_item("vix", f.vix.clone())?;
+        d.set_item("index_variance", f.index_variance.clone())?;
+        let rates: Vec<f64> =
+            f.policy_rate.iter().map(|r| crate::units::percent_to_fraction(*r)).collect();
+        d.set_item("policy_rate", rates)?;
+        d.set_item("oil", f.oil.clone())?;
+        let names = PyDict::new_bound(py);
+        for (ticker, row) in self.tickers.iter().zip(f.name_variance.iter()) {
+            names.set_item(ticker, row.clone())?;
+        }
+        d.set_item("name_variance", names)?;
+        Ok(Some(d))
+    }
+
     /// The day's `random_noise` column split into the three draws it sums,
     /// `"market"`, `"sector"` or `"idio"`, as f64 bytes per company.
     ///

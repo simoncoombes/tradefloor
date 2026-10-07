@@ -153,6 +153,12 @@ CASES = {
     "impact_memory": (MEMORY, (), (), ("book",), {"trade": True}),
     "population": ({}, (), (), (), {"population": "crowded"}),
     "macro_anchors": (MACRO, (), (), (), {}),
+    # What derivatives read (pt-v22 phase 1): the index's divisor is carried
+    # whenever its switch is set; the live VIX within a session; the
+    # forecast once a close has computed it.
+    "index_level": (dict(index_level_listed=1.0), ("index_divisor",), (), (), {}),
+    "vix_live": (dict(vix_intraday_live=1.0), (), (), ("vix_live",), {}),
+    "forecast": (dict(forecast_horizon_sessions=21.0), (), (), ("forecast",), {}),
     "every_r21_dial": (dict(EVERY_R21_DIAL, **MACRO),
                        ("market_vol_leverage_memory", "vix_stress_memory",
                         "cycle_nowcast_rng", "fed_stress_vix_max", "fed_stress_hold_age",

@@ -592,6 +592,74 @@ fn name_noise_variance(
         + idio * idio)
 }
 
+/// One name's constants as the identity reads them, for a caller that reads
+/// the same name many times on states that move (the forecast,
+/// `forecast_horizon_sessions`): its sector loading, and the multiple of
+/// its GARCH sigma its own draw is made at (`idio_sigma_daily` without the
+/// state).
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct NameConstants {
+    pub(crate) loading: f64,
+    pub(crate) idio_unit: f64,
+}
+
+impl NameConstants {
+    pub(crate) fn of(p: &ModelParams, name: &NameVariance) -> Self {
+        NameConstants {
+            loading: crate::market::factors::sector_loading_for(p, name.beta),
+            idio_unit: crate::market::factors::idio_scale_for(p, name.beta)
+                * crate::market::factors::cap_size_multiplier_with(p, name.market_cap),
+        }
+    }
+}
+
+/// [`name_noise_variance`] on a name's constants, with its own draw scaled
+/// by its idiosyncratic variance ratio (`idio_ratio`, 1.0 without that
+/// state): the variance of the innovation the close hands the name's GARCH,
+/// for the forecast's expected step (`forecast_horizon_sessions`).
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn name_noise_variance_scaled(
+    p: &ModelParams,
+    c: &NameConstants,
+    beta: f64,
+    garch_variance: f64,
+    factor_variance: f64,
+    sector_sigma: f64,
+    idio_ratio: f64,
+    k: f64,
+) -> f64 {
+    let idio = mathx::sqrt(mathx::max(garch_variance, p.idio_sigma_floor)) * c.idio_unit;
+    k * (beta * beta * factor_variance
+        + c.loading * c.loading * sector_sigma * sector_sigma
+        + idio * idio * idio_ratio)
+}
+
+/// The variance of one name's session return as the identity reads it: its
+/// noise ([`name_noise_variance_scaled`]), the market's jump, which every
+/// name takes whole, its own jump and its news. The forecast's name variance
+/// (`forecast_horizon_sessions`).
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn name_session_variance(
+    p: &ModelParams,
+    c: &NameConstants,
+    beta: f64,
+    garch_variance: f64,
+    factor_variance: f64,
+    sector_sigma: f64,
+    idio_ratio: f64,
+    jump_rate_scale: f64,
+    k: f64,
+) -> f64 {
+    let (lambda_m, lambda_i) = jump_intensities(p, jump_rate_scale);
+    let mu = p.jump_mean_market;
+    let sig = p.jump_sigma_market;
+    let market_jump = lambda_m * (mu * mu + sig * sig) - (lambda_m * mu) * (lambda_m * mu);
+    name_noise_variance_scaled(p, c, beta, garch_variance, factor_variance, sector_sigma, idio_ratio, k)
+        + market_jump
+        + lambda_i * p.jump_sigma_idio * p.jump_sigma_idio
+        + p.endogenous_news_intensity * p.endogenous_news_sigma * p.endogenous_news_sigma
+}
+
 /// The jump arrival rates at a given rate scale, in the spelling
 /// `Engine::apply_jumps` uses — the branch at zero coupling included, so
 /// the two cannot drift apart.

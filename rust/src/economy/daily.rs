@@ -818,6 +818,21 @@ pub fn vix_and_yields(
     shock_gdp_impact: f64,
     rng: &mut impl Rng,
 ) {
+    new_state.vix = vix_close(economy, inputs, shock_gdp_impact, rng);
+    let volatility = inputs.volatility;
+    close_yields(economy, inputs, new_state, volatility, rng);
+}
+
+/// The close's VIX from `economy` on `inputs`: the VIX half of
+/// [`vix_and_yields`], which writes it before the yields read it. Draws
+/// exactly what that half drew, in the same order. The forecast
+/// (`forecast_horizon_sessions`) runs it alone.
+pub fn vix_close(
+    economy: &EconomyState,
+    inputs: &DailyInputs,
+    shock_gdp_impact: f64,
+    rng: &mut impl Rng,
+) -> f64 {
     let volatility = inputs.volatility;
     let day = inputs.game_day;
     let cal = inputs.macro_calendar;
@@ -1067,8 +1082,17 @@ pub fn vix_and_yields(
     } else {
         stepped_vix
     };
-    new_state.vix = clamp(stepped_vix, 10.0, inputs.vix_ceiling);
+    clamp(stepped_vix, 10.0, inputs.vix_ceiling)
+}
 
+/// The yields half of [`vix_and_yields`], after the VIX is written.
+fn close_yields(
+    economy: &EconomyState,
+    inputs: &DailyInputs,
+    new_state: &mut EconomyState,
+    volatility: f64,
+    rng: &mut impl Rng,
+) {
     // ── Treasury yields ───────────────────────────────────────────────────
     let debt_premium = mathx::max(0.0, (economy.government_debt_to_gdp - 100.0) * 0.002);
     let term_premium_10y =
@@ -1328,6 +1352,79 @@ impl Rng for MeanDraws {
     }
 }
 
+/// The push inventory gives the oil price a day: 0.08 a unit below 40 and
+/// above 60, the dead zone between them.
+pub fn inventory_pressure(inventory: f64) -> f64 {
+    let mut pressure = 0.0;
+    if inventory < 40.0 {
+        pressure = (40.0 - inventory) * 0.08;
+    } else if inventory > 60.0 {
+        pressure = (60.0 - inventory) * 0.08;
+    }
+    pressure
+}
+
+/// [`inventory_pressure`]'s expectation when inventory is normal with mean
+/// `mean` and sd `sd`; at `sd` 0.0 the push at `mean`. For the forecast
+/// (`forecast_horizon_sessions`).
+pub fn inventory_pressure_expected(mean: f64, sd: f64) -> f64 {
+    if !(sd > 0.0) {
+        return inventory_pressure(mean);
+    }
+    // E[(a - X)+] for X ~ N(mean, sd^2), and E[(X - b)+] by symmetry.
+    let shortfall = |a: f64, x_mean: f64| {
+        let d = (a - x_mean) / sd;
+        let cdf = 0.5 * mathx::erfc(-d / std::f64::consts::SQRT_2);
+        let pdf = mathx::exp(-0.5 * d * d) / mathx::sqrt(2.0 * std::f64::consts::PI);
+        (a - x_mean) * cdf + sd * pdf
+    };
+    0.08 * (shortfall(40.0, mean) - shortfall(-60.0, -mean))
+}
+
+/// The dollar's daily drift per VIX point above `usd_crisis_vix_threshold`.
+pub const USD_SAFE_HAVEN_GAIN: f64 = 0.05;
+
+/// The oil price OPEC's rule defends, and the distance from it past which
+/// a decision is a cut or a raise rather than a small adjustment.
+const OPEC_TARGET: f64 = 80.0;
+const OPEC_BAND: f64 = 10.0;
+
+/// OPEC's rule at `oil_opec_symmetry`: the probability and the lower end of
+/// the uniform three-dollar range of a cut below the band, and the same for
+/// a raise above it. At 0.0 the reference's asymmetric pair.
+pub fn opec_rule(symmetry: f64) -> (f64, f64, f64, f64) {
+    if symmetry == 0.0 {
+        (0.6, 3.0, 0.5, 2.0)
+    } else {
+        let g = symmetry;
+        (0.6 - 0.05 * g, 3.0 - 0.5 * g, 0.5 + 0.05 * g, 2.0 + 0.5 * g)
+    }
+}
+
+/// The expected move an OPEC decision makes to the oil price when the price
+/// it reads is normal with mean `mean` and sd `sd`: a cut's mean size times
+/// its probability times the chance the price is under the band, less a
+/// raise's above it. The adjustment inside the band has mean zero. For the
+/// forecast (`forecast_horizon_sessions`); at `sd` 0.0 it is the rule's
+/// expectation at `mean` itself.
+pub fn opec_expected_impact(mean: f64, sd: f64, symmetry: f64) -> f64 {
+    let (cut_p, cut_lo, raise_p, raise_lo) = opec_rule(symmetry);
+    let below = OPEC_TARGET - OPEC_BAND;
+    let above = OPEC_TARGET + OPEC_BAND;
+    let (p_below, p_above) = if sd > 0.0 {
+        (
+            0.5 * mathx::erfc((mean - below) / (sd * std::f64::consts::SQRT_2)),
+            0.5 * mathx::erfc((above - mean) / (sd * std::f64::consts::SQRT_2)),
+        )
+    } else {
+        (
+            if mean < below { 1.0 } else { 0.0 },
+            if mean > above { 1.0 } else { 0.0 },
+        )
+    };
+    cut_p * (cut_lo + 1.5) * p_below - raise_p * (raise_lo + 1.5) * p_above
+}
+
 /// The (2-year, 10-year, corporate) yields, in per cent, that
 /// [`update_economy_daily`] would publish from `economy` on `inputs` with its
 /// draws at their means ([`MeanDraws`]) and no active shock: the VIX and
@@ -1335,6 +1432,17 @@ impl Rng for MeanDraws {
 /// of the step writes or reads what they produce. For the rate indices' live
 /// mark (`rate_intraday_live`). Takes no draw from any engine stream.
 pub fn project_close_yields(economy: &EconomyState, inputs: &DailyInputs) -> (f64, f64, f64) {
+    let next = project_close_state(economy, inputs);
+    (next.treasury_yield_2y, next.treasury_yield_10y, next.corporate_bond_yield)
+}
+
+/// The economy [`project_close_yields`] reads its yields from: `economy` with
+/// the VIX and its three yields as [`update_economy_daily`] would publish
+/// them on `inputs` with its draws at their means and no active shock, and
+/// the credit floor applied. Every other field is `economy`'s. The VIX here
+/// is the state the close writes, before any published premium; the live
+/// VIX (`vix_intraday_live`) reads it. Takes no draw from any engine stream.
+pub fn project_close_state(economy: &EconomyState, inputs: &DailyInputs) -> EconomyState {
     let mut next = economy.clone();
     let mut shock_gdp_impact = 0.0;
     for shock in inputs.active_shocks {
@@ -1347,7 +1455,7 @@ pub fn project_close_yields(economy: &EconomyState, inputs: &DailyInputs) -> (f6
             next.treasury_yield_10y + inputs.daily_credit_floor_gain * CORPORATE_SPREAD_FLOOR,
         );
     }
-    (next.treasury_yield_2y, next.treasury_yield_10y, next.corporate_bond_yield)
+    next
 }
 
 /// One simulated day of the macro chain.
@@ -1834,12 +1942,7 @@ pub fn update_economy_daily(
     };
     new_state.oil_inventory_level = new_oil_inventory;
 
-    let mut oil_inventory_pressure = 0.0;
-    if new_oil_inventory < 40.0 {
-        oil_inventory_pressure = (40.0 - new_oil_inventory) * 0.08;
-    } else if new_oil_inventory > 60.0 {
-        oil_inventory_pressure = (60.0 - new_oil_inventory) * 0.08;
-    }
+    let oil_inventory_pressure = inventory_pressure(new_oil_inventory);
 
     // Summer driving season peaks ~day 180, winter valley ~day 90.
     //
@@ -1870,8 +1973,7 @@ pub fn update_economy_daily(
     if day - oil_last_opec >= cal.opec_interval() {
         new_state.oil_last_opec_day = day;
         let oil_price = economy.oil_price;
-        let opec_target = 80.0;
-        let price_diff = oil_price - opec_target;
+        let price_diff = oil_price - OPEC_TARGET;
 
         // The two outer branches are a pair that should mirror and do not:
         // 0.6 at 3-to-6 against 0.5 at 2-to-5 is an expected +2.700 against
@@ -1882,18 +1984,13 @@ pub fn update_economy_daily(
         //
         // A branch, so 0.0 takes the original arithmetic in the original
         // order and consumes the same draws in the same places either way.
-        let (cut_p, cut_lo, raise_p, raise_lo) = if inputs.oil_opec_symmetry == 0.0 {
-            (0.6, 3.0, 0.5, 2.0)
-        } else {
-            let g = inputs.oil_opec_symmetry;
-            (0.6 - 0.05 * g, 3.0 - 0.5 * g, 0.5 + 0.05 * g, 2.0 + 0.5 * g)
-        };
-        if price_diff < -10.0 {
+        let (cut_p, cut_lo, raise_p, raise_lo) = opec_rule(inputs.oil_opec_symmetry);
+        if price_diff < -OPEC_BAND {
             // Well below target: likely a production cut.
             if rng.next_f64() < cut_p {
                 opec_impact = cut_lo + rng.next_f64() * 3.0;
             }
-        } else if price_diff > 10.0 {
+        } else if price_diff > OPEC_BAND {
             // Well above target: likely a production increase.
             if rng.next_f64() < raise_p {
                 opec_impact = -(raise_lo + rng.next_f64() * 3.0);
@@ -2006,7 +2103,7 @@ pub fn update_economy_daily(
     // regime: a crisis is the same crisis whether you watch gold or the
     // dollar. No behaviour changes at the default, where the two agree.
     let safe_haven_drift = if economy.vix > inputs.usd_crisis_vix_threshold {
-        (economy.vix - inputs.usd_crisis_vix_threshold) * 0.05
+        (economy.vix - inputs.usd_crisis_vix_threshold) * USD_SAFE_HAVEN_GAIN
     } else {
         0.0
     };
@@ -3958,6 +4055,9 @@ mod live_projection {
                     assert_eq!(y2.to_bits(), full.treasury_yield_2y.to_bits());
                     assert_eq!(y10.to_bits(), full.treasury_yield_10y.to_bits());
                     assert_eq!(corp.to_bits(), full.corporate_bond_yield.to_bits());
+                    // And the VIX, which the live VIX reads (`vix_intraday_live`).
+                    let state = project_close_state(&e, &inputs);
+                    assert_eq!(state.vix.to_bits(), full.vix.to_bits());
                     checked += 1;
                 }
             }

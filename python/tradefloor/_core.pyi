@@ -375,6 +375,20 @@ class Engine:
     # The curve now, fractional; `investment_grade` only with rate indices.
     @property
     def curve(self) -> dict[str, float]: ...
+    # The price index (`index_level_listed`): `level`, `close`, `divisor` and
+    # `constituents`. None with the switch off.
+    @property
+    def index_level(self) -> dict[str, Any] | None: ...
+    # The VIX within a session (`vix_intraday_live`): the projection of
+    # tonight's published VIX on the session so far; the published VIX
+    # outside one. None with the switch off.
+    @property
+    def live_vix(self) -> float | None: ...
+    # The forecast the last close computed (`forecast_horizon_sessions`):
+    # `day`, `horizon`, and per horizon `vix`, `index_variance`,
+    # `policy_rate` (fractional), `oil`, and `name_variance` by ticker. None
+    # with the dial at 0 and before the first close.
+    def forecast(self) -> dict[str, Any] | None: ...
     # The `random_noise` column split into the three draws it sums.
     def noise_split(self, part: Literal["market", "sector", "idio"]) -> bytes: ...
     def session_prices(self) -> bytes: ...

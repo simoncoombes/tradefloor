@@ -1144,6 +1144,20 @@ PERTURBATIONS = [
     # engine holding rate indices and only ever moves their prints. Carries
     # the close's re-mark as its companion, which it requires.
     ("rate_intraday_live", 1.0, False),
+    # What derivatives read (pt-v22 phase 1). INERT by construction: the
+    # index, the live VIX and the forecast read the state and write only
+    # their own fields, so no price moves (tests/test_derivative_foundations.py).
+    ("index_level_listed", 1.0, False),
+    ("vix_intraday_live", 1.0, False),
+    ("forecast_horizon_sessions", 21.0, False),
+    # The forecast's derived dials: INERT for the same reason, and read only
+    # with the horizon set.
+    ("forecast_vix_dispersion", 0.3, False),
+    ("forecast_vix_dispersion_half_life", 21.0, False),
+    ("forecast_policy_shadow_discount", 0.25, False),
+    ("forecast_policy_persistence", 0.5, False),
+    ("forecast_policy_reversion", 0.1, False),
+    ("forecast_policy_neutral", 1.7, False),
     # LIVE with the companion start of 15: at pt-v20's 30 no meeting in the
     # probe's burn-in or its three sessions reads a VIX of 30 (measured: the
     # row at 0.25 alone is inert), and at 15 the first meeting cuts a

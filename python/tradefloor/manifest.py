@@ -555,6 +555,12 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          # The day's market t scale, only between an open that drew one
          # and the close (`market_day_tail_df`).
          "market_day_scale",
+         # The price index's divisor and close level, only while
+         # `index_level_listed` is set; the live VIX's projection, only
+         # while `vix_intraday_live` is set and a session holds one; and
+         # the forecast, only while `forecast_horizon_sessions` is set and a
+         # close has computed one.
+         "index_divisor", "vix_live", "forecast",
          # The dividend states, on a model that pays dividends, and an
          # ex-date's move in `s` waiting for its tape row.
          "dividend", "pending_dividend",
@@ -883,6 +889,31 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     if "market_day_scale" in snapshot and float(snapshot["market_day_scale"]) != 1.0:
         _f64(buf, 12.0)
         _f64(buf, float(snapshot["market_day_scale"]))
+    # The price index, the live VIX and the forecast, each behind its own
+    # tag, only while carried: `Engine::state_hash`'s order and rule.
+    if "index_divisor" in snapshot:
+        pair = list(snapshot["index_divisor"])
+        if len(pair) != 2:
+            raise ValidationError(
+                f"this snapshot's index_divisor carries {len(pair)} values; the "
+                "state hash covers 2, the divisor and the last close's level.")
+        _f64(buf, 41.0)
+        for value in pair:
+            _f64(buf, float(value))
+    if "vix_live" in snapshot:
+        _f64(buf, 42.0)
+        _f64(buf, float(snapshot["vix_live"]))
+    if "forecast" in snapshot:
+        raw = snapshot["forecast"]
+        if len(raw) % 8:
+            raise ValidationError(
+                f"snapshot field 'forecast' carries {len(raw)} bytes, which is "
+                "not a whole number of f64s.")
+        values = _column(raw, len(raw) // 8, "forecast")
+        _f64(buf, 43.0)
+        _u32(buf, len(values))
+        for value in values:
+            _f64(buf, value)
     # LENGTH-PREFIXED, because these two are empty between the tape row that
     # consumes them and the close that fills them again -- unlike every
     # per-slot array above, which always follows the roster. An empty buffer

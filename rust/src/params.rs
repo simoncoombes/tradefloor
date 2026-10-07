@@ -945,6 +945,121 @@ pub struct ModelParams {
     /// takes no draw.
     /// pt-v21 ships 1.0.
     pub oil_inflation_passthrough: f64,
+    /// Whether the engine keeps a price index of its roster. 0.0, on every
+    /// shipped preset, keeps none: no level, no state, nothing in the
+    /// snapshot or the state hash, and a value of 0.0 is left out of the
+    /// model's digest.
+    ///
+    /// Off zero the index is `sum(price * shares_outstanding) / divisor` over
+    /// the public, solvent names, through
+    /// [`crate::market::calculate_market_index`]. The divisor is set at the
+    /// first session's open, so the index opens that session at 1000. A
+    /// listing, a delisting, a bankruptcy or a name taken private resets the
+    /// divisor when it happens, at the prices then standing, so the event
+    /// changes the constituents and leaves the level where it was.
+    /// [`crate::engine::Engine::index_level`] reads the level on the prices as
+    /// they stand and the level at the last close. The index reads prices
+    /// and writes nothing any price reads, so every price is the one the
+    /// engine prints without it. It takes no draw. A switch.
+    pub index_level_listed: f64,
+    /// Whether the VIX is published live within the session. 0.0, on every
+    /// shipped preset, publishes it at the close only: on pt-v21 the
+    /// published VIX holds at one value through every step of a session and
+    /// moves only at the close. A value of 0.0 is left out of the model's
+    /// digest.
+    ///
+    /// Off zero, while the market is open, the live VIX is the projection of
+    /// the VIX tonight's close will publish, given the session so far: the
+    /// close's own daily step (`economy::daily::vix_and_yields`) with its
+    /// draws at their means, on the session's return so far, the market
+    /// factor's day so far and the names' variances as the close would
+    /// leave them, with the rest of the session's move integrated by the
+    /// eight-point rule `rate_intraday_live` uses, and the published
+    /// stress premium projected with it. It refreshes at the open and on
+    /// every fifth session minute (`RATE_LIVE_REFRESH_MINUTES`). Outside a
+    /// session it is the published VIX, so at the close it becomes the VIX
+    /// the close published. It writes nothing back: the VIX the model's
+    /// laws read is the close's, and every price is the one the engine
+    /// prints without it. [`crate::engine::Engine::live_vix`] reads it. The
+    /// projection is carried in the snapshot and the state hash while this
+    /// is set and a session holds one. It takes no draw. A switch.
+    pub vix_intraday_live: f64,
+    /// How many sessions ahead the engine's forecast runs, computed at each
+    /// close. 0.0, on every shipped preset, computes none, and a value of
+    /// 0.0 is left out of the model's digest.
+    ///
+    /// Off zero, each close (`Engine::advance_macro_day`) computes the
+    /// expected published VIX, the index's and each name's one-session
+    /// variance, the policy rate and the oil price at horizons 1 to this
+    /// many sessions ([`crate::derivatives::Forecast`]), from public state
+    /// only: the VIX, the curve, prices, the conditional variances, the
+    /// market's cycle nowcast (or the published phase) and the published
+    /// growth. It does not read the true cycle phase, the slow VIX level or
+    /// any draw to come. The VIX and the variances iterate the expected
+    /// value of the model's own laws; the policy rate takes the shadow of
+    /// the next meeting and a projection for the meetings after it. The
+    /// forecast is carried in the snapshot and the state hash while this is
+    /// set. It writes nothing back and takes no draw, so every price is the
+    /// one the engine prints without it. A whole number of sessions in
+    /// [0, 252].
+    pub forecast_horizon_sessions: f64,
+    /// The forecast's measure of how far the VIX can be from its expectation:
+    /// the sd of the log VIX about the forecast at a long horizon, measured
+    /// on the model's own held-out histories. Read only with
+    /// `forecast_horizon_sessions` set. 0.0, on every shipped preset, is a
+    /// branch: the forecast's variances iterate the laws on the expected VIX
+    /// alone, and a value of 0.0 is left out of the model's digest.
+    ///
+    /// The market factor's variance target rises with the VIX at a power of
+    /// 4 above the anchor (2.5 below it on pt-v21), so the expected target
+    /// at a horizon is higher than the target at the expected VIX. On
+    /// pt-v21, 16 held-out seeds over 800 sessions, the forecast's factor
+    /// variance on the expected VIX alone read low by 4, 13, 24, 29 and 37
+    /// per cent at 5, 21, 63, 126 and 252 sessions. Off zero the forecast
+    /// takes each convex coupling (the factor's target, the per-name GARCH
+    /// coupling, the sector sigma, the jump rate, the dollar's safe-haven
+    /// drift that oil reads) as its expectation over a lognormal VIX with
+    /// this sd at long horizons. The VIX's own path is not changed.
+    pub forecast_vix_dispersion: f64,
+    /// The half-life, in sessions, of the gap between the log VIX's spread
+    /// about the forecast and its long-horizon level
+    /// (`forecast_vix_dispersion`): its variance at `h` sessions is
+    /// `sd^2 * (1 - 0.5^(2h / half-life))`. Read only with that dial set;
+    /// 0.0, on every shipped preset, reaches the long-horizon spread from
+    /// the first session, and a value of 0.0 is left out of the model's
+    /// digest.
+    pub forecast_vix_dispersion_half_life: f64,
+    /// The share of the next meeting's shadow change the forecast's policy
+    /// path leaves out. The shadow is the change the meeting function makes
+    /// on the economy as published, the change `policy_anticipation` prices.
+    /// Read only with `forecast_horizon_sessions` set; 0.0, on every shipped
+    /// preset, takes the shadow whole, and a value of 0.0 is left out of the
+    /// model's digest. On pt-v21, 16 held-out seeds over 1,000 sessions, the
+    /// change realised by the next meeting was 0.76 of the shadow; the fit of
+    /// all four policy dials together on 40 held-out histories
+    /// (`tools/calibration/forecast_dials.py derive`) puts this at 0.31.
+    pub forecast_policy_shadow_discount: f64,
+    /// The forecast's policy path's momentum: the share of a meeting's
+    /// expected change expected again at the meeting after it. Read only
+    /// with `forecast_horizon_sessions` set; 0.0, on every shipped preset, is
+    /// a branch to no momentum, and a value of 0.0 is left out of the
+    /// model's digest. A projection fitted on the model's own held-out
+    /// histories, since the meeting ladder is discrete.
+    pub forecast_policy_persistence: f64,
+    /// The share of the gap to `forecast_policy_neutral` the forecast's
+    /// policy path expects each meeting to close. Read only with
+    /// `forecast_horizon_sessions` set; 0.0, on every shipped preset, is a
+    /// branch to no reversion, and a value of 0.0 is left out of the model's
+    /// digest. On pt-v21, 40 held-out histories of 2,000 sessions, the fit
+    /// closes 0.0475 of the gap a meeting toward 1.4 per cent. The ladder
+    /// hikes in small steps and cuts in large ones, so the errors are skewed
+    /// and the fit needs many histories: 16 put the neutral rate at 1.3.
+    pub forecast_policy_reversion: f64,
+    /// The policy rate the forecast's path reverts toward, per cent. Read
+    /// only with `forecast_policy_reversion` set; at its default of 2.5, the
+    /// neutral rate the curve's damping reads (`TREASURY_NEUTRAL_RATE`), it
+    /// is left out of the model's digest.
+    pub forecast_policy_neutral: f64,
     /// Switch that makes the fear/greed index read the business cycle and
     /// GDP growth as published instead of as they are. 0.0, on every preset
     /// through pt-v19, is off; pt-v20 sets 1.0.
@@ -7332,6 +7447,15 @@ impl ModelParams {
             unemployment_natural_rate: 0.0,
             oil_inventory_reversion: 0.0,
             oil_inflation_passthrough: 0.0,
+            index_level_listed: 0.0,
+            vix_intraday_live: 0.0,
+            forecast_horizon_sessions: 0.0,
+            forecast_vix_dispersion: 0.0,
+            forecast_vix_dispersion_half_life: 0.0,
+            forecast_policy_shadow_discount: 0.0,
+            forecast_policy_persistence: 0.0,
+            forecast_policy_reversion: 0.0,
+            forecast_policy_neutral: 2.5,
             fear_greed_published_inputs: 0.0,
             macro_publication_repricing: 0.0,
             treasury_10y_noise: 0.03,
@@ -9917,6 +10041,15 @@ impl ModelParams {
             "unemployment_natural_rate" => self.unemployment_natural_rate,
             "oil_inventory_reversion" => self.oil_inventory_reversion,
             "oil_inflation_passthrough" => self.oil_inflation_passthrough,
+            "index_level_listed" => self.index_level_listed,
+            "vix_intraday_live" => self.vix_intraday_live,
+            "forecast_horizon_sessions" => self.forecast_horizon_sessions,
+            "forecast_vix_dispersion" => self.forecast_vix_dispersion,
+            "forecast_vix_dispersion_half_life" => self.forecast_vix_dispersion_half_life,
+            "forecast_policy_shadow_discount" => self.forecast_policy_shadow_discount,
+            "forecast_policy_persistence" => self.forecast_policy_persistence,
+            "forecast_policy_reversion" => self.forecast_policy_reversion,
+            "forecast_policy_neutral" => self.forecast_policy_neutral,
             "fear_greed_published_inputs" => self.fear_greed_published_inputs,
             "macro_publication_repricing" => self.macro_publication_repricing,
             "treasury_10y_noise" => self.treasury_10y_noise,
@@ -10267,6 +10400,15 @@ impl ModelParams {
             "unemployment_natural_rate" => out.unemployment_natural_rate = value,
             "oil_inventory_reversion" => out.oil_inventory_reversion = value,
             "oil_inflation_passthrough" => out.oil_inflation_passthrough = value,
+            "index_level_listed" => out.index_level_listed = value,
+            "vix_intraday_live" => out.vix_intraday_live = value,
+            "forecast_horizon_sessions" => out.forecast_horizon_sessions = value,
+            "forecast_vix_dispersion" => out.forecast_vix_dispersion = value,
+            "forecast_vix_dispersion_half_life" => out.forecast_vix_dispersion_half_life = value,
+            "forecast_policy_shadow_discount" => out.forecast_policy_shadow_discount = value,
+            "forecast_policy_persistence" => out.forecast_policy_persistence = value,
+            "forecast_policy_reversion" => out.forecast_policy_reversion = value,
+            "forecast_policy_neutral" => out.forecast_policy_neutral = value,
             "fear_greed_published_inputs" => out.fear_greed_published_inputs = value,
             "macro_publication_repricing" => out.macro_publication_repricing = value,
             "treasury_10y_noise" => out.treasury_10y_noise = value,
@@ -11550,6 +11692,52 @@ impl ModelParams {
                  the shipped 0.01 a dollar, both sides, in [0, 3]; 0 is the shipped branch.",
                 self.oil_inflation_passthrough));
         }
+        if !(self.index_level_listed == 0.0 || self.index_level_listed == 1.0) {
+            return Err(format!(
+                "index_level_listed is {}. It is a switch, 0.0 off or 1.0 on.",
+                self.index_level_listed));
+        }
+        if !(self.vix_intraday_live == 0.0 || self.vix_intraday_live == 1.0) {
+            return Err(format!(
+                "vix_intraday_live is {}. It is a switch, 0.0 off or 1.0 on.",
+                self.vix_intraday_live));
+        }
+        if !(self.forecast_horizon_sessions >= 0.0
+            && self.forecast_horizon_sessions <= 252.0
+            && self.forecast_horizon_sessions.fract() == 0.0)
+        {
+            return Err(format!(
+                "forecast_horizon_sessions is {}. It is a whole number of sessions in \
+                 [0, 252]; 0 computes no forecast.",
+                self.forecast_horizon_sessions));
+        }
+        for (name, value, hi, unit) in [
+            ("forecast_vix_dispersion", self.forecast_vix_dispersion, 2.0,
+             "the sd of the log VIX about the forecast at a long horizon"),
+            ("forecast_vix_dispersion_half_life", self.forecast_vix_dispersion_half_life, 2520.0,
+             "a half-life in sessions"),
+            ("forecast_policy_shadow_discount", self.forecast_policy_shadow_discount, 1.0,
+             "the share of the next meeting's shadow change left out"),
+            ("forecast_policy_reversion", self.forecast_policy_reversion, 1.0,
+             "the share of the gap to the neutral rate closed a meeting"),
+        ] {
+            if !(value >= 0.0 && value <= hi) {
+                return Err(format!(
+                    "{name} is {value}. It is {unit}, in [0, {hi}]; 0 is off."));
+            }
+        }
+        if !(self.forecast_policy_persistence >= 0.0 && self.forecast_policy_persistence < 1.0) {
+            return Err(format!(
+                "forecast_policy_persistence is {}. It is the share of a meeting's expected \
+                 change expected again at the next, in [0, 1); 0 is off.",
+                self.forecast_policy_persistence));
+        }
+        if !(self.forecast_policy_neutral >= -5.0 && self.forecast_policy_neutral <= 20.0) {
+            return Err(format!(
+                "forecast_policy_neutral is {}. It is the policy rate the forecast reverts \
+                 toward, per cent, in [-5, 20].",
+                self.forecast_policy_neutral));
+        }
         if !(self.fear_greed_published_inputs == 0.0 || self.fear_greed_published_inputs == 1.0) {
             return Err(format!(
                 "fear_greed_published_inputs is {}. It is a switch: 0 (the index reads the \
@@ -12022,6 +12210,14 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "unemployment_natural_rate",
     "oil_inventory_reversion",
     "oil_inflation_passthrough",
+    "index_level_listed",
+    "vix_intraday_live",
+    "forecast_horizon_sessions",
+    "forecast_vix_dispersion",
+    "forecast_vix_dispersion_half_life",
+    "forecast_policy_shadow_discount",
+    "forecast_policy_persistence",
+    "forecast_policy_reversion",
 ];
 
 #[cfg(test)]
@@ -12041,7 +12237,8 @@ pub(crate) fn digests_taken() -> u64 {
 /// their defaults, which are not 0.0.
 ///
 /// Each is read only while a switch in [`DIGEST_SILENT_AT_ZERO`] is set
-/// (`fed_stress_cut` or `dividend_payout_share`), so at its default with
+/// (`fed_stress_cut`, `dividend_payout_share` or
+/// `forecast_policy_reversion`), so at its default with
 /// that switch off it is the model that existed before it, and with the
 /// switch on the default is the value the switch was built and measured
 /// with. Off its default each enters the digest as every other dial does.
@@ -12051,6 +12248,7 @@ pub const DIGEST_SILENT_AT_DEFAULT: &[(&str, f64)] = &[
     ("dividend_growth_cutoff", 0.30),
     ("dividend_adjustment_speed", 0.4),
     ("dividend_yield_ceiling", 2.0),
+    ("forecast_policy_neutral", 2.5),
 ];
 
 /// The settable names, sorted. A function rather than the const above so
@@ -12194,6 +12392,15 @@ pub fn settable_names() -> Vec<&'static str> {
         "unemployment_natural_rate",
         "oil_inventory_reversion",
         "oil_inflation_passthrough",
+        "index_level_listed",
+        "vix_intraday_live",
+        "forecast_horizon_sessions",
+        "forecast_vix_dispersion",
+        "forecast_vix_dispersion_half_life",
+        "forecast_policy_shadow_discount",
+        "forecast_policy_persistence",
+        "forecast_policy_reversion",
+        "forecast_policy_neutral",
         "fear_greed_published_inputs",
         "macro_publication_repricing",
         "treasury_10y_noise",
