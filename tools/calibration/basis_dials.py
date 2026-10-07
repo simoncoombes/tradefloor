@@ -21,7 +21,9 @@ is a small shift), and repeats until both read within a hundredth of their
 targets. It prints the two values. On seeds 8101 to 8124, 24 histories of
 21 years, it gives `basis_sd` 3.753 and `basis_persistence` 0.429 in one
 step, which read 3.736 and 0.420. `measure` runs fresh seeds with the dials
-given and prints, against their bands:
+given and prints, against their bands (on seeds 8201 to 8224 at the fitted
+values: IF1 3.72, IF2 0.418, NS1 0.516, NS2 3.66, NS2_tick 12.4, NS2_any
+12.8, IF3 0):
 
 * IF1 and IF2, by the estimator above, pooled over every history's windows;
 * NS1, the night's share of the front future's daily variance, night from the

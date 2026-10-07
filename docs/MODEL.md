@@ -3858,6 +3858,25 @@ to the 16:00 index close, to 2026-09-09: a residual sd of 3.74 bp and a
 lag-1 autocorrelation of 0.42, per window of 252 sessions after a regression
 on time to expiry. The fit gives `basis_sd` 3.753 and `basis_persistence`
 0.429, which read 3.736 and 0.420 on the fitting histories.
+On 24 fresh histories of 21 years (`basis_dials.py measure`, seeds 8201 to
+8224, ten night steps):
+
+| Row | Model | Band |
+|---|---|---|
+| IF1, closing basis sd, bp | 3.72 | 1.21 to 6.27 |
+| IF2, its lag-1 autocorrelation | 0.418 | 0.127 to 0.716 |
+| NS1, night share of the front future's daily variance | 0.516 | 0.30 to 0.60 |
+| NS2, 09:29 against fair value on the opening prints, sd bp | 3.66 | at most 6.27 |
+| IF3, settlement less the opening-print index, relative | 0 | at most 1e-12 |
+
+Across the 432 windows of 252 sessions, IF1 runs from 3.41 to 4.07 bp and
+IF2 from 0.31 to 0.51 between the 5th and 95th percentiles. Read against
+fair value after the session's first tick instead of on the opening prints,
+the 09:29 future is 12.4 bp from it, because pt-v21's first tick moves the
+index by 11 to 13 bp sd, against about 4 bp at the tenth tick.
+
+On 40 names the futures and their night add under 2 per cent to the time
+of a session with the three switches above on.
 
 ## Scenarios
 
