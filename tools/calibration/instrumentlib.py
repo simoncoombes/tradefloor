@@ -219,6 +219,15 @@ PARAM_SPECS: dict[str, dict] = {
                                   "derived": True},
     "forecast_policy_neutral": {"kind": "abs", "step_unit": 0.1, "hard_range": (-5.0, 20.0),
                                 "derived": True},
+    # The index futures and their night session (pt-v22 phase 1). Each hard
+    # range is the one `ModelParams::validate` enforces; none moves a price.
+    "futures_index_listed": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0),
+                             "derived": True},
+    "basis_sd": {"kind": "abs", "step_unit": 0.25, "hard_range": (0.0, 100.0), "derived": True},
+    "basis_persistence": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 0.999),
+                          "derived": True},
+    "night_session_steps": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 390.0),
+                            "derived": True},
     "fed_stress_cut": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
     "fed_stress_vix": {"kind": "abs", "step_unit": 1.0, "hard_range": (10.0, 200.0)},
     "fed_stress_inflation_gap": {"kind": "abs", "step_unit": 0.25, "hard_range": (0.0, 10.0)},

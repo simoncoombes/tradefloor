@@ -411,6 +411,34 @@ OUT_OF_SCOPE = {
         "unread while `forecast_policy_reversion` is 0.0, as every preset "
         "ships it; at its default of 2.5 it is also left out of the model's "
         "digest",
+    # The index futures and their night session (pt-v22 phase 1), inert on
+    # every shipped preset. A future reads the index, the dividends and the
+    # forecast and draws only on `stream::DERIVATIVES`, so off zero they
+    # leave every stock price where it was as well.
+    "futures_index_listed":
+        "inert at 0.0: `Engine::futures_open`, `futures_close_marks`, "
+        "`futures_session_step` and `futures_list_initial` in "
+        "engine/futures.rs return at once with the switch off, "
+        "`Engine::contracts` is empty, `Engine::quote` returns None, the "
+        "DERIVATIVES stream is never drawn, and nothing is snapshotted or "
+        "hashed; at 0.0 it is also left out of the model's digest",
+    "basis_sd":
+        "unread while `futures_index_listed` is 0.0, as every preset ships "
+        "it: `futures_step` does not run. Off zero it is the basis noise's "
+        "sd, fitted on held-out histories by "
+        "tools/calibration/basis_dials.py; at 0.0 it is also left out of the "
+        "model's digest",
+    "basis_persistence":
+        "unread while `futures_index_listed` is 0.0: `futures_step` does not "
+        "run, and at 0.0 each step's noise is independent. Fitted with "
+        "`basis_sd` by tools/calibration/basis_dials.py; at 0.0 it is also "
+        "left out of the model's digest",
+    "night_session_steps":
+        "inert at 0.0: `Engine::night_tick` returns 0 and "
+        "`futures_night_setup` and `futures_retarget` return at once, so no "
+        "copy of the open is run and no night is walked or carried; refused "
+        "without `futures_index_listed`; at 0.0 it is also left out of the "
+        "model's digest",
     # The thirteenth registration's bond timing (r13), inert on every
     # preset. When pt-v20 takes them they leave this table: the two switches
     # derived, the cut and its start and gap fitted to FRED's target rate

@@ -1060,6 +1060,74 @@ pub struct ModelParams {
     /// neutral rate the curve's damping reads (`TREASURY_NEUTRAL_RATE`), it
     /// is left out of the model's digest.
     pub forecast_policy_neutral: f64,
+    /// Whether the engine lists futures on its price index. 0.0, on every
+    /// shipped preset, lists none: no contract, no state, nothing in the
+    /// snapshot or the state hash, and a value of 0.0 is left out of the
+    /// model's digest.
+    ///
+    /// Off zero the engine lists the front two quarterly index futures
+    /// (`derivatives::calendar`: each expires at the opening print of session
+    /// 15 of its quarter's last 21-session month, 63q + 56, and rolls six
+    /// sessions before), and settles each at its expiry in cash on the index
+    /// of that session's opening prints. A future is priced at `F = (S -
+    /// PV(D)) * exp(r * tau) + b`: `S` the index (`index_level_listed`, which
+    /// this requires), `D` the dividends going ex before it settles (the
+    /// declared amount for an ex-date within 21 sessions, the Lintner rule's
+    /// projection beyond), `r` the average of the forecast's expected policy
+    /// rate to expiry (`forecast_horizon_sessions`; the policy rate now
+    /// without it), `tau` the sessions to expiry over 252, and `b` the basis
+    /// in index basis points: an AR(1) (`basis_sd`, `basis_persistence`) on
+    /// its own stream, `rng::stream::DERIVATIVES`, plus the decaying mark of
+    /// agents' own flow, tapered to zero over the six sessions before
+    /// expiry. Each future has an agent-facing book: a maker's ladder one
+    /// tick apart, latent square-root depth sized to a stated daily volume
+    /// and agents' resting orders (`derivatives::INDEX_FUTURE`). A futures
+    /// price feeds nothing a stock price reads, so every stock price is the
+    /// one the engine prints without it. A switch.
+    pub futures_index_listed: f64,
+    /// The sd of the index futures' basis noise, in basis points of the
+    /// index: the stationary sd of its AR(1). Read only with
+    /// `futures_index_listed` set; 0.0, on every shipped preset, adds no
+    /// noise, and a value of 0.0 is left out of the model's digest.
+    ///
+    /// The noise steps on every open tick and every night step, with the
+    /// persistence `basis_persistence` spread over a day's steps (390, plus
+    /// `night_session_steps`), so read at the close it is an AR(1) with
+    /// this sd and that lag-1 autocorrelation. The real basis of ES against
+    /// the S&P 500's carry fair value, 2020-10-26 to 2026-09-09, has a
+    /// residual sd of 2.9 to 5.4 bp a year (row IF1). Fitted with
+    /// `basis_persistence` on 24 held-out pt-v21 histories of 21 years
+    /// (`tools/calibration/basis_dials.py derive`, seeds 8101 to 8124), so
+    /// that the front future's closing basis reads the real windows' median
+    /// sd of 3.738 bp: 3.753.
+    pub basis_sd: f64,
+    /// The lag-1 autocorrelation of the index futures' basis noise from one
+    /// close to the next. Read only with `futures_index_listed` set; 0.0, on
+    /// every shipped preset, makes each step's noise independent, and a
+    /// value of 0.0 is left out of the model's digest. The real basis reads
+    /// 0.38 to 0.64 a year (row IF2), with a median of 0.421; fitted with
+    /// `basis_sd` to read it, 0.429 (the estimator's window of 252 sessions
+    /// reads an AR(1) about 0.008 low). In [0, 1).
+    pub basis_persistence: f64,
+    /// How many steps the night session for index futures takes, from the
+    /// close to the next open. 0.0, on every shipped preset, walks no night:
+    /// between sessions a future holds its closing mark and moves to the
+    /// open at the open. A value of 0.0 is left out of the model's digest.
+    ///
+    /// Off zero, each close runs the next open on a copy of the engine,
+    /// which takes the OVERNIGHT stream's draws the open will take (nothing
+    /// else draws on that stream, and nothing between the close and the open
+    /// sets an input to them), and reads the index and each future's fair
+    /// value on the opening prints. `Engine::night_tick` then walks each
+    /// future's fair value from the close to that open on a Brownian bridge,
+    /// one normal per step on `rng::stream::DERIVATIVES`, with the night's
+    /// share of the index's one-session variance, the basis stepping beside
+    /// it; agents trade the futures through it. The open itself takes its
+    /// own draws as it always does, so every opening print is the one the
+    /// engine prints without this. A pin between sessions moves the futures
+    /// when it is written. Stocks do not trade at night. Requires
+    /// `futures_index_listed`. A whole number of steps in [0, 390].
+    pub night_session_steps: f64,
     /// Switch that makes the fear/greed index read the business cycle and
     /// GDP growth as published instead of as they are. 0.0, on every preset
     /// through pt-v19, is off; pt-v20 sets 1.0.
@@ -7456,6 +7524,10 @@ impl ModelParams {
             forecast_policy_persistence: 0.0,
             forecast_policy_reversion: 0.0,
             forecast_policy_neutral: 2.5,
+            futures_index_listed: 0.0,
+            basis_sd: 0.0,
+            basis_persistence: 0.0,
+            night_session_steps: 0.0,
             fear_greed_published_inputs: 0.0,
             macro_publication_repricing: 0.0,
             treasury_10y_noise: 0.03,
@@ -10050,6 +10122,10 @@ impl ModelParams {
             "forecast_policy_persistence" => self.forecast_policy_persistence,
             "forecast_policy_reversion" => self.forecast_policy_reversion,
             "forecast_policy_neutral" => self.forecast_policy_neutral,
+            "futures_index_listed" => self.futures_index_listed,
+            "basis_sd" => self.basis_sd,
+            "basis_persistence" => self.basis_persistence,
+            "night_session_steps" => self.night_session_steps,
             "fear_greed_published_inputs" => self.fear_greed_published_inputs,
             "macro_publication_repricing" => self.macro_publication_repricing,
             "treasury_10y_noise" => self.treasury_10y_noise,
@@ -10409,6 +10485,10 @@ impl ModelParams {
             "forecast_policy_persistence" => out.forecast_policy_persistence = value,
             "forecast_policy_reversion" => out.forecast_policy_reversion = value,
             "forecast_policy_neutral" => out.forecast_policy_neutral = value,
+            "futures_index_listed" => out.futures_index_listed = value,
+            "basis_sd" => out.basis_sd = value,
+            "basis_persistence" => out.basis_persistence = value,
+            "night_session_steps" => out.night_session_steps = value,
             "fear_greed_published_inputs" => out.fear_greed_published_inputs = value,
             "macro_publication_repricing" => out.macro_publication_repricing = value,
             "treasury_10y_noise" => out.treasury_10y_noise = value,
@@ -11738,6 +11818,46 @@ impl ModelParams {
                  toward, per cent, in [-5, 20].",
                 self.forecast_policy_neutral));
         }
+        if !(self.futures_index_listed == 0.0 || self.futures_index_listed == 1.0) {
+            return Err(format!(
+                "futures_index_listed is {}. It is a switch, 0.0 off or 1.0 on.",
+                self.futures_index_listed));
+        }
+        if self.futures_index_listed != 0.0 && self.index_level_listed == 0.0 {
+            return Err(format!(
+                "futures_index_listed is {} but index_level_listed is 0. An index future \
+                 settles on the price index, which only index_level_listed keeps: with \
+                 futures_index_listed on, index_level_listed is 1.0.",
+                self.futures_index_listed));
+        }
+        if !(self.basis_sd >= 0.0 && self.basis_sd <= 100.0) {
+            return Err(format!(
+                "basis_sd is {}. It is the sd of the index futures' basis noise in basis \
+                 points of the index, in [0, 100]; 0 adds none.",
+                self.basis_sd));
+        }
+        if !(self.basis_persistence >= 0.0 && self.basis_persistence < 1.0) {
+            return Err(format!(
+                "basis_persistence is {}. It is the basis noise's lag-1 autocorrelation from \
+                 one close to the next, in [0, 1).",
+                self.basis_persistence));
+        }
+        if !(self.night_session_steps >= 0.0
+            && self.night_session_steps <= 390.0
+            && self.night_session_steps.fract() == 0.0)
+        {
+            return Err(format!(
+                "night_session_steps is {}. It is a whole number of steps in [0, 390]; 0 \
+                 walks no night.",
+                self.night_session_steps));
+        }
+        if self.night_session_steps != 0.0 && self.futures_index_listed == 0.0 {
+            return Err(format!(
+                "night_session_steps is {} but futures_index_listed is 0. The night session \
+                 walks the index futures, which only futures_index_listed lists: with \
+                 night_session_steps set, futures_index_listed is 1.0.",
+                self.night_session_steps));
+        }
         if !(self.fear_greed_published_inputs == 0.0 || self.fear_greed_published_inputs == 1.0) {
             return Err(format!(
                 "fear_greed_published_inputs is {}. It is a switch: 0 (the index reads the \
@@ -12218,6 +12338,10 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "forecast_policy_shadow_discount",
     "forecast_policy_persistence",
     "forecast_policy_reversion",
+    "futures_index_listed",
+    "basis_sd",
+    "basis_persistence",
+    "night_session_steps",
 ];
 
 #[cfg(test)]
@@ -12401,6 +12525,10 @@ pub fn settable_names() -> Vec<&'static str> {
         "forecast_policy_persistence",
         "forecast_policy_reversion",
         "forecast_policy_neutral",
+        "futures_index_listed",
+        "basis_sd",
+        "basis_persistence",
+        "night_session_steps",
         "fear_greed_published_inputs",
         "macro_publication_repricing",
         "treasury_10y_noise",

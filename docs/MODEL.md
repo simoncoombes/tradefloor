@@ -3770,6 +3770,95 @@ On 40 names the forecast takes about 6 ms of CPU a close, about 40 per
 cent of a session's; the live VIX adds about 17 per cent and the index
 under 5.
 
+## Index futures
+
+`futures_index_listed` lists futures on the price index (`index_level_listed`,
+which it requires), and `night_session_steps` lets them trade from one close
+to the next open. Both are 0.0 on every shipped preset and are left out of
+the model's digest there, with their companions `basis_sd` and
+`basis_persistence`. A future reads the index, the dividends, the forecast
+and the market factor's sigma, and it draws only on its own stream
+(`rng::stream::DERIVATIVES`, 14, outside `COUNT`). Nothing a stock price
+reads is written, so an untraded run with every phase 1 switch on prints
+the stock prices, closes and economy of the run without them, night
+included, and a run whose agents trade only futures prints the stocks of a
+run nobody trades (`tests/test_index_futures.py`, seeds 3, 17, 101 and 9001
+of pt-v21).
+
+The contracts are quarterly. Each expires at the opening print of session
+15 of its quarter's last 21-session month, session `63q + 56` counted from
+0 (`derivatives::calendar`). The front two are listed, and each rolls six
+sessions before its expiry, when `contracts()` marks the next one `front`.
+A symbol is the root and the expiry session, `IDX.F0056`
+(`derivatives::ContractSymbol`, which also spells options as
+`ROOT.Onnnn.Rk.cc`); it names the same contract in a fork, a restore and a
+replay. A contract is $250 an index point, on a 0.05 grid.
+
+A future is priced at `F = (S - PV(D)) * exp(r * tau) + b`:
+
+- `S` is the live index within a session, the night's path between
+  sessions under `night_session_steps`, and the close's index without it.
+- `tau` is the sessions from now to the expiry's open over 252. A session
+  uses `k / 390` of its day after `k` ticks, and the night uses none.
+- `r` is the mean over those sessions of the policy rate the forecast
+  expects to be in force in each (`forecast_horizon_sessions`), or the
+  policy rate now without a forecast.
+- `D` is each constituent's dividend for every ex-date after the last open
+  and no later than the expiry, in index points, discounted at `r` from its
+  ex-date: the declared amount within 21 sessions of the ex-date, beyond it
+  the dividend rule's declaration on today's state, iterated a quarter at a
+  time.
+- `b` is the basis, in basis points of the index: an AR(1) with sd
+  `basis_sd` and close-to-close persistence `basis_persistence`, stepped on
+  every open tick and every night step, plus each contract's mark of
+  agents' net flow against the house, `0.15 * sigma * flow / V`, decaying at
+  a 30-step half-life. Both are scaled by `min(1, sessions to expiry / 6)`,
+  so a future converges on the index over its roll.
+
+Each close marks every contract at `F` on the close's index. At its expiry
+session's open a contract settles in cash on the index of the opening
+prints, the level after the open has applied the night and the ex-dates and
+before the first tick (the bars' `open`), and `settlements(day)` reports the
+value and the reference it was set from. The next contract is listed at the
+same open.
+
+Each listed future has an agent-facing book on the equity book's three
+layers: the maker's ten levels a side one tick apart, each 0.3 per cent of
+the daily volume; latent square-root depth beside them at a coefficient of
+0.75 and an exponent of 0.5 out to a day's volume, refilling at a 27-step
+half-life; and agents' resting orders. The daily volume is the constituents'
+daily dollar volume over a contract's notional, about 200,000 contracts on
+`Universe.random(40, seed=111)`. A resting order fills when the moved book
+crosses it, at the book's prices. Fills on contracts come back through
+`take_fills` after the names' fills, numbered on their own counter. There is
+no margin and no `Portfolio` account for futures yet, so a caller keeps a
+position's cash itself.
+
+Under `night_session_steps` each close runs the next open on a copy of the
+engine. Nothing draws on the OVERNIGHT stream but the open, and nothing
+between a close and the next open sets an input to its draws, so the copy
+takes the draws the open will take and its opening prints are the open's to
+the bit. Its index and each future's fair value on those prints are the
+night's targets. `run_night(steps)` walks each future's log fair value to
+its target on a Brownian bridge, one normal per step for all of them, with
+the night's share of the index's one-session variance
+(`overnight_market_share` of it on pt-v21), stepping the basis and filling
+resting orders beside it. The last step lands on the open's fair value. The
+real open takes its own draws, as it always did. A pin, a listing or
+delisting, a change of status, or a fundamentals write from Python between
+sessions reruns the copy and moves the path at once by the change in its
+targets; a write the copy is not rerun for reaches the futures at the open.
+Stocks do not trade at night.
+
+The basis dials are fitted on the model's own histories
+(`tools/calibration/basis_dials.py derive`, 24 held-out pt-v21 histories of
+21 years, seeds 8101 to 8124) to the real closing basis of ES against its
+carry fair value on the S&P 500 from 2020-10-26, when CME's settlement moved
+to the 16:00 index close, to 2026-09-09: a residual sd of 3.74 bp and a
+lag-1 autocorrelation of 0.42, per window of 252 sessions after a regression
+on time to expiry. The fit gives `basis_sd` 3.753 and `basis_persistence`
+0.429, which read 3.736 and 0.420 on the fitting histories.
+
 ## Scenarios
 
 A scenario is a file of changes to the economy or the market, applied once

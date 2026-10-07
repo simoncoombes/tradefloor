@@ -156,6 +156,13 @@ pub enum LogEntry {
     TakeImpacts {
         agent: Option<String>,
     },
+    /// Steps of the night session for index futures (`run_night`), between
+    /// a close and the next open. Logged because each step draws on the
+    /// derivatives' stream and moves the futures' books; `u32::MAX` is
+    /// "the rest of the night".
+    RunNight {
+        steps: u32,
+    },
 }
 
 fn news_to_py(py: Python<'_>, news: &[(Option<String>, Option<String>, f64)]) -> PyResult<PyObject> {
@@ -330,6 +337,11 @@ impl LogEntry {
             LogEntry::TakeImpacts { agent } => {
                 d.set_item("op", "take_impacts")?;
                 d.set_item("agent", agent)?;
+            }
+            LogEntry::RunNight { steps } => {
+                d.set_item("op", "run_night")?;
+                // The rest of the night is None, which JSON can carry.
+                d.set_item("steps", if *steps == u32::MAX { None } else { Some(*steps) })?;
             }
         }
         Ok(d.into())

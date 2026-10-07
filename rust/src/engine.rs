@@ -74,6 +74,10 @@ use crate::rng::{stream, DrawKind, DrawOverlay, DrawRecord, GameRng, Rng, RngSta
 /// (`index_level_listed`, `vix_intraday_live`, `forecast_horizon_sessions`).
 mod foundations;
 
+/// The index futures and their night session (`futures_index_listed`,
+/// `night_session_steps`).
+mod futures;
+
 /// The reference MAIN stream's sequence. Not 0 and not 1 —
 /// both are different streams from the same seed, and picking the wrong one
 /// produces a plausible market that matches nothing.
@@ -1139,6 +1143,12 @@ pub struct Engine {
     /// `None` before the first close and always with the dial off. Carried in
     /// the snapshot and the state hash while it is `Some`.
     forecast: Option<crate::derivatives::Forecast>,
+    /// `futures_index_listed`: the index futures, their book, their
+    /// settlements and their generator (`stream::DERIVATIVES`); the night's
+    /// path under `night_session_steps`. Empty and never drawn from with the
+    /// switch off; carried in the snapshot and the state hash only while it
+    /// is set. See `engine::futures`.
+    futures: futures::FuturesState,
     /// `fed_stress_cut`: the highest published VIX since the last meeting.
     /// 0.0 and never touched with the cut off; carried in the snapshot and
     /// the state hash only while it is set.
@@ -2270,6 +2280,7 @@ impl Engine {
             index_close: 0.0,
             vix_live: None,
             forecast: None,
+            futures: futures::FuturesState::new(seed),
             stress_vix_max: 0.0,
             stress_hold_age: STRESS_HOLD_NEVER,
             drawdown_returns: std::collections::VecDeque::new(),
@@ -2292,6 +2303,9 @@ impl Engine {
         };
         engine.vix_anchor = engine.derive_vix_anchor();
         engine.cycle_nowcast_terms = engine.derive_cycle_nowcast_terms();
+        // The front two index futures (`futures_index_listed`); nothing with
+        // the switch off.
+        engine.futures_list_initial();
         // The opening meeting interval, 45 calendar days, onto the macro
         // calendar's steps. Only a fresh schedule is moved, and never on
         // the shipped calendar, where `scale_days` is the literal anyway.
@@ -2408,6 +2422,10 @@ impl Engine {
         pre.market_vol_level_rng = GameRng::surgery(root, stream::MARKET_VOL_LEVEL, tag);
         pre.crisis_epicentre_rng = GameRng::surgery(root, stream::CRISIS_EPICENTRE, tag);
         pre.cycle_nowcast_rng = GameRng::surgery(root, stream::CYCLE_NOWCAST, tag);
+        // The futures write nothing a price reads, and the prehistory hands
+        // back prices' state alone, so its copy lists none.
+        pre.params.futures_index_listed = 0.0;
+        pre.params.night_session_steps = 0.0;
         pre.earnings_key = crate::rng::prehistory_key(self.earnings_key);
         pre.cycle_publication.key = crate::rng::prehistory_key(self.cycle_publication.key);
         let opening = (self.economy.cycle_phase, self.economy.months_in_current_phase);
@@ -4315,6 +4333,12 @@ impl Engine {
             let live = if rate_live_on && open { self.rate_live_curve() } else { None };
             self.rates.tick_live(request.time, &self.economy, live, request.order_volumes);
         }
+        // The index futures' minute (`futures_index_listed`), after
+        // everything a price reads: the basis steps on its own stream and
+        // resting orders the moved book crosses fill. Nothing with it off.
+        if open {
+            self.futures_session_step();
+        }
         if population_open {
             if let Some(pop) = self.population.as_mut() {
                 pop.after_tick(&self.companies);
@@ -5636,6 +5660,13 @@ impl Engine {
                 return Err(format!("limit_price must be finite and greater than zero, got {p}"));
             }
         }
+        // A listed contract trades in its own book (`futures_index_listed`).
+        if self.futures_on()
+            && !self.companies.iter().any(|c| c.ticker == ticker)
+            && crate::derivatives::ContractSymbol::parse(ticker).is_ok()
+        {
+            return self.submit_contract_order(agent, ticker, side, quantity, limit, order_id);
+        }
         // The rate indices quote their own ladder (`crate::rates`) and take
         // their flow from `run_session`'s `fills`; the agent-facing book
         // holds equities only.
@@ -5664,7 +5695,9 @@ impl Engine {
             }
             None => format!("{agent}-{}", self.book.sequence),
         };
-        if self.book.orders.iter().any(|o| o.id == id) {
+        if self.book.orders.iter().any(|o| o.id == id)
+            || self.futures.book.orders.iter().any(|o| o.id == id)
+        {
             return Err(format!("order id {id:?} is already waiting in the book"));
         }
         let sequence = self.book.sequence;
@@ -5718,32 +5751,46 @@ impl Engine {
         })
     }
 
-    /// Cancel a waiting order. `agent`, when given, must own it. Returns
-    /// whether an order was removed.
+    /// Cancel a waiting order, on a name or on a listed contract. `agent`,
+    /// when given, must own it. Returns whether an order was removed.
     pub fn cancel_order(&mut self, order_id: &str, agent: Option<&str>) -> bool {
         let before = self.book.orders.len();
         self.book
             .orders
             .retain(|o| !(o.id == order_id && agent.is_none_or(|a| a == o.agent)));
-        self.book.orders.len() != before
+        if self.book.orders.len() != before {
+            return true;
+        }
+        self.cancel_contract_order(order_id, agent)
     }
 
-    /// Waiting orders, in arrival order, for one agent or all.
+    /// Waiting orders, in arrival order, for one agent or all: the names'
+    /// first, then the contracts' (`futures_index_listed`).
     pub fn open_orders(&self, agent: Option<&str>) -> Vec<crate::agent_book::AgentOrder> {
         self.book
             .orders
             .iter()
+            .chain(self.futures.book.orders.iter())
             .filter(|o| agent.is_none_or(|a| a == o.agent))
             .cloned()
             .collect()
     }
 
-    /// Collect fills, for one agent or all, in the order they happened.
+    /// Collect fills, for one agent or all, in the order they happened: the
+    /// names' first, then the contracts' (`futures_index_listed`), whose
+    /// `sequence` counts the contracts' fills alone.
     pub fn take_fills(&mut self, agent: Option<&str>) -> Vec<crate::agent_book::AgentFill> {
-        let (taken, kept): (Vec<_>, Vec<_>) = std::mem::take(&mut self.book.fills)
+        let (mut taken, kept): (Vec<_>, Vec<_>) = std::mem::take(&mut self.book.fills)
             .into_iter()
             .partition(|f| agent.is_none_or(|a| a == f.agent));
         self.book.fills = kept;
+        if !self.futures.book.fills.is_empty() {
+            let (contracts, kept): (Vec<_>, Vec<_>) = std::mem::take(&mut self.futures.book.fills)
+                .into_iter()
+                .partition(|f| agent.is_none_or(|a| a == f.agent));
+            self.futures.book.fills = kept;
+            taken.extend(contracts);
+        }
         taken
     }
 
@@ -6932,6 +6979,11 @@ impl Engine {
             self.params.rate_intraday_live != 0.0 && !self.rates.is_empty(),
             self.params.vix_intraday_live != 0.0,
         );
+
+        // The index futures on the opening prints (`futures_index_listed`):
+        // an expiring contract settles on them and the next is listed.
+        // Nothing with the switch off.
+        self.futures_open();
     }
 
     /// The overnight move, applied once per name at the open, before the
@@ -7966,6 +8018,9 @@ impl Engine {
         // The index on the same prints (`index_level_listed`). Nothing with
         // the switch off.
         self.index_mark_close();
+        // The index futures' settlement marks on that index
+        // (`futures_index_listed`). Nothing with the switch off.
+        self.futures_close_marks();
         // WHAT THE FACTOR'S VARIANCE TARGET MEASURES THE VIX AGAINST, and
         // it has to be read HERE, before the per-name GARCH loop below
         // moves a single name's variance.
@@ -10199,6 +10254,9 @@ impl Engine {
         // The forecast on the state the close leaves (`forecast_horizon_sessions`).
         // Nothing with the dial at 0.0.
         self.refresh_forecast(Some(game_day));
+        // The night's path for the index futures, to the next open as a copy
+        // runs it (`night_session_steps`). Nothing with the dial at 0.0.
+        self.futures_night_setup();
         outcome
     }
 
@@ -10216,6 +10274,9 @@ impl Engine {
         }
         // The forecast, re-read on the pinned state (`forecast_horizon_sessions`).
         self.refresh_forecast(None);
+        // Between sessions, the night's path moves by what the pin does to
+        // the next open (`night_session_steps`); nothing otherwise.
+        self.futures_retarget();
     }
 
     /// The live mark's move over the published curve, `now - base`, while a
@@ -11157,6 +11218,9 @@ impl Engine {
             self.tick_liquidity_share.push(0.0);
         }
         self.index_rebase(index_before);
+        // A host's write between sessions moves the night's path at once
+        // (`night_session_steps`); nothing otherwise.
+        self.futures_retarget();
         self.companies.len() - 1
     }
 
@@ -11283,6 +11347,9 @@ impl Engine {
         }
         let leaving = self.companies.remove(index);
         self.index_rebase(index_before);
+        // A host's write between sessions moves the night's path at once
+        // (`night_session_steps`); nothing otherwise.
+        self.futures_retarget();
         Some(leaving)
     }
 
@@ -11318,6 +11385,12 @@ impl Engine {
     /// taken, the latent depth behind it, and every agent's resting orders.
     /// Otherwise it is the maker's ladder, built exactly as it always was.
     pub fn book_for(&self, index: usize) -> Option<crate::order_book::OrderBook> {
+        // Listed contracts sit after the rate instruments, in listing order
+        // (`futures_index_listed`); `Engine::contract_book` reads one by
+        // symbol.
+        if index >= self.instrument_count() {
+            return self.contract_book_at(index - self.instrument_count());
+        }
         // Rate instruments sit after the equities, so their index is the
         // equity count plus their place in the rate book.
         if index >= self.companies.len() {
@@ -11488,6 +11561,9 @@ impl Engine {
             company.is_public = is_public[i];
         }
         self.index_rebase(index_before);
+        // A host's write between sessions moves the night's path at once
+        // (`night_session_steps`); nothing otherwise.
+        self.futures_retarget();
         Ok(())
     }
 
@@ -12074,6 +12150,34 @@ impl Engine {
         if let Some(forecast) = self.forecast() {
             let words = forecast.to_words();
             hash_f64(&mut buf, 43.0);
+            hash_u32(&mut buf, words.len() as u32);
+            for value in words {
+                hash_f64(&mut buf, value);
+            }
+        }
+        // The index futures, only while `futures_index_listed` is set, behind
+        // their own tag: their generator, then their numbers,
+        // length-prefixed; their book behind another tag once an agent has
+        // traded a contract; the night's path behind a third while one is
+        // walked (`night_session_steps`).
+        if let (Some(rng), Some(words)) = (self.derivatives_rng_state(), self.futures_words()) {
+            hash_f64(&mut buf, 44.0);
+            hash_u64(&mut buf, rng.state);
+            hash_u64(&mut buf, rng.increment);
+            hash_bits(&mut buf, rng.spare.unwrap_or(f64::NAN));
+            hash_f64(&mut buf, rng.uniforms as f64);
+            hash_f64(&mut buf, rng.normals as f64);
+            hash_u32(&mut buf, words.len() as u32);
+            for value in words {
+                hash_f64(&mut buf, value);
+            }
+        }
+        if let Some(book) = self.futures_book_state() {
+            hash_f64(&mut buf, 45.0);
+            hash_book(&mut buf, book);
+        }
+        if let Some(words) = self.night_bridge_words() {
+            hash_f64(&mut buf, 46.0);
             hash_u32(&mut buf, words.len() as u32);
             for value in words {
                 hash_f64(&mut buf, value);

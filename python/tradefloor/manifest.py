@@ -561,6 +561,11 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          # the forecast, only while `forecast_horizon_sessions` is set and a
          # close has computed one.
          "index_divisor", "vix_live", "forecast",
+         # The index futures and the generator they draw on, only while
+         # `futures_index_listed` is set; their book, once an agent has
+         # traded a contract; and the night's path, only while
+         # `night_session_steps` is set and a night is walked.
+         "derivatives_rng", "futures", "futures_book", "night_bridge",
          # The dividend states, on a model that pays dividends, and an
          # ex-date's move in `s` waiting for its tape row.
          "dividend", "pending_dividend",
@@ -911,6 +916,48 @@ def state_hash(snapshot: dict[str, Any]) -> str:
                 "not a whole number of f64s.")
         values = _column(raw, len(raw) // 8, "forecast")
         _f64(buf, 43.0)
+        _u32(buf, len(values))
+        for value in values:
+            _f64(buf, value)
+    # The index futures: their generator's bit patterns and draw counts,
+    # then their numbers, length-prefixed; their book behind its own tag;
+    # the night's path behind a third. `Engine::state_hash`'s order and rule.
+    if ("futures" in snapshot) != ("derivatives_rng" in snapshot):
+        raise ValidationError(
+            "this snapshot carries one of futures and derivatives_rng without "
+            "the other. The engine writes both or neither, so it was edited or "
+            "assembled from two snapshots.")
+    if "futures" in snapshot:
+        rng = list(snapshot["derivatives_rng"])
+        if len(rng) != 5:
+            raise ValidationError(
+                f"this snapshot's derivatives_rng carries {len(rng)} numbers; "
+                "the state hash covers 5.")
+        raw = snapshot["futures"]
+        if len(raw) % 8:
+            raise ValidationError(
+                f"snapshot field 'futures' carries {len(raw)} bytes, which is "
+                "not a whole number of f64s.")
+        values = _column(raw, len(raw) // 8, "futures")
+        _f64(buf, 44.0)
+        for value in rng[:3]:
+            _bits(buf, value)
+        for value in rng[3:]:
+            _f64(buf, value)
+        _u32(buf, len(values))
+        for value in values:
+            _f64(buf, value)
+    if "futures_book" in snapshot:
+        _f64(buf, 45.0)
+        _book(buf, snapshot["futures_book"])
+    if "night_bridge" in snapshot:
+        raw = snapshot["night_bridge"]
+        if len(raw) % 8:
+            raise ValidationError(
+                f"snapshot field 'night_bridge' carries {len(raw)} bytes, which "
+                "is not a whole number of f64s.")
+        values = _column(raw, len(raw) // 8, "night_bridge")
+        _f64(buf, 46.0)
         _u32(buf, len(values))
         for value in values:
             _f64(buf, value)
@@ -1533,7 +1580,8 @@ _LEDGER_OPTIONAL_BUFFERS = ("fair_value_offset", "opening_z", "pending_fair_valu
                             "idio_variance", "idio_jump_pending",
                             "idio_jump_var_pending", "opening_carry", "dividend",
                             "pending_dividend", "fed_drawdown_returns",
-                            "innovation_day")
+                            "innovation_day", "forecast", "futures",
+                            "night_bridge")
 
 #: The ``fundamentals`` block's buffers, one per company each.
 _LEDGER_FUNDAMENTALS = ("eps", "book_value_per_share", "revenue_growth")
@@ -1822,12 +1870,13 @@ def _snapshot_to_json(snapshot: dict[str, Any]) -> dict[str, Any]:
     for name in _LEDGER_OPTIONAL_BUFFERS:
         if name in snapshot:
             out[name] = base64.b64encode(snapshot[name]).decode("ascii")
-    if "book" in snapshot:
-        book = dict(snapshot["book"])
-        book["taken"] = base64.b64encode(book["taken"]).decode("ascii")
-        if "memory" in book:
-            book["memory"] = base64.b64encode(book["memory"]).decode("ascii")
-        out["book"] = book
+    for name in ("book", "futures_book"):
+        if name in snapshot:
+            book = dict(snapshot[name])
+            book["taken"] = base64.b64encode(book["taken"]).decode("ascii")
+            if "memory" in book:
+                book["memory"] = base64.b64encode(book["memory"]).decode("ascii")
+            out[name] = book
     if "fundamentals" in snapshot:
         out["fundamentals"] = {
             name: base64.b64encode(snapshot["fundamentals"][name]).decode("ascii")
@@ -1836,10 +1885,11 @@ def _snapshot_to_json(snapshot: dict[str, Any]) -> dict[str, Any]:
     out["rng"] = base64.b64encode(
         struct.pack("<%dd" % len(values), *values)).decode("ascii")
     # Bit patterns wearing floats, as `rng` is, so NaN payloads survive.
-    if "cycle_nowcast_rng" in snapshot:
-        values = list(snapshot["cycle_nowcast_rng"])
-        out["cycle_nowcast_rng"] = base64.b64encode(
-            struct.pack("<%dd" % len(values), *values)).decode("ascii")
+    for name in ("cycle_nowcast_rng", "derivatives_rng"):
+        if name in snapshot:
+            values = list(snapshot[name])
+            out[name] = base64.b64encode(
+                struct.pack("<%dd" % len(values), *values)).decode("ascii")
     return out
 
 
@@ -1853,22 +1903,23 @@ def _snapshot_from_json(payload: dict[str, Any]) -> dict[str, Any]:
     for name in _LEDGER_OPTIONAL_BUFFERS:
         if name in payload:
             out[name] = base64.b64decode(payload[name])
-    if "book" in payload:
-        book = dict(payload["book"])
-        book["taken"] = base64.b64decode(book["taken"])
-        if "memory" in book:
-            book["memory"] = base64.b64decode(book["memory"])
-        out["book"] = book
+    for name in ("book", "futures_book"):
+        if name in payload:
+            book = dict(payload[name])
+            book["taken"] = base64.b64decode(book["taken"])
+            if "memory" in book:
+                book["memory"] = base64.b64decode(book["memory"])
+            out[name] = book
     if "fundamentals" in payload:
         out["fundamentals"] = {
             name: base64.b64decode(payload["fundamentals"][name])
             for name in _LEDGER_FUNDAMENTALS}
     raw = base64.b64decode(payload["rng"])
     out["rng"] = list(struct.unpack("<%dd" % (len(raw) // 8), raw))
-    if "cycle_nowcast_rng" in payload:
-        raw = base64.b64decode(payload["cycle_nowcast_rng"])
-        out["cycle_nowcast_rng"] = list(
-            struct.unpack("<%dd" % (len(raw) // 8), raw))
+    for name in ("cycle_nowcast_rng", "derivatives_rng"):
+        if name in payload:
+            raw = base64.b64decode(payload[name])
+            out[name] = list(struct.unpack("<%dd" % (len(raw) // 8), raw))
     return out
 
 

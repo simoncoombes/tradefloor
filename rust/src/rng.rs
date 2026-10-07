@@ -230,6 +230,14 @@ pub enum Site {
     /// Marsaglia and Tsang (a variable count), on [`stream::OVERNIGHT`]
     /// after every other overnight site. Taken only while the dial is set.
     MarketDayTailChi2 = 25,
+    /// The index futures' basis: one normal per step of the futures (each
+    /// open tick and each night step), on [`stream::DERIVATIVES`], only
+    /// while `futures_index_listed` is set.
+    FuturesBasisZ = 26,
+    /// The night's path for the index futures: one normal per night step,
+    /// after the basis's, on [`stream::DERIVATIVES`], only while
+    /// `night_session_steps` is set and a night is walked.
+    NightBridgeZ = 27,
 }
 
 impl Site {
@@ -261,6 +269,8 @@ impl Site {
             Site::CycleNowcastU => "cycle_nowcast_u",
             Site::OvernightIdioChi2 => "overnight_idio_chi2",
             Site::MarketDayTailChi2 => "market_day_tail_chi2",
+            Site::FuturesBasisZ => "futures_basis_z",
+            Site::NightBridgeZ => "night_bridge_z",
         }
     }
 }
@@ -562,6 +572,17 @@ pub mod stream {
     /// the 11 sim/real-earnings-gaps chose, because [`CYCLE_NOWCAST`] took 11
     /// in sim/r13 and [`ARRIVAL`] 12.
     pub const EARNINGS: u32 = 13;
+
+    /// The derivatives' own draws: the index futures' basis, one normal per
+    /// futures step, and the night's path, one normal per night step
+    /// (`futures_index_listed`, `night_session_steps`). Outside [`COUNT`]
+    /// like [`CYCLE_NOWCAST`], so no array indexed by stream id grows and
+    /// every engine with the switches at 0.0 is the engine it was; its
+    /// generator is carried in the snapshot and the state hash only while
+    /// `futures_index_listed` is set. Nothing else reads it, and a futures
+    /// price feeds nothing a stock price reads, so no other stream moves at
+    /// any setting.
+    pub const DERIVATIVES: u32 = 14;
 
     /// How many streams there are. Every array indexed by stream id, the
     /// snapshot's generator and count vectors, the day mark's positions
