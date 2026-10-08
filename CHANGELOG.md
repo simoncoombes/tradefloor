@@ -14,7 +14,37 @@ within the session, and a forecast of the VIX, the index's and each name's
 variance, the policy rate and oil up to 252 sessions ahead, computed at
 each close from public state. None of them moves a price.
 
+Two more switches, also off on every preset, list futures on that index and
+let them trade through the night: the front two quarterly contracts, each
+priced at its carry fair value plus a basis, with its own book, and settled
+on the index of its expiry session's opening prints. Stock prices are the
+same with them on as off.
+
 <!-- release-note-ends -->
+
+### Index futures
+
+- `futures_index_listed` and `night_session_steps` are new dials, with
+  `basis_sd` and `basis_persistence` beside them, all 0.0 on every preset and
+  left out of the digest there. The basis dials are fitted by the new
+  `tools/calibration/basis_dials.py`: 3.753 bp and 0.429 on 24 held-out
+  pt-v21 histories.
+- New API in Rust: `Engine::contracts`, `Engine::quote`,
+  `Engine::settlements`, `Engine::night_tick`, `Engine::contract_book` and
+  `Engine::is_listed_contract`; `submit_order`, `cancel_order`,
+  `open_orders`, `take_fills` and `book_for` take listed contracts; the
+  `derivatives` module gains `calendar`, `ContractSpec`, `ContractKind`,
+  `ContractSymbol`, `Quote`, `Settlement`, `SettlementRule`,
+  `IndexFutureSpec`, `INDEX_FUTURE`, `Right` and `SymbolKind`; and
+  `rng::stream::DERIVATIVES` with two `Site`s. In Python:
+  `Engine.contracts()`, `Engine.quote(symbol)`, `Engine.settlements(day)`
+  and `Engine.run_night(steps)`, with `submit`, `cancel` and `book` taking a
+  contract symbol, and the order log's `run_night`, which `replay` runs.
+- A snapshot carries `futures`, `derivatives_rng`, `futures_book` and
+  `night_bridge` only under their dials, and the state hash and
+  `manifest.state_hash` cover them only then. A day ledger's JSON form now
+  carries them, and the `forecast` buffer, which it could not encode
+  before. Every known-answer digest is where it was.
 
 ### The VIX's fear memory
 

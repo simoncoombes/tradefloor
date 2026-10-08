@@ -1165,9 +1165,11 @@ def _warn_fractional(name: str, fills: list[dict[str, Any]]) -> None:
         ticker = asked[0][0]
         warnings.warn(
             f"Agent {name!r} asked for fractions of a share ({shown}{more}). "
-            "act() returns numbers of shares, not portfolio weights. To put "
-            f"20% of your money in {ticker}, send 0.2 * net_worth / "
-            f"obs.price({ticker!r}) shares.", stacklevel=4)
+            "act() returns numbers of shares, not portfolio weights. To hold "
+            f"20% of your money in {ticker}, send the shares that close the "
+            f"gap: int(0.2 * obs.portfolio.net_worth() / obs.price({ticker!r})) "
+            f"- obs.position({ticker!r}), less any shares still waiting in "
+            "open orders on it.", stacklevel=4)
         return
 
 

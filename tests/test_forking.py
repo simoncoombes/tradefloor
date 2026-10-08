@@ -125,6 +125,9 @@ def state(engine):
     out["index_level"] = engine.index_level
     out["live_vix"] = engine.live_vix
     out["forecast"] = engine.forecast()
+    # The index futures (`futures_index_listed`): empty on a model without.
+    out["futures"] = [engine.quote(c["symbol"]) for c in engine.contracts()]
+    out["settlements"] = engine.settlements()
     out["draws"] = engine.draws_consumed
     out["draws_by_stream"] = engine.draws_by_stream()
     out["digest"] = market_digest(engine)
@@ -1108,6 +1111,14 @@ def _nothing_dormant():
                    index_level_listed=1.0,
                    vix_intraday_live=1.0,
                    forecast_horizon_sessions=21.0,
+                   # The index futures (pt-v22 phase 1): a switch, a basis
+                   # persistent enough that a restore which lost the basis
+                   # is still apart a month on, and a whole number of night
+                   # steps.
+                   futures_index_listed=1.0,
+                   basis_sd=3.7,
+                   basis_persistence=0.9,
+                   night_session_steps=4.0,
                    # Two switches read only under a macro pin (r13).
                    macro_pins_hold=1.0,
                    pinned_vix_feedback=1.0,
