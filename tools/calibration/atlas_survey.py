@@ -465,6 +465,13 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "forecast_policy_shadow_discount": (0.0, 0.5),
     "forecast_policy_persistence": (0.0, 0.9),
     "forecast_policy_reversion": (0.0, 0.3),
+    # The index futures and their night session (pt-v22 phase 1): a switch,
+    # the basis noise's sd (index basis points) and close-to-close
+    # persistence, and the night's steps. None of them moves a stock price.
+    "futures_index_listed": (0.0, 1.0),
+    "basis_sd": (0.0, 10.0),
+    "basis_persistence": (0.0, 0.9),
+    "night_session_steps": (0.0, 30.0),
     # The central bank's stress cut, points per step: 0.5 is a half-point
     # step, two steps a point, which is 2001's and 2008's emergency size.
     "fed_stress_cut": (0.0, 0.5),

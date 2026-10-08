@@ -1909,7 +1909,11 @@ impl PyEngine {
                 "quantity must be non-zero and finite, got {quantity}"
             )));
         }
-        if !self.tickers.iter().any(|t| t == ticker) {
+        // A contract symbol goes to the core, which lists the contracts
+        // (`futures_index_listed`) and says when one is not listed.
+        let contract = self.inner.params().futures_index_listed != 0.0
+            && crate::derivatives::ContractSymbol::parse(ticker).is_ok();
+        if !self.tickers.iter().any(|t| t == ticker) && !contract {
             return Err(ValidationError::new_err(format!(
                 "no instrument with ticker {ticker:?} in this universe"
             )));
@@ -4269,6 +4273,9 @@ impl PyEngine {
         self.inner
             .set_fundamentals(&eps, &book_value_per_share, &revenue_growth)
             .map_err(ValidationError::new_err)?;
+        // Between sessions the night's path moves to the open this write
+        // makes (`night_session_steps`); nothing otherwise.
+        self.inner.futures_retarget();
         // Logged once the engine has taken it, so a refused write leaves no
         // entry a replay would then fail on.
         self.log.push(crate::python_log::LogEntry::SetFundamentals {
@@ -4701,6 +4708,120 @@ impl PyEngine {
         }
         d.set_item("name_variance", names)?;
         Ok(Some(d))
+    }
+
+    /// The listed contracts (`futures_index_listed`), in expiry order, or
+    /// an empty list with the switch off. Each is a dict: `symbol`
+    /// (`IDX.F0119` for the index future expiring at session 119), `root`
+    /// (`IDX`), `kind` (`"future"`), `expiry` (the session it settles at,
+    /// counted from 0 as `day_count` counts), `roll` (six sessions before
+    /// it), `multiplier` (dollars per index point), `tick`, `settlement`
+    /// (`"opening_print_index"`) and `front` (the first contract whose roll
+    /// has not come). The front two index futures are listed.
+    fn contracts<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyDict>>> {
+        self.inner
+            .contracts()
+            .iter()
+            .map(|c| {
+                let d = PyDict::new_bound(py);
+                d.set_item("symbol", &c.symbol)?;
+                d.set_item("root", &c.root)?;
+                d.set_item("kind", c.kind.family())?;
+                d.set_item("expiry", c.expiry)?;
+                d.set_item("roll", c.roll)?;
+                d.set_item("multiplier", c.multiplier)?;
+                d.set_item("tick", c.tick)?;
+                d.set_item("settlement", c.settlement.as_str())?;
+                d.set_item("front", c.front)?;
+                Ok(d)
+            })
+            .collect()
+    }
+
+    /// A listed contract's quote now, a dict: `bid`, `ask` and `mid` (the
+    /// agent-facing book's touch, None on an empty side); `price`, the
+    /// futures price the book is quoted around; `fair`, the carry fair
+    /// value `(S - PV(D)) * exp(r * tau)`; `mark`, the last close's
+    /// settlement mark (None before the contract's first close); `basis_bp`,
+    /// `price - fair` in basis points of the index; `index`, the level
+    /// `fair` reads (between sessions, the night's path under
+    /// `night_session_steps`); `rate`, the financing rate, fractional;
+    /// `dividends`, the present value of the dividends going ex before it
+    /// settles, index points; `sessions_to_expiry`; `multiplier`; `tick`;
+    /// `daily_volume`, contracts; `initial_margin` (None: no margin is
+    /// listed yet); and `symbol`, `kind` and `expiry`. A read.
+    fn quote<'py>(&self, py: Python<'py>, symbol: &str) -> PyResult<Bound<'py, PyDict>> {
+        let q = self.inner.quote(symbol).ok_or_else(|| {
+            ValidationError::new_err(format!(
+                "{symbol:?} is not a listed contract: Engine.contracts() lists the ones that \
+                 trade, and none does with futures_index_listed off"
+            ))
+        })?;
+        let d = PyDict::new_bound(py);
+        d.set_item("symbol", &q.symbol)?;
+        d.set_item("kind", q.kind.family())?;
+        d.set_item("expiry", q.expiry)?;
+        d.set_item("bid", q.bid)?;
+        d.set_item("ask", q.ask)?;
+        d.set_item("mid", q.mid)?;
+        d.set_item("price", q.price)?;
+        d.set_item("fair", q.fair)?;
+        d.set_item("mark", q.mark)?;
+        d.set_item("basis_bp", q.basis_bp)?;
+        d.set_item("index", q.index)?;
+        d.set_item("rate", q.rate)?;
+        d.set_item("dividends", q.dividends)?;
+        d.set_item("sessions_to_expiry", q.sessions_to_expiry)?;
+        d.set_item("multiplier", q.multiplier)?;
+        d.set_item("tick", q.tick)?;
+        d.set_item("daily_volume", q.daily_volume)?;
+        d.set_item("initial_margin", q.initial_margin)?;
+        Ok(d)
+    }
+
+    /// The contracts' final settlements made at the open of session `day`,
+    /// or every one so far with `day` None, in order: dicts with `symbol`,
+    /// `root`, `kind`, `session`, `value` (the settlement price) and
+    /// `reference` (what it settles on: the index of the expiry session's
+    /// opening prints, from which `value` is set). Empty with
+    /// `futures_index_listed` off. A read.
+    #[pyo3(signature = (day = None))]
+    fn settlements<'py>(&self, py: Python<'py>, day: Option<i64>) -> PyResult<Vec<Bound<'py, PyDict>>> {
+        self.inner
+            .settlements(day)
+            .iter()
+            .map(|s| {
+                let d = PyDict::new_bound(py);
+                d.set_item("symbol", &s.symbol)?;
+                d.set_item("root", &s.root)?;
+                d.set_item("kind", s.kind.family())?;
+                d.set_item("session", s.session)?;
+                d.set_item("value", s.value)?;
+                d.set_item("reference", s.reference)?;
+                Ok(d)
+            })
+            .collect()
+    }
+
+    /// Walk the night session for index futures (`night_session_steps`),
+    /// between a close and the next open: `steps` steps, or the rest of the
+    /// night with None. Each step moves every future's fair value along the
+    /// night's path to the fair value the next open will give it, steps the
+    /// basis, and fills resting contract orders the moved books cross; the
+    /// last step lands on that open. Stocks do not trade, and no stock
+    /// price moves. Returns the steps walked: 0 with the dial at 0, once the
+    /// night is done, or before any close. Refused while a day is open.
+    /// Recorded in the order log.
+    #[pyo3(signature = (steps = None))]
+    fn run_night(&mut self, steps: Option<u32>) -> PyResult<u32> {
+        if self.day_is_open() {
+            return Err(ValidationError::new_err(self.open_day_refusal(
+                "The night runs between a close and the next open: call close_market() first.",
+            )));
+        }
+        let steps = steps.unwrap_or(u32::MAX);
+        self.log.push(crate::python_log::LogEntry::RunNight { steps });
+        Ok(self.inner.night_tick(steps))
     }
 
     /// The day's `random_noise` column split into the three draws it sums,
@@ -5481,6 +5602,12 @@ impl PyEngine {
     /// other applies your pressure, once, so a harness that wants both must
     /// do both.
     fn book(&self, ticker: &str) -> PyResult<crate::python_book::PyOrderBook> {
+        // A listed contract's book (`futures_index_listed`), by its symbol.
+        if !self.tickers.iter().any(|t| t == ticker) {
+            if let Some(book) = self.inner.contract_book(ticker) {
+                return Ok(crate::python_book::PyOrderBook::from_core(book));
+            }
+        }
         let index = self.tickers.iter().position(|t| t == ticker).ok_or_else(|| {
             ValidationError::new_err(format!(
                 "no instrument with ticker {ticker:?} in this universe"

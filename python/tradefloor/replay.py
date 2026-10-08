@@ -36,6 +36,9 @@ _OPS = frozenset({
     # Agents' orders against the book, and the collection of what they
     # produced.
     "submit", "cancel", "take_fills", "take_impacts",
+    # The night session for index futures, between a close and the next
+    # open (`night_session_steps`).
+    "run_night",
 })
 
 
@@ -222,6 +225,8 @@ def apply_log(
             engine.take_fills(entry.get("agent"))
         elif op == "take_impacts":
             engine.take_impacts(entry.get("agent"))
+        elif op == "run_night":
+            engine.run_night(entry.get("steps"))
 
     return engine
 

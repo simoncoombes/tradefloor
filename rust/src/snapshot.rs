@@ -1592,6 +1592,30 @@ impl Engine {
         if let Some(forecast) = self.forecast() {
             out.put("forecast", V::from_f64s(&forecast.to_words()));
         }
+        // The index futures (`futures_index_listed`): their generator on
+        // `stream::DERIVATIVES` as (state, increment, spare, uniforms,
+        // normals), their numbers, their book once an agent has traded a
+        // contract, and the night's path while one is walked
+        // (`night_session_steps`).
+        if let (Some(s), Some(words)) = (self.derivatives_rng_state(), self.futures_words()) {
+            out.put(
+                "derivatives_rng",
+                V::List(vec![
+                    V::Float(f64::from_bits(s.state)),
+                    V::Float(f64::from_bits(s.increment)),
+                    V::Float(s.spare.unwrap_or(f64::NAN)),
+                    V::Float(s.uniforms as f64),
+                    V::Float(s.normals as f64),
+                ]),
+            );
+            out.put("futures", V::from_f64s(&words));
+        }
+        if let Some(book) = self.futures_book_state() {
+            out.put("futures_book", book_value(book));
+        }
+        if let Some(words) = self.night_bridge_words() {
+            out.put("night_bridge", V::from_f64s(&words));
+        }
         // The VIX's fear memory, a key only while `vix_fear_uptake` is set.
         if self.carries_vix_fear() {
             out.put("vix_fear", V::Float(self.vix_fear()));
@@ -1920,6 +1944,10 @@ impl Engine {
             Gated::dial("index_divisor", "index_level_listed", p.index_level_listed),
             Gated::held("vix_live", "vix_intraday_live", p.vix_intraday_live),
             Gated::held("forecast", "forecast_horizon_sessions", p.forecast_horizon_sessions),
+            Gated::dial("derivatives_rng", "futures_index_listed", p.futures_index_listed),
+            Gated::dial("futures", "futures_index_listed", p.futures_index_listed),
+            Gated::held("futures_book", "futures_index_listed", p.futures_index_listed),
+            Gated::held("night_bridge", "night_session_steps", p.night_session_steps),
             Gated::dial("vix_fear", "vix_fear_uptake", p.vix_fear_uptake),
             Gated::when(
                 "buyback_log_shares",
@@ -2520,6 +2548,58 @@ impl Engine {
             None => None,
         };
         inner.set_forecast(forecast).map_err(core)?;
+        // The index futures (`futures_index_listed`, `night_session_steps`):
+        // required while the switch is set, which the key check above has
+        // held them to.
+        {
+            let words = match snapshot.get("futures") {
+                Some(_) => Some(read_buffer(snapshot, "", "futures")?),
+                None => None,
+            };
+            let rng = match snapshot.get("derivatives_rng") {
+                Some(_) => {
+                    let r = read_numbers(snapshot, "", "derivatives_rng")?;
+                    if r.len() != 5 {
+                        return Err(core(format!(
+                            "snapshot field derivatives_rng must be 5 numbers, got {}", r.len())));
+                    }
+                    if let Some(bad) = r[3..].iter().find(|c| {
+                        !c.is_finite() || **c < 0.0 || c.fract() != 0.0 || **c > 9.007_199_254_740_992e15
+                    }) {
+                        return Err(core(format!(
+                            "snapshot field derivatives_rng holds a draw count of {bad}. Each is a \
+                             count of draws taken: a whole number from 0."
+                        )));
+                    }
+                    if r[1].to_bits() & 1 == 0 {
+                        return Err(core(
+                            "snapshot field derivatives_rng holds an even increment; every PCG \
+                             increment is odd, so the word was changed on the way"
+                                .to_string(),
+                        ));
+                    }
+                    Some(crate::rng::RngState {
+                        state: r[0].to_bits(),
+                        increment: r[1].to_bits(),
+                        spare: if r[2].is_nan() { None } else { Some(r[2]) },
+                        uniforms: r[3] as u64,
+                        normals: r[4] as u64,
+                    })
+                }
+                None => None,
+            };
+            let book = match snapshot.get("futures_book") {
+                Some(_) => Some(book_from(read_map(snapshot, "", "futures_book")?)?),
+                None => None,
+            };
+            let night = match snapshot.get("night_bridge") {
+                Some(_) => Some(read_buffer(snapshot, "", "night_bridge")?),
+                None => None,
+            };
+            inner
+                .set_futures_state(words.as_deref(), rng, book, night.as_deref())
+                .map_err(core)?;
+        }
         // The VIX's fear memory (`vix_fear_uptake`): required while the switch
         // is set, which the key check above has held it to.
         if inner.carries_vix_fear() {

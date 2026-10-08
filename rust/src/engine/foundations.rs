@@ -211,7 +211,7 @@ impl Engine {
 
     /// The level on the prices standing, the last close's level being what
     /// a degenerate roster holds.
-    fn index_level_now(&self) -> f64 {
+    pub(super) fn index_level_now(&self) -> f64 {
         let (roster, ids, _) = self.index_constituents();
         let previous = if self.index_close > 0.0 { self.index_close } else { INDEX_BASE };
         calculate_market_index(&roster, &ids, previous, self.index_divisor).value

@@ -389,6 +389,22 @@ class Engine:
     # `policy_rate` (fractional), `oil`, and `name_variance` by ticker. None
     # with the dial at 0 and before the first close.
     def forecast(self) -> dict[str, Any] | None: ...
+    # The listed contracts (`futures_index_listed`): `symbol`, `root`,
+    # `kind`, `expiry` (a session number), `roll`, `multiplier`, `tick`,
+    # `settlement` and `front`. Empty with the switch off.
+    def contracts(self) -> list[dict[str, Any]]: ...
+    # A listed contract's quote: `bid`, `ask`, `mid`, `price`, `fair`,
+    # `mark`, `basis_bp`, `index`, `rate` (fractional), `dividends`,
+    # `sessions_to_expiry`, `multiplier`, `tick`, `daily_volume`,
+    # `initial_margin`, `symbol`, `kind`, `expiry`. Raises for a symbol not
+    # listed.
+    def quote(self, symbol: str) -> dict[str, Any]: ...
+    # The final settlements at session `day`'s open, or all with None:
+    # `symbol`, `root`, `kind`, `session`, `value`, `reference`.
+    def settlements(self, day: int | None = ...) -> list[dict[str, Any]]: ...
+    # Steps of the night session for index futures (`night_session_steps`),
+    # the rest of the night with None; returns the steps walked.
+    def run_night(self, steps: int | None = ...) -> int: ...
     # The `random_noise` column split into the three draws it sums.
     def noise_split(self, part: Literal["market", "sector", "idio"]) -> bytes: ...
     def session_prices(self) -> bytes: ...
@@ -433,8 +449,10 @@ class Engine:
         self, *, day: int = ..., tick: int = ..., levels: int = ...
     ) -> int: ...
 
+    # A ticker's book, or a listed contract's by its symbol.
     def book(self, ticker: str) -> OrderBook: ...
-    # Agents' orders against this market's book. `quantity` is
+    # Agents' orders against this market's book, or a listed contract's
+    # (`ticker` its symbol, `IDX.F0119`). `quantity` is
     # signed, positive to buy; `limit_price=None` is a market order. The
     # dicts' fields are listed on the bindings.
     def submit(
