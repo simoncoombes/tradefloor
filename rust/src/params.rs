@@ -11409,9 +11409,9 @@ impl ModelParams {
         if self.vix_fear_uptake != 0.0 {
             if !(self.vix_fear_half_life > 0.0 && self.vix_fear_half_life <= 2520.0) {
                 return Err(format!(
-                    "vix_fear_half_life is {}. With vix_fear_uptake set it is the fear \
-                     memory's half-life in sessions, in (0, 2520].",
-                    self.vix_fear_half_life));
+                    "vix_fear_half_life is {} but vix_fear_uptake is {}: with the uptake \
+                     set it is the fear memory's half-life in sessions, in (0, 2520].",
+                    self.vix_fear_half_life, self.vix_fear_uptake));
             }
             if self.vix_level_identity == 0.0 {
                 return Err(format!(

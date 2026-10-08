@@ -2036,8 +2036,9 @@ COMPANIONS: dict[str, dict[str, float]] = {
     "vix_anchor_weight": {"vix_level_identity": 1.0},
     # The fear memory decays at its half-life, so the uptake is refused
     # without one; the half-life alone is unread, so both arms are the
-    # default's.
-    "vix_fear_uptake": {"vix_fear_half_life": 20.0},
+    # default's. The memory moves the identity's target, so it is refused
+    # without the identity, which the default ships and pt-v18 does not.
+    "vix_fear_uptake": {"vix_fear_half_life": 20.0, "vix_level_identity": 1.0},
     # The memory is what the weight pulls against, so it is refused without one.
     # The weight is the default's 0.375 since the fifth composition (it was
     # 0.45, the route-1 cell's, while the default shipped none).
