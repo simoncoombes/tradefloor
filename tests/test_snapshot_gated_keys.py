@@ -164,6 +164,8 @@ CASES = {
     "index_futures": (dict(index_level_listed=1.0, futures_index_listed=1.0, basis_sd=3.7,
                            basis_persistence=0.42, night_session_steps=6.0),
                       ("futures", "derivatives_rng"), (), ("night_bridge",), {}),
+    # The VIX's fear memory, carried whenever its switch is set.
+    "vix_fear": (dict(vix_fear_uptake=0.2, vix_fear_half_life=20.0), ("vix_fear",), (), (), {}),
     "every_r21_dial": (dict(EVERY_R21_DIAL, **MACRO),
                        ("market_vol_leverage_memory", "vix_stress_memory",
                         "cycle_nowcast_rng", "fed_stress_vix_max", "fed_stress_hold_age",

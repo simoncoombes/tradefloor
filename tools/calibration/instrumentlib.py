@@ -254,6 +254,11 @@ PARAM_SPECS: dict[str, dict] = {
     "vix_stress_premium": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 10.0)},
     "vix_stress_premium_knee": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 3.0)},
     "vix_stress_premium_cap": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 1.0)},
+    # The VIX's fear memory: the share of the VIX's excursion over its target
+    # taken up each session, and the memory's half-life in sessions. Each hard
+    # range is the one `ModelParams::validate` enforces.
+    "vix_fear_uptake": {"kind": "abs", "step_unit": 0.02, "hard_range": (0.0, 0.99)},
+    "vix_fear_half_life": {"kind": "abs", "step_unit": 2.0, "hard_range": (0.0, 2520.0)},
     "fed_put_gain": {"kind": "abs", "step_unit": 0.25, "hard_range": (0.0, 10.0)},
     "fed_put_threshold": {"kind": "abs", "step_unit": 0.005, "hard_range": (0.0, 0.2)},
     "fed_put_half_life": {"kind": "abs", "step_unit": 5.0, "hard_range": (0.0, 504.0)},

@@ -154,6 +154,13 @@ pub struct DailyInputs<'a> {
     /// The anchor's slow memory of the read-back's log deviation, already
     /// advanced to today by the engine.
     pub vix_anchor_slow: f64,
+    /// See [`crate::params::ModelParams::vix_fear_uptake`]. 0.0 leaves the
+    /// identity's target as the anchor makes it, and `vix_fear` is then not
+    /// read.
+    pub vix_fear_uptake: f64,
+    /// The VIX's fear memory in log units, already advanced to today by the
+    /// engine ([`advance_vix_fear`]).
+    pub vix_fear: f64,
     /// See [`crate::params::ModelParams::vix_jump_intensity`]. 0.0 takes
     /// no draws and reproduces the shipped schedule exactly.
     pub vix_jump_intensity: f64,
@@ -483,6 +490,8 @@ impl<'a> Default for DailyInputs<'a> {
             vix_anchor_weight_level_knee_fixed: 0.0,
             vix_anchor_level_fixed: 0.0,
             vix_anchor_slow: 0.0,
+            vix_fear_uptake: 0.0,
+            vix_fear: 0.0,
             vix_jump_intensity: 0.0,
             vix_jump_scale: 0.0,
             vix_return_gain: VIX_RETURN_GAIN,
@@ -823,6 +832,75 @@ pub fn vix_and_yields(
     close_yields(economy, inputs, new_state, volatility, rng);
 }
 
+/// The identity's target level, before the session's return excursion and
+/// the fear memory: the variance read-back held against the anchor
+/// (`vix_anchor_weight`, `vix_anchor_memory`, the weight's level law read at
+/// the VIX `vix`). The expressions [`vix_close`] steps to, in the same order.
+pub fn identity_target_level(inputs: &DailyInputs, vix: f64) -> f64 {
+    // THE ANCHOR IN THE TARGET, not in the rate: a geometric blend of the
+    // read-back and `L * anchor`. The VIX still reverts at `mr`, so its
+    // lag-one persistence is the loop's and not `mr + kappa`'s. Guarded,
+    // so at 0.0 the target is the read-back bit for bit. See
+    // `ModelParams::vix_anchor_weight`.
+    // The centre and the level law are guarded, so with both at 0.0 the
+    // weight and the reference are the dial and `L * anchor` exactly.
+    let centre_level = if inputs.vix_anchor_centre != 0.0 {
+        inputs.vix_anchor_level * mathx::exp(-inputs.vix_anchor_centre)
+    } else {
+        inputs.vix_anchor_level
+    };
+    let weight = if inputs.vix_anchor_weight != 0.0 && inputs.vix_anchor_weight_level != 0.0 {
+        // The knee is where the held read-back's elasticity reaches the
+        // level the law holds, a property of the VIX's ABSOLUTE level; the
+        // switch takes the slow regime level out of it. Guarded, so at
+        // 0.0 the knee reads `vix_anchor_level` exactly as it did.
+        let knee_base = if inputs.vix_anchor_weight_level_knee_fixed != 0.0 {
+            inputs.vix_anchor_level_fixed
+        } else {
+            inputs.vix_anchor_level
+        };
+        let knee = if inputs.vix_anchor_weight_level_knee != 0.0 {
+            knee_base * mathx::exp(-inputs.vix_anchor_weight_level_knee)
+        } else {
+            knee_base
+        };
+        anchor_weight_at_level(
+            inputs.vix_anchor_weight,
+            inputs.vix_anchor_weight_level,
+            inputs.vix_anchor_weight_level_cap,
+            inputs.vix_anchor_weight_level_below,
+            vix,
+            knee,
+        )
+    } else {
+        inputs.vix_anchor_weight
+    };
+    if inputs.vix_anchor_weight != 0.0 && inputs.vix_anchor_memory != 0.0 {
+        // Against the slow memory: today's move passes in full. The
+        // memory is kept against the centre by the engine.
+        inputs.vix_implied_from_market * mathx::exp(-weight * inputs.vix_anchor_slow)
+    } else if inputs.vix_anchor_weight != 0.0 {
+        let a = weight;
+        mathx::exp((1.0 - a) * mathx::log(inputs.vix_implied_from_market)
+            + a * mathx::log(centre_level))
+    } else {
+        inputs.vix_implied_from_market
+    }
+}
+
+/// The fear memory one close on: `f' = 0.5^(1 / H) f + k ln(vix / (T exp(f)))`,
+/// with `T` the identity's target level ([`identity_target_level`]) on the
+/// close's inputs and `vix` the VIX before the step. See
+/// `ModelParams::vix_fear_uptake`. Called only with the uptake non-zero.
+pub fn advance_vix_fear(fear: f64, inputs: &DailyInputs, vix: f64, half_life: f64) -> f64 {
+    let level = identity_target_level(inputs, vix);
+    if !(level > 0.0) || !(vix > 0.0) {
+        return fear;
+    }
+    let excursion = mathx::log(vix / level) - fear;
+    mathx::pow(0.5, 1.0 / half_life) * fear + inputs.vix_fear_uptake * excursion
+}
+
 /// The close's VIX from `economy` on `inputs`: the VIX half of
 /// [`vix_and_yields`], which writes it before the yields read it. Draws
 /// exactly what that half drew, in the same order. The forecast
@@ -861,54 +939,15 @@ pub fn vix_close(
     // this is the shipped arithmetic exactly. See §71.
     let identity_level = inputs.vix_level_identity != 0.0;
     let mut target_vix = if identity_level {
-        // THE ANCHOR IN THE TARGET, not in the rate: a geometric blend of the
-        // read-back and `L * anchor`. The VIX still reverts at `mr`, so its
-        // lag-one persistence is the loop's and not `mr + kappa`'s. Guarded,
-        // so at 0.0 the target is the read-back bit for bit. See
-        // `ModelParams::vix_anchor_weight`.
-        // The centre and the level law are guarded, so with both at 0.0 the
-        // weight and the reference are the dial and `L * anchor` exactly.
-        let centre_level = if inputs.vix_anchor_centre != 0.0 {
-            inputs.vix_anchor_level * mathx::exp(-inputs.vix_anchor_centre)
+        let level = identity_target_level(inputs, economy.vix);
+        // THE FEAR MEMORY: the target carries the share of the VIX's own
+        // excursion the memory has taken up (`advance_vix_fear`). Guarded,
+        // so at 0.0 the target is the anchor's bit for bit. See
+        // `ModelParams::vix_fear_uptake`.
+        if inputs.vix_fear_uptake != 0.0 {
+            level * mathx::exp(inputs.vix_fear)
         } else {
-            inputs.vix_anchor_level
-        };
-        let weight = if inputs.vix_anchor_weight != 0.0 && inputs.vix_anchor_weight_level != 0.0 {
-            // The knee is where the held read-back's elasticity reaches the
-            // level the law holds, a property of the VIX's ABSOLUTE level; the
-            // switch takes the slow regime level out of it. Guarded, so at
-            // 0.0 the knee reads `vix_anchor_level` exactly as it did.
-            let knee_base = if inputs.vix_anchor_weight_level_knee_fixed != 0.0 {
-                inputs.vix_anchor_level_fixed
-            } else {
-                inputs.vix_anchor_level
-            };
-            let knee = if inputs.vix_anchor_weight_level_knee != 0.0 {
-                knee_base * mathx::exp(-inputs.vix_anchor_weight_level_knee)
-            } else {
-                knee_base
-            };
-            anchor_weight_at_level(
-                inputs.vix_anchor_weight,
-                inputs.vix_anchor_weight_level,
-                inputs.vix_anchor_weight_level_cap,
-                inputs.vix_anchor_weight_level_below,
-                economy.vix,
-                knee,
-            )
-        } else {
-            inputs.vix_anchor_weight
-        };
-        if inputs.vix_anchor_weight != 0.0 && inputs.vix_anchor_memory != 0.0 {
-            // Against the slow memory: today's move passes in full. The
-            // memory is kept against the centre by the engine.
-            inputs.vix_implied_from_market * mathx::exp(-weight * inputs.vix_anchor_slow)
-        } else if inputs.vix_anchor_weight != 0.0 {
-            let a = weight;
-            mathx::exp((1.0 - a) * mathx::log(inputs.vix_implied_from_market)
-                + a * mathx::log(centre_level))
-        } else {
-            inputs.vix_implied_from_market
+            level
         }
     } else if inputs.vix_cycle_amplitude == 1.0 {
         phase_vix

@@ -1616,6 +1616,10 @@ impl Engine {
         if let Some(words) = self.night_bridge_words() {
             out.put("night_bridge", V::from_f64s(&words));
         }
+        // The VIX's fear memory, a key only while `vix_fear_uptake` is set.
+        if self.carries_vix_fear() {
+            out.put("vix_fear", V::Float(self.vix_fear()));
+        }
         // The spread a `corporate_spread` pin holds tonight, only while its
         // mark stands.
         if let Some(spread) = self.pinned_corporate_spread() {
@@ -1944,6 +1948,7 @@ impl Engine {
             Gated::dial("futures", "futures_index_listed", p.futures_index_listed),
             Gated::held("futures_book", "futures_index_listed", p.futures_index_listed),
             Gated::held("night_bridge", "night_session_steps", p.night_session_steps),
+            Gated::dial("vix_fear", "vix_fear_uptake", p.vix_fear_uptake),
             Gated::when(
                 "buyback_log_shares",
                 self.carries_buyback_log_shares(),
@@ -2594,6 +2599,11 @@ impl Engine {
             inner
                 .set_futures_state(words.as_deref(), rng, book, night.as_deref())
                 .map_err(core)?;
+        }
+        // The VIX's fear memory (`vix_fear_uptake`): required while the switch
+        // is set, which the key check above has held it to.
+        if inner.carries_vix_fear() {
+            inner.set_vix_fear(read_finite(snapshot, "", "vix_fear")?);
         }
         inner.set_nominal_output_base(read_finite(snapshot, "", "nominal_output_base")?);
         let variance = read_numbers(snapshot, "", "market_variance")?;

@@ -2256,6 +2256,30 @@ pub struct ModelParams {
     /// otherwise. In [0, 1].
     /// pt-v21 ships 0.35.
     pub vix_stress_premium_cap: f64,
+    /// The VIX's fear memory: the share of the VIX's log excursion over its
+    /// target that the target takes up each session. 0.0, which every preset
+    /// carries, is off: the target is the anchor's and no state is written.
+    ///
+    /// Under the identity the VIX reverts at `vix_mean_reversion` (0.27 a
+    /// session) to a target that is the variance read-back held against the
+    /// anchor, so a move of the VIX that the read-back does not share is
+    /// gone in a few sessions. The tape's is not: the CBOE term structure
+    /// moves 0.64 of a VIX point at three months (VIX3M), 0.45 at six
+    /// (VIX6M) and 0.30 at a year (VIX1Y), and a day's VIX change is still
+    /// 0.67 of itself 11 sessions later, 0.47 at 32 and 0.31 at 74 (local
+    /// projections on ^VIX, 2004-2025), where pt-v21 reads 0.60, 0.38 and
+    /// 0.21. Off zero, before each close the memory `f` takes up this share
+    /// of the excursion `ln(vix / (T exp(f)))` over the target `T` the step
+    /// reverts to, and decays at `vix_fear_half_life`:
+    /// `f' = 0.5^(1 / H) f + k ln(vix / (T exp(f)))`, and the step reverts
+    /// to `T exp(f')`. A move the VIX holds is then carried into the target
+    /// and leaves at the memory's own half-life. Requires
+    /// `vix_level_identity`. In [0, 1).
+    pub vix_fear_uptake: f64,
+    /// The fear memory's half-life in sessions. Read only with
+    /// `vix_fear_uptake` non-zero, where it must be in (0, 2520]; 0.0 on
+    /// every preset.
+    pub vix_fear_half_life: f64,
     /// The Fed put: percentage points of policy-rate cut per unit of the
     /// index's log fall since the last meeting. 0.0, which every preset through
     /// pt-v20 carries, is off: no state is written, the Taylor ladder decides
@@ -7593,6 +7617,8 @@ impl ModelParams {
             vix_stress_premium: 0.0,
             vix_stress_premium_knee: 0.0,
             vix_stress_premium_cap: 0.0,
+            vix_fear_uptake: 0.0,
+            vix_fear_half_life: 0.0,
             fed_put_gain: 0.0,
             fed_put_threshold: 0.0,
             fed_put_half_life: 0.0,
@@ -10191,6 +10217,8 @@ impl ModelParams {
             "vix_stress_premium" => self.vix_stress_premium,
             "vix_stress_premium_knee" => self.vix_stress_premium_knee,
             "vix_stress_premium_cap" => self.vix_stress_premium_cap,
+            "vix_fear_uptake" => self.vix_fear_uptake,
+            "vix_fear_half_life" => self.vix_fear_half_life,
             "fed_put_gain" => self.fed_put_gain,
             "fed_put_threshold" => self.fed_put_threshold,
             "fed_put_half_life" => self.fed_put_half_life,
@@ -10554,6 +10582,8 @@ impl ModelParams {
             "vix_stress_premium" => out.vix_stress_premium = value,
             "vix_stress_premium_knee" => out.vix_stress_premium_knee = value,
             "vix_stress_premium_cap" => out.vix_stress_premium_cap = value,
+            "vix_fear_uptake" => out.vix_fear_uptake = value,
+            "vix_fear_half_life" => out.vix_fear_half_life = value,
             "fed_put_gain" => out.fed_put_gain = value,
             "fed_put_threshold" => out.fed_put_threshold = value,
             "fed_put_half_life" => out.fed_put_half_life = value,
@@ -11450,6 +11480,27 @@ impl ModelParams {
                     self.vix_anchor_memory));
             }
         }
+        if !(self.vix_fear_uptake >= 0.0 && self.vix_fear_uptake < 1.0) {
+            return Err(format!(
+                "vix_fear_uptake is {}. It is the share of the VIX's excursion over its \
+                 target the fear memory takes up each session, in [0, 1); 0 is off.",
+                self.vix_fear_uptake));
+        }
+        if self.vix_fear_uptake != 0.0 {
+            if !(self.vix_fear_half_life > 0.0 && self.vix_fear_half_life <= 2520.0) {
+                return Err(format!(
+                    "vix_fear_half_life is {} but vix_fear_uptake is {}: with the uptake \
+                     set it is the fear memory's half-life in sessions, in (0, 2520].",
+                    self.vix_fear_half_life, self.vix_fear_uptake));
+            }
+            if self.vix_level_identity == 0.0 {
+                return Err(format!(
+                    "vix_fear_uptake is {} but vix_level_identity is 0. The fear memory \
+                     moves the identity's target, so it needs the identity. Set it, or \
+                     vix_fear_uptake to 0.0.",
+                    self.vix_fear_uptake));
+            }
+        }
         if !(self.fed_put_gain >= 0.0 && self.fed_put_gain <= 10.0) {
             return Err(format!(
                 "fed_put_gain is {}. It is percentage points of policy-rate cut per \
@@ -12325,6 +12376,8 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "vix_stress_premium",
     "vix_stress_premium_cap",
     "vix_stress_premium_knee",
+    "vix_fear_uptake",
+    "vix_fear_half_life",
     "unemployment_natural_pull",
     "unemployment_okun_coefficient",
     "unemployment_natural_rate",
@@ -12594,6 +12647,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "vix_stress_premium",
         "vix_stress_premium_knee",
         "vix_stress_premium_cap",
+        "vix_fear_uptake",
+        "vix_fear_half_life",
         "fed_put_gain",
         "fed_put_threshold",
         "fed_put_half_life",
