@@ -3802,13 +3802,14 @@ shadow-driven change before it and closes `forecast_policy_reversion` of
 the gap to `forecast_policy_neutral`. The meeting ladder is discrete, so
 these are a projection fitted on held-out histories, where the VIX and oil
 are iterated laws. `tools/calibration/forecast_dials.py derive` fits the
-seven derived dials on 40 held-out pt-v21 histories of 2,000 sessions; it
-gives 0.30, 31.5, 0.81, 0.31, 0.62, 0.0475 and 1.4. The policy rate's errors
-are skewed, since the ladder hikes in small steps and cuts in large ones, so
-most short samples read a positive mean error that a rare cut takes back:
-on 12 fresh histories of 1,000 sessions the rate read 0.04 and 0.09 points
-high at 63 and 126 sessions, 2.2 standard errors each, and 16 fitting
-histories put the neutral rate at 1.3 where 40 put it at 1.4.
+VIX's three dials on 40 held-out pt-v21 histories of 2,000 sessions and the
+policy path's four on 240, on every close after the first year as RF5 reads
+them; it gives 0.30, 31.5, 0.81, 0.36, 0.6, 0.05 and 1.48. A history's
+policy rate level lasts its whole run (the histories' mean rates have a
+standard deviation of 0.6 points), so a fit on 40 histories pins the
+neutral rate to about 0.1. 40 put it at 1.4, and the forecast then read
+the rate low by 0.019, 0.038 and 0.072 points at 63, 126 and 252 sessions
+on 96 other histories, 2.6 standard errors each.
 
 On 96 pt-v21 histories of 2,000 sessions held out from the fit (seeds
 61001 to 61016, 62001 to 62032 and 7001 to 7048), the mean of realised less
@@ -3818,16 +3819,16 @@ check` reads it, with its standard error across histories:
 | Series | 21 sessions | 63 sessions | 126 sessions |
 |---|---|---|---|
 | Published VIX, points | +0.24 (0.14) | +0.23 (0.20) | +0.29 (0.24) |
-| Oil, dollars | +0.13 (0.09) | +0.21 (0.20) | +0.49 (0.33) |
-| Policy rate, points | +0.005 (0.002) | +0.018 (0.007) | +0.037 (0.014) |
+| Oil, dollars | +0.13 (0.09) | +0.22 (0.20) | +0.53 (0.33) |
+| Policy rate, points | +0.003 (0.003) | +0.012 (0.007) | +0.025 (0.015) |
 | Index variance, 1e-6 a session | +8.4 (1.6) | +11.9 (3.5) | +9.5 (4.9) |
 
 The VIX is within two standard errors at each horizon, and on 7001 to 7048
 alone it is +0.05, -0.05 and -0.06; seeds 61001 to 62032 hold more
-high-VIX histories. The policy rate and the index variance read low by 2.5
-to 5 standard errors. Fitting the policy dials on 160 histories in place of
-40 leaves the rate's error where it is, so it is the projection's and not
-the fit's.
+high-VIX histories. The policy rate is within 1.7 standard errors at each
+horizon, and +0.048 (0.028) at 252. The index variance reads low by 2 to 5
+standard errors at every horizon, as it did before the published VIX was
+taken as an expectation.
 
 On 40 names the forecast takes about 6 ms of CPU a close, about 40 per
 cent of a session's; the live VIX adds about 17 per cent and the index

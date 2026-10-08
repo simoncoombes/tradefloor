@@ -21,12 +21,15 @@ histories and frozen as dials, and this tool is how they were fitted:
   squares on the realised policy rate at 5 to 252 sessions, since the
   meeting ladder is discrete and has no expected-value step to iterate.
 
-The policy rate's errors are skewed (the ladder hikes in small steps and
-cuts in large ones), so the fit wants many histories: 16 put the neutral
-rate at 1.3 per cent and 40 at 1.4. The frozen values are the 40's.
+A history's policy rate level lasts its whole run, so the policy fit wants
+many histories: 40 put the neutral rate at 1.4 per cent, and the forecast
+then read 2.6 standard errors low on 96 others; 240 put it at 1.48, and the
+same 96 read at most 1.7. The frozen values are the 240's.
 
-`derive` runs held-out seeds with every derived dial at zero, fits on every
-close and prints the seven values. `check` runs fresh seeds with the dials
+`derive` runs held-out seeds with every derived dial at zero, fits the VIX's
+spread on every close of 3001-3040 (`--seeds`) and the policy path on every
+close after the first year of 3001-3240 (`--policy-seeds`, `--burn`), as RF5
+reads it, and prints the seven values. `check` runs fresh seeds with the dials
 given and prints, per series and horizon, the mean of realised less forecast
 across histories, its standard error across histories and the ratio of the
 two, over every close after the first year (`--burn`, as VF8, RF5 and OF4
@@ -145,15 +148,16 @@ def fit_dispersion(histories):
     return best[1], best[2], skew, spread
 
 
-def fit_policy(histories):
-    """The policy projection's four dials, by least squares on a grid."""
+def fit_policy(histories, burn=0):
+    """The policy projection's four dials, by least squares on a grid, on
+    every close from `burn` on."""
     import numpy as np
 
     targets = (5, 21, 42, 63, 126, 252)
     cadence = sum(round((42 + j) * 252 / 365) for j in range(14)) / 14.0
     r0, shadow, first, realised = [], [], [], {h: [] for h in targets}
     for rows in histories:
-        for t in range(len(rows) - max(targets)):
+        for t in range(burn, len(rows) - max(targets)):
             row = rows[t]
             start = row["day"] + 1
             nm = row["next_meeting"]
@@ -197,7 +201,7 @@ def fit_policy(histories):
     for d in np.arange(max(0.0, d0 - 0.05), d0 + 0.051, 0.01):
         for phi in np.arange(max(0.0, p0 - 0.1), min(0.95, p0 + 0.101), 0.02):
             for kappa in np.arange(max(0.0, k0 - 0.02), k0 + 0.021, 0.0025):
-                for neutral in np.arange(max(0.0, n0 - 0.4), n0 + 0.41, 0.1):
+                for neutral in np.arange(max(0.0, n0 - 0.4), n0 + 0.41, 0.02):
                     v = loss((d, phi, kappa, neutral))
                     if v < best[0]:
                         best = (v, (d, phi, kappa, neutral))
@@ -211,7 +215,11 @@ def main(argv=None):
     parser.add_argument("mode", choices=("derive", "check"))
     parser.add_argument("--seeds", default=None,
                         help="first,last seed (inclusive); derive defaults to 3001,3040 "
-                             "and check to 7001,7016")
+                             "for the VIX's spread and check to 7001,7016")
+    parser.add_argument("--policy-seeds", default="3001,3240",
+                        help="first,last seed (inclusive) derive fits the policy dials on "
+                             "(default 3001,3240): a history's rate level lasts its whole "
+                             "run, so 40 histories pin the neutral rate to about 0.1")
     parser.add_argument("--sessions", type=int, default=2000,
                         help="sessions per history (default 2000)")
     parser.add_argument("--dials", default="{}",
@@ -224,7 +232,8 @@ def main(argv=None):
     parser.add_argument("--burn", type=int, default=252,
                         help="closes left out at the start of each history for check "
                              "(default 252: VF8, RF5 and OF4 read every close after the "
-                             "first year); derive fits on every close")
+                             "first year); derive fits the VIX's spread on every close "
+                             "and the policy dials from the same close RF5 reads")
     parser.add_argument("--workers", type=int, default=8)
     args = parser.parse_args(argv)
     default = "3001,3040" if args.mode == "derive" else "7001,7016"
@@ -232,11 +241,15 @@ def main(argv=None):
     seeds = range(lo, hi + 1)
     law = json.loads(args.law)
     if args.mode == "derive":
-        histories = run(seeds, args.sessions, law, args.preset, args.workers)
+        plo, phi_ = (int(x) for x in args.policy_seeds.split(","))
+        policy_seeds = range(plo, phi_ + 1)
+        every = sorted(set(seeds) | set(policy_seeds))
+        by_seed = dict(zip(every, run(every, args.sessions, law, args.preset, args.workers)))
+        histories = [by_seed[s] for s in seeds]
         sd, hl, skew, spread = fit_dispersion(histories)
         print("log VIX spread about the forecast:",
               ", ".join(f"h{h} {v:.4f}" for h, v in spread.items()))
-        d, phi, kappa, neutral = fit_policy(histories)
+        d, phi, kappa, neutral = fit_policy([by_seed[s] for s in policy_seeds], burn=args.burn)
         print(json.dumps(dict(
             forecast_vix_dispersion=round(sd, 4), forecast_vix_dispersion_half_life=hl,
             forecast_vix_dispersion_skew=round(skew, 2),

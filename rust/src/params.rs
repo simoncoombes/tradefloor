@@ -1066,8 +1066,8 @@ pub struct ModelParams {
     /// preset, takes the shadow whole, and a value of 0.0 is left out of the
     /// model's digest. On pt-v21, 16 held-out seeds over 1,000 sessions, the
     /// change realised by the next meeting was 0.76 of the shadow; the fit of
-    /// all four policy dials together on 40 held-out histories
-    /// (`tools/calibration/forecast_dials.py derive`) puts this at 0.31.
+    /// all four policy dials together on 240 held-out histories
+    /// (`tools/calibration/forecast_dials.py derive`) puts this at 0.36.
     pub forecast_policy_shadow_discount: f64,
     /// The forecast's policy path's momentum: the share of a meeting's
     /// expected change expected again at the meeting after it. Read only
@@ -1080,10 +1080,11 @@ pub struct ModelParams {
     /// policy path expects each meeting to close. Read only with
     /// `forecast_horizon_sessions` set; 0.0, on every shipped preset, is a
     /// branch to no reversion, and a value of 0.0 is left out of the model's
-    /// digest. On pt-v21, 40 held-out histories of 2,000 sessions, the fit
-    /// closes 0.0475 of the gap a meeting toward 1.4 per cent. The ladder
-    /// hikes in small steps and cuts in large ones, so the errors are skewed
-    /// and the fit needs many histories: 16 put the neutral rate at 1.3.
+    /// digest. On pt-v21, 240 held-out histories of 2,000 sessions read
+    /// after their first year, the fit closes 0.05 of the gap a meeting
+    /// toward 1.48 per cent. A history's rate level lasts its whole run, so
+    /// the fit needs many histories: 40 put the neutral rate at 1.4, and the
+    /// forecast then read 2.6 standard errors low on 96 others.
     pub forecast_policy_reversion: f64,
     /// The policy rate the forecast's path reverts toward, per cent. Read
     /// only with `forecast_policy_reversion` set; at its default of 2.5, the

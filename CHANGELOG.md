@@ -42,6 +42,12 @@ each close from public state. None of them moves a price.
   sessions. A seventh derived dial, `forecast_vix_dispersion_skew`, gives
   the spread the right tail the VIX's errors have, and the variances and
   the dollar's drift that oil reads take their expectations over it.
+- `forecast_dials.py derive` fits the policy path's four dials on 240
+  histories (`--policy-seeds`, default 3001 to 3240) after their first
+  year, as RF5 reads them. A history's rate level lasts its whole run, and
+  the 40 the VIX's dials are fitted on put the neutral rate at 1.4, which
+  read the rate 2.6 standard errors low on 96 other histories; 240 put it
+  at 1.48.
 - New API: `Engine::index_level`, `Engine::live_vix` and
   `Engine::forecast` in Rust, with `market::IndexLevel`,
   `market::INDEX_BASE` and `derivatives::Forecast`; `Engine.index_level`,

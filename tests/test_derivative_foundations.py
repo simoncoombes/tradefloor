@@ -27,12 +27,13 @@ SMALL = tf.Universe.random(8, seed=5)
 
 SWITCHES = ("index_level_listed", "vix_intraday_live", "forecast_horizon_sessions")
 #: The forecast's derived dials as fitted on pt-v21's held-out histories
-#: (`tools/calibration/forecast_dials.py derive --seeds 3001,3040`, 2,000
+#: (`tools/calibration/forecast_dials.py derive`: the VIX's spread on seeds
+#: 3001-3040 and the policy path on 3001-3240 after their first year, 2,000
 #: sessions each, on `Universe.random(40, seed=111)`).
 DERIVED = dict(forecast_vix_dispersion=0.3, forecast_vix_dispersion_half_life=31.5,
                forecast_vix_dispersion_skew=0.81,
-               forecast_policy_shadow_discount=0.31, forecast_policy_persistence=0.62,
-               forecast_policy_reversion=0.0475, forecast_policy_neutral=1.4)
+               forecast_policy_shadow_discount=0.36, forecast_policy_persistence=0.6,
+               forecast_policy_reversion=0.05, forecast_policy_neutral=1.48)
 ON = dict(index_level_listed=1.0, vix_intraday_live=1.0, forecast_horizon_sessions=252.0,
           **DERIVED)
 SLOW = bool(os.environ.get("TRADEFLOOR_SLOW_TESTS"))
