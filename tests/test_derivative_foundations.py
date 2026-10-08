@@ -27,11 +27,13 @@ SMALL = tf.Universe.random(8, seed=5)
 
 SWITCHES = ("index_level_listed", "vix_intraday_live", "forecast_horizon_sessions")
 #: The forecast's derived dials as fitted on pt-v21's held-out histories
-#: (`tools/calibration/forecast_dials.py derive --seeds 3001,3040`, 2,000
+#: (`tools/calibration/forecast_dials.py derive`: the VIX's spread on seeds
+#: 3001-3040 and the policy path on 3001-3240 after their first year, 2,000
 #: sessions each, on `Universe.random(40, seed=111)`).
 DERIVED = dict(forecast_vix_dispersion=0.3, forecast_vix_dispersion_half_life=31.5,
-               forecast_policy_shadow_discount=0.31, forecast_policy_persistence=0.62,
-               forecast_policy_reversion=0.0475, forecast_policy_neutral=1.4)
+               forecast_vix_dispersion_skew=0.81,
+               forecast_policy_shadow_discount=0.36, forecast_policy_persistence=0.6,
+               forecast_policy_reversion=0.05, forecast_policy_neutral=1.48)
 ON = dict(index_level_listed=1.0, vix_intraday_live=1.0, forecast_horizon_sessions=252.0,
           **DERIVED)
 SLOW = bool(os.environ.get("TRADEFLOOR_SLOW_TESTS"))
@@ -263,31 +265,35 @@ def test_a_key_is_refused_by_name_on_a_model_without_its_dial(key, dials):
 
 # ── Unbiasedness on fresh histories (RF5, VF8, OF4 at construction level) ──
 
-@pytest.mark.skipif(not SLOW, reason="sixteen forty-name histories of 2,000 sessions; "
+@pytest.mark.skipif(not SLOW, reason="forty-eight forty-name histories of 2,000 sessions; "
                     "set TRADEFLOOR_SLOW_TESTS=1")
 def test_the_forecast_is_unbiased_on_fresh_histories():
-    """Mean realised less forecast, per history, then across histories: zero
-    within two standard errors for the VIX (VF8), oil (OF4) and the policy
-    rate (RF5) at 21, 63 and 126 sessions, on 16 fresh histories of 2,000
-    sessions that were never used to fit the derived dials. The runs are
+    """Mean realised less forecast over every close after the first year, per
+    history, then across histories: zero within two standard errors for the
+    VIX (VF8), oil (OF4) and the policy rate (RF5) at 21, 63 and 126
+    sessions, on 48 fresh histories of 2,000 sessions that were never used to
+    fit the derived dials. The runs are
     `tools/calibration/forecast_dials.py check`'s.
 
     Long histories because the policy rate's errors are skewed: the ladder
     hikes in small steps and cuts in large ones, so most short samples read a
     positive mean error that a rare cut would take back. On 12 histories of
     1,000 sessions the policy rate read +0.041 and +0.095 points at 63 and 126
-    sessions, 2.2 standard errors each.
+    sessions, 2.2 standard errors each. Many histories because each one's
+    mean error moves with its own slow VIX level, which the forecast cannot
+    see: the first 16 of these are calm ones, on which the forecast's VIX
+    path ran 3 to 5 per cent above the realised log VIX.
     """
     sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "tools" / "calibration"))
     import forecast_dials  # noqa: PLC0415
 
-    histories = forecast_dials.run(range(7001, 7017), 2000, DERIVED, "pt-v21",
+    histories = forecast_dials.run(range(7001, 7049), 2000, DERIVED, "pt-v21",
                                    os.cpu_count() or 4)
     failures = []
     for series in ("vix", "oil", "rate"):
         for h in (21, 63, 126):
             means = [sum(e) / len(e) for e in
-                     (forecast_dials.errors(rows, h, series) for rows in histories)]
+                     (forecast_dials.errors(rows, h, series, burn=252) for rows in histories)]
             mean = sum(means) / len(means)
             sd = math.sqrt(sum((v - mean) ** 2 for v in means) / (len(means) - 1))
             se = sd / math.sqrt(len(means))

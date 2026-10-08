@@ -996,19 +996,21 @@ pub struct ModelParams {
     /// market's cycle nowcast (or the published phase) and the published
     /// growth. It does not read the true cycle phase, the slow VIX level or
     /// any draw to come. The VIX and the variances iterate the expected
-    /// value of the model's own laws; the policy rate takes the shadow of
-    /// the next meeting and a projection for the meetings after it. The
-    /// forecast is carried in the snapshot and the state hash while this is
-    /// set. It writes nothing back and takes no draw, so every price is the
-    /// one the engine prints without it. A whole number of sessions in
-    /// [0, 252].
+    /// value of the model's own laws, and the published VIX is the quote's
+    /// expectation over the VIX's spread about that path
+    /// (`forecast_vix_dispersion`); the policy rate takes the shadow of the
+    /// next meeting and a projection for the meetings after it. The forecast is carried in the snapshot and the
+    /// state hash while this is set. It writes nothing back and takes no
+    /// draw, so every price is the one the engine prints without it. A whole
+    /// number of sessions in [0, 252].
     pub forecast_horizon_sessions: f64,
     /// The forecast's measure of how far the VIX can be from its expectation:
     /// the sd of the log VIX about the forecast at a long horizon, measured
     /// on the model's own held-out histories. Read only with
     /// `forecast_horizon_sessions` set. 0.0, on every shipped preset, is a
     /// branch: the forecast's variances iterate the laws on the expected VIX
-    /// alone, and a value of 0.0 is left out of the model's digest.
+    /// alone, it reports the published quote at the expected state, and a
+    /// value of 0.0 is left out of the model's digest.
     ///
     /// The market factor's variance target rises with the VIX at a power of
     /// 4 above the anchor (2.5 below it on pt-v21), so the expected target
@@ -1018,8 +1020,19 @@ pub struct ModelParams {
     /// per cent at 5, 21, 63, 126 and 252 sessions. Off zero the forecast
     /// takes each convex coupling (the factor's target, the per-name GARCH
     /// coupling, the sector sigma, the jump rate, the dollar's safe-haven
-    /// drift that oil reads) as its expectation over a lognormal VIX with
-    /// this sd at long horizons. The VIX's own path is not changed.
+    /// drift that oil reads) as its expectation over the VIX's spread with
+    /// this sd at long horizons (`forecast_vix_dispersion_skew` its shape).
+    /// The VIX's own path is not changed.
+    ///
+    /// The published VIX is the state times `exp(premium)`, the premium a
+    /// capped hinge in the stress memory (`vix_stress_premium`), so the
+    /// quote at the expected state reads low: on pt-v21, 136 held-out
+    /// histories of 2,000 sessions, by 0.19, 0.37 and 0.52 points at 21, 63
+    /// and 126 sessions at the slow VIX level's mean, where the state alone
+    /// read 0.12, 0.12 and 0.15 low. Off zero the forecast reports the
+    /// quote's expectation over the spread, the stress memory moving with
+    /// the log VIX by its own average of the spread
+    /// (`Engine::forecast_published_vix`).
     pub forecast_vix_dispersion: f64,
     /// The half-life, in sessions, of the gap between the log VIX's spread
     /// about the forecast and its long-horizon level
@@ -1029,6 +1042,23 @@ pub struct ModelParams {
     /// the first session, and a value of 0.0 is left out of the model's
     /// digest.
     pub forecast_vix_dispersion_half_life: f64,
+    /// The skewness of the log VIX's spread about the forecast's path
+    /// (`forecast_vix_dispersion`), measured with it on the model's own
+    /// held-out histories at 126 to 252 sessions. Read only with that dial
+    /// set; 0.0, on every shipped preset, takes the spread as normal in the
+    /// log, and a value of 0.0 is left out of the model's digest.
+    ///
+    /// The VIX rises in jumps and falls back slowly, so its log errors about
+    /// the forecast lean right: on pt-v21, 40 held-out histories of 2,000
+    /// sessions, their skewness at 126 to 252 sessions was 0.81. The
+    /// expectations the forecast takes over the spread read that tail: the
+    /// published stress premium (a hinge in the stress memory), the
+    /// dollar's safe-haven drift above `usd_crisis_vix_threshold` and the
+    /// variance couplings. Off zero the spread's shape is a skew-normal with
+    /// this skewness, integrated on forty nodes; its tails stay normal, so
+    /// the expectation of every power of the VIX stays finite. In
+    /// [-0.99, 0.99], the skew-normal's reach.
+    pub forecast_vix_dispersion_skew: f64,
     /// The share of the next meeting's shadow change the forecast's policy
     /// path leaves out. The shadow is the change the meeting function makes
     /// on the economy as published, the change `policy_anticipation` prices.
@@ -1036,8 +1066,8 @@ pub struct ModelParams {
     /// preset, takes the shadow whole, and a value of 0.0 is left out of the
     /// model's digest. On pt-v21, 16 held-out seeds over 1,000 sessions, the
     /// change realised by the next meeting was 0.76 of the shadow; the fit of
-    /// all four policy dials together on 40 held-out histories
-    /// (`tools/calibration/forecast_dials.py derive`) puts this at 0.31.
+    /// all four policy dials together on 240 held-out histories
+    /// (`tools/calibration/forecast_dials.py derive`) puts this at 0.36.
     pub forecast_policy_shadow_discount: f64,
     /// The forecast's policy path's momentum: the share of a meeting's
     /// expected change expected again at the meeting after it. Read only
@@ -1050,10 +1080,11 @@ pub struct ModelParams {
     /// policy path expects each meeting to close. Read only with
     /// `forecast_horizon_sessions` set; 0.0, on every shipped preset, is a
     /// branch to no reversion, and a value of 0.0 is left out of the model's
-    /// digest. On pt-v21, 40 held-out histories of 2,000 sessions, the fit
-    /// closes 0.0475 of the gap a meeting toward 1.4 per cent. The ladder
-    /// hikes in small steps and cuts in large ones, so the errors are skewed
-    /// and the fit needs many histories: 16 put the neutral rate at 1.3.
+    /// digest. On pt-v21, 240 held-out histories of 2,000 sessions read
+    /// after their first year, the fit closes 0.05 of the gap a meeting
+    /// toward 1.48 per cent. A history's rate level lasts its whole run, so
+    /// the fit needs many histories: 40 put the neutral rate at 1.4, and the
+    /// forecast then read 2.6 standard errors low on 96 others.
     pub forecast_policy_reversion: f64,
     /// The policy rate the forecast's path reverts toward, per cent. Read
     /// only with `forecast_policy_reversion` set; at its default of 2.5, the
@@ -7544,6 +7575,7 @@ impl ModelParams {
             forecast_horizon_sessions: 0.0,
             forecast_vix_dispersion: 0.0,
             forecast_vix_dispersion_half_life: 0.0,
+            forecast_vix_dispersion_skew: 0.0,
             forecast_policy_shadow_discount: 0.0,
             forecast_policy_persistence: 0.0,
             forecast_policy_reversion: 0.0,
@@ -10144,6 +10176,7 @@ impl ModelParams {
             "forecast_horizon_sessions" => self.forecast_horizon_sessions,
             "forecast_vix_dispersion" => self.forecast_vix_dispersion,
             "forecast_vix_dispersion_half_life" => self.forecast_vix_dispersion_half_life,
+            "forecast_vix_dispersion_skew" => self.forecast_vix_dispersion_skew,
             "forecast_policy_shadow_discount" => self.forecast_policy_shadow_discount,
             "forecast_policy_persistence" => self.forecast_policy_persistence,
             "forecast_policy_reversion" => self.forecast_policy_reversion,
@@ -10509,6 +10542,7 @@ impl ModelParams {
             "forecast_horizon_sessions" => out.forecast_horizon_sessions = value,
             "forecast_vix_dispersion" => out.forecast_vix_dispersion = value,
             "forecast_vix_dispersion_half_life" => out.forecast_vix_dispersion_half_life = value,
+            "forecast_vix_dispersion_skew" => out.forecast_vix_dispersion_skew = value,
             "forecast_policy_shadow_discount" => out.forecast_policy_shadow_discount = value,
             "forecast_policy_persistence" => out.forecast_policy_persistence = value,
             "forecast_policy_reversion" => out.forecast_policy_reversion = value,
@@ -11857,6 +11891,13 @@ impl ModelParams {
                     "{name} is {value}. It is {unit}, in [0, {hi}]; 0 is off."));
             }
         }
+        if !(self.forecast_vix_dispersion_skew >= -0.99 && self.forecast_vix_dispersion_skew <= 0.99) {
+            return Err(format!(
+                "forecast_vix_dispersion_skew is {}. It is the skewness of the log VIX's \
+                 spread about the forecast, a skew-normal's, in [-0.99, 0.99]; 0 takes the \
+                 spread as normal.",
+                self.forecast_vix_dispersion_skew));
+        }
         if !(self.forecast_policy_persistence >= 0.0 && self.forecast_policy_persistence < 1.0) {
             return Err(format!(
                 "forecast_policy_persistence is {}. It is the share of a meeting's expected \
@@ -12388,6 +12429,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "forecast_horizon_sessions",
     "forecast_vix_dispersion",
     "forecast_vix_dispersion_half_life",
+    "forecast_vix_dispersion_skew",
     "forecast_policy_shadow_discount",
     "forecast_policy_persistence",
     "forecast_policy_reversion",
@@ -12574,6 +12616,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "forecast_horizon_sessions",
         "forecast_vix_dispersion",
         "forecast_vix_dispersion_half_life",
+        "forecast_vix_dispersion_skew",
         "forecast_policy_shadow_discount",
         "forecast_policy_persistence",
         "forecast_policy_reversion",

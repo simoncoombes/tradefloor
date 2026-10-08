@@ -36,6 +36,110 @@ const GAUSS_HERMITE_5: [(f64, f64); 5] = [
 const FACTOR_NODES: [f64; 4] = [-1.370_224_249_159_755, -0.349_979_295_122_705,
                                 0.349_979_295_122_705, 1.370_224_249_159_755];
 
+/// Forty-point Gauss-Hermite nodes and weights (physicists' form), the
+/// positive half; the rule is symmetric. Fine enough for the stress premium,
+/// which has a kink at its knee, and for a skewed spread's tail.
+const GAUSS_HERMITE_40_HALF: [(f64, f64); 20] = [
+    (0.17453721459758237, 0.3386432774255891),
+    (0.5238747138322772, 0.2657282518773773),
+    (0.8740066123570881, 0.1633787327132714),
+    (1.225480109046289, 0.07847460586540442),
+    (1.5788698949316138, 0.029312565536172383),
+    (1.9347914722822959, 0.008460888008258134),
+    (2.2939171418750837, 0.0018714968295979483),
+    (2.6569959984428957, 0.00031385359454133175),
+    (3.0248798839012845, 3.936933981092491e-5),
+    (3.398558265859628, 3.6315761506930256e-6),
+    (3.7792067534352234, 2.411144163670531e-7),
+    (4.1682570668325, 1.1212360832275839e-8),
+    (4.567502072844395, 3.525620791365422e-10),
+    (4.9792609785452555, 7.156528052690362e-12),
+    (5.406654247970128, 8.805707645216109e-14),
+    (5.8540950560304, 6.008358789490818e-16),
+    (6.328255351220082, 1.9891810121165008e-18),
+    (6.840237305249355, 2.567593365411684e-21),
+    (7.411582531485469, 8.544056963775433e-25),
+    (8.09876113925085, 2.5910437138470347e-29),
+];
+
+/// The shape of the log VIX's spread about the forecast's path: a standard
+/// variable, skewed to `forecast_vix_dispersion_skew`, on the forty nodes of
+/// a standard normal. Each node is `(shape, weight)`, the weights summing to
+/// one and the shapes to mean 0 and variance 1 under them. At a skew of 0.0
+/// the shape is the normal itself; off it, a skew-normal, the normal's
+/// weights times `2 Phi(a z)`, with `a` the one whose skewness under the
+/// rule is the skew. Its tails stay normal, so every power of the VIX the
+/// forecast takes an expectation of stays finite; its skewness reaches
+/// about 0.99.
+fn spread_shape(skew: f64) -> Vec<(f64, f64)> {
+    let root_pi = crate::mathx::sqrt(std::f64::consts::PI);
+    let mut normal = Vec::with_capacity(40);
+    for &(x, w) in GAUSS_HERMITE_40_HALF.iter().rev() {
+        normal.push((-std::f64::consts::SQRT_2 * x, w / root_pi));
+    }
+    for &(x, w) in GAUSS_HERMITE_40_HALF.iter() {
+        normal.push((std::f64::consts::SQRT_2 * x, w / root_pi));
+    }
+    // The skew-normal of shape `a`, standardised under the rule itself, so a
+    // node's shape is exactly a number of the spread's sds; and its
+    // skewness under the rule.
+    let skewed = |a: f64| -> (Vec<(f64, f64)>, f64) {
+        let mut nodes = normal.clone();
+        if a != 0.0 {
+            let mut total = 0.0;
+            for node in nodes.iter_mut() {
+                node.1 *= crate::mathx::erfc(-a * node.0 / std::f64::consts::SQRT_2);
+                total += node.1;
+            }
+            for node in nodes.iter_mut() {
+                node.1 /= total;
+            }
+        }
+        let mean: f64 = nodes.iter().map(|(z, w)| w * z).sum();
+        let var: f64 = nodes.iter().map(|(z, w)| w * (z - mean) * (z - mean)).sum();
+        let sd = crate::mathx::sqrt(var);
+        let mut third = 0.0;
+        for node in nodes.iter_mut() {
+            node.0 = (node.0 - mean) / sd;
+            third += node.1 * node.0 * node.0 * node.0;
+        }
+        (nodes, third)
+    };
+    if skew == 0.0 {
+        return skewed(0.0).0;
+    }
+    let (mut lo, mut hi) = (0.0, 50.0);
+    for _ in 0..60 {
+        let mid = 0.5 * (lo + hi);
+        if skewed(mid).1 < skew.abs() {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    // A left skew is the right one reflected.
+    skewed(skew.signum() * 0.5 * (lo + hi)).0
+}
+
+/// The log of `V / mean` at each node of a spread of log variance `var`
+/// with shape `shape` ([`spread_shape`]), shifted so that `E[V]` is the mean
+/// under the rule. Each entry is `(log ratio, weight)`.
+fn spread_at(shape: &[(f64, f64)], var: f64) -> Vec<(f64, f64)> {
+    let sd = crate::mathx::sqrt(crate::mathx::max(0.0, var));
+    let total: f64 = shape.iter().map(|(s, w)| w * crate::mathx::exp(sd * s)).sum();
+    let shift = -crate::mathx::log(total);
+    shape.iter().map(|(s, w)| (shift + sd * s, *w)).collect()
+}
+
+/// `E[g(V)]` for `V = mean * exp(x)` over the nodes of [`spread_at`].
+fn spread_expect(nodes: &[(f64, f64)], mean: f64, g: impl Fn(f64) -> f64) -> f64 {
+    let mut total = 0.0;
+    for &(x, w) in nodes {
+        total += w * g(mean * crate::mathx::exp(x));
+    }
+    total
+}
+
 /// `E[g(X)]` for `X` lognormal with mean `mean` and log variance `var`, by
 /// five-point Gauss-Hermite; `g(mean)` at a variance of 0.0.
 fn lognormal_expect(mean: f64, var: f64, g: impl Fn(f64) -> f64) -> f64 {
@@ -554,9 +658,13 @@ impl Engine {
     /// expected VIX: the VIX's own path, its index variance read-back and
     /// the economy the step reads come from it. The second carries the same
     /// states for the variances the forecast reports, with each convex VIX
-    /// coupling taken as its expectation over a lognormal VIX
-    /// (`forecast_vix_dispersion`) and the market factor's return memory's
-    /// multiplier as its expectation over the memory's own spread.
+    /// coupling taken as its expectation over the VIX's spread about the
+    /// first track (`forecast_vix_dispersion`, skewed by
+    /// `forecast_vix_dispersion_skew`) and the market factor's return
+    /// memory's multiplier as its expectation over the memory's own spread.
+    /// The first track's VIX is the state's expectation; the published VIX
+    /// reported is the published quote's expectation over the same spread
+    /// ([`Engine::forecast_published_vix`]).
     fn compute_forecast(&self, day: i64) -> Forecast {
         let p = &self.params;
         let horizon = p.forecast_horizon_sessions as usize;
@@ -608,6 +716,16 @@ impl Engine {
         let (mut var_oil, mut var_inventory) = (0.0, 0.0);
         let policy = self.forecast_policy_path(day, horizon);
         let k_curve = intraday_variance_factor();
+        // The spread's shape (`forecast_vix_dispersion_skew`), and the stress
+        // memory's sd about its path: the memory's own average of the log
+        // VIX's spread, moving with it.
+        let shape = if p.forecast_vix_dispersion != 0.0 {
+            spread_shape(p.forecast_vix_dispersion_skew)
+        } else {
+            Vec::new()
+        };
+        let skewed = p.forecast_vix_dispersion != 0.0 && p.forecast_vix_dispersion_skew != 0.0;
+        let mut stress_sd = 0.0;
 
         let mut out = Forecast {
             day,
@@ -626,7 +744,16 @@ impl Engine {
             // The log VIX's variance about its expectation after `step`
             // closes, and the VIX whose square is the expected square.
             let spread = self.forecast_vix_log_variance(step);
-            let vix_sq = if spread > 0.0 { vix * crate::mathx::exp(0.5 * spread) } else { vix };
+            // Off zero skew, the spread's nodes: the log of V / vix at each.
+            let nodes = if skewed && spread > 0.0 { spread_at(&shape, spread) } else { Vec::new() };
+            let vix_sq = if !nodes.is_empty() {
+                let second: f64 = nodes.iter().map(|(x, w)| w * crate::mathx::exp(2.0 * x)).sum();
+                vix * crate::mathx::sqrt(second)
+            } else if spread > 0.0 {
+                vix * crate::mathx::exp(0.5 * spread)
+            } else {
+                vix
+            };
             let lev = self.forecast_leverage_factor(step);
             let mut econ_sq = econ.clone();
             econ_sq.vix = vix_sq;
@@ -647,12 +774,27 @@ impl Engine {
             // Its close. The factor on both tracks: the expected update over
             // the day's factor (four nodes) and the believed phase's regimes.
             let regimes = self.forecast_regimes(&belief, &phase_regimes);
-            let (next_mv, next_faces) = self.forecast_factor_close(&mv, &regimes, vix, 0.0);
-            let (next_mv_e, next_faces_e) = self.forecast_factor_close(&mv_e, &regimes, vix, spread);
+            let (next_mv, next_faces) = self.forecast_factor_close(&mv, &regimes, vix, 0.0, &[]);
+            let (next_mv_e, next_faces_e) = self.forecast_factor_close(&mv_e, &regimes, vix, spread, &nodes);
 
             // Each name's GARCH on both tracks: the expected GJR step on the
             // session's noise.
             if p.garch_cascade_components < 1.0 {
+                let coupled = |x: f64| {
+                    if p.garch_vix_coupling == 0.0 {
+                        1.0
+                    } else {
+                        let cpl = p.garch_vix_coupling;
+                        1.0 - cpl + crate::market::garch::vix_coupled_response(p, cpl, x / self.vix_anchor)
+                    }
+                };
+                let coupled_e = if p.garch_vix_coupling == 0.0 {
+                    1.0
+                } else if !nodes.is_empty() {
+                    spread_expect(&nodes, vix, coupled)
+                } else {
+                    lognormal_expect(vix, spread, coupled)
+                };
                 let target = crate::market::tick::sector_sigma_at(p, &econ, self.vix_anchor);
                 let target_e = crate::market::tick::sector_sigma_at(p, &econ_sq, self.vix_anchor);
                 for (i, n) in names.iter().enumerate() {
@@ -664,19 +806,11 @@ impl Engine {
                         }
                     };
                     let r = idio.get(i).copied().unwrap_or(1.0);
-                    let coupled = |x: f64| {
-                        if p.garch_vix_coupling == 0.0 {
-                            1.0
-                        } else {
-                            let cpl = p.garch_vix_coupling;
-                            1.0 - cpl + crate::market::garch::vix_coupled_response(p, cpl, x / self.vix_anchor)
-                        }
-                    };
                     let base = n.sector_base * coupled(vix);
                     let base_e = if p.garch_vix_coupling == 0.0 {
                         n.sector_base
                     } else {
-                        n.sector_base * lognormal_expect(vix, spread, coupled)
+                        n.sector_base * coupled_e
                     };
                     garch[i] = self.forecast_garch_step(
                         n, garch[i], mv.variance(), state(target), r, base, k_curve);
@@ -733,6 +867,8 @@ impl Engine {
                     slow = (1.0 - h) * slow + h * d;
                     if p.vix_stress_premium != 0.0 {
                         stress = (1.0 - h) * stress + h * d;
+                        let after = self.forecast_vix_log_variance(step + 1);
+                        stress_sd = (1.0 - h) * stress_sd + h * crate::mathx::sqrt(after);
                     }
                 }
             }
@@ -792,14 +928,18 @@ impl Engine {
             if spread > 0.0 {
                 let k = p.usd_crisis_vix_threshold;
                 let at_mean = if vix > k { vix - k } else { 0.0 };
-                next.usd_index += crate::economy::daily::USD_SAFE_HAVEN_GAIN
-                    * (lognormal_excess(vix, spread, k) - at_mean);
+                let excess = if !nodes.is_empty() {
+                    spread_expect(&nodes, vix, |x| if x > k { x - k } else { 0.0 })
+                } else {
+                    lognormal_excess(vix, spread, k)
+                };
+                next.usd_index += crate::economy::daily::USD_SAFE_HAVEN_GAIN * (excess - at_mean);
             }
             next.vix = vix_next;
             next.federal_funds_rate = rate;
             econ = next;
 
-            out.vix.push(self.published_vix_at(econ.vix, stress));
+            out.vix.push(self.forecast_published_vix(&shape, econ.vix, stress, stress_sd, step + 1));
             out.oil.push(econ.oil_price);
 
             // The belief, one session on.
@@ -811,6 +951,32 @@ impl Engine {
             belief = pred;
         }
         out
+    }
+
+    /// The published VIX expected `closes` closes ahead, from the first
+    /// track's VIX `vix` and stress memory `stress`. The quote is the state
+    /// times `exp(premium)`, the premium a capped hinge in the stress memory
+    /// (`vix_stress_premium`), so its expectation is not the quote at the
+    /// track's state. With `forecast_vix_dispersion` set it is taken over the
+    /// VIX's spread after these closes ([`spread_shape`], [`spread_at`]),
+    /// the first track's VIX being the state's mean, and the stress memory
+    /// at each node `stress_sd` of its own sds from `stress`, the same number
+    /// as the VIX's: the memory is an average of the VIX's log excursions,
+    /// so it moves with them, and `stress_sd` is that average of the VIX's
+    /// spread. With the dial or the premium at 0.0 it is the quote at the
+    /// track's state.
+    fn forecast_published_vix(&self, shape: &[(f64, f64)], vix: f64, stress: f64, stress_sd: f64,
+                              closes: usize) -> f64 {
+        let var = self.forecast_vix_log_variance(closes);
+        if self.params.vix_stress_premium == 0.0 || shape.is_empty() || !(var > 0.0) {
+            return self.published_vix_at(vix, stress);
+        }
+        let nodes = spread_at(shape, var);
+        let mut total = 0.0;
+        for (&(x, w), &(z, _)) in nodes.iter().zip(shape.iter()) {
+            total += w * self.published_vix_at(vix * crate::mathx::exp(x), stress + stress_sd * z);
+        }
+        total
     }
 
     /// The log VIX's variance about the forecast after `closes` closes:
@@ -855,15 +1021,17 @@ impl Engine {
     /// One close of the market factor's variance state in expectation: the
     /// update over the four nodes of the day's factor and each believed
     /// regime, at the VIX `vix`. With `spread` off zero the target's VIX
-    /// coupling is taken as its expectation over a lognormal VIX of that log
-    /// variance, by scaling the regime's level by the ratio of the expected
-    /// coupling to the coupling at the expected VIX.
+    /// coupling is taken as its expectation over the VIX's spread of that log
+    /// variance (a lognormal, or `nodes` when the spread is skewed), by
+    /// scaling the regime's level by the ratio of the expected coupling to
+    /// the coupling at the expected VIX.
     fn forecast_factor_close(
         &self,
         mv: &MarketVarianceState,
         regimes: &[(f64, f64, f64)],
         vix: f64,
         spread: f64,
+        nodes: &[(f64, f64)],
     ) -> (MarketVarianceState, (f64, f64)) {
         let p = &self.params;
         let sd_f = crate::mathx::sqrt(crate::mathx::max(0.0, mv.variance()));
@@ -887,9 +1055,12 @@ impl Engine {
             let denominator = self.vix_anchor * scale;
             let level = if spread > 0.0 && c != 0.0 {
                 let at = crate::market::factor_vol::vix_response(p, smoothed / denominator);
-                let expected = lognormal_expect(smoothed, spread, |x| {
-                    crate::market::factor_vol::vix_response(p, x / denominator)
-                });
+                let response = |x: f64| crate::market::factor_vol::vix_response(p, x / denominator);
+                let expected = if nodes.is_empty() {
+                    lognormal_expect(smoothed, spread, response)
+                } else {
+                    spread_expect(nodes, smoothed, response)
+                };
                 let ratio_fast = (1.0 - c + c * expected) / (1.0 - c + c * at);
                 let ratio_slow = (1.0 - c_slow + c_slow * expected) / (1.0 - c_slow + c_slow * at);
                 level * ((1.0 - w_slow) * ratio_fast + w_slow * ratio_slow)
@@ -1200,5 +1371,73 @@ mod tests {
         let words = f.to_words();
         let back = crate::derivatives::Forecast::from_words(&words).unwrap();
         assert_eq!(back, f);
+    }
+
+    /// The rule's mean, variance and skewness of a list of `(value, weight)`.
+    fn moments(nodes: &[(f64, f64)]) -> (f64, f64, f64) {
+        let mean: f64 = nodes.iter().map(|(x, w)| w * x).sum();
+        let var: f64 = nodes.iter().map(|(x, w)| w * (x - mean) * (x - mean)).sum();
+        let third: f64 = nodes.iter().map(|(x, w)| w * (x - mean).powi(3)).sum();
+        (mean, var, third / var.powf(1.5))
+    }
+
+    #[test]
+    fn the_spread_is_standard_skewed_as_asked_and_keeps_the_mean() {
+        let weights: f64 = spread_shape(0.0).iter().map(|(_, w)| w).sum();
+        assert!((weights - 1.0).abs() < 1e-12);
+        for skew in [0.0, 0.81, 0.95, -0.5] {
+            let shape = spread_shape(skew);
+            let (mean, var, sk) = moments(&shape);
+            assert!(mean.abs() < 1e-12 && (var - 1.0).abs() < 1e-12, "{skew}: {mean} {var}");
+            assert!((sk - skew).abs() < 1e-9, "{skew}: skewness {sk}");
+            // The nodes are a spread of the asked log variance whose
+            // exponential has mean one, so `vix` stays the mean.
+            let nodes = spread_at(&shape, 0.09);
+            let (_, var_x, _) = moments(&nodes);
+            assert!((var_x - 0.09).abs() < 1e-12);
+            assert!((spread_expect(&nodes, 18.0, |v| v) - 18.0).abs() < 1e-12);
+        }
+        // At no skew the second moment is the lognormal's.
+        let nodes = spread_at(&spread_shape(0.0), 0.09);
+        let second = spread_expect(&nodes, 1.0, |v| v * v);
+        assert!((second - crate::mathx::exp(0.09)).abs() < 1e-12);
+        // Skewed, a steep power's expectation is above the lognormal's and
+        // finite: the tails stay normal (the variance target reads the VIX
+        // to the fourth power).
+        let lognormal = spread_expect(&nodes, 1.0, |v| v.powi(4));
+        let skewed = spread_expect(&spread_at(&spread_shape(0.95), 0.09), 1.0, |v| v.powi(4));
+        assert!(skewed > lognormal && skewed < 1.5 * lognormal, "{skewed} {lognormal}");
+    }
+
+    #[test]
+    fn the_published_vix_is_the_quotes_expectation_over_the_spread() {
+        let dials = [
+            ("forecast_horizon_sessions", 63.0),
+            ("forecast_vix_dispersion", 0.3),
+            ("forecast_vix_dispersion_half_life", 31.5),
+            ("forecast_vix_dispersion_skew", 0.81),
+        ];
+        let e = engine(with(&dials));
+        let shape = spread_shape(0.81);
+        // Calm: the stress memory under the knee at the state, so the quote
+        // is the state, and its expectation adds the premium's right tail.
+        let (vix, calm) = (16.0, 0.1);
+        assert_eq!(e.published_vix_at(vix, calm), vix);
+        let near = e.forecast_published_vix(&shape, vix, calm, 0.0, 1);
+        let far = e.forecast_published_vix(&shape, vix, calm, 0.3, 126);
+        assert!((near - vix).abs() < 1e-9, "{near}");
+        assert!(far > vix * 1.005, "{far}");
+        // More of the memory's spread, more of the premium.
+        assert!(e.forecast_published_vix(&shape, vix, calm, 0.2, 126) < far);
+        // Stressed: the premium is near its cap at the state, and the
+        // expectation reads its concave top, so it is below the quote.
+        let hot = 2.0;
+        let quote = e.published_vix_at(40.0, hot);
+        assert!(e.forecast_published_vix(&shape, 40.0, hot, 0.05, 1) <= quote * 1.0001);
+        // With the premium off it is the state, whatever the spread.
+        let off = engine(with(&[dials[0], dials[1], dials[2], dials[3], ("vix_stress_premium", 0.0)]));
+        assert_eq!(off.forecast_published_vix(&shape, vix, calm, 0.3, 126), vix);
+        // With the dispersion off, the quote at the state.
+        assert_eq!(e.forecast_published_vix(&[], vix, 2.0, 0.3, 126), e.published_vix_at(vix, 2.0));
     }
 }

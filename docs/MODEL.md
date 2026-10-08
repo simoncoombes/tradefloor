@@ -3761,18 +3761,39 @@ model without one) and the published growth. It does not read the true
 phase, the slow VIX level or any draw to come. A pin computes it again on
 the pinned state.
 
-The VIX and the variances iterate the expected value of the model's laws
-one session at a time. The day's market factor is integrated on four nodes,
-the belief over the phases moves on the cycle's own exit rates, and each
-phase's volatility regime is weighted by it. The variances the forecast
-reports run on a second track, where each convex VIX coupling (the factor's
-target, the GARCH coupling, the sector sigma and the jump rate) is taken as
-its expectation over a lognormal VIX whose log variance grows to
+The VIX and the variances iterate the model's laws on their expected
+inputs one session at a time. The day's market factor is integrated on four
+nodes, the belief over the phases moves on the cycle's own exit rates, and
+each phase's volatility regime is weighted by it. On 136 pt-v21 histories
+of 2,000 sessions (seeds 61001 to 61016, 62001 to 62032, 3001 to 3040 and
+7001 to 7048) the VIX state this gives is the state's mean: realised less
+forecast was +0.11, +0.11 and +0.14 points at 21, 63 and 126 sessions, under
+one standard error, and -0.03 in log VIX, so it sits above the median. The
+published VIX is the state times the stress premium, which is a capped hinge
+in the stress memory, and the quote at the expected state read +0.18, +0.36
+and +0.50 points low, 1.5 to 2.5 standard errors. A history's mean error
+follows its own VIX level, which the slow VIX level the forecast cannot see
+sets: at 63 sessions -1.6 points on the 21 histories whose VIX averaged
+under 16, +5.0 on the 8 that averaged over 24.
+
+The VIX the forecast reports is therefore the quote's expectation over a
+spread of the log VIX about the state, whose variance $s_h^2$ grows to
 `forecast_vix_dispersion` squared at the half-life
-`forecast_vix_dispersion_half_life`, and the market factor's return
-memory's multiplier as its expectation over the memory's own spread. Oil
-adds the expected inventory push, OPEC decision and dollar safe-haven drift
-over the same spreads.
+`forecast_vix_dispersion_half_life`. The VIX's errors have a right tail, so
+the spread is a skew-normal with skewness `forecast_vix_dispersion_skew`,
+on forty nodes, shifted so the VIX's mean under it is the state; at a skew
+of 0.0 it is a lognormal. The stress memory at each node moves the same
+number of its own standard deviations as the log VIX, since it is an
+average of the VIX's log excursions.
+
+The variances the forecast reports run on a second track, where each convex
+VIX coupling (the factor's target, the GARCH coupling, the sector sigma and
+the jump rate) is taken as its expectation over the same spread, and the
+market factor's return memory's multiplier as its expectation over the
+memory's own spread. Oil adds the expected inventory push, OPEC decision
+and dollar safe-haven drift over the same spreads. The dollar's drift is a
+hinge in the VIX above 25.5, so the spread's right tail raises the expected
+dollar and lowers oil.
 
 The policy rate takes the shadow of the next meeting, the change
 `policy_anticipation` prices, less `forecast_policy_shadow_discount` of it.
@@ -3781,24 +3802,33 @@ shadow-driven change before it and closes `forecast_policy_reversion` of
 the gap to `forecast_policy_neutral`. The meeting ladder is discrete, so
 these are a projection fitted on held-out histories, where the VIX and oil
 are iterated laws. `tools/calibration/forecast_dials.py derive` fits the
-six derived dials on 40 held-out pt-v21 histories of 2,000 sessions; it
-gives 0.30, 31.5, 0.31, 0.62, 0.0475 and 1.4. The policy rate's errors are
-skewed, since the ladder hikes in small steps and cuts in large ones, so
-most short samples read a positive mean error that a rare cut takes back:
-on 12 fresh histories of 1,000 sessions the rate read 0.04 and 0.09 points
-high at 63 and 126 sessions, 2.2 standard errors each, and 16 fitting
-histories put the neutral rate at 1.3 where 40 put it at 1.4.
+VIX's three dials on 40 held-out pt-v21 histories of 2,000 sessions and the
+policy path's four on 240, on every close after the first year as RF5 reads
+them; it gives 0.30, 31.5, 0.81, 0.36, 0.6, 0.05 and 1.48. A history's
+policy rate level lasts its whole run (the histories' mean rates have a
+standard deviation of 0.6 points), so a fit on 40 histories pins the
+neutral rate to about 0.1. 40 put it at 1.4, and the forecast then read
+the rate low by 0.019, 0.038 and 0.072 points at 63, 126 and 252 sessions
+on 96 other histories, 2.6 standard errors each.
 
-On 16 fresh pt-v21 histories of 2,000 sessions (seeds 7001 to 7016,
-`forecast_dials.py check`), the mean of realised less forecast, with its
-standard error across histories:
+On 96 pt-v21 histories of 2,000 sessions held out from the fit (seeds
+61001 to 61016, 62001 to 62032 and 7001 to 7048), the mean of realised less
+forecast over every close after the first year, as `forecast_dials.py
+check` reads it, with its standard error across histories:
 
 | Series | 21 sessions | 63 sessions | 126 sessions |
 |---|---|---|---|
-| Published VIX, points | +0.02 (0.27) | -0.00 (0.35) | -0.07 (0.37) |
-| Oil, dollars | +0.03 (0.22) | +0.02 (0.39) | +0.09 (0.53) |
-| Policy rate, points | +0.004 (0.005) | +0.015 (0.015) | +0.038 (0.032) |
-| Index variance, 1e-6 a session | +2.5 (1.7) | +1.5 (3.8) | -1.3 (4.9) |
+| Published VIX, points | +0.24 (0.14) | +0.23 (0.20) | +0.29 (0.24) |
+| Oil, dollars | +0.13 (0.09) | +0.22 (0.20) | +0.53 (0.33) |
+| Policy rate, points | +0.003 (0.003) | +0.012 (0.007) | +0.025 (0.015) |
+| Index variance, 1e-6 a session | +8.4 (1.6) | +11.9 (3.5) | +9.5 (4.9) |
+
+The VIX is within two standard errors at each horizon, and on 7001 to 7048
+alone it is +0.05, -0.05 and -0.06; seeds 61001 to 62032 hold more
+high-VIX histories. The policy rate is within 1.7 standard errors at each
+horizon, and +0.048 (0.028) at 252. The index variance reads low by 2 to 5
+standard errors at every horizon, as it did before the published VIX was
+taken as an expectation.
 
 On 40 names the forecast takes about 6 ms of CPU a close, about 40 per
 cent of a session's; the live VIX adds about 17 per cent and the index

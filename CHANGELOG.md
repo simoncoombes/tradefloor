@@ -62,9 +62,22 @@ same with them on as off.
 
 - `index_level_listed`, `vix_intraday_live` and `forecast_horizon_sessions`
   are new dials, 0.0 on every preset and left out of the digest there. The
-  forecast has six derived dials beside them (`forecast_vix_dispersion`,
-  `forecast_vix_dispersion_half_life` and four `forecast_policy_*`),
-  fitted by the new `tools/calibration/forecast_dials.py`.
+  forecast has seven derived dials beside them (three
+  `forecast_vix_dispersion*` and four `forecast_policy_*`), fitted by the
+  new `tools/calibration/forecast_dials.py`, which takes `--law` to fit them
+  on a law no preset ships.
+- The forecast's published VIX is the quote's expectation over the VIX's
+  spread, not the quote at the expected state: the stress premium is a
+  hinge, and at the state the VIX read 0.18 to 0.50 points low at 21 to 126
+  sessions. A seventh derived dial, `forecast_vix_dispersion_skew`, gives
+  the spread the right tail the VIX's errors have, and the variances and
+  the dollar's drift that oil reads take their expectations over it.
+- `forecast_dials.py derive` fits the policy path's four dials on 240
+  histories (`--policy-seeds`, default 3001 to 3240) after their first
+  year, as RF5 reads them. A history's rate level lasts its whole run, and
+  the 40 the VIX's dials are fitted on put the neutral rate at 1.4, which
+  read the rate 2.6 standard errors low on 96 other histories; 240 put it
+  at 1.48.
 - New API: `Engine::index_level`, `Engine::live_vix` and
   `Engine::forecast` in Rust, with `market::IndexLevel`,
   `market::INDEX_BASE` and `derivatives::Forecast`; `Engine.index_level`,
