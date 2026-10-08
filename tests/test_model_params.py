@@ -1158,6 +1158,15 @@ PERTURBATIONS = [
     ("forecast_policy_persistence", 0.5, False),
     ("forecast_policy_reversion", 0.1, False),
     ("forecast_policy_neutral", 1.7, False),
+    # The index futures and their night session (pt-v22 phase 1). INERT by
+    # construction: a future reads the index, the dividends and the forecast
+    # and draws only on its own stream, so no stock price moves
+    # (tests/test_index_futures.py). Each carries the switch it requires as
+    # its companion; the basis dials are read only with the futures listed.
+    ("futures_index_listed", 1.0, False),
+    ("basis_sd", 3.7, False),
+    ("basis_persistence", 0.42, False),
+    ("night_session_steps", 10.0, False),
     # LIVE with the companion start of 15: at pt-v20's 30 no meeting in the
     # probe's burn-in or its three sessions reads a VIX of 30 (measured: the
     # row at 0.25 alone is inert), and at 15 the first meeting cuts a
@@ -1968,6 +1977,10 @@ COMPANIONS: dict[str, dict[str, float]] = {
     "market_prehistory_valuation": {"market_prehistory_sessions": 21.0},
     # The live mark requires the close's re-mark (`ModelParams::invariants`).
     "rate_intraday_live": {"rate_close_remark": 1.0},
+    # An index future settles on the price index, and the night walks the
+    # futures: each is refused without the switch it reads.
+    "futures_index_listed": {"index_level_listed": 1.0},
+    "night_session_steps": {"index_level_listed": 1.0, "futures_index_listed": 1.0},
     # The stress cut's start at 15, where the probe's burn-in reads it (see
     # the rows), and the cut on for the two dials read only with it.
     "fed_stress_cut": {"fed_stress_vix": 15.0},

@@ -159,6 +159,11 @@ CASES = {
     "index_level": (dict(index_level_listed=1.0), ("index_divisor",), (), (), {}),
     "vix_live": (dict(vix_intraday_live=1.0), (), (), ("vix_live",), {}),
     "forecast": (dict(forecast_horizon_sessions=21.0), (), (), ("forecast",), {}),
+    # The index futures: their numbers and generator whenever the switch is
+    # set; the night's path from a close to the next open.
+    "index_futures": (dict(index_level_listed=1.0, futures_index_listed=1.0, basis_sd=3.7,
+                           basis_persistence=0.42, night_session_steps=6.0),
+                      ("futures", "derivatives_rng"), (), ("night_bridge",), {}),
     "every_r21_dial": (dict(EVERY_R21_DIAL, **MACRO),
                        ("market_vol_leverage_memory", "vix_stress_memory",
                         "cycle_nowcast_rng", "fed_stress_vix_max", "fed_stress_hold_age",
