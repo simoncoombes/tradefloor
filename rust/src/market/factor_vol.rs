@@ -411,7 +411,7 @@ fn clamp_variance(params: &crate::params::ModelParams, v: f64) -> f64 {
 /// Round 100: along the real covid path the square is too convex through
 /// mid-VIX, and the exponent (with the coupling re-fit to preserve the
 /// held-VIX ratio) is the shape the driven window asks for.
-fn vix_response(params: &crate::params::ModelParams, vix_ratio: f64) -> f64 {
+pub(crate) fn vix_response(params: &crate::params::ModelParams, vix_ratio: f64) -> f64 {
     // The calm side's own exponent. Guarded, so at 0.0 -- every preset --
     // this branch is never taken and the arithmetic below is unchanged to
     // the bit. See `ModelParams::market_vol_vix_exponent_below`.

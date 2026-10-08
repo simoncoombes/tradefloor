@@ -120,6 +120,11 @@ def state(engine):
     out.update({f"attribution:{f}": engine.attribution(f)
                 for f in tf.Engine.FACTORS})
     out["prices"] = engine.prices()
+    # What derivatives read (`index_level_listed`, `vix_intraday_live`,
+    # `forecast_horizon_sessions`): None on a model without them.
+    out["index_level"] = engine.index_level
+    out["live_vix"] = engine.live_vix
+    out["forecast"] = engine.forecast()
     out["draws"] = engine.draws_consumed
     out["draws_by_stream"] = engine.draws_by_stream()
     out["digest"] = market_digest(engine)
@@ -1098,6 +1103,11 @@ def _nothing_dormant():
                    # timing); the stress cut takes the blanket 0.05.
                    rate_close_remark=1.0,
                    rate_intraday_live=1.0,
+                   # What derivatives read (pt-v22 phase 1): two switches and
+                   # a whole number of sessions.
+                   index_level_listed=1.0,
+                   vix_intraday_live=1.0,
+                   forecast_horizon_sessions=21.0,
                    # Two switches read only under a macro pin (r13).
                    macro_pins_hold=1.0,
                    pinned_vix_feedback=1.0,
@@ -1308,6 +1318,21 @@ REQUIRED_SNAPSHOT_KEYS = ("columns", "rng", "tickers", "tick_components")
 #: dials put the scenario in reach of them: `fed_drawdown_mcap_prev`,
 #: `night_market_factor` and `market_vol_cycle_log`.
 UNREACHED_SNAPSHOT_FIELDS = {
+    "vix_live":
+        "the live VIX's projection (`vix_intraday_live`). It moves no price, "
+        "and a restore without it projects again on the next tick from the "
+        "same state, so the continuation reads the same live VIX from the "
+        "next refresh on and the published one after the close. What it "
+        "takes to see it is a read between the restore and the next "
+        "five-minute refresh. tests/test_derivative_foundations.py holds it "
+        "in the state hash and across a mid-session restore.",
+    "forecast":
+        "the forecast the last close computed (`forecast_horizon_sessions`). "
+        "It moves no price, and every close computes it afresh from the "
+        "state, so the continuation's forecasts are the copy's from its "
+        "first close on. What it takes to see it is a read before that "
+        "close. tests/test_derivative_foundations.py holds it in the state "
+        "hash and across a restore.",
     "attribution":
         "the day's decomposition of the change in `s`. This model splits the "
         "day (`overnight_market_share`), and under a split the close's GJR "

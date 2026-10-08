@@ -1577,6 +1577,21 @@ impl Engine {
         if self.market_day_scale() != 1.0 {
             out.put("market_day_scale", V::Float(self.market_day_scale()));
         }
+        // The price index's divisor and close level, a key only while
+        // `index_level_listed` is set.
+        if let Some([divisor, close]) = self.index_state() {
+            out.put("index_divisor", V::List(vec![V::Float(divisor), V::Float(close)]));
+        }
+        // The live VIX's projection, only while `vix_intraday_live` is set and
+        // a session holds one.
+        if let Some(mark) = self.vix_live_mark() {
+            out.put("vix_live", V::Float(mark));
+        }
+        // The forecast the last close computed, only while
+        // `forecast_horizon_sessions` is set and a close has computed one.
+        if let Some(forecast) = self.forecast() {
+            out.put("forecast", V::from_f64s(&forecast.to_words()));
+        }
         // The spread a `corporate_spread` pin holds tonight, only while its
         // mark stands.
         if let Some(spread) = self.pinned_corporate_spread() {
@@ -1898,6 +1913,9 @@ impl Engine {
             Gated::held("rate_live_marks", "rate_intraday_live", p.rate_intraday_live),
             Gated::held("pinned_vix_jump", "pinned_vix_variance_share", p.pinned_vix_variance_share),
             Gated::held("market_day_scale", "market_day_tail_df", p.market_day_tail_df),
+            Gated::dial("index_divisor", "index_level_listed", p.index_level_listed),
+            Gated::held("vix_live", "vix_intraday_live", p.vix_intraday_live),
+            Gated::held("forecast", "forecast_horizon_sessions", p.forecast_horizon_sessions),
             Gated::when(
                 "buyback_log_shares",
                 self.carries_buyback_log_shares(),
@@ -2466,6 +2484,37 @@ impl Engine {
                  positive finite multiplier.")));
         }
         inner.set_market_day_scale(day_scale);
+        // The price index (`index_level_listed`): required while the switch is
+        // set, which the key check above has held it to.
+        let index = match snapshot.get("index_divisor") {
+            Some(_) => {
+                let values = read_numbers(snapshot, "", "index_divisor")?;
+                let pair: [f64; 2] = values.as_slice().try_into().map_err(|_| {
+                    core(format!(
+                        "this snapshot's index_divisor carries {} values; it is two, the \
+                         divisor and the last close's level.",
+                        values.len()))
+                })?;
+                Some(pair)
+            }
+            None => None,
+        };
+        inner.set_index_state(index).map_err(core)?;
+        // Absent means no session held a live VIX when it was taken.
+        let live_vix = match snapshot.get("vix_live") {
+            Some(_) => Some(read_finite(snapshot, "", "vix_live")?),
+            None => None,
+        };
+        inner.set_vix_live_mark(live_vix).map_err(core)?;
+        // Absent means no close had computed a forecast.
+        let forecast = match snapshot.get("forecast") {
+            Some(_) => Some(
+                crate::derivatives::Forecast::from_words(&read_buffer(snapshot, "", "forecast")?)
+                    .map_err(core)?,
+            ),
+            None => None,
+        };
+        inner.set_forecast(forecast).map_err(core)?;
         inner.set_nominal_output_base(read_finite(snapshot, "", "nominal_output_base")?);
         let variance = read_numbers(snapshot, "", "market_variance")?;
         if variance.len() != 6 || variance.iter().any(|v| !v.is_finite()) {

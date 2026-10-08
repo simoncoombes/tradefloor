@@ -8,7 +8,28 @@ are paid. A holder through an ex-date is paid what `evaluate` pays it on
 the same market, and a fork, a rewind or a replay of the session's orders
 pays each ex-date once, with every known-answer digest where it was.
 
+Three switches, off on every preset, build what futures and options will
+read: a price index of the roster with a divisor, a VIX published live
+within the session, and a forecast of the VIX, the index's and each name's
+variance, the policy rate and oil up to 252 sessions ahead, computed at
+each close from public state. None of them moves a price.
+
 <!-- release-note-ends -->
+
+### Inputs for derivatives
+
+- `index_level_listed`, `vix_intraday_live` and `forecast_horizon_sessions`
+  are new dials, 0.0 on every preset and left out of the digest there. The
+  forecast has six derived dials beside them (`forecast_vix_dispersion`,
+  `forecast_vix_dispersion_half_life` and four `forecast_policy_*`),
+  fitted by the new `tools/calibration/forecast_dials.py`.
+- New API: `Engine::index_level`, `Engine::live_vix` and
+  `Engine::forecast` in Rust, with `market::IndexLevel`,
+  `market::INDEX_BASE` and `derivatives::Forecast`; `Engine.index_level`,
+  `Engine.live_vix` and `Engine.forecast()` in Python.
+- A snapshot carries `index_divisor`, `vix_live` and `forecast` only under
+  their dials, and the state hash and `manifest.state_hash` cover them only
+  then. Every known-answer digest is where it was.
 
 ### Dividends in sessions
 

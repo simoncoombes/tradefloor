@@ -449,6 +449,20 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # survey records a draw there as the model's refusal.
     "rate_close_remark": (0.0, 1.0),
     "rate_intraday_live": (0.0, 1.0),
+    # What derivatives read (pt-v22 phase 1): two switches and the forecast's
+    # horizon in sessions, none of which moves a price, so a survey draw on
+    # them reads the market it would read without them.
+    "index_level_listed": (0.0, 1.0),
+    "vix_intraday_live": (0.0, 1.0),
+    "forecast_horizon_sessions": (0.0, 252.0),
+    # The forecast's derived dials, read only with the horizon set: the log
+    # VIX's spread about the forecast (about 0.3 on pt-v21's histories) and
+    # its half-life, and the policy path's three projection shares.
+    "forecast_vix_dispersion": (0.0, 0.6),
+    "forecast_vix_dispersion_half_life": (0.0, 126.0),
+    "forecast_policy_shadow_discount": (0.0, 0.5),
+    "forecast_policy_persistence": (0.0, 0.9),
+    "forecast_policy_reversion": (0.0, 0.3),
     # The central bank's stress cut, points per step: 0.5 is a half-point
     # step, two steps a point, which is 2001's and 2008's emergency size.
     "fed_stress_cut": (0.0, 0.5),
@@ -946,6 +960,10 @@ EXPLICIT_RANGES: dict[str, tuple[float, float]] = {
     "dividend_yield_ceiling": (1.0, 4.0),
     "dividend_growth_cutoff": (0.1, 1.0),
     "dividend_adjustment_speed": (0.1, 1.0),
+    # The policy rate the forecast's path reverts toward, read only with
+    # `forecast_policy_reversion` set: per cent, about the range the model's
+    # policy rate spends its time in.
+    "forecast_policy_neutral": (0.0, 5.0),
     # The stop and squeeze ladders' scale: 1.0 on every preset through
     # pt-v19, 0.1 on pt-v20 (measured against the daily Lo-MacKinlay book).
     # The whole unit range, off to full.

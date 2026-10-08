@@ -3686,6 +3686,90 @@ the next tick; they move the maker's inventory, which decays with a
 `rates.rs:564-615`). The agent book, limit orders and news do not apply to
 the indices. Graded: rows R1 to R4 read the curve the indices price off.
 
+## Inputs for derivatives
+
+Three switches build what futures and options read. Each is 0.0 on every
+shipped preset and is left out of the model's digest there. None writes
+anything a price reads, so a model with all three on prints the prices the
+model prints without them; `tests/test_derivative_foundations.py` checks
+this print by print on four seeds of pt-v21.
+
+`index_level_listed` keeps a price index of the roster,
+`sum(price * shares_outstanding) / divisor` over the public, solvent names
+(`calculate_market_index`). The divisor is set at the first session's open,
+so that session opens at 1000. A listing, a delisting, a bankruptcy or a
+name taken private resets the divisor at the prices standing when it
+happens, so the level stays where it was. An edit through
+`Engine::companies_mut` resets nothing. `Engine::index_level` reports the
+level on the prices as they stand, the level on the last close's prints,
+the divisor and the number of names.
+
+`vix_intraday_live` publishes the VIX within a session. Without it the
+published VIX holds at the last close's value until the next close. With
+it the live VIX is the projection of the VIX tonight's close will publish,
+given the session so far: the close's own step with its draws at their
+means, on the session's return so far and on the variances as the close
+would leave them, with the rest of the session integrated as the rate
+indices' live mark integrates it and the published stress premium projected
+beside it. It refreshes at the open and every fifth session minute, and
+outside a session it is the published VIX (`Engine::live_vix`). With the
+sector and own-variance states and the slow VIX level off, the last
+minute's projection is the VIX the close publishes at its means, to the
+bit. pt-v21 runs all three, which the close steps and the projection holds
+still.
+
+`forecast_horizon_sessions` makes each close compute a forecast for 1 to
+that many sessions ahead (`Engine::forecast`): the published VIX, the
+index's and each name's one-session variance, the policy rate and the oil
+price. It reads public state only: the VIX, the curve, prices, the
+conditional variances, the market's cycle nowcast (the published phase on a
+model without one) and the published growth. It does not read the true
+phase, the slow VIX level or any draw to come. A pin computes it again on
+the pinned state.
+
+The VIX and the variances iterate the expected value of the model's laws
+one session at a time. The day's market factor is integrated on four nodes,
+the belief over the phases moves on the cycle's own exit rates, and each
+phase's volatility regime is weighted by it. The variances the forecast
+reports run on a second track, where each convex VIX coupling (the factor's
+target, the GARCH coupling, the sector sigma and the jump rate) is taken as
+its expectation over a lognormal VIX whose log variance grows to
+`forecast_vix_dispersion` squared at the half-life
+`forecast_vix_dispersion_half_life`, and the market factor's return
+memory's multiplier as its expectation over the memory's own spread. Oil
+adds the expected inventory push, OPEC decision and dollar safe-haven drift
+over the same spreads.
+
+The policy rate takes the shadow of the next meeting, the change
+`policy_anticipation` prices, less `forecast_policy_shadow_discount` of it.
+Each later meeting repeats `forecast_policy_persistence` of the
+shadow-driven change before it and closes `forecast_policy_reversion` of
+the gap to `forecast_policy_neutral`. The meeting ladder is discrete, so
+these are a projection fitted on held-out histories, where the VIX and oil
+are iterated laws. `tools/calibration/forecast_dials.py derive` fits the
+six derived dials on 40 held-out pt-v21 histories of 2,000 sessions; it
+gives 0.30, 31.5, 0.31, 0.62, 0.0475 and 1.4. The policy rate's errors are
+skewed, since the ladder hikes in small steps and cuts in large ones, so
+most short samples read a positive mean error that a rare cut takes back:
+on 12 fresh histories of 1,000 sessions the rate read 0.04 and 0.09 points
+high at 63 and 126 sessions, 2.2 standard errors each, and 16 fitting
+histories put the neutral rate at 1.3 where 40 put it at 1.4.
+
+On 16 fresh pt-v21 histories of 2,000 sessions (seeds 7001 to 7016,
+`forecast_dials.py check`), the mean of realised less forecast, with its
+standard error across histories:
+
+| Series | 21 sessions | 63 sessions | 126 sessions |
+|---|---|---|---|
+| Published VIX, points | +0.02 (0.27) | -0.00 (0.35) | -0.07 (0.37) |
+| Oil, dollars | +0.03 (0.22) | +0.02 (0.39) | +0.09 (0.53) |
+| Policy rate, points | +0.004 (0.005) | +0.015 (0.015) | +0.038 (0.032) |
+| Index variance, 1e-6 a session | +2.5 (1.7) | +1.5 (3.8) | -1.3 (4.9) |
+
+On 40 names the forecast takes about 6 ms of CPU a close, about 40 per
+cent of a session's; the live VIX adds about 17 per cent and the index
+under 5.
+
 ## Scenarios
 
 A scenario is a file of changes to the economy or the market, applied once
