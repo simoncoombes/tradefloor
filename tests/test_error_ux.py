@@ -134,6 +134,16 @@ def test_portfolio_weights_are_warned_about_and_still_executed():
     assert card.trades == 10
 
 
+def test_the_weights_warning_sizes_the_order_not_the_holding():
+    # The fix it suggests subtracts what is already held, so following it
+    # on a second step does not buy the whole position again.
+    with pytest.warns(UserWarning, match=r"close the gap: int\(0\.2 \* "
+                                         r"obs\.portfolio\.net_worth\(\) / "
+                                         r"obs\.price\('AAA'\)\) - "
+                                         r"obs\.position\('AAA'\)"):
+        _evaluate({"w": Weights()})
+
+
 def test_whole_share_orders_are_not_warned_about():
     with warnings.catch_warnings():
         warnings.simplefilter("error")
