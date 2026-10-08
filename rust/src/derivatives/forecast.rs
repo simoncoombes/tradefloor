@@ -18,7 +18,10 @@
 pub struct Forecast {
     /// The engine's elapsed sessions at the close that computed it.
     pub day: i64,
-    /// The published VIX expected at the close `h` sessions ahead.
+    /// The published VIX expected at the close `h` sessions ahead: the
+    /// quote's expectation over the VIX's spread about the forecast's state
+    /// (`forecast_vix_dispersion`), since the quote's stress premium is a
+    /// hinge.
     pub vix: Vec<f64>,
     /// The index's one-session variance expected for session `t + h`, in
     /// fraction squared per session: the identity the VIX is read from

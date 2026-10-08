@@ -456,10 +456,12 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "vix_intraday_live": (0.0, 1.0),
     "forecast_horizon_sessions": (0.0, 252.0),
     # The forecast's derived dials, read only with the horizon set: the log
-    # VIX's spread about the forecast (about 0.3 on pt-v21's histories) and
-    # its half-life, and the policy path's three projection shares.
+    # VIX's spread about the forecast (about 0.3 on pt-v21's histories), its
+    # half-life and its skewness (about 0.8), and the policy path's three
+    # projection shares.
     "forecast_vix_dispersion": (0.0, 0.6),
     "forecast_vix_dispersion_half_life": (0.0, 126.0),
+    "forecast_vix_dispersion_skew": (0.0, 0.99),
     "forecast_policy_shadow_discount": (0.0, 0.5),
     "forecast_policy_persistence": (0.0, 0.9),
     "forecast_policy_reversion": (0.0, 0.3),
