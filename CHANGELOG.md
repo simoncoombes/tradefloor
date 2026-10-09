@@ -225,6 +225,32 @@ same with them on as off.
   they do not cover `session_tick`, so every leaf and known-answer digest is
   where it was.
 
+### Host input for the VIX target
+
+- A host can now raise the VIX's target without writing the VIX (#275).
+  `Engine::set_vix_target_premium(points, half_life_sessions)` adds a
+  premium to the target beside the inflation and shock terms, inside
+  `vix_target_shock_cap`, and each close fades it at its half-life (0.0
+  holds it). `Engine::set_vix_target_floor(Some(level))` keeps the target
+  at or above `level` until it is cleared with `None`. The VIX moves to
+  either at the engine's own reversion rate, where a written VIX was pulled
+  back toward the engine's target within days. In Python these are
+  `Engine.set_vix_target_premium`, `Engine.set_vix_target_floor`, and
+  their readers `vix_target_premium()` and `vix_target_floor()`.
+- The forecast (`forecast_horizon_sessions`) reads the premium fading and
+  the floor held. A write re-reads the forecast and the live VIX at once,
+  as a pin does.
+- A snapshot carries `vix_target_premium` and `vix_target_floor` only
+  while each stands, and the state hash and `manifest.state_hash` cover
+  them only then, so every saved snapshot, ledger and known-answer digest
+  is where it was. The run log records both writes, and `replay` and
+  `explain` replay them.
+- `ExternalFlow` counts the input apart from VIX writes
+  (`record_vix_target_premium`, `record_vix_target_floor_session`). Any
+  premium written, or any session closed under a floor, is outside the
+  fitted flow. `envelope.external_flow` takes them as `vix_target_premiums`
+  and `vix_target_floor_sessions`.
+
 ## 0.10.1
 
 A library and documentation release with no coefficient or default

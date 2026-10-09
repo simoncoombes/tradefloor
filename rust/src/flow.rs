@@ -48,6 +48,12 @@
 //!   variance target on a coupled preset as the VIX's own moves do. The
 //!   fitted flow writes none, and the tally is outside once the written
 //!   changes average more than [`VIX_WRITE_TOLERANCE`] points a session.
+//! - A premium on the VIX target or a floor under it
+//!   ([`crate::engine::Engine::set_vix_target_premium`],
+//!   [`crate::engine::Engine::set_vix_target_floor`]) moves the VIX through
+//!   the engine's own reversion rather than by a write, and lasts as long as
+//!   the host holds it. The fitted flow has neither, so any premium written,
+//!   or any session closed under a floor, is outside.
 //! - From pt-v19 the macro calendar counts trading sessions
 //!   (`macro_calendar_days_per_year` 252). A host that steps the economy on
 //!   every calendar day, weekends included, runs the macro clock about 1.45
@@ -209,7 +215,10 @@ impl CalibratedFlow {
 /// step ([`crate::engine::Engine::advance_day`] or
 /// [`crate::engine::Engine::close_day_with_shocks`]),
 /// [`ExternalFlow::record_fundamental_move`] for each earnings figure a host
-/// rewrites, [`ExternalFlow::record_vix_write`] for each VIX it writes, and
+/// rewrites, [`ExternalFlow::record_vix_write`] for each VIX it writes,
+/// [`ExternalFlow::record_vix_target_premium`] for each premium it writes on
+/// the VIX target, [`ExternalFlow::record_vix_target_floor_session`] for each
+/// session it closes under a floor, and
 /// [`ExternalFlow::record_session`] once per trading session. The tally then
 /// holds rates and sizes [`ExternalFlow::assess`] can compare with the
 /// fitted flow.
@@ -256,6 +265,12 @@ pub struct ExternalFlow {
     /// Ticks recorded outside the regular session, 09:30 to 16:00 on a
     /// weekday.
     pub off_session_ticks: u64,
+    /// Premiums the host wrote on the VIX target: how many, and the sum of
+    /// their absolute changes in points.
+    pub vix_target_writes: u64,
+    pub vix_target_write_abs: f64,
+    /// Sessions closed with a floor under the VIX target.
+    pub vix_target_floor_sessions: u64,
 }
 
 impl ExternalFlow {
@@ -349,6 +364,23 @@ impl ExternalFlow {
         }
     }
 
+    /// The host wrote the VIX target's premium
+    /// ([`crate::engine::Engine::set_vix_target_premium`]), changing it by
+    /// `delta` points from the premium standing.
+    pub fn record_vix_target_premium(&mut self, delta: f64) {
+        if !delta.is_finite() || delta == 0.0 {
+            return;
+        }
+        self.vix_target_writes += 1;
+        self.vix_target_write_abs += delta.abs();
+    }
+
+    /// One session closed with a floor under the VIX target
+    /// ([`crate::engine::Engine::set_vix_target_floor`]).
+    pub fn record_vix_target_floor_session(&mut self) {
+        self.vix_target_floor_sessions += 1;
+    }
+
     /// One call of [`crate::engine::Engine::advance_day`] with these shocks.
     pub fn record_macro_step(&mut self, shocks: &[EconomicShock]) {
         self.macro_steps += 1;
@@ -387,6 +419,10 @@ pub struct FlowAssessment {
     pub fundamental_ratio: f64,
     /// Mean absolute VIX points the host wrote a session.
     pub vix_write_per_session: f64,
+    /// Mean absolute points of VIX target premium the host wrote a session.
+    pub vix_target_per_session: f64,
+    /// Share of sessions closed with a floor under the VIX target.
+    pub vix_target_floor_share: f64,
     /// Share of macro steps that carried an active shock.
     pub macro_shock_share: f64,
     /// Mean `|sum of gdp_impact x severity|` a macro step: half the VIX
@@ -445,6 +481,8 @@ fn assess(fit: &CalibratedFlow, obs: &ExternalFlow) -> FlowAssessment {
         0.0
     };
     let vix_write_per_session = obs.vix_write_abs / sessions;
+    let vix_target_per_session = obs.vix_target_write_abs / sessions;
+    let vix_target_floor_share = obs.vix_target_floor_sessions as f64 / sessions;
     let steps = obs.macro_steps as f64;
     let macro_shock_share = if steps > 0.0 {
         obs.macro_shock_steps as f64 / steps
@@ -532,6 +570,21 @@ fn assess(fit: &CalibratedFlow, obs: &ExternalFlow) -> FlowAssessment {
             obs.vix_writes, vix_write_per_session, obs.vix_write_max,
         ));
     }
+    if obs.vix_target_writes > 0 {
+        findings.push(format!(
+            "the host wrote a premium on the VIX target {} times, {:.2} points a session in \
+             absolute terms; the preset was fitted with none, and the VIX reverts toward the \
+             target the premium raises for as long as it stands",
+            obs.vix_target_writes, vix_target_per_session,
+        ));
+    }
+    if obs.vix_target_floor_sessions > 0 {
+        findings.push(format!(
+            "{:.0}% of sessions closed with a floor under the VIX target; the preset was \
+             fitted with none, and the VIX reverts toward the floor while the target is under it",
+            100.0 * vix_target_floor_share,
+        ));
+    }
     if obs.macro_shock_steps > 0 {
         findings.push(format!(
             "{:.0}% of macro steps carried an active economic shock, at a mean load of {:.2}; \
@@ -587,6 +640,8 @@ fn assess(fit: &CalibratedFlow, obs: &ExternalFlow) -> FlowAssessment {
         common_news_ratio,
         fundamental_ratio,
         vix_write_per_session,
+        vix_target_per_session,
+        vix_target_floor_share,
         macro_shock_share,
         macro_shock_load,
         macro_steps_per_session,
@@ -723,6 +778,38 @@ mod tests {
         assert!(!a.inside);
         assert_eq!(t.vix_write_max, 10.0);
         assert!((a.vix_write_per_session - 0.15).abs() < 1e-12);
+    }
+
+    #[test]
+    fn a_vix_target_premium_or_floor_is_outside_and_counted_apart_from_writes() {
+        let p = v20();
+        let mut t = ExternalFlow::new(10);
+        for _ in 0..100 {
+            t.record_session();
+            t.record_macro_step(&[]);
+        }
+        assert!(t.assess(&p).inside);
+        t.record_vix_target_premium(0.0);
+        assert!(t.assess(&p).inside, "a write that moved nothing is no write");
+        t.record_vix_target_premium(6.0);
+        t.record_vix_target_premium(-2.0);
+        let a = t.assess(&p);
+        assert!(!a.inside);
+        assert_eq!(t.vix_target_writes, 2);
+        assert_eq!(t.vix_writes, 0);
+        assert!((a.vix_target_per_session - 0.08).abs() < 1e-12);
+        let mut f = ExternalFlow::new(10);
+        for _ in 0..100 {
+            f.record_session();
+            f.record_macro_step(&[]);
+        }
+        for _ in 0..25 {
+            f.record_vix_target_floor_session();
+        }
+        let a = f.assess(&p);
+        assert!(!a.inside);
+        assert!((a.vix_target_floor_share - 0.25).abs() < 1e-12);
+        assert!(a.findings.iter().any(|x| x.contains("floor")), "{:?}", a.findings);
     }
 
     #[test]

@@ -93,6 +93,11 @@ mod margin;
 /// `GameRng::new(seed, MAIN_STREAM)`, exactly as before.
 pub const MAIN_STREAM: u32 = 99;
 
+/// A fading VIX target premium under this many points is cleared to 0.0
+/// ([`Engine::set_vix_target_premium`]), so a faded event stops being state
+/// a snapshot carries.
+pub const VIX_TARGET_PREMIUM_CLEARED_UNDER: f64 = 1e-6;
+
 /// `Engine::macro_pins_today`: the VIX was pinned today.
 pub const PIN_VIX: u16 = 1;
 /// `Engine::macro_pins_today`: the corporate yield was pinned today.
@@ -934,6 +939,15 @@ pub struct Engine {
     /// the snapshot and the state hash only then. See
     /// `ModelParams::vix_fear_uptake`.
     vix_fear: f64,
+    /// The host's premium on the VIX target, in VIX points, and the
+    /// half-life in sessions it fades at (0.0 holds it). 0.0 with nothing
+    /// written, where the target reads no term. See
+    /// [`Engine::set_vix_target_premium`].
+    vix_target_premium: f64,
+    vix_target_premium_half_life: f64,
+    /// The host's floor under the VIX target, held until cleared. See
+    /// [`Engine::set_vix_target_floor`].
+    vix_target_floor: Option<f64>,
     /// Whether a crisis EPISODE is running. The episode starts at the open
     /// of the first session whose VIX is above `crisis_vix_threshold` with
     /// no episode running, and ends after `crisis_epicentre_end_sessions`
@@ -2271,6 +2285,9 @@ impl Engine {
             market_vol_cycle_log: None,
             vix_stress_memory: 0.0,
             vix_fear: 0.0,
+            vix_target_premium: 0.0,
+            vix_target_premium_half_life: 0.0,
+            vix_target_floor: None,
             crisis_in_episode: false,
             crisis_sessions_under: 0,
             crisis_epicentre: -1,
@@ -9118,6 +9135,9 @@ impl Engine {
             inputs.yields.spread_multiplier = Some((spread_before, spread_after_report));
         }
         self.economy = update_economy_daily(&self.economy, &inputs, rng);
+        // The host's premium on the target (`set_vix_target_premium`), read
+        // by the step above, faded for the next close.
+        self.fade_vix_target_premium();
         if let Some(h) = &held {
             let e = &mut self.economy;
             if pins_today & PIN_VIX != 0 { e.vix = h.vix; }
@@ -9400,6 +9420,8 @@ impl Engine {
             vix_anchor_slow,
             vix_fear_uptake: self.params.vix_fear_uptake,
             vix_fear: self.vix_fear,
+            vix_target_premium: self.vix_target_premium,
+            vix_target_floor: self.vix_target_floor,
             vix_jump_intensity: self.params.vix_jump_intensity,
             vix_jump_scale: self.params.vix_jump_scale,
             vix_return_level_exponent: self.params.vix_return_level_exponent,
@@ -9808,6 +9830,115 @@ impl Engine {
 
     pub fn set_vix_fear(&mut self, value: f64) {
         self.vix_fear = value;
+    }
+
+    /// Put a premium on the VIX target, in VIX points, that fades at
+    /// `half_life_sessions` (0.0 holds it until it is written again).
+    ///
+    /// For fear the macro model does not carry: a bankruptcy's contagion, a
+    /// geopolitical escalation. The premium joins the target beside the
+    /// inflation and shock terms, inside `vix_target_shock_cap`, so the
+    /// engine's own reversion carries the VIX up to it and back down as it
+    /// fades, where a one-off write of the VIX itself is reverted to the
+    /// engine's target within days. Each close reads the premium and then
+    /// fades it by `0.5^(1 / half_life)`; one under a millionth of a point
+    /// is cleared to 0.0.
+    ///
+    /// This REPLACES the premium standing. A host adding an event to one
+    /// still fading reads [`Engine::vix_target_premium`] and writes the sum,
+    /// at whichever half-life it wants the whole to fade on.
+    ///
+    /// Consumes no draws. With nothing written the target is bit for bit
+    /// the one the engine computes.
+    pub fn set_vix_target_premium(&mut self, points: f64, half_life_sessions: f64) -> Result<(), String> {
+        if !points.is_finite() {
+            return Err(format!("the VIX target premium must be finite, got {points}"));
+        }
+        if !(half_life_sessions.is_finite() && half_life_sessions >= 0.0) {
+            return Err(format!(
+                "the VIX target premium's half-life must be 0.0 (held) or a finite number of \
+                 sessions above 0, got {half_life_sessions}"
+            ));
+        }
+        if points == 0.0 {
+            self.vix_target_premium = 0.0;
+            self.vix_target_premium_half_life = 0.0;
+        } else {
+            self.vix_target_premium = points;
+            self.vix_target_premium_half_life = half_life_sessions;
+        }
+        self.after_vix_target_write();
+        Ok(())
+    }
+
+    /// A host wrote the VIX target's premium or floor: what reads the next
+    /// close's target is re-read now, as after a pin. The live VIX's
+    /// projection is dropped for the next tick to recompute, the forecast
+    /// re-read (`forecast_horizon_sessions`), and between sessions the
+    /// night's path moved (`night_session_steps`). Nothing with those off.
+    fn after_vix_target_write(&mut self) {
+        self.vix_live = None;
+        self.refresh_forecast(None);
+        self.futures_retarget();
+    }
+
+    /// The host's premium on the VIX target in points, and the half-life it
+    /// fades at: `(0.0, 0.0)` with none standing.
+    pub fn vix_target_premium(&self) -> (f64, f64) {
+        (self.vix_target_premium, self.vix_target_premium_half_life)
+    }
+
+    /// Put a floor under the VIX target, or clear it with `None`.
+    ///
+    /// For a period in which the host's world holds fear at a level, an
+    /// election campaign for one: each close's target is at least the
+    /// floor, so the VIX reverts toward it at the engine's own rate, and its
+    /// noise, jumps and ceiling still apply. The floor holds until it is
+    /// cleared. Consumes no draws.
+    pub fn set_vix_target_floor(&mut self, floor: Option<f64>) -> Result<(), String> {
+        if let Some(f) = floor {
+            if !(f.is_finite() && f > 0.0) {
+                return Err(format!("the VIX target floor must be finite and above 0, got {f}"));
+            }
+        }
+        self.vix_target_floor = floor;
+        self.after_vix_target_write();
+        Ok(())
+    }
+
+    /// The host's floor under the VIX target, `None` with none set.
+    pub fn vix_target_floor(&self) -> Option<f64> {
+        self.vix_target_floor
+    }
+
+    /// Put the host's input to the VIX target back as a snapshot carries it
+    /// (checked by the restore), touching nothing the setters re-read: the
+    /// forecast and the live VIX are the snapshot's own.
+    pub(crate) fn restore_vix_target_input(&mut self, premium: (f64, f64), floor: Option<f64>) {
+        (self.vix_target_premium, self.vix_target_premium_half_life) = premium;
+        self.vix_target_floor = floor;
+    }
+
+    /// Whether the host's VIX target premium is standing, which is when the
+    /// snapshot and the state hash carry it.
+    pub fn carries_vix_target_premium(&self) -> bool {
+        self.vix_target_premium != 0.0
+    }
+
+    /// The premium one close on: faded at its half-life, cleared under a
+    /// millionth of a point. Nothing with none standing, or one held.
+    fn fade_vix_target_premium(&mut self) {
+        let h = self.vix_target_premium_half_life;
+        if self.vix_target_premium == 0.0 || h == 0.0 {
+            return;
+        }
+        let faded = self.vix_target_premium * crate::mathx::pow(0.5, 1.0 / h);
+        if faded.abs() < VIX_TARGET_PREMIUM_CLEARED_UNDER {
+            self.vix_target_premium = 0.0;
+            self.vix_target_premium_half_life = 0.0;
+        } else {
+            self.vix_target_premium = faded;
+        }
     }
 
     /// A caller wrote the VIX: the stress memory restarts from 0.0, so the
@@ -12747,6 +12878,18 @@ impl Engine {
             for c in &self.companies {
                 hash_f64(&mut buf, c.stock.shares_outstanding);
             }
+        }
+        // The host's input to the VIX target, each behind its name and only
+        // while it stands (`set_vix_target_premium`, `set_vix_target_floor`),
+        // so an engine no host wrote one on hashes as it did before.
+        if self.carries_vix_target_premium() {
+            hash_str(&mut buf, "vix_target_premium");
+            hash_f64(&mut buf, self.vix_target_premium);
+            hash_f64(&mut buf, self.vix_target_premium_half_life);
+        }
+        if let Some(floor) = self.vix_target_floor {
+            hash_str(&mut buf, "vix_target_floor");
+            hash_f64(&mut buf, floor);
         }
         // The variance cascade's components, only on a model that runs it.
         if self.carries_garch_cascade() {
