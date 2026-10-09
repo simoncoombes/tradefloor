@@ -46,6 +46,23 @@ same with them on as off.
   carries them, and the `forecast` buffer, which it could not encode
   before. Every known-answer digest is where it was.
 
+### Oil futures
+
+- `futures_oil_listed` is a new dial, 0.0 on every preset and left out of
+  the digest there. Off zero the engine lists the next twelve monthly oil
+  futures from the first close, each expiring at session `21m + 14` and
+  settling at its expiry's open on the oil price then, priced at the
+  forecast's expected oil price at settlement with no premium. Each quotes
+  a maker's ladder, in the session only.
+- New API: `ContractKind::OilFuture`, `SettlementRule::OilPriceAtOpen`,
+  `derivatives::OIL_FUTURE`, `OilFutureSpec`, `oil_future_symbol` and
+  `calendar::OIL_FUTURES_LISTED` in Rust; `contracts()`, `quote()`,
+  `settlements()`, `book`, `submit`, `cancel`, `open_orders` and
+  `take_fills` take oil futures.
+- A snapshot carries `oil_futures` and `oil_futures_book` only under the
+  switch, hashed behind tags 52 and 53 only then. Every known-answer digest
+  is where it was.
+
 ### Rate futures
 
 - `futures_rates_listed` is a new dial, 0.0 on every preset and left out of

@@ -97,6 +97,10 @@ pub fn is_vix_future_expiry(session: i64) -> bool {
 /// next twelve.
 pub const POLICY_RATE_FUTURES_LISTED: usize = 13;
 
+/// How many oil futures are listed at once: the next twelve monthly
+/// expiries, on the VIX futures' calendar.
+pub const OIL_FUTURES_LISTED: usize = 12;
+
 /// How many term-rate futures are listed: the quarter in progress and the
 /// next seven.
 pub const TERM_RATE_FUTURES_LISTED: usize = 8;

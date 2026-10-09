@@ -170,6 +170,8 @@ CASES = {
     "vix_futures": (dict(forecast_horizon_sessions=126.0, futures_vix_listed=1.0), ("vix_futures",), (), (), {}),
     # The rate futures, carried whenever their switch is set.
     "rate_futures": (dict(futures_rates_listed=1.0), ("rate_futures",), (), (), {}),
+    # The oil futures, carried whenever their switch is set.
+    "oil_futures": (dict(futures_oil_listed=1.0), ("oil_futures",), (), (), {}),
     "every_r21_dial": (dict(EVERY_R21_DIAL, **MACRO),
                        ("market_vol_leverage_memory", "vix_stress_memory",
                         "cycle_nowcast_rng", "fed_stress_vix_max", "fed_stress_hold_age",

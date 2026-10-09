@@ -390,10 +390,11 @@ class Engine:
     # with the dial at 0 and before the first close.
     def forecast(self) -> dict[str, Any] | None: ...
     # The listed contracts, the index futures (`futures_index_listed`), the
-    # VIX futures (`futures_vix_listed`) and the policy-rate and term-rate
-    # futures (`futures_rates_listed`): `symbol`, `root`, `kind`, `expiry` (a
-    # session number), `roll`, `multiplier`, `tick`, `settlement` and
-    # `front`. Empty with all three off.
+    # VIX futures (`futures_vix_listed`), the policy-rate and term-rate
+    # futures (`futures_rates_listed`) and the oil futures
+    # (`futures_oil_listed`): `symbol`, `root`, `kind`, `expiry` (a session
+    # number), `roll`, `multiplier`, `tick`, `settlement` and `front`. Empty
+    # with all off.
     def contracts(self) -> list[dict[str, Any]]: ...
     # A listed contract's quote: `bid`, `ask`, `mid`, `price`, `fair`,
     # `mark`, `basis_bp`, `index`, `rate` (fractional), `dividends`,

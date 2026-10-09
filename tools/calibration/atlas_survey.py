@@ -480,6 +480,8 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "futures_vix_live_slow_half_life": (0.0, 120.0),
     # The rate futures (pt-v22 phase 1): a switch. It moves no stock price.
     "futures_rates_listed": (0.0, 1.0),
+    # The oil futures (pt-v22 phase 1): a switch. It moves no stock price.
+    "futures_oil_listed": (0.0, 1.0),
     # The central bank's stress cut, points per step: 0.5 is a half-point
     # step, two steps a point, which is 2001's and 2008's emergency size.
     "fed_stress_cut": (0.0, 0.5),

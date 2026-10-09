@@ -1636,6 +1636,13 @@ impl Engine {
         if let Some(book) = self.rate_futures_book_state() {
             out.put("rate_futures_book", book_value(book));
         }
+        // The oil futures (`futures_oil_listed`).
+        if let Some(words) = self.oil_futures_words() {
+            out.put("oil_futures", V::from_f64s(&words));
+        }
+        if let Some(book) = self.oil_futures_book_state() {
+            out.put("oil_futures_book", book_value(book));
+        }
         // The spread a `corporate_spread` pin holds tonight, only while its
         // mark stands.
         if let Some(spread) = self.pinned_corporate_spread() {
@@ -1969,6 +1976,8 @@ impl Engine {
             Gated::held("vix_futures_book", "futures_vix_listed", p.futures_vix_listed),
             Gated::dial("rate_futures", "futures_rates_listed", p.futures_rates_listed),
             Gated::held("rate_futures_book", "futures_rates_listed", p.futures_rates_listed),
+            Gated::dial("oil_futures", "futures_oil_listed", p.futures_oil_listed),
+            Gated::held("oil_futures_book", "futures_oil_listed", p.futures_oil_listed),
             Gated::when(
                 "buyback_log_shares",
                 self.carries_buyback_log_shares(),
@@ -2649,6 +2658,18 @@ impl Engine {
                 None => None,
             };
             inner.set_rate_futures_state(words.as_deref(), book).map_err(core)?;
+        }
+        // The oil futures (`futures_oil_listed`), the same.
+        {
+            let words = match snapshot.get("oil_futures") {
+                Some(_) => Some(read_buffer(snapshot, "", "oil_futures")?),
+                None => None,
+            };
+            let book = match snapshot.get("oil_futures_book") {
+                Some(_) => Some(book_from(read_map(snapshot, "", "oil_futures_book")?)?),
+                None => None,
+            };
+            inner.set_oil_futures_state(words.as_deref(), book).map_err(core)?;
         }
         inner.set_nominal_output_base(read_finite(snapshot, "", "nominal_output_base")?);
         let variance = read_numbers(snapshot, "", "market_variance")?;

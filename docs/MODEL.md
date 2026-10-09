@@ -4118,6 +4118,56 @@ meeting ladder is discrete, so the front contract is near still on the
 policy law's and the forecast's, not the futures': the futures price what
 the forecast expects.
 
+## Oil futures
+
+`futures_oil_listed` lists monthly oil futures. It is 0.0 on every shipped
+preset and left out of the model's digest there. An oil future reads the
+oil price and the forecast, and draws nothing, so an untraded run with it
+on prints the stock prices, closes and economy of the run without it, with
+every other phase 1 contract on as well, across an expiry and a pin, and a
+run whose agents trade oil futures prints the stocks of a run nobody trades
+(`tests/test_oil_futures.py`, seeds 3, 17, 101 and 9001 of pt-v21).
+
+The contracts are on the VIX futures' calendar: each expires at session 15
+of a 21-session month, $21m + 14$, and the next twelve are listed from the
+first close. A contract settles at its expiry session's open, in cash, on
+the oil price then, the previous close's, since oil moves only at a close.
+It is 1,000 barrels on a one-cent grid. At a close, a contract $n$ sessions
+from expiry is priced at the forecast's expected oil price after $n - 1$
+closes (the price now at $n = 1$, its last past the forecast's horizon,
+the price now without a forecast), with no premium. The curve so carries
+what the forecast expects of oil: the reversion to its target, the
+inventory push, the OPEC decision and the dollar's drift. A contract holds
+its price through a session, and a pin moves it at once. Each quotes a
+maker's ladder ten levels a side one tick apart, sized to a stated daily
+volume (300,000 contracts for the front, falling to 6,000 for the twelfth),
+with no latent depth, in the session only; agents' flow marks the price
+and decays.
+
+The plan priced oil futures by cost of carry, $S\,e^{(r + u - y)\tau}$,
+with a storage cost and a convenience yield that rises as inventory falls.
+Under the model's law that curve is not the model's own expectation: oil
+reverts 3 per cent a session to its target, so a contract a month out is
+worth about half the spot's distance from the target less than the spot,
+and a convenience yield that reads inventory alone cannot follow the
+distance. An agent would short the curve whenever oil is above target. No
+oil premium is registered, so the futures are the expectation itself.
+
+On 16 fresh histories of 1,800 sessions (seeds 8401 to 8416), read as the
+registered criteria read them, after the first year:
+
+| Row | Model | Band |
+|---|---|---|
+| OF1, share of sessions with contract 1 above contract 4 | 0.513 | 0.396 to 0.638 |
+| OF2, correlation of ln(F4/F1) with inventory's deviation from its five-year mean | -0.04 | 0.443 to 0.665 |
+| OF3, slope of contract 4's daily log change on contract 1's | 0.22 | 0.485 to 1.063 |
+
+OF2 and OF3 are out of band, as the plan expected of OF3: under a 23-session
+half-life a contract four months out moves about a fifth as far as the
+front, where on NYMEX it moves about three quarters as far, and the
+inventory's own push on the expected path is too small to tilt the curve.
+Both are the oil law's, not the futures'.
+
 ## Scenarios
 
 A scenario is a file of changes to the economy or the market, applied once
