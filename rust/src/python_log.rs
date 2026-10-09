@@ -110,6 +110,19 @@ pub enum LogEntry {
     SetSharesOutstanding {
         shares: Vec<f64>,
     },
+    /// The host's premium on the VIX target, as
+    /// `Engine.set_vix_target_premium` wrote it. An input for the reason
+    /// `SetFundamentals` is: nothing in the engine writes it, and the VIX
+    /// reverts toward the target it raises.
+    SetVixTargetPremium {
+        points: f64,
+        half_life_sessions: f64,
+    },
+    /// The host's floor under the VIX target (`Engine.set_vix_target_floor`),
+    /// `None` to clear it.
+    SetVixTargetFloor {
+        floor: Option<f64>,
+    },
     ListInstrument {
         ticker: String,
         sector: String,
@@ -309,6 +322,15 @@ impl LogEntry {
             LogEntry::SetSharesOutstanding { shares } => {
                 d.set_item("op", "set_shares_outstanding")?;
                 d.set_item("shares", shares.to_vec())?;
+            }
+            LogEntry::SetVixTargetPremium { points, half_life_sessions } => {
+                d.set_item("op", "set_vix_target_premium")?;
+                d.set_item("points", points)?;
+                d.set_item("half_life_sessions", half_life_sessions)?;
+            }
+            LogEntry::SetVixTargetFloor { floor } => {
+                d.set_item("op", "set_vix_target_floor")?;
+                d.set_item("floor", floor)?;
             }
             LogEntry::Delist { index } => {
                 d.set_item("op", "delist")?;

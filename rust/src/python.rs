@@ -842,10 +842,12 @@ const FLOW_TALLY_KEYS: [&str; 16] = [
 ];
 
 /// The keys it reads when present and takes as zero when not: the signed
-/// sums behind the drift, and the ticks outside the regular session. Added
-/// after 0.10.0, so a tally written for 0.10.0 still reads.
-const FLOW_TALLY_OPTIONAL_KEYS: [&str; 5] = [
+/// sums behind the drift, the ticks outside the regular session, and the
+/// host's input to the VIX target. Added after 0.10.0, so a tally written
+/// for 0.10.0 still reads.
+const FLOW_TALLY_OPTIONAL_KEYS: [&str; 8] = [
     "company_sum", "sector_sum", "market_sum", "fundamental_sum", "off_session_ticks",
+    "vix_target_writes", "vix_target_write_abs", "vix_target_floor_sessions",
 ];
 
 /// `tradefloor.flow::ExternalFlow::assess`, from a tally a caller kept.
@@ -905,10 +907,19 @@ fn assess_external_flow(
     obs.sector_sum = signed("sector_sum")?;
     obs.market_sum = signed("market_sum")?;
     obs.fundamental_sum = signed("fundamental_sum")?;
-    obs.off_session_ticks = match tally.get_item("off_session_ticks")? {
-        None => 0,
-        Some(v) => v.extract::<u64>().map_err(|_| ValidationError::new_err(
-            "off_session_ticks must be a non-negative integer"))?,
+    let optional_count = |k: &str| -> PyResult<u64> {
+        match tally.get_item(k)? {
+            None => Ok(0),
+            Some(v) => v.extract::<u64>().map_err(|_| ValidationError::new_err(format!(
+                "{k} must be a non-negative integer"))),
+        }
+    };
+    obs.off_session_ticks = optional_count("off_session_ticks")?;
+    obs.vix_target_writes = optional_count("vix_target_writes")?;
+    obs.vix_target_floor_sessions = optional_count("vix_target_floor_sessions")?;
+    obs.vix_target_write_abs = match tally.get_item("vix_target_write_abs")? {
+        None => 0.0,
+        Some(_) => real("vix_target_write_abs")?,
     };
     obs.sessions = count("sessions")?;
     obs.company_events = count("company_events")?;
@@ -932,6 +943,8 @@ fn assess_external_flow(
     d.set_item("common_news_ratio", a.common_news_ratio)?;
     d.set_item("fundamental_ratio", a.fundamental_ratio)?;
     d.set_item("vix_write_per_session", a.vix_write_per_session)?;
+    d.set_item("vix_target_per_session", a.vix_target_per_session)?;
+    d.set_item("vix_target_floor_share", a.vix_target_floor_share)?;
     d.set_item("macro_shock_share", a.macro_shock_share)?;
     d.set_item("macro_shock_load", a.macro_shock_load)?;
     d.set_item("macro_steps_per_session", a.macro_steps_per_session)?;

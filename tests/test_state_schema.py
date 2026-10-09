@@ -493,6 +493,9 @@ def _every_dial():
     engine = tf.Engine(seed=3, universe=universe, model=model)
     eps, book, growth = engine.fundamentals()
     engine.set_fundamentals([e * 1.1 for e in eps], book, growth)
+    # The host's input to the VIX target, fading through the run.
+    engine.set_vix_target_premium(3.0, 13.0)
+    engine.set_vix_target_floor(18.0)
     _run(engine, 2)
     engine.open_market()
     engine.submit("fund", engine.tickers[0], 100.0, limit_price=1.0)
@@ -505,7 +508,8 @@ def test_a_model_with_every_gated_key_round_trips():
     model, universe, original = _every_dial()
     snapshot = original.state_snapshot()
     for key in ("vix_anchor_slow", "fair_value_offset", "opening_z",
-                "garch_cascade", "rates", "book", "fundamentals"):
+                "garch_cascade", "rates", "book", "fundamentals",
+                "vix_target_premium", "vix_target_floor"):
         assert key in snapshot, key
     for key in ("earnings_cycle", "vix_feedback", "qe_assets_ratio",
                 "cycle_history", "unemployment_impulse", "gdp_publication"):

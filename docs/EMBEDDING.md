@@ -159,6 +159,8 @@ what you add to it:
 | `record_macro_step(shocks)` | every macro step, with its active shocks |
 | `record_fundamental_move(log_change)` | every earnings figure you rewrite with `set_fundamentals` |
 | `record_vix_write(delta)` | every change you make to the economy's VIX |
+| `record_vix_target_premium(delta)` | every change you make to the VIX target's premium with `set_vix_target_premium` |
+| `record_vix_target_floor_session()` | every session you close with a floor set by `set_vix_target_floor` |
 | `record_session()` | once a trading session |
 
 `tally.assess(engine.params())` says which channels are outside the fitted
@@ -268,6 +270,33 @@ as the VIX's own moves do. The tally is outside once written changes
 average more than 0.1 points a session. Writing back a value the engine
 already holds changes nothing, so a host that round-trips the whole economy
 each day only needs to count the fields it changed.
+
+### Fear the macro model does not carry
+
+A written VIX does not last. The engine's reversion pulls it back toward its
+own target. The game measured a 6-point write lifting the next session's
+VIX by 4.5 points, with a half-life of about 3 sessions. For an event that
+should hold the VIX up, such as a bankruptcy's contagion or an escalation,
+put a premium on the target instead.
+`set_vix_target_premium(points, half_life_sessions)` adds `points` to the
+target beside the inflation and shock terms, inside `vix_target_shock_cap`.
+Each close then fades it by `0.5^(1 / half_life)`, and 0.0 holds it. The VIX
+moves toward the raised target at the engine's own rate, with its own noise
+and jumps. In one 40-session run on pt-v21, a 6-point premium at a
+13-session half-life raised the mean VIX by 3.9 points, and a 6-point write
+by 0.8. A write replaces the premium standing, so to add an event, read
+`vix_target_premium()` and write the sum.
+
+For a period that holds fear at a level, such as an election campaign,
+`set_vix_target_floor(Some(level))` keeps each close's target at or above
+`level` until `set_vix_target_floor(None)` clears it.
+
+Neither consumes a draw. While one stands, the snapshot carries it and the
+state hash covers it, so a resume restores it. Both are outside the fitted
+flow: record each premium change with `record_vix_target_premium` and each
+floored session with `record_vix_target_floor_session`. In Python,
+`external_flow` takes them as `vix_target_premiums=` and
+`vix_target_floor_sessions=`.
 
 ## The combined effect
 
