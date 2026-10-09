@@ -705,10 +705,11 @@ const SNAPSHOT_KEYS: &[&str] = &[
 /// Top-level keys carried only while they hold something. Their absence is
 /// a value: a pristine book, no close forced tonight, no pins today, no
 /// fair-value shift waiting, the day the counter gives, the fundamentals
-/// the engine was built with.
+/// and the share counts the engine was built with.
 const SNAPSHOT_OPTIONAL_KEYS: &[&str] = &[
     "state_schema", "book", "vix_sets_variance_pending", "macro_pins_today",
     "pending_fair_value", "current_day", "elapsed_days", "fundamentals",
+    "shares_outstanding",
     // The spread a `pin_macro(corporate_spread=...)` holds through tonight's
     // close, carried exactly while `macro_pins_today` marks it.
     "pinned_corporate_spread",
@@ -1889,6 +1890,10 @@ impl Engine {
             block.put("revenue_growth", V::from_f64s(&growth));
             out.put("fundamentals", V::Map(block));
         }
+        // The share counts, once `set_shares_outstanding` has moved them.
+        if self.shares_outstanding_changed() {
+            out.put("shares_outstanding", V::from_f64s(&self.shares_outstanding()));
+        }
         // The variance cascade, only on a model that runs it.
         if self.carries_garch_cascade() {
             out.put("garch_cascade", V::from_f64s(&self.garch_cascade()));
@@ -2896,6 +2901,16 @@ impl Engine {
                 inner.set_fundamentals(&eps, &book, &growth).map_err(core)?;
             }
             None => inner.reset_fundamentals(),
+        }
+        // The share counts. Absent means they had not moved, so the counts
+        // each company was built with go back. Written raw: the market caps
+        // and the index divisor come from the snapshot.
+        match snapshot.get("shares_outstanding") {
+            Some(_) => {
+                let shares = read_buffer(snapshot, "", "shares_outstanding")?;
+                inner.restore_shares_outstanding(&shares).map_err(core)?;
+            }
+            None => inner.reset_shares_outstanding(),
         }
         if inner.carries_garch_cascade() {
             inner.set_garch_cascade(&read_buffer(snapshot, "", "garch_cascade")?).map_err(core)?;

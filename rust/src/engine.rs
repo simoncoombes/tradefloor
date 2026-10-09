@@ -1053,6 +1053,11 @@ pub struct Engine {
     /// only once they have moved and every engine that was never told
     /// anything snapshots and hashes as it did before they were carried.
     base_fundamentals: Vec<[Option<f64>; 3]>,
+    /// Each company's share count as it was built or listed. What
+    /// `set_shares_outstanding` changes is measured against this, on the
+    /// same rule as `base_fundamentals`: a snapshot carries the counts, and
+    /// the state hash covers them, only once a host has moved one.
+    base_shares: Vec<f64>,
     /// One mark per opened day: the day, the seven streams' draw positions
     /// at the open, the active company indices and the sector count, and
     /// the ticks the day ran. Together they map a `(day, company)` pair to
@@ -2182,6 +2187,7 @@ impl Engine {
             .iter()
             .map(|c| [c.eps, c.book_value_per_share, c.revenue_growth])
             .collect();
+        let base_shares = companies.iter().map(|c| c.stock.shares_outstanding).collect();
         // Read before the economy moves into the struct, and never
         // recomputed: this is where the run's nominal output starts.
         let nominal_output_base = economy.gdp * economy.cpi;
@@ -2292,6 +2298,7 @@ impl Engine {
             elapsed_days: 0,
             carried_ticks: None,
             base_fundamentals,
+            base_shares,
             day_marks: Vec::new(),
             params,
             model_fingerprint: std::sync::OnceLock::new(),
@@ -11278,6 +11285,7 @@ impl Engine {
         let index_before = self.index_before_change();
         self.base_fundamentals
             .push([company.eps, company.book_value_per_share, company.revenue_growth]);
+        self.base_shares.push(company.stock.shares_outstanding);
         self.companies.push(company);
         self.attribution.push([0.0; crate::market::factors::COMPONENT_COUNT]);
         self.noise_parts.push([0.0; 3]);
@@ -11466,6 +11474,9 @@ impl Engine {
         }
         if index < self.base_fundamentals.len() {
             self.base_fundamentals.remove(index);
+        }
+        if index < self.base_shares.len() {
+            self.base_shares.remove(index);
         }
         let leaving = self.companies.remove(index);
         self.index_rebase(index_before);
@@ -11743,6 +11754,104 @@ impl Engine {
             c.book_value_per_share = b[1];
             c.revenue_growth = b[2];
         }
+    }
+
+    /// Write each company's share count, for a host whose companies buy
+    /// back stock or issue it (#274).
+    ///
+    /// Without it the count was the one each company was built or listed
+    /// with for the life of the engine, and every tick sets the market cap
+    /// to `price * shares_outstanding`, so a host that wrote `MarketCap`
+    /// saw it overwritten at the next print. Everything the engine weights
+    /// by its own capitalisation -- the market factor's loadings, the
+    /// roster beta normalisation, the cap-weighted market P/E, the index
+    /// variance -- read the opening counts.
+    ///
+    /// Each market cap follows at once, at the price standing. The listed
+    /// index (`index_level_listed`) keeps its level: the divisor is reset
+    /// across the write, as it is across a listing, a delisting or a change
+    /// of status, so a buyback is not a fall in the index. The float is the
+    /// host's to keep in step (`set_column(FloatShares, ..)`); it is not
+    /// moved here.
+    ///
+    /// Every count must be finite and above 0, and the length must be the
+    /// roster's, on the same rule as [`Engine::set_fundamentals`]. A
+    /// refused write changes nothing. Consumes no draws.
+    pub fn set_shares_outstanding(&mut self, shares: &[f64]) -> Result<(), String> {
+        let n = self.companies.len();
+        if shares.len() != n {
+            return Err(format!("shares_outstanding has {} values for {n} companies", shares.len()));
+        }
+        if let Some((i, v)) = shares.iter().enumerate().find(|(_, v)| !(v.is_finite() && **v > 0.0)) {
+            return Err(format!(
+                "shares_outstanding[{i}] ({}) is {v}; a share count is finite and above 0",
+                self.companies[i].id
+            ));
+        }
+        let index_before = self.index_before_change();
+        for (company, &count) in self.companies.iter_mut().zip(shares) {
+            company.stock.shares_outstanding = count;
+            company.stock.market_cap = company.stock.price * count;
+        }
+        self.index_rebase(index_before);
+        // A host's write between sessions moves the night's path at once
+        // (`night_session_steps`); nothing otherwise.
+        self.futures_retarget();
+        Ok(())
+    }
+
+    /// Each company's share count, in roster order.
+    pub fn shares_outstanding(&self) -> Vec<f64> {
+        self.companies.iter().map(|c| c.stock.shares_outstanding).collect()
+    }
+
+    /// Whether any company's share count differs from the one it was built
+    /// or listed with, to the bit. What decides whether a snapshot carries
+    /// the counts and whether the state hash covers them, so an engine
+    /// `set_shares_outstanding` never moved snapshots and hashes as it did
+    /// before they were carried.
+    pub fn shares_outstanding_changed(&self) -> bool {
+        self.companies.len() != self.base_shares.len()
+            || self
+                .companies
+                .iter()
+                .zip(&self.base_shares)
+                .any(|(c, b)| c.stock.shares_outstanding.to_bits() != b.to_bits())
+    }
+
+    /// Put every company's share count back to the one it was built or
+    /// listed with. What a restore does when the snapshot carries none.
+    /// Moves nothing else: the market caps and the index divisor a restore
+    /// writes come from the snapshot.
+    pub fn reset_shares_outstanding(&mut self) {
+        for (c, b) in self.companies.iter_mut().zip(&self.base_shares) {
+            c.stock.shares_outstanding = *b;
+        }
+    }
+
+    /// Write the share counts a snapshot carries, raw: no market cap is
+    /// recomputed and the index divisor is not reset, because a restore
+    /// writes both from the snapshot. The length must be the roster's.
+    pub fn restore_shares_outstanding(&mut self, shares: &[f64]) -> Result<(), String> {
+        if shares.len() != self.companies.len() {
+            return Err(format!(
+                "this snapshot carries {} share counts and the roster holds {} \
+                 companies. They are positional against the roster, so this \
+                 restore is refused rather than padded or truncated.",
+                shares.len(),
+                self.companies.len()
+            ));
+        }
+        if let Some((i, v)) = shares.iter().enumerate().find(|(_, v)| !(v.is_finite() && **v > 0.0)) {
+            return Err(format!(
+                "this snapshot's shares_outstanding[{i}] is {v}; a share count is \
+                 finite and above 0"
+            ));
+        }
+        for (c, &v) in self.companies.iter_mut().zip(shares) {
+            c.stock.shares_outstanding = v;
+        }
+        Ok(())
     }
 
     pub fn set_column(&mut self, field: PriceField, values: &[f64]) -> Result<(), String> {
@@ -12621,6 +12730,16 @@ impl Engine {
                 hash_f64(&mut buf, c.eps.unwrap_or(f64::NAN));
                 hash_f64(&mut buf, c.book_value_per_share.unwrap_or(f64::NAN));
                 hash_f64(&mut buf, c.revenue_growth.unwrap_or(f64::NAN));
+            }
+        }
+        // The share counts, once `set_shares_outstanding` has moved them off
+        // the ones each company was built or listed with: every tick's market
+        // cap is the price times the count.
+        if self.shares_outstanding_changed() {
+            hash_str(&mut buf, "shares_outstanding");
+            hash_u32(&mut buf, n as u32);
+            for c in &self.companies {
+                hash_f64(&mut buf, c.stock.shares_outstanding);
             }
         }
         // The variance cascade's components, only on a model that runs it.

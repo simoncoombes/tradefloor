@@ -375,10 +375,10 @@ has an even increment word, and `from_words` refuses one.
 ## Scope of this crate
 
 The published crate carries the engine, the unit tests in its source
-modules and ten integration tests that run standalone:
+modules and eleven integration tests that run standalone:
 `circuit_breaker`, `depth_counterfactual`, `fed_put`, `host_constructors`,
 `maker_ladder_allocations`, `platform_maths`, `postcut`, `roster_mutation`,
-`snapshot_restore` and `stream_alignment`. The parity corpus that pins the
+`shares_outstanding`, `snapshot_restore` and `stream_alignment`. The parity corpus that pins the
 engine's output is 140 MB of fixtures and stays in the repository, so the
 tests that read it are left out of the package rather than shipped in a
 state where they cannot pass.
