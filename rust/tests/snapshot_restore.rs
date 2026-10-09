@@ -423,9 +423,11 @@ fn edit(preset: &str, path: &[&str], value: Option<SnapshotValue>) -> EngineSnap
 #[test]
 fn a_missing_field_is_refused_by_name_at_every_level() {
     let keys: Vec<String> = taken("pt-v20").fields().keys().map(str::to_string).collect();
-    // Less the fields whose absence is a value.
+    // Less the fields whose absence is a value, and the derived VIX anchor,
+    // which a snapshot from before #268 does not carry.
     let optional = ["state_schema", "book", "vix_sets_variance_pending", "macro_pins_today",
-                    "pending_fair_value", "current_day", "elapsed_days", "fundamentals"];
+                    "pending_fair_value", "current_day", "elapsed_days", "fundamentals",
+                    "vix_anchor"];
     for key in keys.iter().filter(|k| !optional.contains(&k.as_str())) {
         let err = refused("pt-v20", &edit("pt-v20", &[key], None));
         assert_eq!(err.kind(), SnapshotErrorKind::Fields, "{key}: {err}");
@@ -458,6 +460,19 @@ fn a_dial_gated_field_follows_the_model() {
             "{err}");
     let err = refused("pt-v3", &edit("pt-v3", &["vix_anchor_slow"], Some(SnapshotValue::Float(0.0))));
     assert!(err.message().contains("vix_anchor_memory"), "{err}");
+}
+
+#[test]
+fn the_derived_vix_anchor_rides_with_the_identity() {
+    assert!(taken("pt-v20").fields().contains_key("vix_anchor"));
+    assert!(!taken("pt-v3").fields().contains_key("vix_anchor"));
+    let err = refused("pt-v3", &edit("pt-v3", &["vix_anchor"], Some(SnapshotValue::Float(16.0))));
+    assert!(err.message().contains("vix_level_identity"), "{err}");
+    let err = refused("pt-v20", &edit("pt-v20", &["vix_anchor"], Some(SnapshotValue::Float(0.0))));
+    assert!(err.message().contains("vix_anchor"), "{err}");
+    // A snapshot from before the anchor was carried still restores.
+    let mut target = engine("pt-v20");
+    target.restore(&edit("pt-v20", &["vix_anchor"], None)).unwrap();
 }
 
 #[test]

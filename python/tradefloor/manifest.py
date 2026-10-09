@@ -255,7 +255,7 @@ _SNAPSHOT_KEYS = (
     "pending_jump", "pending_overnight",
 )
 
-#: Snapshot keys the state hash accepts and does not cover. Two:
+#: Snapshot keys the state hash accepts and does not cover. Three:
 #: ``session_tick``, the ticks the day has run, which is the tick the book
 #: stamps a fill with. It moves no price, and every snapshot of an open or a
 #: closed day carries a count, so covering it would have moved every leaf
@@ -263,8 +263,12 @@ _SNAPSHOT_KEYS = (
 #: is carried for: a fill after a restore is stamped as the original's was.
 #: And ``state_schema``, the snapshot's layout version, which describes the
 #: dict rather than the market; snapshots written before it carried none and
-#: hash as they did.
-_UNHASHED_KEYS = ("session_tick", "state_schema")
+#: hash as they did. And ``vix_anchor``, the VIX anchor `vix_level_identity`
+#: derives from the roster the engine was built on: a constant of the run,
+#: carried so an engine rebuilt on a later roster restores the run's own
+#: (#268). Covering it would have moved every pt-v19 and later leaf written
+#: before it was carried.
+_UNHASHED_KEYS = ("session_tick", "state_schema", "vix_anchor")
 
 
 def _default_day(day_count: int, market_open: bool) -> int:
@@ -447,9 +451,10 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     ``set_fundamentals`` has changed them, and the variance cascade on a
     model that runs it.
 
-    It accepts two keys and does not cover them: ``session_tick``, the
-    ticks the day has run, and ``state_schema``, the snapshot's layout
-    version (:data:`_UNHASHED_KEYS` says why). It accepts the economy's
+    It accepts three keys and does not cover them: ``session_tick``, the
+    ticks the day has run, ``state_schema``, the snapshot's layout version,
+    and ``vix_anchor``, the derived VIX anchor (:data:`_UNHASHED_KEYS` says
+    why). It accepts the economy's
     ``qe_assets_ratio``, carried on a model with ``qe_pe_stock_gain`` set,
     and does not cover it either, as the engine's own hash does not.
 
@@ -516,9 +521,11 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # From pt-v20 the fair-value levels and the unapplied opening draws are
     # carried, together, on a model that can move a level. The accrued
     # buyback share-count reductions are carried only with
-    # `buyback_accrual` and `buyback_payout_share` both set.
+    # `buyback_accrual` and `buyback_payout_share` both set. The derived VIX
+    # anchor rides with `vix_level_identity`, and is not hashed: it is a
+    # constant of the run.
     expected = set(_SNAPSHOT_KEYS) | (
-        {"vix_anchor_slow", "vix_stress_memory", "market_vol_leverage_memory",
+        {"vix_anchor_slow", "vix_anchor", "vix_stress_memory", "market_vol_leverage_memory",
          "market_vol_cycle_log", "rates", "book", "fair_value_offset", "opening_z",
          "buyback_log_shares", "opening_carry",
          # Carried only while set: a forced close pending tonight, today's
