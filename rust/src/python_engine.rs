@@ -1910,8 +1910,10 @@ impl PyEngine {
             )));
         }
         // A contract symbol goes to the core, which lists the contracts
-        // (`futures_index_listed`) and says when one is not listed.
-        let contract = self.inner.params().futures_index_listed != 0.0
+        // (`futures_index_listed`, `futures_vix_listed`) and says when one is
+        // not listed.
+        let p = self.inner.params();
+        let contract = (p.futures_index_listed != 0.0 || p.futures_vix_listed != 0.0)
             && crate::derivatives::ContractSymbol::parse(ticker).is_ok();
         if !self.tickers.iter().any(|t| t == ticker) && !contract {
             return Err(ValidationError::new_err(format!(
@@ -4710,14 +4712,17 @@ impl PyEngine {
         Ok(Some(d))
     }
 
-    /// The listed contracts (`futures_index_listed`), in expiry order, or
-    /// an empty list with the switch off. Each is a dict: `symbol`
-    /// (`IDX.F0119` for the index future expiring at session 119), `root`
-    /// (`IDX`), `kind` (`"future"`), `expiry` (the session it settles at,
+    /// The listed contracts: the front two index futures
+    /// (`futures_index_listed`) in expiry order, then the next six monthly
+    /// VIX futures (`futures_vix_listed`, from the first close) in expiry
+    /// order; an empty list with both off. Each is a dict: `symbol`
+    /// (`IDX.F0119` for the index future expiring at session 119,
+    /// `VIX.F0035` for the VIX future expiring at 35), `root` (`IDX` or
+    /// `VIX`), `kind` (`"future"`), `expiry` (the session it settles at,
     /// counted from 0 as `day_count` counts), `roll` (six sessions before
-    /// it), `multiplier` (dollars per index point), `tick`, `settlement`
-    /// (`"opening_print_index"`) and `front` (the first contract whose roll
-    /// has not come). The front two index futures are listed.
+    /// it), `multiplier` (dollars per point), `tick`, `settlement`
+    /// (`"opening_print_index"` or `"published_vix_at_open"`) and `front`
+    /// (the first of its family whose roll has not come).
     fn contracts<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyDict>>> {
         self.inner
             .contracts()
@@ -4749,12 +4754,20 @@ impl PyEngine {
     /// `dividends`, the present value of the dividends going ex before it
     /// settles, index points; `sessions_to_expiry`; `multiplier`; `tick`;
     /// `daily_volume`, contracts; `initial_margin` (None: no margin is
-    /// listed yet); and `symbol`, `kind` and `expiry`. A read.
+    /// listed yet); and `symbol`, `kind` and `expiry`.
+    ///
+    /// For a VIX future, `fair` is the expected settlement plus the premium,
+    /// moved within a session by the live VIX's surprise: `expected` (the
+    /// forecast's published VIX at expiry), `premium` (VIX points) and
+    /// `loading` (on the live VIX's surprise over the forecast's expectation
+    /// of tonight's VIX); `index` is the VIX the price reads, `basis_bp` the
+    /// mark of agents' flow in basis points of the price, and `rate` and
+    /// `dividends` are 0. These three are None for an index future. A read.
     fn quote<'py>(&self, py: Python<'py>, symbol: &str) -> PyResult<Bound<'py, PyDict>> {
         let q = self.inner.quote(symbol).ok_or_else(|| {
             ValidationError::new_err(format!(
                 "{symbol:?} is not a listed contract: Engine.contracts() lists the ones that \
-                 trade, and none does with futures_index_listed off"
+                 trade, and none does with futures_index_listed and futures_vix_listed off"
             ))
         })?;
         let d = PyDict::new_bound(py);
@@ -4776,15 +4789,20 @@ impl PyEngine {
         d.set_item("tick", q.tick)?;
         d.set_item("daily_volume", q.daily_volume)?;
         d.set_item("initial_margin", q.initial_margin)?;
+        d.set_item("expected", q.expected)?;
+        d.set_item("premium", q.premium)?;
+        d.set_item("loading", q.loading)?;
         Ok(d)
     }
 
     /// The contracts' final settlements made at the open of session `day`,
     /// or every one so far with `day` None, in order: dicts with `symbol`,
     /// `root`, `kind`, `session`, `value` (the settlement price) and
-    /// `reference` (what it settles on: the index of the expiry session's
-    /// opening prints, from which `value` is set). Empty with
-    /// `futures_index_listed` off. A read.
+    /// `reference` (what it settles on, from which `value` is set: the index
+    /// of the expiry session's opening prints for an index future, the
+    /// published VIX at the expiry open for a VIX future), in session order.
+    /// Empty with `futures_index_listed` and `futures_vix_listed` off. A
+    /// read.
     #[pyo3(signature = (day = None))]
     fn settlements<'py>(&self, py: Python<'py>, day: Option<i64>) -> PyResult<Vec<Bound<'py, PyDict>>> {
         self.inner
@@ -5602,7 +5620,7 @@ impl PyEngine {
     /// other applies your pressure, once, so a harness that wants both must
     /// do both.
     fn book(&self, ticker: &str) -> PyResult<crate::python_book::PyOrderBook> {
-        // A listed contract's book (`futures_index_listed`), by its symbol.
+        // A listed contract's book (`futures_index_listed`, `futures_vix_listed`), by its symbol.
         if !self.tickers.iter().any(|t| t == ticker) {
             if let Some(book) = self.inner.contract_book(ticker) {
                 return Ok(crate::python_book::PyOrderBook::from_core(book));

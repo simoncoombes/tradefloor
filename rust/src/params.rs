@@ -1159,6 +1159,56 @@ pub struct ModelParams {
     /// when it is written. Stocks do not trade at night. Requires
     /// `futures_index_listed`. A whole number of steps in [0, 390].
     pub night_session_steps: f64,
+    /// Whether the engine lists monthly futures on the published VIX. 0.0,
+    /// on every shipped preset, lists none: no contract, no state, nothing
+    /// in the snapshot or the state hash, and a value of 0.0 is left out of
+    /// the model's digest.
+    ///
+    /// Off zero the engine lists the next six monthly VIX futures from the
+    /// first close (`derivatives::calendar`: each expires at session 15 of a
+    /// 21-session month, 21m + 14, the index options' expiry), and settles
+    /// each at its expiry's open in cash on the published VIX then, the
+    /// previous close's value. At a close a contract `n` sessions from
+    /// expiry is marked at the forecast's expected published VIX after `n -
+    /// 1` closes plus the premium `derivatives::VIX_FUTURE` freezes, fitted
+    /// once to the CFE VX settlements: `a(n) + b(n) (VIX - centre)`. Within a
+    /// session it moves with the live VIX's surprise over the forecast's
+    /// expectation of tonight's VIX, by the loading
+    /// `futures_vix_live_fast_share`, `futures_vix_live_fast_half_life` and
+    /// `futures_vix_live_slow_half_life` give, and rolls its premium to the
+    /// next close's. The front three have agent-facing books (a maker's
+    /// ladder, latent square-root depth and agents' resting orders), the
+    /// rest a maker's ladder; they trade in the session only. Requires
+    /// `forecast_horizon_sessions` of at least 126, which the sixth
+    /// contract's expectation reads. A VIX futures price feeds nothing a
+    /// stock price or the VIX reads. A switch.
+    pub futures_vix_listed: f64,
+    /// The fast part's share of the VIX futures' intraday loading. A
+    /// contract `m` sessions from expiry, counted from tonight's close,
+    /// moves within a session by `lambda(m) = w 0.5^((m - 1) / H1) + (1 - w)
+    /// 0.5^((m - 1) / H2)` times the live VIX's surprise (the live VIX less
+    /// the forecast's expectation of tonight's published VIX), where `w` is
+    /// this, `H1` `futures_vix_live_fast_half_life` and `H2`
+    /// `futures_vix_live_slow_half_life`; a half-life of 0.0 makes its part
+    /// 1 at `m = 1` and 0 beyond. `lambda(1)` is 1, so the contract that
+    /// settles on tonight's VIX follows the live VIX one for one. Read only
+    /// with `futures_vix_listed` set; 0.0, on every shipped preset, is a
+    /// branch, and a value of 0.0 is left out of the model's digest. A
+    /// projection fitted on the model's own held-out histories
+    /// (`tools/calibration/vix_futures_dials.py derive`): the slope of each
+    /// close's revision of a contract's expected settlement on the close's
+    /// surprise, horizon by horizon. In [0, 1].
+    pub futures_vix_live_fast_share: f64,
+    /// The fast part's half-life, in sessions, of the VIX futures' intraday
+    /// loading (`futures_vix_live_fast_share`). Read only with
+    /// `futures_vix_listed` set; 0.0, on every shipped preset, is a branch,
+    /// and a value of 0.0 is left out of the model's digest. In [0, 2520].
+    pub futures_vix_live_fast_half_life: f64,
+    /// The slow part's half-life, in sessions, of the VIX futures' intraday
+    /// loading (`futures_vix_live_fast_share`). Read only with
+    /// `futures_vix_listed` set; 0.0, on every shipped preset, is a branch,
+    /// and a value of 0.0 is left out of the model's digest. In [0, 2520].
+    pub futures_vix_live_slow_half_life: f64,
     /// Switch that makes the fear/greed index read the business cycle and
     /// GDP growth as published instead of as they are. 0.0, on every preset
     /// through pt-v19, is off; pt-v20 sets 1.0.
@@ -7584,6 +7634,10 @@ impl ModelParams {
             basis_sd: 0.0,
             basis_persistence: 0.0,
             night_session_steps: 0.0,
+            futures_vix_listed: 0.0,
+            futures_vix_live_fast_share: 0.0,
+            futures_vix_live_fast_half_life: 0.0,
+            futures_vix_live_slow_half_life: 0.0,
             fear_greed_published_inputs: 0.0,
             macro_publication_repricing: 0.0,
             treasury_10y_noise: 0.03,
@@ -10185,6 +10239,10 @@ impl ModelParams {
             "basis_sd" => self.basis_sd,
             "basis_persistence" => self.basis_persistence,
             "night_session_steps" => self.night_session_steps,
+            "futures_vix_listed" => self.futures_vix_listed,
+            "futures_vix_live_fast_share" => self.futures_vix_live_fast_share,
+            "futures_vix_live_fast_half_life" => self.futures_vix_live_fast_half_life,
+            "futures_vix_live_slow_half_life" => self.futures_vix_live_slow_half_life,
             "fear_greed_published_inputs" => self.fear_greed_published_inputs,
             "macro_publication_repricing" => self.macro_publication_repricing,
             "treasury_10y_noise" => self.treasury_10y_noise,
@@ -10551,6 +10609,10 @@ impl ModelParams {
             "basis_sd" => out.basis_sd = value,
             "basis_persistence" => out.basis_persistence = value,
             "night_session_steps" => out.night_session_steps = value,
+            "futures_vix_listed" => out.futures_vix_listed = value,
+            "futures_vix_live_fast_share" => out.futures_vix_live_fast_share = value,
+            "futures_vix_live_fast_half_life" => out.futures_vix_live_fast_half_life = value,
+            "futures_vix_live_slow_half_life" => out.futures_vix_live_slow_half_life = value,
             "fear_greed_published_inputs" => out.fear_greed_published_inputs = value,
             "macro_publication_repricing" => out.macro_publication_repricing = value,
             "treasury_10y_noise" => out.treasury_10y_noise = value,
@@ -11950,6 +12012,44 @@ impl ModelParams {
                  night_session_steps set, futures_index_listed is 1.0.",
                 self.night_session_steps));
         }
+        if !(self.futures_vix_listed == 0.0 || self.futures_vix_listed == 1.0) {
+            return Err(format!(
+                "futures_vix_listed is {}. It is a switch, 0.0 off or 1.0 on.",
+                self.futures_vix_listed));
+        }
+        if self.futures_vix_listed != 0.0 && self.forecast_horizon_sessions < 126.0 {
+            return Err(format!(
+                "forecast_horizon_sessions is {} but futures_vix_listed is {}. A VIX future is \
+                 priced at the forecast's expected published VIX at its expiry, and the sixth \
+                 listed contract reads 126 sessions ahead: with futures_vix_listed on, \
+                 forecast_horizon_sessions is at least 126.",
+                self.forecast_horizon_sessions, self.futures_vix_listed));
+        }
+        if !(self.futures_vix_live_fast_share >= 0.0 && self.futures_vix_live_fast_share <= 1.0) {
+            return Err(format!(
+                "futures_vix_live_fast_share is {}. It is the fast part's share of the VIX \
+                 futures' intraday loading, in [0, 1].",
+                self.futures_vix_live_fast_share));
+        }
+        for (name, v) in [("futures_vix_live_fast_half_life", self.futures_vix_live_fast_half_life),
+                          ("futures_vix_live_slow_half_life", self.futures_vix_live_slow_half_life)] {
+            if !(0.0..=2520.0).contains(&v) {
+                return Err(format!(
+                    "{name} is {v}. It is a half-life of the VIX futures' intraday loading in \
+                     sessions, in [0, 2520]; 0 makes its part 1 at one session to expiry and 0 \
+                     beyond."));
+            }
+        }
+        for (name, v) in [("futures_vix_live_fast_share", self.futures_vix_live_fast_share),
+                          ("futures_vix_live_fast_half_life", self.futures_vix_live_fast_half_life),
+                          ("futures_vix_live_slow_half_life", self.futures_vix_live_slow_half_life)] {
+            if v != 0.0 && self.futures_vix_listed == 0.0 {
+                return Err(format!(
+                    "futures_vix_listed is 0 but {name} is {v}. It shapes the VIX futures' \
+                     intraday loading, which only futures_vix_listed lists: set \
+                     futures_vix_listed to 1.0 first."));
+            }
+        }
         if !(self.fear_greed_published_inputs == 0.0 || self.fear_greed_published_inputs == 1.0) {
             return Err(format!(
                 "fear_greed_published_inputs is {}. It is a switch: 0 (the index reads the \
@@ -12436,6 +12536,10 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "futures_index_listed",
     "basis_sd",
     "basis_persistence",
+    "futures_vix_listed",
+    "futures_vix_live_fast_share",
+    "futures_vix_live_fast_half_life",
+    "futures_vix_live_slow_half_life",
     "night_session_steps",
 ];
 
@@ -12625,6 +12729,10 @@ pub fn settable_names() -> Vec<&'static str> {
         "basis_sd",
         "basis_persistence",
         "night_session_steps",
+        "futures_vix_listed",
+        "futures_vix_live_fast_share",
+        "futures_vix_live_fast_half_life",
+        "futures_vix_live_slow_half_life",
         "fear_greed_published_inputs",
         "macro_publication_repricing",
         "treasury_10y_noise",

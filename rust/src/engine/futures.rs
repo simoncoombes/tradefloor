@@ -436,9 +436,11 @@ impl Engine {
         self.futures.contracts.iter().position(|c| c.expiry == parsed.expiry)
     }
 
-    /// Whether `symbol` names a listed contract.
+    /// Whether `symbol` names a listed contract: an index future
+    /// (`futures_index_listed`) or a VIX future (`futures_vix_listed`).
     pub fn is_listed_contract(&self, symbol: &str) -> bool {
-        self.futures_on() && self.futures_slot(symbol).is_some()
+        (self.futures_on() && self.futures_slot(symbol).is_some())
+            || (self.vix_futures_on() && self.vix_futures_slot(symbol).is_some())
     }
 
     // ── Pricing ───────────────────────────────────────────────────────────
@@ -669,6 +671,11 @@ impl Engine {
     /// The agent-facing book of a listed contract: `None` for a symbol not
     /// listed.
     pub fn contract_book(&self, symbol: &str) -> Option<OrderBook> {
+        if self.vix_futures_on() {
+            if let Some(slot) = self.vix_futures_slot(symbol) {
+                return self.vix_futures_book_at(slot);
+            }
+        }
         if !self.futures_on() {
             return None;
         }
@@ -676,13 +683,15 @@ impl Engine {
         Some(self.futures_book(slot, None))
     }
 
-    /// The listed contract at position `k` in listing order, for
-    /// [`Engine::book_for`]'s indices past the rate instruments.
+    /// The listed contract at position `k` in listing order, the index
+    /// futures first and then the VIX futures, for [`Engine::book_for`]'s
+    /// indices past the rate instruments.
     pub(super) fn contract_book_at(&self, k: usize) -> Option<OrderBook> {
-        if !self.futures_on() || k >= self.futures.contracts.len() {
-            return None;
+        let index = if self.futures_on() { self.futures.contracts.len() } else { 0 };
+        if k < index {
+            return Some(self.futures_book(k, None));
         }
-        Some(self.futures_book(k, None))
+        self.vix_futures_book_at(k - index)
     }
 
     fn futures_push_fill(&mut self, mut fill: AgentFill) -> AgentFill {
@@ -832,7 +841,10 @@ impl Engine {
             }
             None => format!("{agent}-{symbol}-{}", self.futures.book.sequence),
         };
-        if self.futures.book.orders.iter().any(|o| o.id == id) || self.book.orders.iter().any(|o| o.id == id) {
+        if self.futures.book.orders.iter().any(|o| o.id == id)
+            || self.book.orders.iter().any(|o| o.id == id)
+            || self.vix_futures_orders().iter().any(|o| o.id == id)
+        {
             return Err(format!("order id {id:?} is already waiting in the book"));
         }
         let sequence = self.futures.book.sequence;
@@ -1155,9 +1167,16 @@ impl Engine {
 
     // ── Reads ─────────────────────────────────────────────────────────────
 
-    /// The listed contracts, in expiry order: the front two index futures
-    /// under `futures_index_listed`, none with it off.
+    /// The listed contracts: the front two index futures under
+    /// `futures_index_listed`, in expiry order, then the six VIX futures
+    /// under `futures_vix_listed`, in expiry order; none with both off.
     pub fn contracts(&self) -> Vec<ContractSpec> {
+        let mut out = self.index_futures_contracts();
+        out.extend(self.vix_futures_contracts());
+        out
+    }
+
+    fn index_futures_contracts(&self) -> Vec<ContractSpec> {
         if !self.futures_on() {
             return Vec::new();
         }
@@ -1188,8 +1207,13 @@ impl Engine {
     }
 
     /// A listed contract's quote now: `None` for a symbol not listed, and
-    /// for every symbol with `futures_index_listed` off.
+    /// for every symbol with its family's switch off.
     pub fn quote(&self, symbol: &str) -> Option<Quote> {
+        if self.vix_futures_on() {
+            if let Some(slot) = self.vix_futures_slot(symbol) {
+                return self.vix_futures_quote(slot);
+            }
+        }
         if !self.futures_on() {
             return None;
         }
@@ -1220,21 +1244,30 @@ impl Engine {
             tick: INDEX_FUTURE.tick,
             daily_volume: self.futures_daily_volume(v.index),
             initial_margin: None,
+            expected: None,
+            premium: None,
+            loading: None,
         })
     }
 
     /// The final settlements made at `session`'s open, or every one so far
-    /// with `None`, in order. Empty with `futures_index_listed` off.
+    /// with `None`, in session order, an index future before a VIX future at
+    /// the same open. Empty with both switches off.
     pub fn settlements(&self, session: Option<i64>) -> Vec<Settlement> {
-        if !self.futures_on() {
-            return Vec::new();
-        }
-        self.futures
-            .settlements
-            .iter()
-            .filter(|s| session.is_none_or(|d| s.session == d))
-            .cloned()
-            .collect()
+        let mut out: Vec<Settlement> = if self.futures_on() {
+            self.futures
+                .settlements
+                .iter()
+                .filter(|s| session.is_none_or(|d| s.session == d))
+                .cloned()
+                .collect()
+        } else {
+            Vec::new()
+        };
+        out.extend(self.vix_futures_settlements(session));
+        // Stable, so each family keeps its own order within a session.
+        out.sort_by_key(|s| s.session);
+        out
     }
 
     // ── Snapshot ──────────────────────────────────────────────────────────

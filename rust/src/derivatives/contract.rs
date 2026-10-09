@@ -8,15 +8,18 @@
 
 use super::symbol::{ContractSymbol, SymbolKind};
 
-/// What kind of contract this is. Index futures are the one kind listed so
-/// far (`futures_index_listed`); the enum is non-exhaustive so the VIX,
-/// rate and oil futures and the options of later releases join it.
+/// What kind of contract this is: index futures (`futures_index_listed`)
+/// and VIX futures (`futures_vix_listed`) so far; the enum is non-exhaustive
+/// so the rate and oil futures and the options of later releases join it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum ContractKind {
     /// A future on the engine's price index (`Engine::index_level`),
     /// cash-settled on the index of its expiry session's opening prints.
     IndexFuture,
+    /// A future on the published VIX, cash-settled on the published VIX at
+    /// its expiry session's open: the previous close's value.
+    VixFuture,
 }
 
 impl ContractKind {
@@ -24,13 +27,14 @@ impl ContractKind {
     pub fn root(self) -> &'static str {
         match self {
             ContractKind::IndexFuture => "IDX",
+            ContractKind::VixFuture => "VIX",
         }
     }
 
     /// Whether this is a future (rather than an option).
     pub fn is_future(self) -> bool {
         match self {
-            ContractKind::IndexFuture => true,
+            ContractKind::IndexFuture | ContractKind::VixFuture => true,
         }
     }
 
@@ -47,6 +51,7 @@ impl ContractKind {
     pub fn settlement(self) -> SettlementRule {
         match self {
             ContractKind::IndexFuture => SettlementRule::OpeningPrintIndex,
+            ContractKind::VixFuture => SettlementRule::PublishedVixAtOpen,
         }
     }
 }
@@ -60,6 +65,9 @@ pub enum SettlementRule {
     /// before the session's first tick (the AM settlement of an index
     /// future).
     OpeningPrintIndex,
+    /// In cash, on the published VIX at the expiry session's open, which is
+    /// the previous close's value: the VIX moves only at a close.
+    PublishedVixAtOpen,
 }
 
 impl SettlementRule {
@@ -67,6 +75,7 @@ impl SettlementRule {
     pub fn as_str(self) -> &'static str {
         match self {
             SettlementRule::OpeningPrintIndex => "opening_print_index",
+            SettlementRule::PublishedVixAtOpen => "published_vix_at_open",
         }
     }
 }
@@ -103,6 +112,12 @@ pub struct ContractSpec {
 /// For an index future: `fair` is the carry fair value, `(S - PV(D)) *
 /// exp(r tau)`, `price` is `fair` plus the basis, the price the maker quotes
 /// around, and `bid` and `ask` are the agent-facing book's touch.
+///
+/// For a VIX future: `fair` is the expected settlement plus the premium,
+/// moved within a session by the live VIX's surprise (`expected`,
+/// `premium`, `loading`), `price` is `fair` plus the mark of agents' own
+/// flow, `index` is the VIX the price reads (the live VIX in a session, the
+/// published VIX outside one), and `rate` and `dividends` are 0.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct Quote {
@@ -140,6 +155,16 @@ pub struct Quote {
     pub daily_volume: f64,
     /// The initial margin a contract asks. `None` until margin is listed.
     pub initial_margin: Option<f64>,
+    /// A VIX future's expected settlement, the forecast's published VIX at
+    /// its expiry as the last close (or pin) expected it; `None` for other
+    /// kinds.
+    pub expected: Option<f64>,
+    /// A VIX future's premium over its expected settlement now, VIX points;
+    /// `None` for other kinds.
+    pub premium: Option<f64>,
+    /// A VIX future's intraday loading on the live VIX's surprise
+    /// (`futures_vix_live_fast_share`); `None` for other kinds.
+    pub loading: Option<f64>,
 }
 
 /// A contract's final settlement, as [`crate::engine::Engine::settlements`]
@@ -155,7 +180,8 @@ pub struct Settlement {
     /// The settlement price.
     pub value: f64,
     /// What it settles on: for an index future, the index of the expiry
-    /// session's opening prints. `value` is set from it, so the two agree.
+    /// session's opening prints; for a VIX future, the published VIX at the
+    /// expiry session's open. `value` is set from it, so the two agree.
     pub reference: f64,
 }
 
@@ -212,6 +238,114 @@ pub const INDEX_FUTURE: IndexFutureSpec = IndexFutureSpec {
     impact_coefficient: 0.15,
     impact_half_life: 30.0,
 };
+
+/// The VIX futures' premium over the expected settlement, frozen: fitted
+/// once to the CFE VX monthly settlements, 266 contracts from May 2004,
+/// and not to any row of the model's. For a contract `n` sessions from
+/// expiry, on the VIX `vix`, the premium is `a(n) + b(n) (vix - centre)`,
+/// with `a(n) = k (n - 1)^p` the settlement `n` sessions before expiry less
+/// the final settlement, mean over contracts, and `b(n) = beta (1 -
+/// exp(-(n - 1) / tau))` its slope on the VIX's close that day; both are 0
+/// at `n = 1`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
+pub struct VixPremium {
+    pub centre: f64,
+    pub k: f64,
+    pub p: f64,
+    pub beta: f64,
+    pub tau: f64,
+}
+
+impl VixPremium {
+    /// The premium's level part, `a(n)`.
+    pub fn level(&self, n: f64) -> f64 {
+        if n <= 1.0 {
+            0.0
+        } else {
+            self.k * crate::mathx::pow(n - 1.0, self.p)
+        }
+    }
+
+    /// The premium's slope on the VIX, `b(n)`.
+    pub fn slope(&self, n: f64) -> f64 {
+        if n <= 1.0 {
+            0.0
+        } else {
+            self.beta * (1.0 - crate::mathx::exp(-(n - 1.0) / self.tau))
+        }
+    }
+
+    /// The premium of a contract `n` sessions from expiry on the VIX `vix`.
+    pub fn at(&self, n: f64, vix: f64) -> f64 {
+        self.level(n) + self.slope(n) * (vix - self.centre)
+    }
+}
+
+/// The VIX future's specification: constants of the contract, not dials.
+///
+/// The book takes the index future's shape (`INDEX_FUTURE`): a maker's
+/// ladder one tick apart, latent square-root depth at 0.75 and 0.5 out to
+/// a day's volume, and agents' flow marking the price and decaying. The
+/// stated daily volumes are about CFE VX's by position, 2023-2025.
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
+pub struct VixFutureSpec {
+    /// Dollars per VIX point: 1,000, as CFE VX.
+    pub multiplier: f64,
+    /// The price grid: 0.05 VIX points, as CFE VX's outright tick.
+    pub tick: f64,
+    /// The daily volume of the front three contracts, in listing order,
+    /// contracts; their books carry latent depth sized to it.
+    pub front_daily_volume: [f64; 3],
+    /// The daily volume each deferred contract's maker ladder is sized to.
+    pub deferred_daily_volume: f64,
+    /// The maker's levels a side, one tick apart.
+    pub maker_levels: usize,
+    /// Each maker level, as a share of the daily volume.
+    pub maker_level_share: f64,
+    /// The latent depth's coefficient, exponent and reach (in days' volume).
+    pub depth_coefficient: f64,
+    pub depth_exponent: f64,
+    pub depth_reach: f64,
+    /// Consumed latent depth refills at this half-life, in steps.
+    pub refill_half_life: f64,
+    /// A contract's daily sd of its log price, the sigma its latent depth
+    /// and its flow's mark are scaled by: about the front CFE VX future's.
+    pub daily_sigma: f64,
+    /// Agents' net taker flow against the house moves the price by this
+    /// times `daily_sigma` times the flow over the daily volume, a share of
+    /// the price.
+    pub impact_coefficient: f64,
+    /// The flow's mark decays at this half-life, in steps.
+    pub impact_half_life: f64,
+    /// The premium over the expected settlement.
+    pub premium: VixPremium,
+}
+
+/// The VIX future's specification.
+pub const VIX_FUTURE: VixFutureSpec = VixFutureSpec {
+    multiplier: 1000.0,
+    tick: 0.05,
+    front_daily_volume: [110_000.0, 55_000.0, 25_000.0],
+    deferred_daily_volume: 8_000.0,
+    maker_levels: 10,
+    maker_level_share: 0.003,
+    depth_coefficient: 0.75,
+    depth_exponent: 0.5,
+    depth_reach: 1.0,
+    refill_half_life: 27.0,
+    daily_sigma: 0.05,
+    impact_coefficient: 0.15,
+    impact_half_life: 30.0,
+    premium: VixPremium { centre: 19.3197, k: 0.26, p: 0.4925, beta: 0.36, tau: 148.0 },
+};
+
+/// The symbol of the VIX future expiring at session `expiry`.
+pub fn vix_future_symbol(expiry: i64) -> String {
+    ContractSymbol { root: ContractKind::VixFuture.root().to_string(), expiry, kind: SymbolKind::Future }
+        .to_string()
+}
 
 /// The symbol of the index future expiring at session `expiry`.
 pub fn index_future_symbol(expiry: i64) -> String {

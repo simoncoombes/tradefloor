@@ -389,15 +389,17 @@ class Engine:
     # `policy_rate` (fractional), `oil`, and `name_variance` by ticker. None
     # with the dial at 0 and before the first close.
     def forecast(self) -> dict[str, Any] | None: ...
-    # The listed contracts (`futures_index_listed`): `symbol`, `root`,
-    # `kind`, `expiry` (a session number), `roll`, `multiplier`, `tick`,
-    # `settlement` and `front`. Empty with the switch off.
+    # The listed contracts, the index futures (`futures_index_listed`) and
+    # then the VIX futures (`futures_vix_listed`): `symbol`, `root`, `kind`,
+    # `expiry` (a session number), `roll`, `multiplier`, `tick`,
+    # `settlement` and `front`. Empty with both off.
     def contracts(self) -> list[dict[str, Any]]: ...
     # A listed contract's quote: `bid`, `ask`, `mid`, `price`, `fair`,
     # `mark`, `basis_bp`, `index`, `rate` (fractional), `dividends`,
     # `sessions_to_expiry`, `multiplier`, `tick`, `daily_volume`,
-    # `initial_margin`, `symbol`, `kind`, `expiry`. Raises for a symbol not
-    # listed.
+    # `initial_margin`, `symbol`, `kind`, `expiry`, and for a VIX future
+    # `expected`, `premium` and `loading` (None for an index future). Raises
+    # for a symbol not listed.
     def quote(self, symbol: str) -> dict[str, Any]: ...
     # The final settlements at session `day`'s open, or all with None:
     # `symbol`, `root`, `kind`, `session`, `value`, `reference`.

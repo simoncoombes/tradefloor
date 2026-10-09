@@ -13,6 +13,12 @@
 //! session `63q + 56`. The front two are listed, and each has a roll date
 //! [`ROLL_SESSIONS`] sessions before its expiry, the session from which the
 //! next contract is the front by the roll rule.
+//!
+//! VIX futures are monthly. Each expires at session 15 of its 21-session
+//! month, `21m + 14`, where the month's index options expire, so the
+//! quarterly index futures' expiries are every third of them. The next
+//! [`VIX_FUTURES_LISTED`] are listed: 126 sessions, the furthest horizon the
+//! VIX futures' rows read.
 
 /// Sessions in the model's year.
 pub const SESSIONS_PER_YEAR: i64 = 252;
@@ -53,6 +59,38 @@ pub fn index_future_expiries(after: i64, count: usize) -> Vec<i64> {
         q -= 1;
     }
     (0..count as i64).map(|k| quarterly_expiry(q + k)).collect()
+}
+
+/// How many VIX futures are listed at once: the next six monthly expiries.
+pub const VIX_FUTURES_LISTED: usize = 6;
+
+/// How many of them, from the front, have an agent-facing book with latent
+/// depth; the rest quote from the maker's ladder alone.
+pub const VIX_FUTURES_WITH_DEPTH: usize = 3;
+
+/// The session the VIX future of month `month` expires at, at its open:
+/// session 15 of the month, where the month's index options expire.
+pub fn monthly_expiry(month: i64) -> i64 {
+    month * SESSIONS_PER_MONTH + INDEX_FUTURE_EXPIRY_SESSION - 1
+}
+
+/// The first `count` VIX-future expiries strictly after session `after`,
+/// in order. `after` may be negative.
+pub fn vix_future_expiries(after: i64, count: usize) -> Vec<i64> {
+    let offset = monthly_expiry(0);
+    let mut m = (after - offset).div_euclid(SESSIONS_PER_MONTH);
+    while monthly_expiry(m) <= after {
+        m += 1;
+    }
+    while monthly_expiry(m - 1) > after {
+        m -= 1;
+    }
+    (0..count as i64).map(|k| monthly_expiry(m + k)).collect()
+}
+
+/// Whether `session` is a VIX-future expiry.
+pub fn is_vix_future_expiry(session: i64) -> bool {
+    session.rem_euclid(SESSIONS_PER_MONTH) == monthly_expiry(0)
 }
 
 /// A contract's roll date: [`ROLL_SESSIONS`] sessions before its expiry.
@@ -107,5 +145,33 @@ mod tests {
             assert!(is_index_future_expiry(e[0]));
         }
         assert_eq!(roll_session(56), 50);
+    }
+
+    #[test]
+    fn vix_futures_expire_monthly_on_session_15_and_the_next_six_are_listed() {
+        assert_eq!(monthly_expiry(0), 14);
+        assert_eq!(monthly_expiry(2), 56);
+        for m in 0..120 {
+            let e = monthly_expiry(m);
+            assert_eq!(e % SESSIONS_PER_MONTH + 1, INDEX_FUTURE_EXPIRY_SESSION);
+            assert!(is_vix_future_expiry(e) && !is_vix_future_expiry(e + 1));
+        }
+        // Every quarterly index-future expiry is a VIX-future expiry.
+        for q in 0..40 {
+            assert!(is_vix_future_expiry(quarterly_expiry(q)));
+        }
+        assert_eq!(vix_future_expiries(-1, 2), vec![14, 35]);
+        assert_eq!(vix_future_expiries(13, 1), vec![14]);
+        // At the expiry's own open it settles, so it is no longer listed.
+        assert_eq!(vix_future_expiries(14, 1), vec![35]);
+        for t in -100..2000 {
+            let e = vix_future_expiries(t, VIX_FUTURES_LISTED);
+            assert!(e[0] > t && e[0] - t <= SESSIONS_PER_MONTH, "{t} {e:?}");
+            // The sixth is at most 126 sessions out, the horizon VF6 reads.
+            assert!(e[VIX_FUTURES_LISTED - 1] - t <= 126, "{t} {e:?}");
+            for w in e.windows(2) {
+                assert_eq!(w[1] - w[0], SESSIONS_PER_MONTH);
+            }
+        }
     }
 }

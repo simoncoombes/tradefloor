@@ -444,6 +444,32 @@ OUT_OF_SCOPE = {
         "copy of the open is run and no night is walked or carried; refused "
         "without `futures_index_listed`; at 0.0 it is also left out of the "
         "model's digest",
+    # The VIX futures (pt-v22 phase 1), inert on every shipped preset. A VIX
+    # future reads the published and live VIX and the forecast and draws
+    # nothing, so off zero it leaves every price and the VIX where they were.
+    "futures_vix_listed":
+        "inert at 0.0: `vix_futures_open`, `vix_futures_close_marks` and "
+        "`vix_futures_session_step` in engine/vix_futures.rs return at once "
+        "with the switch off, `Engine::contracts` lists no VIX future, "
+        "`Engine::quote` returns None for one, and nothing is snapshotted or "
+        "hashed; refused with `forecast_horizon_sessions` under 126; at 0.0 "
+        "it is also left out of the model's digest",
+    "futures_vix_live_fast_share":
+        "unread while `futures_vix_listed` is 0.0, as every preset ships it: "
+        "only `vix_futures_loading` reads it, and refused without the switch. "
+        "A projection fitted on the model's held-out histories by "
+        "tools/calibration/vix_futures_dials.py; at 0.0 it is also left out "
+        "of the model's digest",
+    "futures_vix_live_fast_half_life":
+        "unread while `futures_vix_listed` is 0.0: only `vix_futures_loading` "
+        "reads it, and at 0.0 its part is a branch; fitted with "
+        "`futures_vix_live_fast_share`; at 0.0 it is also left out of the "
+        "model's digest",
+    "futures_vix_live_slow_half_life":
+        "unread while `futures_vix_listed` is 0.0: only `vix_futures_loading` "
+        "reads it, and at 0.0 its part is a branch; fitted with "
+        "`futures_vix_live_fast_share`; at 0.0 it is also left out of the "
+        "model's digest",
     # The VIX's fear memory (pt-v22 phase 1, the VIX law), inert on every
     # shipped preset.
     "vix_fear_uptake":

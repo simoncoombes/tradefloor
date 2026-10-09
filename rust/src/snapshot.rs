@@ -1620,6 +1620,14 @@ impl Engine {
         if self.carries_vix_fear() {
             out.put("vix_fear", V::Float(self.vix_fear()));
         }
+        // The VIX futures (`futures_vix_listed`): their numbers, and their
+        // book once an agent has traded one.
+        if let Some(words) = self.vix_futures_words() {
+            out.put("vix_futures", V::from_f64s(&words));
+        }
+        if let Some(book) = self.vix_futures_book_state() {
+            out.put("vix_futures_book", book_value(book));
+        }
         // The spread a `corporate_spread` pin holds tonight, only while its
         // mark stands.
         if let Some(spread) = self.pinned_corporate_spread() {
@@ -1949,6 +1957,8 @@ impl Engine {
             Gated::held("futures_book", "futures_index_listed", p.futures_index_listed),
             Gated::held("night_bridge", "night_session_steps", p.night_session_steps),
             Gated::dial("vix_fear", "vix_fear_uptake", p.vix_fear_uptake),
+            Gated::dial("vix_futures", "futures_vix_listed", p.futures_vix_listed),
+            Gated::held("vix_futures_book", "futures_vix_listed", p.futures_vix_listed),
             Gated::when(
                 "buyback_log_shares",
                 self.carries_buyback_log_shares(),
@@ -2604,6 +2614,19 @@ impl Engine {
         // is set, which the key check above has held it to.
         if inner.carries_vix_fear() {
             inner.set_vix_fear(read_finite(snapshot, "", "vix_fear")?);
+        }
+        // The VIX futures (`futures_vix_listed`): required while the switch
+        // is set, which the key check above has held them to.
+        {
+            let words = match snapshot.get("vix_futures") {
+                Some(_) => Some(read_buffer(snapshot, "", "vix_futures")?),
+                None => None,
+            };
+            let book = match snapshot.get("vix_futures_book") {
+                Some(_) => Some(book_from(read_map(snapshot, "", "vix_futures_book")?)?),
+                None => None,
+            };
+            inner.set_vix_futures_state(words.as_deref(), book).map_err(core)?;
         }
         inner.set_nominal_output_base(read_finite(snapshot, "", "nominal_output_base")?);
         let variance = read_numbers(snapshot, "", "market_variance")?;
