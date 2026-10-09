@@ -185,23 +185,6 @@ same with them on as off.
   their dials, and the state hash and `manifest.state_hash` cover them only
   then. Every known-answer digest is where it was.
 
-### Share counts from the host
-
-- `Engine::set_shares_outstanding` and `Engine::shares_outstanding` are new
-  (#274), in Python `Engine.set_shares_outstanding(shares)` and
-  `Engine.shares_outstanding()`. A host whose companies buy back stock or
-  issue it writes the counts, one for each company in roster order, each
-  finite and above 0. Each market cap is reset to the current price times
-  the new count, so the market factor's loadings, the beta normalisation
-  and the cap-weighted P/E all read the host's counts.
-  The listed index keeps its level across the write. Writing the counts
-  draws no random numbers, the order log records the write, and `replay`
-  and `explain` apply it again.
-- A snapshot carries the counts as `shares_outstanding`, and the state hash
-  covers them, only once they differ from the ones each company was built
-  or listed with. Saves and hashes from an engine that never had its counts
-  written are unchanged.
-
 ### Dividends in sessions
 
 - MCP sessions never called `Portfolio.collect_dividends` (#260). Every
@@ -210,46 +193,107 @@ same with them on as off.
 - RELEASING.md said the traded known answer runs on pt-v20 (#261). From
   0.10.0 it runs on the default preset, pt-v21.
 
+### The 0.10.2 host inputs and the derivatives
+
+- `Engine::set_shares_outstanding` (#274, released in 0.10.2) keeps the
+  listed index's level across the write (`index_level_listed`): the
+  divisor is reset, as it is across a listing.
+- A write of `set_vix_target_premium` or `set_vix_target_floor` (#275,
+  released in 0.10.2) reads the forecast (`forecast_horizon_sessions`) and
+  the live VIX again at once, as a pin does, and the forecast reads the
+  premium fading and the floor held.
+
+## 0.10.2
+
+A patch release with three changes for programs that host the engine. No
+coefficient, preset or default moves, and every known-answer digest is
+0.10.1's.
+
+A restore onto an engine rebuilt on a later day's companies now continues
+bit for bit (#268). From pt-v19 the VIX's anchor is derived from the roster
+the engine is built on, and a snapshot did not carry it, so the rebuilt
+engine's VIX parted from the original's at its next day. Snapshots now
+carry `vix_anchor`, and ones written before still restore.
+
+A host can now write each company's share count, for buybacks and share
+issues (#274). `set_shares_outstanding` resets each market cap at the price
+standing, and everything the engine weights by capitalisation reads the new
+counts.
+
+A host can now raise the VIX's target without writing the VIX (#275).
+`set_vix_target_premium` adds a premium in VIX points that fades on a
+half-life the host chooses, and `set_vix_target_floor` holds the target at
+or above a level until it is cleared. The engine's own reversion carries
+the VIX to the raised target; a one-off write of the VIX reverts within
+days.
+
+The snapshot and the state hash carry each new input only once a host has
+used it, so saves and hashes from a host that never calls them are
+unchanged.
+
+<!-- release-note-ends -->
+
 ### A restore onto a rebuilt engine
 
-- A host that rebuilds its engine on the day's companies and restores a
-  snapshot onto it now continues bit for bit (#268). Under
-  `vix_level_identity` (pt-v19 and later) the VIX's anchor is derived from
-  the roster the engine is built on, and a snapshot did not carry it, so an
-  engine rebuilt on a later day's market capitalisations derived another
-  anchor and its VIX parted from the original's at the sixth significant
-  figure. A snapshot now carries `vix_anchor` under the identity, and a
-  restore reads it. A snapshot without it, from before this, still
-  restores, onto the anchor the engine derived.
+- Under `vix_level_identity` (pt-v19 and later) `Engine::derive_vix_anchor`
+  reads the index's unconditional variance off the roster's market caps
+  when the engine is built. A host that rebuilt its engine on the day's
+  companies before `restore` derived another anchor, and the VIX step in
+  the next `advance_day` read it: the VIX parted at the sixth significant
+  figure and prices followed. Every column, the economy and the central
+  bank restored exactly. A host loop that calls `close_market` and
+  `advance_day` itself needs no `DayLoop` for this.
+- `Engine::snapshot` carries `vix_anchor` under the identity and `restore`
+  writes it back; a value at or under 0 is refused, and a snapshot carrying
+  it on a model without the identity is refused by name. A snapshot written
+  before 0.10.2 has none and restores onto the anchor the engine derived,
+  as every restore did before.
 - The state hash and `manifest.state_hash` do not cover `vix_anchor`, as
-  they do not cover `session_tick`, so every leaf and known-answer digest is
-  where it was.
+  they do not cover `session_tick`, so no leaf or digest moves.
+- `rust/tests/host_day_restore.rs` runs a host's day loop (`open_market`,
+  390 `tick`s, `close_market`, a snapshot, `advance_day`) onto an engine
+  rebuilt from the save-time companies, on pt-v21 and pt-v20.
 
-### Host input for the VIX target
+### Share counts from the host
 
-- A host can now raise the VIX's target without writing the VIX (#275).
-  `Engine::set_vix_target_premium(points, half_life_sessions)` adds a
-  premium to the target beside the inflation and shock terms, inside
-  `vix_target_shock_cap`, and each close fades it at its half-life (0.0
-  holds it). `Engine::set_vix_target_floor(Some(level))` keeps the target
-  at or above `level` until it is cleared with `None`. The VIX moves to
-  either at the engine's own reversion rate, where a written VIX was pulled
-  back toward the engine's target within days. In Python these are
-  `Engine.set_vix_target_premium`, `Engine.set_vix_target_floor`, and
-  their readers `vix_target_premium()` and `vix_target_floor()`.
-- The forecast (`forecast_horizon_sessions`) reads the premium fading and
-  the floor held. A write re-reads the forecast and the live VIX at once,
-  as a pin does.
-- A snapshot carries `vix_target_premium` and `vix_target_floor` only
-  while each stands, and the state hash and `manifest.state_hash` cover
-  them only then, so every saved snapshot, ledger and known-answer digest
-  is where it was. The run log records both writes, and `replay` and
-  `explain` replay them.
-- `ExternalFlow` counts the input apart from VIX writes
-  (`record_vix_target_premium`, `record_vix_target_floor_session`). Any
-  premium written, or any session closed under a floor, is outside the
-  fitted flow. `envelope.external_flow` takes them as `vix_target_premiums`
-  and `vix_target_floor_sessions`.
+- `Engine::set_shares_outstanding(&[f64])` and
+  `Engine::shares_outstanding()` are new, and in Python
+  `Engine.set_shares_outstanding(shares)` and
+  `Engine.shares_outstanding()`. One count per company in roster order,
+  each finite and above 0; a refused write changes nothing. It draws no
+  random numbers.
+- Each market cap is reset to the current price times the new count, and
+  every later tick prices off it, so the market factor's loadings, the
+  roster beta normalisation and the cap-weighted market P/E read the
+  host's counts. The float is the host's to keep in step, with
+  `set_column` on `PriceField::FloatShares` in Rust and on `float_shares`
+  in Python.
+- A snapshot carries `shares_outstanding`, and the state hash covers it,
+  once a count differs from the one the company was built with. A restore
+  writes the counts back as carried, puts back the built counts when the
+  snapshot has none, and refuses a length other than the roster's. The
+  order log records the write, and `replay` and `explain` make it again.
+
+### A host's input to the VIX target
+
+- `Engine::set_vix_target_premium(points, half_life_sessions)`,
+  `Engine::vix_target_premium()`, `Engine::set_vix_target_floor(Option<f64>)`
+  and `Engine::vix_target_floor()` are new, with the same four in Python.
+- The premium joins the target beside the inflation and shock terms,
+  inside `vix_target_shock_cap`, so a crash day whose return spike fills
+  the cap takes nothing from it that session. Each close reads the premium
+  and fades it by `0.5^(1 / half_life)`; a half-life of 0 holds it, and one
+  under a millionth of a point is cleared. A write replaces the premium
+  standing, so a host adding an event reads the premium and writes the
+  sum.
+- The floor applies once the target is complete, before the reversion
+  picks its rate, and holds until it is cleared with `None`. Neither input
+  moves GDP or writes the VIX, and both draw no random numbers.
+- The snapshot carries `vix_target_premium` (its points and half-life,
+  mid-fade included) and `vix_target_floor` only while each stands, and
+  the state hash covers each only then. `ExternalFlow` counts premium
+  writes and floored sessions apart from VIX writes. docs/EMBEDDING.md
+  points a host to these in place of VIX writes.
 
 ## 0.10.1
 
