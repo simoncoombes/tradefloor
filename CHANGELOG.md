@@ -210,6 +210,21 @@ same with them on as off.
 - RELEASING.md said the traded known answer runs on pt-v20 (#261). From
   0.10.0 it runs on the default preset, pt-v21.
 
+### A restore onto a rebuilt engine
+
+- A host that rebuilds its engine on the day's companies and restores a
+  snapshot onto it now continues bit for bit (#268). Under
+  `vix_level_identity` (pt-v19 and later) the VIX's anchor is derived from
+  the roster the engine is built on, and a snapshot did not carry it, so an
+  engine rebuilt on a later day's market capitalisations derived another
+  anchor and its VIX parted from the original's at the sixth significant
+  figure. A snapshot now carries `vix_anchor` under the identity, and a
+  restore reads it. A snapshot without it, from before this, still
+  restores, onto the anchor the engine derived.
+- The state hash and `manifest.state_hash` do not cover `vix_anchor`, as
+  they do not cover `session_tick`, so every leaf and known-answer digest is
+  where it was.
+
 ## 0.10.1
 
 A library and documentation release with no coefficient or default

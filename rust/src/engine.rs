@@ -9772,6 +9772,12 @@ impl Engine {
         self.vix_anchor_slow = value;
     }
 
+    /// Sets the anchor a snapshot carries (`vix_level_identity`), in place
+    /// of the one this engine derived from the roster it was built on.
+    pub fn set_vix_anchor(&mut self, value: f64) {
+        self.vix_anchor = value;
+    }
+
     /// Whether this engine's model carries the published VIX's stress
     /// memory, which is when the snapshot and the state hash carry it: only
     /// with `vix_stress_premium` non-zero, which no preset sets.
