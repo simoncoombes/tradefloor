@@ -245,6 +245,21 @@ sees the split, which is correct, since a split changes no company's value.
 `ExternalFlow` counts a split written as an earnings cut as a revision of
 `-ln(ratio)`, and flagged the game's on all 20 seeds.
 
+### Buybacks and share issues
+
+A host whose companies retire shares or sell new ones writes the counts
+with `set_shares_outstanding` (Rust `Engine::set_shares_outstanding`), one
+count for each company in roster order. Each market cap is reset to the
+current price times the new count straight away, and every later tick
+uses it. That puts the new counts into everything the engine weights by
+capitalisation: the market factor's loadings, the roster beta
+normalisation and the cap-weighted market P/E. A share count does not
+move fair value per share; send earnings and book value per share on the
+new count through `set_fundamentals`. The float is not changed, so write
+`float_shares` with `set_column` to keep it in step. Without this, a count
+the host changed while the engine kept the opening one put the engine's
+market caps 1.37% off `price × shares` on 29 of 30 seeds over two years.
+
 ### Writing the economy
 
 A write through `economy_mut` replaces what the macro step computed. A

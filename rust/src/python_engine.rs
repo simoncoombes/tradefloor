@@ -4279,6 +4279,38 @@ impl PyEngine {
         Ok(())
     }
 
+    /// Every company's share count, in roster order. The equities only;
+    /// rate instruments carry no share count. `set_shares_outstanding`
+    /// writes them.
+    fn shares_outstanding(&self) -> Vec<f64> {
+        self.inner.shares_outstanding()
+    }
+
+    /// Replace every company's share count, in roster order: one value per
+    /// equity, each finite and above 0. For a host whose companies buy back
+    /// stock or issue it.
+    ///
+    /// Each market cap follows at once, at the price standing, and every
+    /// tick after reads the new count, so everything the engine weights by
+    /// its own capitalisation -- the market factor's loadings, the roster
+    /// beta normalisation, the cap-weighted market P/E -- weights by it.
+    /// The float is not moved; write
+    /// `float_shares` with `set_column` to keep it in step. It consumes no
+    /// draws, and a refused write writes nothing.
+    ///
+    /// Once the counts differ from the ones the engine was built with,
+    /// `state_snapshot` carries them and `state_hash` covers them, so a
+    /// restore weights by what this wrote.
+    fn set_shares_outstanding(&mut self, shares: Vec<f64>) -> PyResult<()> {
+        self.inner
+            .set_shares_outstanding(&shares)
+            .map_err(ValidationError::new_err)?;
+        // Logged once the engine has taken it, so a refused write leaves no
+        // entry a replay would then fail on.
+        self.log.push(crate::python_log::LogEntry::SetSharesOutstanding { shares });
+        Ok(())
+    }
+
     /// Write the `avg_volume` column: one value per instrument, in shares.
     ///
     /// # Why this is the liquidity lever

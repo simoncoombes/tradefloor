@@ -445,11 +445,12 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     the market factor's variance, the volume states, the universe stress, the
     forced-flow budget, the growth term's nominal base, the day's endogenous
     news, the economy in declared order, the central bank and the day
-    counter. After the book come four fields a snapshot carries only when
+    counter. After the book come five fields a snapshot carries only when
     they have moved: the day's label and the valuation's clock where they
     are not the day the counter gives, the fair-value inputs once
-    ``set_fundamentals`` has changed them, and the variance cascade on a
-    model that runs it.
+    ``set_fundamentals`` has changed them, the share counts once
+    ``set_shares_outstanding`` has changed them, and the variance cascade on
+    a model that runs it.
 
     It accepts three keys and does not cover them: ``session_tick``, the
     ticks the day has run, ``state_schema``, the snapshot's layout version,
@@ -533,9 +534,11 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          # shift waiting for its tape row.
          "vix_sets_variance_pending", "macro_pins_today", "pending_fair_value",
          # Carried only where they are not the day the counter gives, once
-         # `set_fundamentals` has moved them, and on a model that runs the
-         # variance cascade. Hashed after the book, each behind its name.
-         "current_day", "elapsed_days", "fundamentals", "garch_cascade",
+         # `set_fundamentals` or `set_shares_outstanding` has moved them, and
+         # on a model that runs the variance cascade. Hashed after the book,
+         # each behind its name.
+         "current_day", "elapsed_days", "fundamentals", "shares_outstanding",
+         "garch_cascade",
          # Carried on an engine built with a population, and hashed last.
          "population",
          # The market's cycle nowcast's generator, only while
@@ -1184,6 +1187,14 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         for i in range(n):
             for column in columns:
                 _f64(buf, column[i])
+    # The share counts, once `set_shares_outstanding` has moved them: every
+    # tick's market cap is the price times the count.
+    if "shares_outstanding" in snapshot:
+        shares = _column(snapshot["shares_outstanding"], n, "shares_outstanding")
+        _text(buf, "shares_outstanding")
+        _u32(buf, n)
+        for value in shares:
+            _f64(buf, value)
     # The variance cascade's components, on a model that runs it,
     # LENGTH-PREFIXED as the engine writes them.
     if "garch_cascade" in snapshot:
@@ -1509,7 +1520,7 @@ _LEDGER_OPTIONAL_BUFFERS = ("fair_value_offset", "opening_z", "pending_fair_valu
                             "idio_variance", "idio_jump_pending",
                             "idio_jump_var_pending", "opening_carry", "dividend",
                             "pending_dividend", "fed_drawdown_returns",
-                            "innovation_day")
+                            "innovation_day", "shares_outstanding")
 
 #: The ``fundamentals`` block's buffers, one per company each.
 _LEDGER_FUNDAMENTALS = ("eps", "book_value_per_share", "revenue_growth")
