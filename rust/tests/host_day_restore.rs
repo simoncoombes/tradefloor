@@ -11,7 +11,7 @@ fn engine(preset: &str) -> Engine {
     engine_on(preset, create_initial_economy_state(&Default::default()))
 }
 
-/// Built as margincall builds one: from an opening it names, with no burn-in.
+/// Built as a host builds one: from an opening it names, with no burn-in.
 fn engine_on(preset: &str, economy: tradefloor::economy::EconomyState) -> Engine {
     let companies = tradefloor::universe::random_universe(12, 5)
         .iter()
