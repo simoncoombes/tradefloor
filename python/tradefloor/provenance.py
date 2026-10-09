@@ -470,6 +470,15 @@ OUT_OF_SCOPE = {
         "reads it, and at 0.0 its part is a branch; fitted with "
         "`futures_vix_live_fast_share`; at 0.0 it is also left out of the "
         "model's digest",
+    # The rate futures (pt-v22 phase 1), inert on every shipped preset. A
+    # rate future reads the policy rate each close sets and the forecast and
+    # draws nothing, so off zero it leaves every price where it was.
+    "futures_rates_listed":
+        "inert at 0.0: `rate_futures_open`, `rate_futures_close_marks` and "
+        "`rate_futures_session_step` in engine/rate_futures.rs return at once "
+        "with the switch off, `Engine::contracts` lists no rate future, "
+        "`Engine::quote` returns None for one, and nothing is snapshotted or "
+        "hashed; at 0.0 it is also left out of the model's digest",
     # The VIX's fear memory (pt-v22 phase 1, the VIX law), inert on every
     # shipped preset.
     "vix_fear_uptake":

@@ -8,9 +8,10 @@
 
 use super::symbol::{ContractSymbol, SymbolKind};
 
-/// What kind of contract this is: index futures (`futures_index_listed`)
-/// and VIX futures (`futures_vix_listed`) so far; the enum is non-exhaustive
-/// so the rate and oil futures and the options of later releases join it.
+/// What kind of contract this is: index futures (`futures_index_listed`),
+/// VIX futures (`futures_vix_listed`) and policy-rate and term-rate futures
+/// (`futures_rates_listed`) so far; the enum is non-exhaustive so the oil
+/// futures and the options of later releases join it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum ContractKind {
@@ -20,6 +21,14 @@ pub enum ContractKind {
     /// A future on the published VIX, cash-settled on the published VIX at
     /// its expiry session's open: the previous close's value.
     VixFuture,
+    /// A future on the policy rate over a 21-session month, the 30-day fed
+    /// funds analogue, cash-settled at the close of the month's last session
+    /// at 100 less the mean of the policy rate the month's closes set.
+    PolicyRateFuture,
+    /// A future on the policy rate compounded over a 63-session quarter, the
+    /// three-month SOFR analogue, cash-settled at the close of the quarter's
+    /// last session.
+    TermRateFuture,
 }
 
 impl ContractKind {
@@ -28,13 +37,18 @@ impl ContractKind {
         match self {
             ContractKind::IndexFuture => "IDX",
             ContractKind::VixFuture => "VIX",
+            ContractKind::PolicyRateFuture => "FF",
+            ContractKind::TermRateFuture => "TR3",
         }
     }
 
     /// Whether this is a future (rather than an option).
     pub fn is_future(self) -> bool {
         match self {
-            ContractKind::IndexFuture | ContractKind::VixFuture => true,
+            ContractKind::IndexFuture
+            | ContractKind::VixFuture
+            | ContractKind::PolicyRateFuture
+            | ContractKind::TermRateFuture => true,
         }
     }
 
@@ -52,6 +66,8 @@ impl ContractKind {
         match self {
             ContractKind::IndexFuture => SettlementRule::OpeningPrintIndex,
             ContractKind::VixFuture => SettlementRule::PublishedVixAtOpen,
+            ContractKind::PolicyRateFuture => SettlementRule::AveragePolicyRateAtClose,
+            ContractKind::TermRateFuture => SettlementRule::CompoundedPolicyRateAtClose,
         }
     }
 }
@@ -68,6 +84,13 @@ pub enum SettlementRule {
     /// In cash, on the published VIX at the expiry session's open, which is
     /// the previous close's value: the VIX moves only at a close.
     PublishedVixAtOpen,
+    /// In cash, at the close of the period's last session, at 100 less the
+    /// mean of the policy rate (per cent) each of the period's closes set.
+    AveragePolicyRateAtClose,
+    /// In cash, at the close of the period's last session, at 100 less the
+    /// policy rate each of the period's closes set, compounded a session at
+    /// a time (`1 + r / 25200`) and quoted as a simple rate over the period.
+    CompoundedPolicyRateAtClose,
 }
 
 impl SettlementRule {
@@ -76,6 +99,8 @@ impl SettlementRule {
         match self {
             SettlementRule::OpeningPrintIndex => "opening_print_index",
             SettlementRule::PublishedVixAtOpen => "published_vix_at_open",
+            SettlementRule::AveragePolicyRateAtClose => "average_policy_rate_at_close",
+            SettlementRule::CompoundedPolicyRateAtClose => "compounded_policy_rate_at_close",
         }
     }
 }
@@ -92,7 +117,8 @@ pub struct ContractSpec {
     /// The underlying's root: `IDX` for the price index.
     pub root: String,
     /// The session it expires at, counted from 0 as the engine's elapsed
-    /// sessions are; it settles at that session's open.
+    /// sessions are: an index or VIX future settles at that session's open,
+    /// a rate future at its close, the last of its period.
     pub expiry: i64,
     /// The session from which the next contract is the front by the roll
     /// rule: [`super::calendar::ROLL_SESSIONS`] before the expiry.
@@ -118,6 +144,13 @@ pub struct ContractSpec {
 /// `premium`, `loading`), `price` is `fair` plus the mark of agents' own
 /// flow, `index` is the VIX the price reads (the live VIX in a session, the
 /// published VIX outside one), and `rate` and `dividends` are 0.
+///
+/// For a rate future: `fair` is 100 less the period's expected rate and the
+/// premium, `expected` the period's rate (per cent) as the closes so far set
+/// it and the forecast expects the rest, `premium` the premium in rate
+/// points, `index` the policy rate now (per cent), `rate` the expected
+/// rate as a fraction, `basis_bp` the mark of agents' flow in rate basis
+/// points, and `dividends` 0; `loading` is None.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct Quote {
@@ -181,7 +214,8 @@ pub struct Settlement {
     pub value: f64,
     /// What it settles on: for an index future, the index of the expiry
     /// session's opening prints; for a VIX future, the published VIX at the
-    /// expiry session's open. `value` is set from it, so the two agree.
+    /// expiry session's open; for a rate future, 100 less the period's
+    /// realised rate. `value` is set from it, so the two agree.
     pub reference: f64,
 }
 
@@ -340,6 +374,91 @@ pub const VIX_FUTURE: VixFutureSpec = VixFutureSpec {
     impact_half_life: 30.0,
     premium: VixPremium { centre: 19.3197, k: 0.26, p: 0.4925, beta: 0.36, tau: 148.0 },
 };
+
+/// The rate futures' premium over the expected rate, frozen: fitted once,
+/// weighted by their standard errors, to the fed funds futures' excess
+/// returns (the free 2000-2026 front-month reading of 1.28 bp at one month;
+/// Piazzesi and Swanson, Journal of Monetary Economics 55(4), 2008, Table 1,
+/// 6.3, 10.5, 16.1, 23.2 and 30.7 bp at two to six months), and to no row of
+/// the model's. For a contract `h` sessions from its last close, `k (h /
+/// 21)^p` basis points, held at its value at `cap` sessions beyond: no
+/// figure past six months was verified.
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
+pub struct RatePremium {
+    pub k: f64,
+    pub p: f64,
+    pub cap: f64,
+}
+
+impl RatePremium {
+    /// The premium `h` sessions from the last close, in rate points.
+    pub fn at(&self, h: f64) -> f64 {
+        if h <= 0.0 {
+            return 0.0;
+        }
+        let h = crate::mathx::min(h, self.cap);
+        self.k * crate::mathx::pow(h / 21.0, self.p) / 100.0
+    }
+}
+
+/// The rate futures' premium.
+pub const RATE_PREMIUM: RatePremium = RatePremium { k: 1.5956, p: 1.683, cap: 126.0 };
+
+/// A rate future's specification: constants of the contract, not dials.
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
+pub struct RateFutureSpec {
+    /// Dollars per price point: CME ZQ's $41.67 a basis point, SR3's $25.
+    pub multiplier: f64,
+    /// The price grid: a quarter of a basis point.
+    pub tick: f64,
+    /// The daily volume each listed contract's maker ladder is sized to, in
+    /// listing order: stated, not measured.
+    pub daily_volume: &'static [f64],
+    /// The maker's levels a side, one tick apart, and each level's size as a
+    /// share of the daily volume.
+    pub maker_levels: usize,
+    pub maker_level_share: f64,
+    /// A contract's daily sd in price points, the scale of its flow's mark.
+    pub daily_sigma: f64,
+    /// Agents' net taker flow against the house moves the price by this
+    /// times `daily_sigma` times the flow over the daily volume; the mark
+    /// decays at `impact_half_life` steps.
+    pub impact_coefficient: f64,
+    pub impact_half_life: f64,
+}
+
+/// The policy-rate future's specification (thirteen listed).
+pub const POLICY_RATE_FUTURE: RateFutureSpec = RateFutureSpec {
+    multiplier: 4167.0,
+    tick: 0.0025,
+    daily_volume: &[100_000.0, 80_000.0, 60_000.0, 40_000.0, 25_000.0, 15_000.0, 10_000.0, 6_000.0,
+                    4_000.0, 3_000.0, 2_000.0, 1_500.0, 1_000.0],
+    maker_levels: 10,
+    maker_level_share: 0.003,
+    daily_sigma: 0.015,
+    impact_coefficient: 0.15,
+    impact_half_life: 30.0,
+};
+
+/// The term-rate future's specification (eight listed).
+pub const TERM_RATE_FUTURE: RateFutureSpec = RateFutureSpec {
+    multiplier: 2500.0,
+    tick: 0.0025,
+    daily_volume: &[300_000.0, 300_000.0, 250_000.0, 200_000.0, 150_000.0, 100_000.0, 80_000.0, 60_000.0],
+    maker_levels: 10,
+    maker_level_share: 0.003,
+    daily_sigma: 0.05,
+    impact_coefficient: 0.15,
+    impact_half_life: 30.0,
+};
+
+/// The symbol of the rate future of kind `kind` whose period ends at session
+/// `expiry`.
+pub fn rate_future_symbol(kind: ContractKind, expiry: i64) -> String {
+    ContractSymbol { root: kind.root().to_string(), expiry, kind: SymbolKind::Future }.to_string()
+}
 
 /// The symbol of the VIX future expiring at session `expiry`.
 pub fn vix_future_symbol(expiry: i64) -> String {

@@ -4044,6 +4044,80 @@ fewer sessions, and less steeply, than CFE's.
 On 40 names the VIX futures add under 1 per cent to the time of a session
 with the three switches above on.
 
+## Rate futures
+
+`futures_rates_listed` lists policy-rate and term-rate futures. It is 0.0
+on every shipped preset and left out of the model's digest there. A rate
+future reads the policy rate each close sets and the forecast, and draws
+nothing, so an untraded run with it on prints the stock prices, closes and
+economy of the run without it, with every other phase 1 contract on as
+well, across settlements and a pin, and a run whose agents trade rate
+futures prints the stocks of a run nobody trades
+(`tests/test_rate_futures.py`, seeds 3, 17, 101 and 9001 of pt-v21).
+
+A policy-rate future (`FF`, the 30-day fed funds analogue) is on a model
+month, the 21 sessions $21j$ to $21j + 20$; a term-rate future (`TR3`, the
+three-month SOFR analogue) on a model quarter, $63q$ to $63q + 62$. Each is
+named by its period's last session (`FF.F0020`), trades through it, and
+settles at its close, in cash, at 100 less the period's rate: for `FF` the
+mean of the policy rate (per cent) each of the period's closes sets, for
+`TR3` those rates compounded a close at a time,
+$\prod (1 + r/25200) - 1$, quoted as a simple annual rate over the
+period's sessions (RF3, to 1e-9). The month in progress and the next twelve
+are listed, and the quarter in progress and the next seven, from the first
+close. `FF` is $4,167 a price point and `TR3` $2,500, both on a grid of a
+quarter of a basis point.
+
+A contract is priced at
+
+$$F = 100 - R - \tau(h)$$
+
+where $R$ is the period's rate with each close already made at the rate it
+set and each close to come at the rate the forecast expects it to set
+(`forecast_horizon_sessions`; past the forecast's horizon its last rate;
+without a forecast the policy rate now), and $h$ the sessions from now to
+the period's last close, a session having used $k/390$ of itself after $k$
+ticks. The premium is frozen in `derivatives::RATE_PREMIUM`, fitted once,
+weighted by their standard errors, to the fed funds futures' excess returns
+and to nothing the model prints: $\tau(h) = 1.5956\,(h/21)^{1.683}$ basis
+points, through the free 2000 to 2026 front-month reading of 1.28 bp at one
+month and Piazzesi and Swanson's 6.3, 10.5, 16.1, 23.2 and 30.7 bp at two
+to six months, every point within 0.63 of its standard error, and held at
+its six-month value of 32.6 bp beyond, where no figure was verified. A
+contract holds its price through a session but for the premium's roll,
+since the policy rate moves only at a close, and a pin moves it at once.
+Each quotes a maker's ladder ten levels a side one tick apart, sized to a
+stated daily volume (100,000 contracts for the front `FF`, falling to 1,000
+for the thirteenth; 300,000 to 60,000 for `TR3`), with no latent depth;
+agents' flow marks the price and decays at a half-life of 30 steps. Rate
+futures trade in the session only. The cash-settled 10-year note future the
+plan made optional is not built.
+
+`Engine.forecast()["next_meeting"]` names the session whose close holds the
+next scheduled meeting, as the forecast's policy path reads it: on 1,500
+sessions of pt-v21 every change in the policy rate fell on the session the
+previous close named, and the meetings fell about 33 sessions apart.
+
+On 24 fresh histories of 1,500 sessions (seeds 8301 to 8324, the forecast's
+derived dials as `forecast_dials.py derive` gives them), read as
+the registered criteria read them, after the first year:
+
+| Row | Model | Band |
+|---|---|---|
+| RF1, future's rate less the realised, 1 month, bp | 1.72 (se 0.17) | -0.07 to 2.62 |
+| RF1, 3 months | 10.7 (0.6) | 3.5 to 17.5 |
+| RF1, 6 months | 33.3 (1.2) | 8.0 to 53.4 |
+| RF1, 12 months, reported | 34.1 (2.1) | none |
+| RF2, RMS daily change on meeting sessions over others | 6.52 | 1.06 to 3.32 |
+| RF4, eight-quarter strip less the 2-year yield, bp | -6.8 | -160.3 to 70.6 |
+
+RF2 is out of band: between meetings the forecast's policy path barely
+moves, since the published data the shadow reads change slowly and the
+meeting ladder is discrete, so the front contract is near still on the
+27,661 other sessions and moves on the 851 meeting sessions themselves. It is the
+policy law's and the forecast's, not the futures': the futures price what
+the forecast expects.
+
 ## Scenarios
 
 A scenario is a file of changes to the economy or the market, applied once

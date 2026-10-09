@@ -604,6 +604,7 @@ impl Engine {
             None => format!("{agent}-{symbol}-{}", self.vix_futures.book.sequence),
         };
         if self.vix_futures.book.orders.iter().any(|o| o.id == id)
+            || self.rate_futures_orders().iter().any(|o| o.id == id)
             || self.futures.book.orders.iter().any(|o| o.id == id)
             || self.book.orders.iter().any(|o| o.id == id)
         {
