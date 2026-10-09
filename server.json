@@ -8,19 +8,19 @@
     "source": "github"
   },
   "websiteUrl": "https://docs.tradefloor.dev/mcp-local.html",
-  "version": "0.10.1",
+  "version": "0.10.2",
   "packages": [
     {
       "registryType": "pypi",
       "registryBaseUrl": "https://pypi.org",
       "identifier": "tradefloor",
-      "version": "0.10.1",
+      "version": "0.10.2",
       "runtimeHint": "uvx",
       "runtimeArguments": [
         {
           "type": "named",
           "name": "--with",
-          "value": "tradefloor[mcp]==0.10.1",
+          "value": "tradefloor[mcp]==0.10.2",
           "description": "Install the MCP extra at the same version."
         }
       ],
