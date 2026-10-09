@@ -134,8 +134,10 @@ def test_a_snapshot_missing_a_central_bank_field_is_refused_by_name():
 
 def _top_level_keys():
     # Without the version, which a snapshot written before it was recorded
-    # also lacks: that case is the legacy rule's, below.
-    return sorted(set(_mid_day().state_snapshot()) - {"state_schema"})
+    # also lacks: that case is the legacy rule's, below. And without the
+    # derived VIX anchor, which a snapshot written before #268 lacks: that
+    # case is the next test's.
+    return sorted(set(_mid_day().state_snapshot()) - {"state_schema", "vix_anchor"})
 
 
 @pytest.mark.parametrize("key", _top_level_keys())
@@ -144,6 +146,15 @@ def test_a_snapshot_missing_any_top_level_key_is_refused_by_name(key):
     del snapshot[key]
     with pytest.raises(tf.ValidationError, match=key):
         _engine().restore_state(snapshot)
+
+
+def test_a_snapshot_without_the_derived_vix_anchor_restores_with_the_engines_own():
+    """A snapshot from before #268 carries no anchor; the restore keeps the
+    one the engine derived, which is what every restore read until then."""
+    snapshot = _mid_day().state_snapshot()
+    assert "vix_anchor" in snapshot
+    del snapshot["vix_anchor"]
+    _engine().restore_state(snapshot)
 
 
 @pytest.mark.parametrize("where", ["top", "economy", "central_bank", "columns"])

@@ -185,6 +185,23 @@ same with them on as off.
   their dials, and the state hash and `manifest.state_hash` cover them only
   then. Every known-answer digest is where it was.
 
+### Share counts from the host
+
+- `Engine::set_shares_outstanding` and `Engine::shares_outstanding` are new
+  (#274), in Python `Engine.set_shares_outstanding(shares)` and
+  `Engine.shares_outstanding()`. A host whose companies buy back stock or
+  issue it writes the counts, one for each company in roster order, each
+  finite and above 0. Each market cap is reset to the current price times
+  the new count, so the market factor's loadings, the beta normalisation
+  and the cap-weighted P/E all read the host's counts.
+  The listed index keeps its level across the write. Writing the counts
+  draws no random numbers, the order log records the write, and `replay`
+  and `explain` apply it again.
+- A snapshot carries the counts as `shares_outstanding`, and the state hash
+  covers them, only once they differ from the ones each company was built
+  or listed with. Saves and hashes from an engine that never had its counts
+  written are unchanged.
+
 ### Dividends in sessions
 
 - MCP sessions never called `Portfolio.collect_dividends` (#260). Every
@@ -192,6 +209,21 @@ same with them on as off.
   environment and the TCA run) already did.
 - RELEASING.md said the traded known answer runs on pt-v20 (#261). From
   0.10.0 it runs on the default preset, pt-v21.
+
+### A restore onto a rebuilt engine
+
+- A host that rebuilds its engine on the day's companies and restores a
+  snapshot onto it now continues bit for bit (#268). Under
+  `vix_level_identity` (pt-v19 and later) the VIX's anchor is derived from
+  the roster the engine is built on, and a snapshot did not carry it, so an
+  engine rebuilt on a later day's market capitalisations derived another
+  anchor and its VIX parted from the original's at the sixth significant
+  figure. A snapshot now carries `vix_anchor` under the identity, and a
+  restore reads it. A snapshot without it, from before this, still
+  restores, onto the anchor the engine derived.
+- The state hash and `manifest.state_hash` do not cover `vix_anchor`, as
+  they do not cover `session_tick`, so every leaf and known-answer digest is
+  where it was.
 
 ### Host input for the VIX target
 

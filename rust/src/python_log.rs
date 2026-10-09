@@ -103,6 +103,13 @@ pub enum LogEntry {
         book_value_per_share: Vec<f64>,
         revenue_growth: Vec<f64>,
     },
+    /// Every company's share count, as `Engine.set_shares_outstanding`
+    /// wrote it, in roster order. An input for the reason `SetFundamentals`
+    /// is: nothing in the engine writes the counts back, and a replay that
+    /// did not carry them rebuilt the market on its original counts.
+    SetSharesOutstanding {
+        shares: Vec<f64>,
+    },
     /// The host's premium on the VIX target, as
     /// `Engine.set_vix_target_premium` wrote it. An input for the reason
     /// `SetFundamentals` is: nothing in the engine writes it, and the VIX
@@ -318,6 +325,10 @@ impl LogEntry {
                 d.set_item("eps", absent(eps))?;
                 d.set_item("book_value_per_share", absent(book_value_per_share))?;
                 d.set_item("revenue_growth", absent(revenue_growth))?;
+            }
+            LogEntry::SetSharesOutstanding { shares } => {
+                d.set_item("op", "set_shares_outstanding")?;
+                d.set_item("shares", shares.to_vec())?;
             }
             LogEntry::SetVixTargetPremium { points, half_life_sessions } => {
                 d.set_item("op", "set_vix_target_premium")?;

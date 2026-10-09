@@ -1473,6 +1473,8 @@ def _replay_inputs(engine: Engine, inputs: Sequence[dict],
             engine.set_fundamentals(
                 *([float("nan") if v is None else v for v in entry[k]]
                   for k in ("eps", "book_value_per_share", "revenue_growth")))
+        elif op == "set_shares_outstanding":
+            engine.set_shares_outstanding(entry["shares"])
         elif op == "set_vix_target_premium":
             engine.set_vix_target_premium(float(entry["points"]),
                                           float(entry["half_life_sessions"]))
