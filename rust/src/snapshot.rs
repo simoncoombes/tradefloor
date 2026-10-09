@@ -1484,6 +1484,13 @@ impl Engine {
         out.put("forced_flow_spent", V::Float(self.forced_flow_spent()));
         out.put("market_vol_log_level", V::Float(self.market_vol_log_level()));
         out.put("vix_log_level", V::Float(self.vix_log_level()));
+        // The derived anchor (`vix_level_identity`): a constant of the run,
+        // but derived from the roster the engine was BUILT on, so an engine
+        // rebuilt on a later day's roster derives another one. Carried so a
+        // restore reads the run's own (#268).
+        if p.vix_level_identity != 0.0 {
+            out.put("vix_anchor", V::Float(self.vix_anchor()));
+        }
         // Only where the hash covers it: the memory moves only with
         // `vix_anchor_memory` nonzero.
         if p.vix_anchor_memory != 0.0 {
@@ -1942,6 +1949,17 @@ impl Engine {
         );
         let gated = [
             Gated::dial("vix_anchor_slow", "vix_anchor_memory", p.vix_anchor_memory),
+            // Optional where wanted: a snapshot from before #268 has none.
+            Gated {
+                key: "vix_anchor",
+                wanted: p.vix_level_identity != 0.0,
+                held: true,
+                why: format!(
+                    "vix_level_identity is not 0, and this engine's \
+                     vix_level_identity is {}",
+                    p.vix_level_identity
+                ),
+            },
             Gated::when("fair_value_offset", fair_value, fair_value_why.clone()),
             Gated::when("opening_z", fair_value, fair_value_why),
             Gated::when(
@@ -2430,6 +2448,18 @@ impl Engine {
         inner.set_vix_log_level(read_finite(snapshot, "", "vix_log_level")?);
         if inner.params().vix_anchor_memory != 0.0 {
             inner.set_vix_anchor_slow(read_finite(snapshot, "", "vix_anchor_slow")?);
+        }
+        // A snapshot from before the anchor was carried keeps the one this
+        // engine derived, which is what every restore read until then.
+        if snapshot.get("vix_anchor").is_some() {
+            let anchor = read_finite(snapshot, "", "vix_anchor")?;
+            if !(anchor > 0.0) {
+                return Err(SnapshotError::new(
+                    SnapshotErrorKind::Fields,
+                    format!("snapshot field vix_anchor must be above 0, got {anchor}"),
+                ));
+            }
+            inner.set_vix_anchor(anchor);
         }
         // The cycle's volatility multiplier (`market_vol_cycle_ratio`), unset
         // where the snapshot carries none: taken before the first close set
