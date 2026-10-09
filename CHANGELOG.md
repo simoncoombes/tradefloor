@@ -193,7 +193,7 @@ same with them on as off.
   issue it writes the counts, one for each company in roster order, each
   finite and above 0. Each market cap is reset to the current price times
   the new count, so the market factor's loadings, the beta normalisation
-  and the cap-weighted P/E use the new counts rather than the opening ones.
+  and the cap-weighted P/E all read the host's counts.
   The listed index keeps its level across the write. Writing the counts
   draws no random numbers, the order log records the write, and `replay`
   and `explain` apply it again.
