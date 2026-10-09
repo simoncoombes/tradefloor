@@ -1881,6 +1881,8 @@ def external_flow(
     macro_steps: int | None = None,
     macro_shock_loads: Iterable[float] = (),
     off_session_ticks: int = 0,
+    vix_target_premiums: Iterable[float] = (),
+    vix_target_floor_sessions: int = 0,
     preset: str | None = None,
 ) -> Verdict:
     """Is the news and shock flow a caller adds inside the flow the preset
@@ -1903,6 +1905,11 @@ def external_flow(
     carried active economic shocks, the sum of `gdp_impact * severity` over
     them. `off_session_ticks` counts the `Engine.tick` calls made outside
     09:30 to 16:00 on a weekday, pre-market or after-hours.
+    `vix_target_premiums` are the changes, in VIX points, each
+    `Engine.set_vix_target_premium` made to the premium standing, and
+    `vix_target_floor_sessions` counts the sessions closed with a floor set
+    by `Engine.set_vix_target_floor`; the preset is fitted with neither, so
+    any is outside.
 
     Each move list is signed. Its squares give the channel's variance and
     its sum the drift it adds to fair value: the fitted news has mean zero,
@@ -1932,6 +1939,11 @@ def external_flow(
         raise ValidationError(
             f"off_session_ticks must be a non-negative integer, got "
             f"{off_session_ticks!r}")
+    if (int(vix_target_floor_sessions) != vix_target_floor_sessions
+            or vix_target_floor_sessions < 0):
+        raise ValidationError(
+            f"vix_target_floor_sessions must be a non-negative integer, got "
+            f"{vix_target_floor_sessions!r}")
     def tally(moves: Iterable[float], what: str) -> tuple[int, float, float]:
         xs = [float(x) for x in moves]
         if any(not math.isfinite(x) for x in xs):
@@ -1946,7 +1958,11 @@ def external_flow(
     if any(not math.isfinite(x) for x in vix):
         raise ValidationError("vix_writes holds a value that is not finite")
     vix = [x for x in vix if x != 0.0]
-    loads = [abs(float(x)) for x in macro_shock_loads]
+    premiums = [abs(float(x)) for x in vix_target_premiums]
+    if any(not math.isfinite(x) for x in premiums):
+        raise ValidationError("vix_target_premiums holds a value that is not finite")
+    premiums = [x for x in premiums if x != 0.0]
+    loads =[abs(float(x)) for x in macro_shock_loads]
     steps = sessions if macro_steps is None else int(macro_steps)
     if steps < len(loads):
         raise ValidationError(
@@ -1964,6 +1980,9 @@ def external_flow(
         "macro_shock_load": ordered_sum(loads),
         "company_sum": c_sum, "sector_sum": s_sum, "market_sum": m_sum,
         "fundamental_sum": f_sum, "off_session_ticks": int(off_session_ticks),
+        "vix_target_writes": len(premiums),
+        "vix_target_write_abs": ordered_sum(premiums),
+        "vix_target_floor_sessions": int(vix_target_floor_sessions),
     }, preset)
     fit = CALIBRATED_FLOW[preset]
     summary = (
@@ -1983,6 +2002,12 @@ def external_flow(
         f"revisions by {100 * a['fundamental_drift']:+.1f}%, and it ran "
         f"{a['off_session_ticks_per_session']:.0f} ticks a session outside "
         f"the regular session")
+    if premiums or vix_target_floor_sessions:
+        summary += (
+            f"; it wrote {a['vix_target_per_session']:.2f} points of VIX "
+            f"target premium a session and closed "
+            f"{100 * a['vix_target_floor_share']:.0f}% of its sessions under a "
+            f"VIX target floor")
     findings = tuple(a["findings"])
     if findings:
         reasons = tuple(findings) + (

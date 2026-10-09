@@ -32,6 +32,8 @@ _OPS = frozenset({
     # The day's label, moved between an open and its close (`set_day`).
     "set_day",
     "set_avg_volume", "set_fundamentals", "list_instrument", "delist",
+    # The host's input to the VIX target.
+    "set_vix_target_premium", "set_vix_target_floor",
     "draw_uniform", "draw_normal", "record",
     # Agents' orders against the book, and the collection of what they
     # produced.
@@ -192,6 +194,10 @@ def apply_log(
             engine.set_fundamentals(
                 *([float("nan") if v is None else v for v in entry[k]]
                   for k in ("eps", "book_value_per_share", "revenue_growth")))
+        elif op == "set_vix_target_premium":
+            engine.set_vix_target_premium(entry["points"], entry["half_life_sessions"])
+        elif op == "set_vix_target_floor":
+            engine.set_vix_target_floor(entry["floor"])
         elif op == "tick":
             engine.tick(
                 entry["hour"], entry["minute"], entry["day_of_week"],

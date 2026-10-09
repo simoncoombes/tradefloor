@@ -529,6 +529,10 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          # `set_fundamentals` has moved them, and on a model that runs the
          # variance cascade. Hashed after the book, each behind its name.
          "current_day", "elapsed_days", "fundamentals", "garch_cascade",
+         # The host's input to the VIX target while it stands
+         # (`set_vix_target_premium`, `set_vix_target_floor`), hashed after
+         # the fundamentals, each behind its name.
+         "vix_target_premium", "vix_target_floor",
          # Carried on an engine built with a population, and hashed last.
          "population",
          # The market's cycle nowcast's generator, only while
@@ -1337,6 +1341,20 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         for i in range(n):
             for column in columns:
                 _f64(buf, column[i])
+    # The host's input to the VIX target, while it stands: the premium and
+    # its half-life, then the floor, each behind its name.
+    if "vix_target_premium" in snapshot:
+        block = snapshot["vix_target_premium"]
+        if not isinstance(block, dict) or set(block) != {"points", "half_life"}:
+            raise ValidationError(
+                "this snapshot's vix_target_premium is not the points and "
+                "half_life the state hash covers.")
+        _text(buf, "vix_target_premium")
+        _f64(buf, block["points"])
+        _f64(buf, block["half_life"])
+    if "vix_target_floor" in snapshot:
+        _text(buf, "vix_target_floor")
+        _f64(buf, snapshot["vix_target_floor"])
     # The variance cascade's components, on a model that runs it,
     # LENGTH-PREFIXED as the engine writes them.
     if "garch_cascade" in snapshot:

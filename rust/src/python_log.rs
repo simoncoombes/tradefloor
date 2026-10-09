@@ -103,6 +103,19 @@ pub enum LogEntry {
         book_value_per_share: Vec<f64>,
         revenue_growth: Vec<f64>,
     },
+    /// The host's premium on the VIX target, as
+    /// `Engine.set_vix_target_premium` wrote it. An input for the reason
+    /// `SetFundamentals` is: nothing in the engine writes it, and the VIX
+    /// reverts toward the target it raises.
+    SetVixTargetPremium {
+        points: f64,
+        half_life_sessions: f64,
+    },
+    /// The host's floor under the VIX target (`Engine.set_vix_target_floor`),
+    /// `None` to clear it.
+    SetVixTargetFloor {
+        floor: Option<f64>,
+    },
     ListInstrument {
         ticker: String,
         sector: String,
@@ -305,6 +318,15 @@ impl LogEntry {
                 d.set_item("eps", absent(eps))?;
                 d.set_item("book_value_per_share", absent(book_value_per_share))?;
                 d.set_item("revenue_growth", absent(revenue_growth))?;
+            }
+            LogEntry::SetVixTargetPremium { points, half_life_sessions } => {
+                d.set_item("op", "set_vix_target_premium")?;
+                d.set_item("points", points)?;
+                d.set_item("half_life_sessions", half_life_sessions)?;
+            }
+            LogEntry::SetVixTargetFloor { floor } => {
+                d.set_item("op", "set_vix_target_floor")?;
+                d.set_item("floor", floor)?;
             }
             LogEntry::Delist { index } => {
                 d.set_item("op", "delist")?;

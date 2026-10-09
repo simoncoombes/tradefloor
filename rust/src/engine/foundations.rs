@@ -729,6 +729,15 @@ impl Engine {
         let mut slow = self.vix_anchor_slow;
         let mut stress = self.vix_stress_memory;
         let mut fear = self.vix_fear;
+        // The host's premium on the VIX target, which the next close reads
+        // as it stands, fading on its half-life a close at a time; the floor
+        // is held (`daily_inputs` carries it).
+        let mut premium = self.vix_target_premium;
+        let premium_fade = if self.vix_target_premium_half_life != 0.0 {
+            crate::mathx::pow(0.5, 1.0 / self.vix_target_premium_half_life)
+        } else {
+            1.0
+        };
         let mut universe_stress = self.universe_stress;
         let mut down = Some(self.market_vol.prev_day_down());
         let (mut var_oil, mut var_inventory) = (0.0, 0.0);
@@ -903,6 +912,13 @@ impl Engine {
             };
             let mut inputs = self.daily_inputs(&request, 0.0, v_next, slow, scale_bar);
             inputs.vix_anchor_level = self.vix_anchor * scale_bar;
+            inputs.vix_target_premium = premium;
+            if premium != 0.0 {
+                premium *= premium_fade;
+                if premium.abs() < crate::engine::VIX_TARGET_PREMIUM_CLEARED_UNDER {
+                    premium = 0.0;
+                }
+            }
             inputs.vix_implied_from_market = if p.vix_level_identity != 0.0 {
                 implied
             } else if p.vix_realised_vol_weight == 0.0 {

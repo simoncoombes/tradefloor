@@ -161,6 +161,12 @@ pub struct DailyInputs<'a> {
     /// The VIX's fear memory in log units, already advanced to today by the
     /// engine ([`advance_vix_fear`]).
     pub vix_fear: f64,
+    /// The host's premium on the VIX target in points
+    /// (`Engine::set_vix_target_premium`). 0.0 adds no term.
+    pub vix_target_premium: f64,
+    /// The host's floor under the VIX target
+    /// (`Engine::set_vix_target_floor`). `None` applies none.
+    pub vix_target_floor: Option<f64>,
     /// See [`crate::params::ModelParams::vix_jump_intensity`]. 0.0 takes
     /// no draws and reproduces the shipped schedule exactly.
     pub vix_jump_intensity: f64,
@@ -492,6 +498,8 @@ impl<'a> Default for DailyInputs<'a> {
             vix_anchor_slow: 0.0,
             vix_fear_uptake: 0.0,
             vix_fear: 0.0,
+            vix_target_premium: 0.0,
+            vix_target_floor: None,
             vix_jump_intensity: 0.0,
             vix_jump_scale: 0.0,
             vix_return_gain: VIX_RETURN_GAIN,
@@ -984,10 +992,15 @@ pub fn vix_close(
         inputs.vix_return_level_exponent_up, economy.vix);
     let inflation_adj = mathx::max(0.0, (economy.inflation_rate - 3.0) * 0.2);
     let shock_adj = shock_gdp_impact.abs() * 2.0;
-    target_vix += mathx::min(
-        inputs.vix_target_shock_cap,
-        return_spike + inflation_adj + shock_adj,
-    );
+    // THE HOST'S PREMIUM (`Engine::set_vix_target_premium`): fear the macro
+    // model does not carry, beside the shock term and inside the same cap.
+    // Guarded, so with none standing the sum is the expression that stood.
+    let excursion = if inputs.vix_target_premium != 0.0 {
+        return_spike + inflation_adj + shock_adj + inputs.vix_target_premium
+    } else {
+        return_spike + inflation_adj + shock_adj
+    };
+    target_vix += mathx::min(inputs.vix_target_shock_cap, excursion);
 
     // THE EXCURSION'S OWN MEAN, which is what the offset was for.
     //
@@ -1044,6 +1057,16 @@ pub fn vix_close(
     if !identity_level && inputs.vix_realised_vol_weight != 0.0 {
         let w = inputs.vix_realised_vol_weight;
         target_vix = (1.0 - w) * target_vix + w * inputs.vix_implied_from_market;
+    }
+
+    // THE HOST'S FLOOR (`Engine::set_vix_target_floor`), on the target once
+    // it is complete, so the reversion below picks its rate against the
+    // floored target. A comparison, not a max: unfloored, or with the
+    // target above the floor, the target is the f64 it was.
+    if let Some(floor) = inputs.vix_target_floor {
+        if target_vix < floor {
+            target_vix = floor;
+        }
     }
 
     // Asymmetric reversion: fear arrives at the full rate and decays at
