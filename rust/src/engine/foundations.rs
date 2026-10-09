@@ -598,6 +598,29 @@ impl Engine {
     /// date and then at the mean of the ladder's normal cadence. The ladder
     /// is discrete, so these three are a projection fitted on the model's own
     /// held-out histories rather than an iteration of its law.
+    /// The day count the next scheduled meeting is held at, for a forecast
+    /// taken for `day`: the first close whose timestamp reaches the date on
+    /// the calendar, and no earlier than `day + 1`. Its decision is the rate
+    /// the close of session `first - 1` sets.
+    fn next_meeting_day(&self, day: i64) -> i64 {
+        let minutes = 24 * 60;
+        let next = self.central_bank.next_meeting_date;
+        let first = if next <= 0 { day + 1 } else { (next + minutes - 1) / minutes };
+        if first < day + 1 {
+            day + 1
+        } else {
+            first
+        }
+    }
+
+    /// The session, counted from 0, whose close holds the next scheduled
+    /// meeting, as the standing forecast's policy path reads it: `None`
+    /// without a forecast (`forecast_horizon_sessions`).
+    pub fn next_meeting_session(&self) -> Option<i64> {
+        let f = self.forecast()?;
+        Some(self.next_meeting_day(f.day) - 1)
+    }
+
     fn forecast_policy_path(&self, day: i64, horizon: usize) -> Vec<f64> {
         let p = &self.params;
         let r0 = self.economy.federal_funds_rate;
@@ -610,12 +633,7 @@ impl Engine {
         };
         let options = self.policy_options(false);
         let shadow = self.shadow_meeting_change(&request, &options);
-        // The close a meeting is held at is the first whose timestamp
-        // reaches the date on the calendar.
-        let minutes = 24 * 60;
-        let next = self.central_bank.next_meeting_date;
-        let first = if next <= 0 { day + 1 } else { (next + minutes - 1) / minutes };
-        let first = if first < day + 1 { day + 1 } else { first };
+        let first = self.next_meeting_day(day);
         // The normal cadence is 42 to 55 calendar days, uniform.
         let cal = self.macro_calendar();
         let mut cadence = 0.0;

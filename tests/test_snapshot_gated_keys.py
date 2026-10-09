@@ -168,6 +168,8 @@ CASES = {
     "vix_fear": (dict(vix_fear_uptake=0.2, vix_fear_half_life=20.0), ("vix_fear",), (), (), {}),
     # The VIX futures, carried whenever their switch is set.
     "vix_futures": (dict(forecast_horizon_sessions=126.0, futures_vix_listed=1.0), ("vix_futures",), (), (), {}),
+    # The rate futures, carried whenever their switch is set.
+    "rate_futures": (dict(futures_rates_listed=1.0), ("rate_futures",), (), (), {}),
     "every_r21_dial": (dict(EVERY_R21_DIAL, **MACRO),
                        ("market_vol_leverage_memory", "vix_stress_memory",
                         "cycle_nowcast_rng", "fed_stress_vix_max", "fed_stress_hold_age",

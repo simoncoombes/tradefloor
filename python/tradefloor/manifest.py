@@ -571,6 +571,9 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          # The VIX futures, only while `futures_vix_listed` is set, and
          # their book once an agent has traded one.
          "vix_futures", "vix_futures_book",
+         # The rate futures, only while `futures_rates_listed` is set, and
+         # their book once an agent has traded one.
+         "rate_futures", "rate_futures_book",
          # The dividend states, on a model that pays dividends, and an
          # ex-date's move in `s` waiting for its tape row.
          "dividend", "pending_dividend",
@@ -988,6 +991,23 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     if "vix_futures_book" in snapshot:
         _f64(buf, 49.0)
         _book(buf, snapshot["vix_futures_book"])
+    # The rate futures, only while `futures_rates_listed` is set, behind their
+    # own tag, length-prefixed; their book behind another once an agent has
+    # traded one.
+    if "rate_futures" in snapshot:
+        raw = snapshot["rate_futures"]
+        if len(raw) % 8:
+            raise ValidationError(
+                f"snapshot field 'rate_futures' carries {len(raw)} bytes, which "
+                "is not a whole number of f64s.")
+        values = _column(raw, len(raw) // 8, "rate_futures")
+        _f64(buf, 50.0)
+        _u32(buf, len(values))
+        for value in values:
+            _f64(buf, value)
+    if "rate_futures_book" in snapshot:
+        _f64(buf, 51.0)
+        _book(buf, snapshot["rate_futures_book"])
     # LENGTH-PREFIXED, because these two are empty between the tape row that
     # consumes them and the close that fills them again -- unlike every
     # per-slot array above, which always follows the roster. An empty buffer
@@ -1608,7 +1628,7 @@ _LEDGER_OPTIONAL_BUFFERS = ("fair_value_offset", "opening_z", "pending_fair_valu
                             "idio_jump_var_pending", "opening_carry", "dividend",
                             "pending_dividend", "fed_drawdown_returns",
                             "innovation_day", "forecast", "futures",
-                            "night_bridge", "vix_futures")
+                            "night_bridge", "vix_futures", "rate_futures")
 
 #: The ``fundamentals`` block's buffers, one per company each.
 _LEDGER_FUNDAMENTALS = ("eps", "book_value_per_share", "revenue_growth")
@@ -1897,7 +1917,7 @@ def _snapshot_to_json(snapshot: dict[str, Any]) -> dict[str, Any]:
     for name in _LEDGER_OPTIONAL_BUFFERS:
         if name in snapshot:
             out[name] = base64.b64encode(snapshot[name]).decode("ascii")
-    for name in ("book", "futures_book", "vix_futures_book"):
+    for name in ("book", "futures_book", "vix_futures_book", "rate_futures_book"):
         if name in snapshot:
             book = dict(snapshot[name])
             book["taken"] = base64.b64encode(book["taken"]).decode("ascii")
@@ -1930,7 +1950,7 @@ def _snapshot_from_json(payload: dict[str, Any]) -> dict[str, Any]:
     for name in _LEDGER_OPTIONAL_BUFFERS:
         if name in payload:
             out[name] = base64.b64decode(payload[name])
-    for name in ("book", "futures_book", "vix_futures_book"):
+    for name in ("book", "futures_book", "vix_futures_book", "rate_futures_book"):
         if name in payload:
             book = dict(payload[name])
             book["taken"] = base64.b64decode(book["taken"])

@@ -93,6 +93,33 @@ pub fn is_vix_future_expiry(session: i64) -> bool {
     session.rem_euclid(SESSIONS_PER_MONTH) == monthly_expiry(0)
 }
 
+/// How many policy-rate futures are listed: the month in progress and the
+/// next twelve.
+pub const POLICY_RATE_FUTURES_LISTED: usize = 13;
+
+/// How many term-rate futures are listed: the quarter in progress and the
+/// next seven.
+pub const TERM_RATE_FUTURES_LISTED: usize = 8;
+
+/// The last session of the 21-session month `month`, where its policy-rate
+/// future settles at the close.
+pub fn month_end(month: i64) -> i64 {
+    (month + 1) * SESSIONS_PER_MONTH - 1
+}
+
+/// The last session of the 63-session quarter `quarter`, where its term-rate
+/// future settles at the close.
+pub fn quarter_end(quarter: i64) -> i64 {
+    (quarter + 1) * SESSIONS_PER_QUARTER - 1
+}
+
+/// The first `count` period ends of `length` sessions at or after session
+/// `from`, in order.
+pub fn period_ends(from: i64, length: i64, count: usize) -> Vec<i64> {
+    let first = from.div_euclid(length);
+    (0..count as i64).map(|k| (first + k + 1) * length - 1).collect()
+}
+
 /// A contract's roll date: [`ROLL_SESSIONS`] sessions before its expiry.
 pub fn roll_session(expiry: i64) -> i64 {
     expiry - ROLL_SESSIONS
@@ -145,6 +172,23 @@ mod tests {
             assert!(is_index_future_expiry(e[0]));
         }
         assert_eq!(roll_session(56), 50);
+    }
+
+    #[test]
+    fn rate_futures_periods_end_on_each_months_and_quarters_last_session() {
+        assert_eq!(month_end(0), 20);
+        assert_eq!(quarter_end(0), 62);
+        assert_eq!(period_ends(0, SESSIONS_PER_MONTH, 2), vec![20, 41]);
+        assert_eq!(period_ends(20, SESSIONS_PER_MONTH, 1), vec![20]);
+        assert_eq!(period_ends(21, SESSIONS_PER_MONTH, 1), vec![41]);
+        assert_eq!(period_ends(62, SESSIONS_PER_QUARTER, 2), vec![62, 125]);
+        for t in 0..1000 {
+            let m = period_ends(t, SESSIONS_PER_MONTH, POLICY_RATE_FUTURES_LISTED);
+            assert!(m[0] >= t && m[0] - t < SESSIONS_PER_MONTH);
+            assert_eq!(m[12] - m[0], 12 * SESSIONS_PER_MONTH);
+            let q = period_ends(t, SESSIONS_PER_QUARTER, TERM_RATE_FUTURES_LISTED);
+            assert!(q[0] >= t && q[0] - t < SESSIONS_PER_QUARTER);
+        }
     }
 
     #[test]

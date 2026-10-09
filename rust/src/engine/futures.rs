@@ -441,6 +441,7 @@ impl Engine {
     pub fn is_listed_contract(&self, symbol: &str) -> bool {
         (self.futures_on() && self.futures_slot(symbol).is_some())
             || (self.vix_futures_on() && self.vix_futures_slot(symbol).is_some())
+            || (self.rate_futures_on() && self.rate_futures_slot(symbol).is_some())
     }
 
     // ── Pricing ───────────────────────────────────────────────────────────
@@ -676,6 +677,11 @@ impl Engine {
                 return self.vix_futures_book_at(slot);
             }
         }
+        if self.rate_futures_on() {
+            if let Some(slot) = self.rate_futures_slot(symbol) {
+                return self.rate_futures_book_at(slot);
+            }
+        }
         if !self.futures_on() {
             return None;
         }
@@ -683,15 +689,19 @@ impl Engine {
         Some(self.futures_book(slot, None))
     }
 
-    /// The listed contract at position `k` in listing order, the index
-    /// futures first and then the VIX futures, for [`Engine::book_for`]'s
-    /// indices past the rate instruments.
+    /// The listed contract at position `k` in listing order (the index
+    /// futures, then the VIX futures, then the rate futures), for
+    /// [`Engine::book_for`]'s indices past the rate instruments.
     pub(super) fn contract_book_at(&self, k: usize) -> Option<OrderBook> {
         let index = if self.futures_on() { self.futures.contracts.len() } else { 0 };
         if k < index {
             return Some(self.futures_book(k, None));
         }
-        self.vix_futures_book_at(k - index)
+        let vix = if self.vix_futures_on() { self.vix_futures.contracts.len() } else { 0 };
+        if k < index + vix {
+            return self.vix_futures_book_at(k - index);
+        }
+        self.rate_futures_book_at(k - index - vix)
     }
 
     fn futures_push_fill(&mut self, mut fill: AgentFill) -> AgentFill {
@@ -844,6 +854,7 @@ impl Engine {
         if self.futures.book.orders.iter().any(|o| o.id == id)
             || self.book.orders.iter().any(|o| o.id == id)
             || self.vix_futures_orders().iter().any(|o| o.id == id)
+            || self.rate_futures_orders().iter().any(|o| o.id == id)
         {
             return Err(format!("order id {id:?} is already waiting in the book"));
         }
@@ -1168,11 +1179,14 @@ impl Engine {
     // ── Reads ─────────────────────────────────────────────────────────────
 
     /// The listed contracts: the front two index futures under
-    /// `futures_index_listed`, in expiry order, then the six VIX futures
-    /// under `futures_vix_listed`, in expiry order; none with both off.
+    /// `futures_index_listed`, then the six VIX futures under
+    /// `futures_vix_listed`, then the thirteen policy-rate and eight
+    /// term-rate futures under `futures_rates_listed`, each family in expiry
+    /// order; none with all three off.
     pub fn contracts(&self) -> Vec<ContractSpec> {
         let mut out = self.index_futures_contracts();
         out.extend(self.vix_futures_contracts());
+        out.extend(self.rate_futures_contracts());
         out
     }
 
@@ -1212,6 +1226,11 @@ impl Engine {
         if self.vix_futures_on() {
             if let Some(slot) = self.vix_futures_slot(symbol) {
                 return self.vix_futures_quote(slot);
+            }
+        }
+        if self.rate_futures_on() {
+            if let Some(slot) = self.rate_futures_slot(symbol) {
+                return self.rate_futures_quote(slot);
             }
         }
         if !self.futures_on() {
@@ -1265,6 +1284,7 @@ impl Engine {
             Vec::new()
         };
         out.extend(self.vix_futures_settlements(session));
+        out.extend(self.rate_futures_settlements(session));
         // Stable, so each family keeps its own order within a session.
         out.sort_by_key(|s| s.session);
         out

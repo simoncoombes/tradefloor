@@ -46,6 +46,31 @@ same with them on as off.
   carries them, and the `forecast` buffer, which it could not encode
   before. Every known-answer digest is where it was.
 
+### Rate futures
+
+- `futures_rates_listed` is a new dial, 0.0 on every preset and left out of
+  the digest there. Off zero the engine lists, from the first close,
+  thirteen monthly policy-rate futures (`FF`) and eight quarterly term-rate
+  futures (`TR3`), each settling at the close of its period's last session
+  at 100 less the period's rate: the mean of the policy rate the period's
+  closes set, or those rates compounded. A contract is priced at 100 less
+  the period's realised and expected rate and the premium frozen in
+  `derivatives::RATE_PREMIUM`, fitted once to the fed funds futures' excess
+  returns. Each quotes a maker's ladder, in the session only.
+- `Engine.forecast()` carries `next_meeting`, the session whose close holds
+  the next scheduled policy meeting (`Engine::next_meeting_session` in
+  Rust).
+- New API: `ContractKind::PolicyRateFuture` and `TermRateFuture`,
+  `SettlementRule::AveragePolicyRateAtClose` and
+  `CompoundedPolicyRateAtClose`, `derivatives::RATE_PREMIUM`,
+  `POLICY_RATE_FUTURE`, `TERM_RATE_FUTURE`, `RateFutureSpec`, `RatePremium`,
+  `rate_future_symbol` and `calendar::month_end`, `quarter_end` and
+  `period_ends` in Rust. `contracts()`, `quote()`, `settlements()`, `book`,
+  `submit`, `cancel`, `open_orders` and `take_fills` take rate futures.
+- A snapshot carries `rate_futures` and `rate_futures_book` only under the
+  switch, hashed behind tags 50 and 51 only then. Every known-answer digest
+  is where it was.
+
 ### VIX futures
 
 - `futures_vix_listed` is a new dial, with three companions

@@ -1126,6 +1126,8 @@ def _nothing_dormant():
                    futures_vix_live_fast_share=0.27,
                    futures_vix_live_fast_half_life=1.3,
                    futures_vix_live_slow_half_life=28.6,
+                   # The rate futures (pt-v22 phase 1): a switch.
+                   futures_rates_listed=1.0,
                    # Two switches read only under a macro pin (r13).
                    macro_pins_hold=1.0,
                    pinned_vix_feedback=1.0,
@@ -1360,6 +1362,15 @@ UNREACHED_SNAPSHOT_FIELDS = {
         "wait on an expiry inside the window, and the listing within a "
         "session, which waits on a read before the close. "
         "tests/test_vix_futures.py holds each in the state hash and across a "
+        "restore.",
+    "rate_futures":
+        "the policy-rate and term-rate futures (`futures_rates_listed`). They "
+        "move no price, and every close marks them afresh from the rate it "
+        "sets and the forecast. What the key alone carries is the closing "
+        "rates a period in progress has realised, which reach a mark only "
+        "where a restore lost one inside the period, agents' flow's mark, "
+        "which waits on a trade, and the settlements made. "
+        "tests/test_rate_futures.py holds each in the state hash and across a "
         "restore.",
     "attribution":
         "the day's decomposition of the change in `s`. This model splits the "
