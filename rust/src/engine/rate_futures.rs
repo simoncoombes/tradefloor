@@ -783,6 +783,7 @@ impl Engine {
             tick: spec.tick,
             daily_volume: self.rate_futures_daily_volume(slot),
             initial_margin: None,
+            maintenance_margin: None,
             expected: Some(v.expected),
             premium: Some(v.premium),
             loading: None,

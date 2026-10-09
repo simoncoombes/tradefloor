@@ -1239,8 +1239,16 @@ impl Engine {
     }
 
     /// A listed contract's quote now: `None` for a symbol not listed, and
-    /// for every symbol with its family's switch off.
+    /// for every symbol with its family's switch off. Its `initial_margin` is
+    /// the one the last close set (`margin_scan_coverage`).
     pub fn quote(&self, symbol: &str) -> Option<Quote> {
+        let mut q = self.quote_unmargined(symbol)?;
+        q.initial_margin = self.initial_margin(q.kind, q.expiry, q.multiplier);
+        q.maintenance_margin = q.initial_margin.map(|m| m / super::margin::MAINTENANCE_RATIO);
+        Some(q)
+    }
+
+    fn quote_unmargined(&self, symbol: &str) -> Option<Quote> {
         if self.vix_futures_on() {
             if let Some(slot) = self.vix_futures_slot(symbol) {
                 return self.vix_futures_quote(slot);
@@ -1286,6 +1294,7 @@ impl Engine {
             tick: INDEX_FUTURE.tick,
             daily_volume: self.futures_daily_volume(v.index),
             initial_margin: None,
+            maintenance_margin: None,
             expected: None,
             premium: None,
             loading: None,

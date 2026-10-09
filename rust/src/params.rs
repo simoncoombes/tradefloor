@@ -1281,6 +1281,33 @@ pub struct ModelParams {
     /// only. An oil futures price feeds nothing a stock price or the economy
     /// reads. A switch.
     pub futures_oil_listed: f64,
+    /// The share of one-session moves the listed contracts' initial margin
+    /// covers. 0.0, on every shipped preset, sets no margin: every quote's
+    /// `initial_margin` is `None`, nothing is snapshotted or hashed, and a
+    /// value of 0.0 is left out of the model's digest.
+    ///
+    /// Off zero each listed contract's initial margin, set at each close, is
+    /// its multiplier times `z * t * sigma`: `sigma` the contract's own
+    /// one-session sd, an exponentially weighted mean of its squared
+    /// close-to-close mark changes at a half-life of 21 sessions (the
+    /// historical-volatility scaling clearing houses' value-at-risk margins
+    /// use), seeded at listing from its family's front; `z` the standard
+    /// normal quantile that leaves `(1 - coverage) / 2` in each tail; and
+    /// `t` the tail allowance `margin_scan_tail`. Maintenance is initial over
+    /// 1.1. 0.99 is the confidence level 17 CFR 39.13(g)(2)(iii) asks of a
+    /// clearing house over a one-day liquidation time. In (0.5, 0.9999).
+    pub margin_scan_coverage: f64,
+    /// The tail allowance on the margin's normal quantile
+    /// (`margin_scan_coverage`): one-session moves have fatter tails than a
+    /// normal and the volatility the margin scales by lags a jump, so the
+    /// quantile alone covers fewer moves than it names. Read only with
+    /// `margin_scan_coverage` set; 0.0, on every shipped preset, is an
+    /// allowance of 1, and a value of 0.0 is left out of the model's digest.
+    /// A projection fitted on the model's own held-out histories
+    /// (`tools/calibration/margin_dials.py derive`), so that the front
+    /// contracts' moves past it read the coverage's complement (row MG1). In
+    /// [0, 5].
+    pub margin_scan_tail: f64,
     /// Switch that makes the fear/greed index read the business cycle and
     /// GDP growth as published instead of as they are. 0.0, on every preset
     /// through pt-v19, is off; pt-v20 sets 1.0.
@@ -7715,6 +7742,8 @@ impl ModelParams {
             futures_vix_live_slow_half_life: 0.0,
             futures_rates_listed: 0.0,
             futures_oil_listed: 0.0,
+            margin_scan_coverage: 0.0,
+            margin_scan_tail: 0.0,
             fear_greed_published_inputs: 0.0,
             macro_publication_repricing: 0.0,
             treasury_10y_noise: 0.03,
@@ -10325,6 +10354,8 @@ impl ModelParams {
             "futures_vix_live_slow_half_life" => self.futures_vix_live_slow_half_life,
             "futures_rates_listed" => self.futures_rates_listed,
             "futures_oil_listed" => self.futures_oil_listed,
+            "margin_scan_coverage" => self.margin_scan_coverage,
+            "margin_scan_tail" => self.margin_scan_tail,
             "fear_greed_published_inputs" => self.fear_greed_published_inputs,
             "macro_publication_repricing" => self.macro_publication_repricing,
             "treasury_10y_noise" => self.treasury_10y_noise,
@@ -10700,6 +10731,8 @@ impl ModelParams {
             "futures_vix_live_slow_half_life" => out.futures_vix_live_slow_half_life = value,
             "futures_rates_listed" => out.futures_rates_listed = value,
             "futures_oil_listed" => out.futures_oil_listed = value,
+            "margin_scan_coverage" => out.margin_scan_coverage = value,
+            "margin_scan_tail" => out.margin_scan_tail = value,
             "fear_greed_published_inputs" => out.fear_greed_published_inputs = value,
             "macro_publication_repricing" => out.macro_publication_repricing = value,
             "treasury_10y_noise" => out.treasury_10y_noise = value,
@@ -12166,6 +12199,27 @@ impl ModelParams {
                 "futures_oil_listed is {}. It is a switch, 0.0 off or 1.0 on.",
                 self.futures_oil_listed));
         }
+        if !(self.margin_scan_coverage == 0.0
+            || (self.margin_scan_coverage > 0.5 && self.margin_scan_coverage < 0.9999))
+        {
+            return Err(format!(
+                "margin_scan_coverage is {}. It is the share of one-session moves the initial \
+                 margin covers, in (0.5, 0.9999), or 0.0 for no margin.",
+                self.margin_scan_coverage));
+        }
+        if !(0.0..=5.0).contains(&self.margin_scan_tail) {
+            return Err(format!(
+                "margin_scan_tail is {}. It is the tail allowance on the margin's normal quantile, \
+                 in [0, 5]; 0 is an allowance of 1.",
+                self.margin_scan_tail));
+        }
+        if self.margin_scan_tail != 0.0 && self.margin_scan_coverage == 0.0 {
+            return Err(format!(
+                "margin_scan_coverage is 0 but margin_scan_tail is {}. The allowance scales the \
+                 initial margin, which only margin_scan_coverage sets: set margin_scan_coverage \
+                 first.",
+                self.margin_scan_tail));
+        }
         if !(self.fear_greed_published_inputs == 0.0 || self.fear_greed_published_inputs == 1.0) {
             return Err(format!(
                 "fear_greed_published_inputs is {}. It is a switch: 0 (the index reads the \
@@ -12661,6 +12715,8 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "futures_vix_live_slow_half_life",
     "futures_rates_listed",
     "futures_oil_listed",
+    "margin_scan_coverage",
+    "margin_scan_tail",
     "night_session_steps",
 ];
 
@@ -12859,6 +12915,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "futures_vix_live_slow_half_life",
         "futures_rates_listed",
         "futures_oil_listed",
+        "margin_scan_coverage",
+        "margin_scan_tail",
         "fear_greed_published_inputs",
         "macro_publication_repricing",
         "treasury_10y_noise",

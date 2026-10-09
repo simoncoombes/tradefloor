@@ -3705,6 +3705,10 @@ class _Session:
                 # model without dividends.
                 for label in self.labels:
                     books[label].collect_dividends(engine)
+                # The futures the open settled and each margin call decided
+                # (pt-v22 phase 1); nothing without futures.
+                for label in self.labels:
+                    books[label].settle_open(engine)
             prices = _f64(engine.prices())
             observed: dict[str, Any] = {}
             for label in self.labels:
@@ -3742,6 +3746,10 @@ class _Session:
                     book.accrue(engine)
                 live["history"]._close(engine, day)
                 engine.close_market()
+                # Variation margin and margin calls at the close (pt-v22
+                # phase 1); nothing without futures.
+                for label in self.labels:
+                    books[label].settle_close(engine)
         return refused
 
 

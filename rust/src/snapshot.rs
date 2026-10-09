@@ -705,10 +705,11 @@ const SNAPSHOT_KEYS: &[&str] = &[
 /// Top-level keys carried only while they hold something. Their absence is
 /// a value: a pristine book, no close forced tonight, no pins today, no
 /// fair-value shift waiting, the day the counter gives, the fundamentals
-/// the engine was built with.
+/// and the share counts the engine was built with.
 const SNAPSHOT_OPTIONAL_KEYS: &[&str] = &[
     "state_schema", "book", "vix_sets_variance_pending", "macro_pins_today",
     "pending_fair_value", "current_day", "elapsed_days", "fundamentals",
+    "shares_outstanding",
     // The spread a `pin_macro(corporate_spread=...)` holds through tonight's
     // close, carried exactly while `macro_pins_today` marks it.
     "pinned_corporate_spread",
@@ -1484,6 +1485,13 @@ impl Engine {
         out.put("forced_flow_spent", V::Float(self.forced_flow_spent()));
         out.put("market_vol_log_level", V::Float(self.market_vol_log_level()));
         out.put("vix_log_level", V::Float(self.vix_log_level()));
+        // The derived anchor (`vix_level_identity`): a constant of the run,
+        // but derived from the roster the engine was BUILT on, so an engine
+        // rebuilt on a later day's roster derives another one. Carried so a
+        // restore reads the run's own (#268).
+        if p.vix_level_identity != 0.0 {
+            out.put("vix_anchor", V::Float(self.vix_anchor()));
+        }
         // Only where the hash covers it: the memory moves only with
         // `vix_anchor_memory` nonzero.
         if p.vix_anchor_memory != 0.0 {
@@ -1642,6 +1650,10 @@ impl Engine {
         }
         if let Some(book) = self.oil_futures_book_state() {
             out.put("oil_futures_book", book_value(book));
+        }
+        // The contracts' margin (`margin_scan_coverage`).
+        if let Some(words) = self.margin_words() {
+            out.put("margin", V::from_f64s(&words));
         }
         // The spread a `corporate_spread` pin holds tonight, only while its
         // mark stands.
@@ -1885,6 +1897,10 @@ impl Engine {
             block.put("revenue_growth", V::from_f64s(&growth));
             out.put("fundamentals", V::Map(block));
         }
+        // The share counts, once `set_shares_outstanding` has moved them.
+        if self.shares_outstanding_changed() {
+            out.put("shares_outstanding", V::from_f64s(&self.shares_outstanding()));
+        }
         // The variance cascade, only on a model that runs it.
         if self.carries_garch_cascade() {
             out.put("garch_cascade", V::from_f64s(&self.garch_cascade()));
@@ -1938,6 +1954,17 @@ impl Engine {
         );
         let gated = [
             Gated::dial("vix_anchor_slow", "vix_anchor_memory", p.vix_anchor_memory),
+            // Optional where wanted: a snapshot from before #268 has none.
+            Gated {
+                key: "vix_anchor",
+                wanted: p.vix_level_identity != 0.0,
+                held: true,
+                why: format!(
+                    "vix_level_identity is not 0, and this engine's \
+                     vix_level_identity is {}",
+                    p.vix_level_identity
+                ),
+            },
             Gated::when("fair_value_offset", fair_value, fair_value_why.clone()),
             Gated::when("opening_z", fair_value, fair_value_why),
             Gated::when(
@@ -1978,6 +2005,7 @@ impl Engine {
             Gated::held("rate_futures_book", "futures_rates_listed", p.futures_rates_listed),
             Gated::dial("oil_futures", "futures_oil_listed", p.futures_oil_listed),
             Gated::held("oil_futures_book", "futures_oil_listed", p.futures_oil_listed),
+            Gated::dial("margin", "margin_scan_coverage", p.margin_scan_coverage),
             Gated::when(
                 "buyback_log_shares",
                 self.carries_buyback_log_shares(),
@@ -2426,6 +2454,18 @@ impl Engine {
         if inner.params().vix_anchor_memory != 0.0 {
             inner.set_vix_anchor_slow(read_finite(snapshot, "", "vix_anchor_slow")?);
         }
+        // A snapshot from before the anchor was carried keeps the one this
+        // engine derived, which is what every restore read until then.
+        if snapshot.get("vix_anchor").is_some() {
+            let anchor = read_finite(snapshot, "", "vix_anchor")?;
+            if !(anchor > 0.0) {
+                return Err(SnapshotError::new(
+                    SnapshotErrorKind::Fields,
+                    format!("snapshot field vix_anchor must be above 0, got {anchor}"),
+                ));
+            }
+            inner.set_vix_anchor(anchor);
+        }
         // The cycle's volatility multiplier (`market_vol_cycle_ratio`), unset
         // where the snapshot carries none: taken before the first close set
         // it.
@@ -2671,6 +2711,14 @@ impl Engine {
             };
             inner.set_oil_futures_state(words.as_deref(), book).map_err(core)?;
         }
+        // The contracts' margin (`margin_scan_coverage`).
+        {
+            let words = match snapshot.get("margin") {
+                Some(_) => Some(read_buffer(snapshot, "", "margin")?),
+                None => None,
+            };
+            inner.set_margin_state(words.as_deref()).map_err(core)?;
+        }
         inner.set_nominal_output_base(read_finite(snapshot, "", "nominal_output_base")?);
         let variance = read_numbers(snapshot, "", "market_variance")?;
         if variance.len() != 6 || variance.iter().any(|v| !v.is_finite()) {
@@ -2883,6 +2931,16 @@ impl Engine {
                 inner.set_fundamentals(&eps, &book, &growth).map_err(core)?;
             }
             None => inner.reset_fundamentals(),
+        }
+        // The share counts. Absent means they had not moved, so the counts
+        // each company was built with go back. Written raw: the market caps
+        // and the index divisor come from the snapshot.
+        match snapshot.get("shares_outstanding") {
+            Some(_) => {
+                let shares = read_buffer(snapshot, "", "shares_outstanding")?;
+                inner.restore_shares_outstanding(&shares).map_err(core)?;
+            }
+            None => inner.reset_shares_outstanding(),
         }
         if inner.carries_garch_cascade() {
             inner.set_garch_cascade(&read_buffer(snapshot, "", "garch_cascade")?).map_err(core)?;

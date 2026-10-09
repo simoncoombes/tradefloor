@@ -1290,6 +1290,10 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
         # name under the portfolio's plan, cash otherwise. Nothing on a
         # model without dividends.
         portfolio.collect_dividends(engine)
+        # The futures the open settled, and the last close's margin call met
+        # or the account's futures liquidated (pt-v22 phase 1). Nothing for
+        # a portfolio without futures.
+        portfolio.settle_open(engine)
         for _ in range(steps_per_day):
             # The roster and the depth are copies, so an agent that sorts or
             # edits what it was shown edits its own copy and not the lists
@@ -1411,6 +1415,10 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
         # `explain(day)` below already sees today in `obs.history`.
         history._close(engine, day)
         engine.close_market()
+        # Variation margin to the close's settlement marks, the contracts
+        # settled at it, and a margin call under maintenance (pt-v22 phase
+        # 1). Nothing for a portfolio without futures.
+        portfolio.settle_close(engine)
         # Marked after the close, which on pt-v20 re-marks every name, so
         # the last value is the final net worth below.
         equity_curve.append(portfolio.net_worth(engine))
@@ -1505,7 +1513,12 @@ def _impact_bps(portfolio, tickers, baseline, actual) -> float:
     """Notional-weighted impact, signed so positive is worse for the trader."""
     traded: dict[str, float] = {}
     direction: dict[str, float] = {}
+    names = set(tickers)
     for fill in portfolio.fills:
+        # Impact is on the names' prices. A listed contract holds no slot in
+        # them, and its flow moves none of them (pt-v22 phase 1).
+        if fill["ticker"] not in names:
+            continue
         traded[fill["ticker"]] = traded.get(fill["ticker"], 0.0) + abs(fill["notional"])
         direction[fill["ticker"]] = direction.get(fill["ticker"], 0.0) + fill["quantity"]
 

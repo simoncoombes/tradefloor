@@ -46,6 +46,36 @@ same with them on as off.
   carries them, and the `forecast` buffer, which it could not encode
   before. Every known-answer digest is where it was.
 
+### Margin
+
+- `margin_scan_coverage` and `margin_scan_tail` are new dials, 0.0 on every
+  preset and left out of the digest there. Off zero each listed contract's
+  initial margin, set at each close, is its multiplier times the normal
+  quantile for the coverage times the tail allowance times its one-session
+  sd, an exponentially weighted mean of its squared mark changes at a
+  seven-session half-life; maintenance is initial over 1.1. A quote's
+  `initial_margin` carries it, and the new `maintenance_margin` its
+  maintenance level.
+- `tools/calibration/margin_dials.py derive` fits the tail allowance on
+  held-out histories (1.762 with every phase 1 contract listed), and
+  `measure` reads row MG1: 1.05 per cent on 16 fresh histories.
+- A snapshot carries `margin` only under the coverage, hashed behind tag 54
+  only then. Every known-answer digest is where it was.
+- `Portfolio` holds futures (`Portfolio.futures`, `FuturesPosition`): a trade
+  pays only its distance from the position's mark, each close pays
+  variation margin (`settle_close`), and expiry pays the last move to the
+  settlement price (`Portfolio.settled`). Net worth counts futures, and the
+  leverage limit counts them at notional. `margin_requirement` reads the
+  contracts' margins; a close under maintenance makes a margin call
+  (`margin_calls`), and at the next open (`settle_open`) it is met or the
+  futures are closed through their books (`liquidations`). Every harness
+  calls the two hooks; a portfolio without futures asks the engine nothing
+  new.
+- An agent's read-only market view serves `contracts()`, `quote(symbol)`,
+  `settlements(day)`, `index_level`, `live_vix` and `forecast()`, and `act`
+  trades a contract by its symbol. The scorecard's impact leaves contracts
+  out: it reads the names' prices, which no contract moves.
+
 ### The oil law
 
 - `oil_mean_reversion`, `oil_noise_sd` and `oil_inventory_level_gain` are
@@ -166,6 +196,23 @@ same with them on as off.
   their dials, and the state hash and `manifest.state_hash` cover them only
   then. Every known-answer digest is where it was.
 
+### Share counts from the host
+
+- `Engine::set_shares_outstanding` and `Engine::shares_outstanding` are new
+  (#274), in Python `Engine.set_shares_outstanding(shares)` and
+  `Engine.shares_outstanding()`. A host whose companies buy back stock or
+  issue it writes the counts, one for each company in roster order, each
+  finite and above 0. Each market cap is reset to the current price times
+  the new count, so the market factor's loadings, the beta normalisation
+  and the cap-weighted P/E all read the host's counts.
+  The listed index keeps its level across the write. Writing the counts
+  draws no random numbers, the order log records the write, and `replay`
+  and `explain` apply it again.
+- A snapshot carries the counts as `shares_outstanding`, and the state hash
+  covers them, only once they differ from the ones each company was built
+  or listed with. Saves and hashes from an engine that never had its counts
+  written are unchanged.
+
 ### Dividends in sessions
 
 - MCP sessions never called `Portfolio.collect_dividends` (#260). Every
@@ -173,6 +220,21 @@ same with them on as off.
   environment and the TCA run) already did.
 - RELEASING.md said the traded known answer runs on pt-v20 (#261). From
   0.10.0 it runs on the default preset, pt-v21.
+
+### A restore onto a rebuilt engine
+
+- A host that rebuilds its engine on the day's companies and restores a
+  snapshot onto it now continues bit for bit (#268). Under
+  `vix_level_identity` (pt-v19 and later) the VIX's anchor is derived from
+  the roster the engine is built on, and a snapshot did not carry it, so an
+  engine rebuilt on a later day's market capitalisations derived another
+  anchor and its VIX parted from the original's at the sixth significant
+  figure. A snapshot now carries `vix_anchor` under the identity, and a
+  restore reads it. A snapshot without it, from before this, still
+  restores, onto the anchor the engine derived.
+- The state hash and `manifest.state_hash` do not cover `vix_anchor`, as
+  they do not cover `session_tick`, so every leaf and known-answer digest is
+  where it was.
 
 ## 0.10.1
 

@@ -4187,6 +4187,73 @@ front, where on NYMEX it moves about three quarters as far, and the
 inventory's own push on the expected path is too small to tilt the curve.
 Both are the oil law's, not the futures'.
 
+## Margin
+
+`margin_scan_coverage` sets every listed contract's initial margin, and
+`margin_scan_tail` its tail allowance. Both are 0.0 on every shipped preset
+and left out of the model's digest there; with the coverage at 0.0 every
+quote's `initial_margin` and `maintenance_margin` are `None`. The margin
+reads the contracts' marks and writes only its own state, so no price moves
+(`tests/test_margin.py`).
+
+Each listed contract's one-session sd, $\sigma$, is an exponentially
+weighted mean of its squared close-to-close mark changes at a half-life of
+seven sessions, the historical-volatility scaling clearing houses'
+value-at-risk margins use (CME's SPAN 2 among them). A contract listed with
+no history takes its family's front's variance at its first close, and a
+family with none starts from its spec's daily sigma. Its initial margin,
+set at each close and read through `quote()`, is its multiplier times
+$z\,t\,\sigma$: $z$ the normal quantile leaving $(1 - c)/2$ in each tail
+at the coverage $c$, and $t$ the tail allowance. Maintenance is initial
+over 1.1. A coverage of 0.99 is the confidence level 17 CFR
+39.13(g)(2)(iii) asks of a clearing house over a one-day liquidation time.
+
+One-session moves have fatter tails than a normal and the volatility lags
+a jump, so $z\sigma$ alone covers fewer moves than it names: on the first 12
+of the histories below, 2.4 per cent of the front index future's moves pass
+it, 6.7 the VIX future's and 5.8 the
+oil future's, whose sensitivity to their underlying rises as they near
+expiry, and 1.9 and 2.3 the rate futures', which move in jumps on meeting
+days. `tools/calibration/margin_dials.py derive` fits the allowance on 24
+held-out histories of 1,500 sessions (seeds 8501 to 8524, every phase 1
+contract listed) as the quantile, at the coverage, of each front move over
+the $z\sigma$ its margin was set from: 1.762. The half-life is the
+compromise between the families: at 21 sessions the VIX futures' moves pass
+the margin 2.9 per cent of the time, at three sessions the rate futures'
+2.0 and 2.2 per cent, and at seven every family lies between 0.2 and 2.0.
+
+On 16 fresh histories (`margin_dials.py measure`, seeds 8601 to 8616), the
+share of each root's front contract's one-session moves past the initial
+margin the previous close set (row MG1, 0.5 to 1.5 per cent pooled):
+
+| Root | IDX | VIX | FF | TR3 | OIL | Pooled |
+|---|---|---|---|---|---|---|
+| Past the margin, % | 0.17 | 1.80 | 1.38 | 1.64 | 0.27 | 1.05 |
+
+A `Portfolio` holds a future at a mark: a trade pays only its distance
+from the mark, so the position is held at it; each close pays the move to
+the new settlement mark in cash (variation margin, `Portfolio.settle_close`);
+and the contract's settlement pays the last move, to the settlement price,
+and closes the position (at the open for index, VIX and oil futures, at the
+close for rate futures; `Portfolio.settled`). A position's value is its
+quantity times its multiplier times its price's distance from the mark, net
+worth counts it, and the leverage limit counts a future at its notional.
+`Portfolio.margin_requirement` is the contracts' initial margin times the
+contracts held, or their maintenance margin. A close that leaves the
+account's equity under the maintenance requirement makes a margin call
+(`Portfolio.margin_calls`); at the next open (`Portfolio.settle_open`) the
+call is met when equity is back at or above the initial requirement, and
+otherwise every futures position is closed at the market through its book
+(`Portfolio.liquidations`), so no account carries a call past an open (row
+MG2). `tf.evaluate`, `tf.rank`, `World`, the gym environment and MCP
+sessions call both hooks; a portfolio that never traded a future asks the
+engine nothing new, so every scorecard without futures is the one it was.
+An agent sees the contracts through `obs.engine.contracts()`,
+`obs.engine.quote(symbol)` and `obs.engine.settlements()`, and trades one by
+its symbol in the mapping `act` returns. The scorecard's impact reads the
+names' prices, which no contract moves. Stock is not liquidated: with the
+futures closed the requirement is nil.
+
 ## Scenarios
 
 A scenario is a file of changes to the economy or the market, applied once

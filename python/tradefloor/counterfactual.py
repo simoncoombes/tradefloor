@@ -748,6 +748,10 @@ class World:
             # `evaluate` collects them. Nothing on a model without dividends.
             paid = {label: self._portfolios[label].collect_dividends(self.engine)
                     for label in self._agents}
+            # The futures the open settled, and each margin call decided
+            # (pt-v22 phase 1), in label order. Nothing without futures.
+            for label in self._agents:
+                self._portfolios[label].settle_open(self.engine)
             self._dividends_today = paid if any(paid.values()) else None
 
             for _ in range(self.steps_per_day):
@@ -827,6 +831,10 @@ class World:
             if record:
                 self.engine.record(day)
             self.engine.close_market()
+            # Variation margin and margin calls at the close (pt-v22 phase
+            # 1), in label order. Nothing without futures.
+            for label in self._agents:
+                self._portfolios[label].settle_close(self.engine)
             self._verify_surgery(day)
             if ledger is not None:
                 ledger.close(self.engine)

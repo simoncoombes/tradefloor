@@ -22,6 +22,16 @@ hidden state all raise `tf.SandboxError`. The hidden state includes the true
 business-cycle phase; the macro fields carry the phase as published. The gym
 environment's `env.engine` and `env.portfolio` are the same views.
 
+On a model that lists futures (the pt-v22 switches, off on every shipped
+preset), `obs.engine.contracts()`, `obs.engine.quote(symbol)` and
+`obs.engine.settlements()` read them, and `act` trades one by its symbol,
+`IDX.F0056` for instance, as it trades a ticker. The portfolio holds a
+future at its last settlement mark and pays the mark's move in cash at each
+close; a close that leaves equity under the contracts' maintenance margin
+makes a margin call, and if equity is not back at the initial margin by the
+next open, the futures are closed at the market. MODEL.md's Margin section
+has the rules.
+
 In the mapping `act` returns, a plain number is a market order for that many
 shares, negative to sell. A native Python agent can also return
 `tf.Limit(quantity, price)`, which waits in the book for what does not fill,
