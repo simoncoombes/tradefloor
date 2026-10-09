@@ -1128,6 +1128,8 @@ def _nothing_dormant():
                    futures_vix_live_slow_half_life=28.6,
                    # The rate futures (pt-v22 phase 1): a switch.
                    futures_rates_listed=1.0,
+                   # The oil futures (pt-v22 phase 1): a switch.
+                   futures_oil_listed=1.0,
                    # Two switches read only under a macro pin (r13).
                    macro_pins_hold=1.0,
                    pinned_vix_feedback=1.0,
@@ -1371,6 +1373,14 @@ UNREACHED_SNAPSHOT_FIELDS = {
         "where a restore lost one inside the period, agents' flow's mark, "
         "which waits on a trade, and the settlements made. "
         "tests/test_rate_futures.py holds each in the state hash and across a "
+        "restore.",
+    "oil_futures":
+        "the oil futures (`futures_oil_listed`). They move no price, and every "
+        "close marks them afresh from the forecast. What the key alone "
+        "carries is agents' flow's mark, which waits on a trade, the "
+        "settlements made, which wait on an expiry inside the window, and the "
+        "listing within a session, which waits on a read before the close. "
+        "tests/test_oil_futures.py holds each in the state hash and across a "
         "restore.",
     "attribution":
         "the day's decomposition of the change in `s`. This model splits the "

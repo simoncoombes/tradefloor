@@ -603,11 +603,7 @@ impl Engine {
             }
             None => format!("{agent}-{symbol}-{}", self.vix_futures.book.sequence),
         };
-        if self.vix_futures.book.orders.iter().any(|o| o.id == id)
-            || self.rate_futures_orders().iter().any(|o| o.id == id)
-            || self.futures.book.orders.iter().any(|o| o.id == id)
-            || self.book.orders.iter().any(|o| o.id == id)
-        {
+        if self.contract_order_id_taken(&id) {
             return Err(format!("order id {id:?} is already waiting in the book"));
         }
         let sequence = self.vix_futures.book.sequence;

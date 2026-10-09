@@ -479,6 +479,14 @@ OUT_OF_SCOPE = {
         "with the switch off, `Engine::contracts` lists no rate future, "
         "`Engine::quote` returns None for one, and nothing is snapshotted or "
         "hashed; at 0.0 it is also left out of the model's digest",
+    # The oil futures (pt-v22 phase 1), inert on every shipped preset. An oil
+    # future reads the oil price and the forecast and draws nothing.
+    "futures_oil_listed":
+        "inert at 0.0: `oil_futures_open`, `oil_futures_close_marks` and "
+        "`oil_futures_session_step` in engine/oil_futures.rs return at once "
+        "with the switch off, `Engine::contracts` lists no oil future, "
+        "`Engine::quote` returns None for one, and nothing is snapshotted or "
+        "hashed; at 0.0 it is also left out of the model's digest",
     # The VIX's fear memory (pt-v22 phase 1, the VIX law), inert on every
     # shipped preset.
     "vix_fear_uptake":

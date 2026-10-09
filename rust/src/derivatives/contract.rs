@@ -9,9 +9,9 @@
 use super::symbol::{ContractSymbol, SymbolKind};
 
 /// What kind of contract this is: index futures (`futures_index_listed`),
-/// VIX futures (`futures_vix_listed`) and policy-rate and term-rate futures
-/// (`futures_rates_listed`) so far; the enum is non-exhaustive so the oil
-/// futures and the options of later releases join it.
+/// VIX futures (`futures_vix_listed`), policy-rate and term-rate futures
+/// (`futures_rates_listed`) and oil futures (`futures_oil_listed`) so far;
+/// the enum is non-exhaustive so the options of later releases join it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum ContractKind {
@@ -29,6 +29,9 @@ pub enum ContractKind {
     /// three-month SOFR analogue, cash-settled at the close of the quarter's
     /// last session.
     TermRateFuture,
+    /// A future on the oil price, cash-settled on the oil price at its expiry
+    /// session's open: the previous close's.
+    OilFuture,
 }
 
 impl ContractKind {
@@ -39,6 +42,7 @@ impl ContractKind {
             ContractKind::VixFuture => "VIX",
             ContractKind::PolicyRateFuture => "FF",
             ContractKind::TermRateFuture => "TR3",
+            ContractKind::OilFuture => "OIL",
         }
     }
 
@@ -48,7 +52,8 @@ impl ContractKind {
             ContractKind::IndexFuture
             | ContractKind::VixFuture
             | ContractKind::PolicyRateFuture
-            | ContractKind::TermRateFuture => true,
+            | ContractKind::TermRateFuture
+            | ContractKind::OilFuture => true,
         }
     }
 
@@ -68,6 +73,7 @@ impl ContractKind {
             ContractKind::VixFuture => SettlementRule::PublishedVixAtOpen,
             ContractKind::PolicyRateFuture => SettlementRule::AveragePolicyRateAtClose,
             ContractKind::TermRateFuture => SettlementRule::CompoundedPolicyRateAtClose,
+            ContractKind::OilFuture => SettlementRule::OilPriceAtOpen,
         }
     }
 }
@@ -91,6 +97,9 @@ pub enum SettlementRule {
     /// policy rate each of the period's closes set, compounded a session at
     /// a time (`1 + r / 25200`) and quoted as a simple rate over the period.
     CompoundedPolicyRateAtClose,
+    /// In cash, on the oil price at the expiry session's open: the previous
+    /// close's, since oil moves only at a close.
+    OilPriceAtOpen,
 }
 
 impl SettlementRule {
@@ -101,6 +110,7 @@ impl SettlementRule {
             SettlementRule::PublishedVixAtOpen => "published_vix_at_open",
             SettlementRule::AveragePolicyRateAtClose => "average_policy_rate_at_close",
             SettlementRule::CompoundedPolicyRateAtClose => "compounded_policy_rate_at_close",
+            SettlementRule::OilPriceAtOpen => "oil_price_at_open",
         }
     }
 }
@@ -117,8 +127,8 @@ pub struct ContractSpec {
     /// The underlying's root: `IDX` for the price index.
     pub root: String,
     /// The session it expires at, counted from 0 as the engine's elapsed
-    /// sessions are: an index or VIX future settles at that session's open,
-    /// a rate future at its close, the last of its period.
+    /// sessions are: an index, VIX or oil future settles at that session's
+    /// open, a rate future at its close, the last of its period.
     pub expiry: i64,
     /// The session from which the next contract is the front by the roll
     /// rule: [`super::calendar::ROLL_SESSIONS`] before the expiry.
@@ -151,6 +161,12 @@ pub struct ContractSpec {
 /// points, `index` the policy rate now (per cent), `rate` the expected
 /// rate as a fraction, `basis_bp` the mark of agents' flow in rate basis
 /// points, and `dividends` 0; `loading` is None.
+///
+/// For an oil future: `fair` and `expected` are the forecast's expected oil
+/// price at its settlement, `premium` is 0, `index` the oil price now,
+/// `rate` the mean policy rate the forecast expects to expiry (a fraction),
+/// `basis_bp` the mark of agents' flow in basis points of the price, and
+/// `dividends` 0; `loading` is None.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct Quote {
@@ -215,7 +231,7 @@ pub struct Settlement {
     /// What it settles on: for an index future, the index of the expiry
     /// session's opening prints; for a VIX future, the published VIX at the
     /// expiry session's open; for a rate future, 100 less the period's
-    /// realised rate. `value` is set from it, so the two agree.
+    /// realised rate; for an oil future, the oil price at the expiry open. `value` is set from it, so the two agree.
     pub reference: f64,
 }
 
@@ -458,6 +474,44 @@ pub const TERM_RATE_FUTURE: RateFutureSpec = RateFutureSpec {
 /// `expiry`.
 pub fn rate_future_symbol(kind: ContractKind, expiry: i64) -> String {
     ContractSymbol { root: kind.root().to_string(), expiry, kind: SymbolKind::Future }.to_string()
+}
+
+/// The oil future's specification: constants of the contract, not dials.
+/// NYMEX WTI's size and grid; the stated daily volumes, by listing order,
+/// are not measured.
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
+pub struct OilFutureSpec {
+    /// Dollars per dollar of the oil price: 1,000 barrels.
+    pub multiplier: f64,
+    /// The price grid: one cent a barrel.
+    pub tick: f64,
+    pub daily_volume: &'static [f64],
+    pub maker_levels: usize,
+    pub maker_level_share: f64,
+    /// A contract's daily sd of its log price, the scale of its flow's mark.
+    pub daily_sigma: f64,
+    pub impact_coefficient: f64,
+    pub impact_half_life: f64,
+}
+
+/// The oil future's specification (twelve listed).
+pub const OIL_FUTURE: OilFutureSpec = OilFutureSpec {
+    multiplier: 1000.0,
+    tick: 0.01,
+    daily_volume: &[300_000.0, 150_000.0, 80_000.0, 50_000.0, 35_000.0, 25_000.0, 20_000.0, 15_000.0,
+                    12_000.0, 10_000.0, 8_000.0, 6_000.0],
+    maker_levels: 10,
+    maker_level_share: 0.003,
+    daily_sigma: 0.02,
+    impact_coefficient: 0.15,
+    impact_half_life: 30.0,
+};
+
+/// The symbol of the oil future expiring at session `expiry`.
+pub fn oil_future_symbol(expiry: i64) -> String {
+    ContractSymbol { root: ContractKind::OilFuture.root().to_string(), expiry, kind: SymbolKind::Future }
+        .to_string()
 }
 
 /// The symbol of the VIX future expiring at session `expiry`.

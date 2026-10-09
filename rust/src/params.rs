@@ -1230,6 +1230,23 @@ pub struct ModelParams {
     /// the session only. A rate futures price feeds nothing a stock price or
     /// the economy reads. A switch.
     pub futures_rates_listed: f64,
+    /// Whether the engine lists monthly oil futures. 0.0, on every shipped
+    /// preset, lists none: no contract, no state, nothing in the snapshot or
+    /// the state hash, and a value of 0.0 is left out of the model's digest.
+    ///
+    /// Off zero the engine lists the next twelve monthly oil futures from the
+    /// first close, each expiring at session 15 of a 21-session month, `21m +
+    /// 14`, and settling at its expiry's open, in cash, on the oil price then:
+    /// the previous close's, since oil moves only at a close. A contract `n`
+    /// sessions from expiry is priced at the forecast's expected oil price
+    /// after `n - 1` closes (`forecast_horizon_sessions`; past the forecast's
+    /// horizon its last price; without a forecast the price now), with no
+    /// premium, so the curve carries the inventory push, the OPEC decision
+    /// and the dollar's drift the forecast expects and no edge over the
+    /// model's own expectation. Each quotes a maker's ladder, in the session
+    /// only. An oil futures price feeds nothing a stock price or the economy
+    /// reads. A switch.
+    pub futures_oil_listed: f64,
     /// Switch that makes the fear/greed index read the business cycle and
     /// GDP growth as published instead of as they are. 0.0, on every preset
     /// through pt-v19, is off; pt-v20 sets 1.0.
@@ -7660,6 +7677,7 @@ impl ModelParams {
             futures_vix_live_fast_half_life: 0.0,
             futures_vix_live_slow_half_life: 0.0,
             futures_rates_listed: 0.0,
+            futures_oil_listed: 0.0,
             fear_greed_published_inputs: 0.0,
             macro_publication_repricing: 0.0,
             treasury_10y_noise: 0.03,
@@ -10266,6 +10284,7 @@ impl ModelParams {
             "futures_vix_live_fast_half_life" => self.futures_vix_live_fast_half_life,
             "futures_vix_live_slow_half_life" => self.futures_vix_live_slow_half_life,
             "futures_rates_listed" => self.futures_rates_listed,
+            "futures_oil_listed" => self.futures_oil_listed,
             "fear_greed_published_inputs" => self.fear_greed_published_inputs,
             "macro_publication_repricing" => self.macro_publication_repricing,
             "treasury_10y_noise" => self.treasury_10y_noise,
@@ -10637,6 +10656,7 @@ impl ModelParams {
             "futures_vix_live_fast_half_life" => out.futures_vix_live_fast_half_life = value,
             "futures_vix_live_slow_half_life" => out.futures_vix_live_slow_half_life = value,
             "futures_rates_listed" => out.futures_rates_listed = value,
+            "futures_oil_listed" => out.futures_oil_listed = value,
             "fear_greed_published_inputs" => out.fear_greed_published_inputs = value,
             "macro_publication_repricing" => out.macro_publication_repricing = value,
             "treasury_10y_noise" => out.treasury_10y_noise = value,
@@ -12079,6 +12099,11 @@ impl ModelParams {
                 "futures_rates_listed is {}. It is a switch, 0.0 off or 1.0 on.",
                 self.futures_rates_listed));
         }
+        if !(self.futures_oil_listed == 0.0 || self.futures_oil_listed == 1.0) {
+            return Err(format!(
+                "futures_oil_listed is {}. It is a switch, 0.0 off or 1.0 on.",
+                self.futures_oil_listed));
+        }
         if !(self.fear_greed_published_inputs == 0.0 || self.fear_greed_published_inputs == 1.0) {
             return Err(format!(
                 "fear_greed_published_inputs is {}. It is a switch: 0 (the index reads the \
@@ -12570,6 +12595,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "futures_vix_live_fast_half_life",
     "futures_vix_live_slow_half_life",
     "futures_rates_listed",
+    "futures_oil_listed",
     "night_session_steps",
 ];
 
@@ -12764,6 +12790,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "futures_vix_live_fast_half_life",
         "futures_vix_live_slow_half_life",
         "futures_rates_listed",
+        "futures_oil_listed",
         "fear_greed_published_inputs",
         "macro_publication_repricing",
         "treasury_10y_noise",

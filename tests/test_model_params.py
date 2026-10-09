@@ -1181,6 +1181,10 @@ PERTURBATIONS = [
     # reads the policy rate each close sets and the forecast, draws nothing
     # and writes only its own state (tests/test_rate_futures.py).
     ("futures_rates_listed", 1.0, False),
+    # The oil futures (pt-v22 phase 1). INERT by construction: an oil future
+    # reads the oil price and the forecast, draws nothing and writes only its
+    # own state (tests/test_oil_futures.py).
+    ("futures_oil_listed", 1.0, False),
     # The VIX's fear memory (pt-v22 phase 1). LIVE: the first close's VIX
     # sits off its target, the memory takes up a share of the gap, and the
     # target the step reverts to moves, which the factor's VIX-coupled

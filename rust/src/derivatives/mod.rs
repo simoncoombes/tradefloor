@@ -14,7 +14,8 @@
 //!
 //! The engine lists index futures under `ModelParams::futures_index_listed`
 //! VIX futures under `ModelParams::futures_vix_listed` and policy-rate and
-//! term-rate futures under `ModelParams::futures_rates_listed`, and walks the
+//! term-rate futures under `ModelParams::futures_rates_listed` and oil futures
+//! under `ModelParams::futures_oil_listed`, and walks the
 //! index futures through the night under `ModelParams::night_session_steps`
 //! ([`crate::engine::Engine::contracts`], [`crate::engine::Engine::quote`],
 //! [`crate::engine::Engine::settlements`],
@@ -30,9 +31,9 @@ pub mod forecast;
 pub mod symbol;
 
 pub use contract::{
-    index_future_symbol, rate_future_symbol, vix_future_symbol, ContractKind, ContractSpec, IndexFutureSpec,
-    Quote, RateFutureSpec, RatePremium, Settlement, SettlementRule, VixFutureSpec, VixPremium, INDEX_FUTURE,
-    POLICY_RATE_FUTURE, RATE_PREMIUM, TERM_RATE_FUTURE, VIX_FUTURE,
+    index_future_symbol, oil_future_symbol, rate_future_symbol, vix_future_symbol, ContractKind, ContractSpec,
+    IndexFutureSpec, OilFutureSpec, Quote, RateFutureSpec, RatePremium, Settlement, SettlementRule, VixFutureSpec,
+    VixPremium, INDEX_FUTURE, OIL_FUTURE, POLICY_RATE_FUTURE, RATE_PREMIUM, TERM_RATE_FUTURE, VIX_FUTURE,
 };
 pub use forecast::Forecast;
 pub use symbol::{ContractSymbol, Right, SymbolKind};

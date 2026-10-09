@@ -1913,7 +1913,10 @@ impl PyEngine {
         // (`futures_index_listed`, `futures_vix_listed`) and says when one is
         // not listed.
         let p = self.inner.params();
-        let contract = (p.futures_index_listed != 0.0 || p.futures_vix_listed != 0.0 || p.futures_rates_listed != 0.0)
+        let contract = (p.futures_index_listed != 0.0
+            || p.futures_vix_listed != 0.0
+            || p.futures_rates_listed != 0.0
+            || p.futures_oil_listed != 0.0)
             && crate::derivatives::ContractSymbol::parse(ticker).is_ok();
         if !self.tickers.iter().any(|t| t == ticker) && !contract {
             return Err(ValidationError::new_err(format!(
@@ -4718,16 +4721,18 @@ impl PyEngine {
     /// The listed contracts: the front two index futures
     /// (`futures_index_listed`), the next six monthly VIX futures
     /// (`futures_vix_listed`), then thirteen monthly policy-rate and eight
-    /// quarterly term-rate futures (`futures_rates_listed`), the last two
-    /// families from the first close, each in expiry order; an empty list
-    /// with all off. Each is a dict: `symbol` (`IDX.F0119` for the index
+    /// quarterly term-rate futures (`futures_rates_listed`), then the next
+    /// twelve monthly oil futures (`futures_oil_listed`), all but the index
+    /// futures from the first close, each in expiry order; an empty list with
+    /// all off. Each is a dict: `symbol` (`IDX.F0119` for the index
     /// future expiring at session 119, `VIX.F0035`, `FF.F0020` for the
     /// policy-rate future on sessions 0 to 20, `TR3.F0062`), `root`, `kind`
     /// (`"future"`), `expiry` (counted from 0 as `day_count` counts: an index
     /// or VIX future settles at that session's open, a rate future at its
     /// close), `roll`, `multiplier` (dollars per point), `tick`, `settlement`
     /// (`"opening_print_index"`, `"published_vix_at_open"`,
-    /// `"average_policy_rate_at_close"` or `"compounded_policy_rate_at_close"`)
+    /// `"average_policy_rate_at_close"`, `"compounded_policy_rate_at_close"`
+    /// or `"oil_price_at_open"`)
     /// and `front` (the first of its family whose roll has not come; a rate
     /// future's period in progress).
     fn contracts<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyDict>>> {
@@ -4773,14 +4778,17 @@ impl PyEngine {
     /// expected rate and the premium: `expected` is that rate (per cent,
     /// realised closes and the forecast's expectation of the rest), `premium`
     /// the premium in rate points, `index` the policy rate now and `rate` the
-    /// expected rate as a fraction; `loading` is None. `expected`, `premium`
+    /// expected rate as a fraction; `loading` is None. For an oil future,
+    /// `fair` and `expected` are the forecast's expected oil price at its
+    /// settlement, `premium` 0, `index` the oil price now and `rate` the
+    /// mean policy rate expected to expiry. `expected`, `premium`
     /// and `loading` are None for an index future. A read.
     fn quote<'py>(&self, py: Python<'py>, symbol: &str) -> PyResult<Bound<'py, PyDict>> {
         let q = self.inner.quote(symbol).ok_or_else(|| {
             ValidationError::new_err(format!(
                 "{symbol:?} is not a listed contract: Engine.contracts() lists the ones that \
-                 trade, and none does with futures_index_listed, futures_vix_listed and \
-                 futures_rates_listed off"
+                 trade, and none does with futures_index_listed, futures_vix_listed, \
+                 futures_rates_listed and futures_oil_listed off"
             ))
         })?;
         let d = PyDict::new_bound(py);

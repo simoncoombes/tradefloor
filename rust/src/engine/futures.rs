@@ -436,12 +436,23 @@ impl Engine {
         self.futures.contracts.iter().position(|c| c.expiry == parsed.expiry)
     }
 
-    /// Whether `symbol` names a listed contract: an index future
-    /// (`futures_index_listed`) or a VIX future (`futures_vix_listed`).
+    /// Whether `symbol` names a listed contract: an index, VIX, rate or oil
+    /// future under its family's switch.
     pub fn is_listed_contract(&self, symbol: &str) -> bool {
         (self.futures_on() && self.futures_slot(symbol).is_some())
             || (self.vix_futures_on() && self.vix_futures_slot(symbol).is_some())
             || (self.rate_futures_on() && self.rate_futures_slot(symbol).is_some())
+            || (self.oil_futures_on() && self.oil_futures_slot(symbol).is_some())
+    }
+
+    /// Whether an order with the id `id` already waits in any book: the
+    /// names' or a contract family's.
+    pub(super) fn contract_order_id_taken(&self, id: &str) -> bool {
+        self.book.orders.iter().any(|o| o.id == id)
+            || self.futures.book.orders.iter().any(|o| o.id == id)
+            || self.vix_futures_orders().iter().any(|o| o.id == id)
+            || self.rate_futures_orders().iter().any(|o| o.id == id)
+            || self.oil_futures_orders().iter().any(|o| o.id == id)
     }
 
     // ── Pricing ───────────────────────────────────────────────────────────
@@ -682,6 +693,11 @@ impl Engine {
                 return self.rate_futures_book_at(slot);
             }
         }
+        if self.oil_futures_on() {
+            if let Some(slot) = self.oil_futures_slot(symbol) {
+                return self.oil_futures_book_at(slot);
+            }
+        }
         if !self.futures_on() {
             return None;
         }
@@ -690,7 +706,7 @@ impl Engine {
     }
 
     /// The listed contract at position `k` in listing order (the index
-    /// futures, then the VIX futures, then the rate futures), for
+    /// futures, then the VIX, rate and oil futures), for
     /// [`Engine::book_for`]'s indices past the rate instruments.
     pub(super) fn contract_book_at(&self, k: usize) -> Option<OrderBook> {
         let index = if self.futures_on() { self.futures.contracts.len() } else { 0 };
@@ -701,7 +717,11 @@ impl Engine {
         if k < index + vix {
             return self.vix_futures_book_at(k - index);
         }
-        self.rate_futures_book_at(k - index - vix)
+        let rates = if self.rate_futures_on() { self.rate_futures.contracts.len() } else { 0 };
+        if k < index + vix + rates {
+            return self.rate_futures_book_at(k - index - vix);
+        }
+        self.oil_futures_book_at(k - index - vix - rates)
     }
 
     fn futures_push_fill(&mut self, mut fill: AgentFill) -> AgentFill {
@@ -851,11 +871,7 @@ impl Engine {
             }
             None => format!("{agent}-{symbol}-{}", self.futures.book.sequence),
         };
-        if self.futures.book.orders.iter().any(|o| o.id == id)
-            || self.book.orders.iter().any(|o| o.id == id)
-            || self.vix_futures_orders().iter().any(|o| o.id == id)
-            || self.rate_futures_orders().iter().any(|o| o.id == id)
-        {
+        if self.contract_order_id_taken(&id) {
             return Err(format!("order id {id:?} is already waiting in the book"));
         }
         let sequence = self.futures.book.sequence;
@@ -1181,12 +1197,14 @@ impl Engine {
     /// The listed contracts: the front two index futures under
     /// `futures_index_listed`, then the six VIX futures under
     /// `futures_vix_listed`, then the thirteen policy-rate and eight
-    /// term-rate futures under `futures_rates_listed`, each family in expiry
-    /// order; none with all three off.
+    /// term-rate futures under `futures_rates_listed`, then the twelve oil
+    /// futures under `futures_oil_listed`, each family in expiry order; none
+    /// with all off.
     pub fn contracts(&self) -> Vec<ContractSpec> {
         let mut out = self.index_futures_contracts();
         out.extend(self.vix_futures_contracts());
         out.extend(self.rate_futures_contracts());
+        out.extend(self.oil_futures_contracts());
         out
     }
 
@@ -1231,6 +1249,11 @@ impl Engine {
         if self.rate_futures_on() {
             if let Some(slot) = self.rate_futures_slot(symbol) {
                 return self.rate_futures_quote(slot);
+            }
+        }
+        if self.oil_futures_on() {
+            if let Some(slot) = self.oil_futures_slot(symbol) {
+                return self.oil_futures_quote(slot);
             }
         }
         if !self.futures_on() {
@@ -1285,6 +1308,7 @@ impl Engine {
         };
         out.extend(self.vix_futures_settlements(session));
         out.extend(self.rate_futures_settlements(session));
+        out.extend(self.oil_futures_settlements(session));
         // Stable, so each family keeps its own order within a session.
         out.sort_by_key(|s| s.session);
         out

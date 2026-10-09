@@ -240,6 +240,8 @@ PARAM_SPECS: dict[str, dict] = {
                                         "derived": True},
     # The rate futures (pt-v22 phase 1): a switch; it moves no price.
     "futures_rates_listed": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0), "derived": True},
+    # The oil futures (pt-v22 phase 1): a switch; it moves no price.
+    "futures_oil_listed": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0), "derived": True},
     "fed_stress_cut": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
     "fed_stress_vix": {"kind": "abs", "step_unit": 1.0, "hard_range": (10.0, 200.0)},
     "fed_stress_inflation_gap": {"kind": "abs", "step_unit": 0.25, "hard_range": (0.0, 10.0)},
