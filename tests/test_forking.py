@@ -1107,10 +1107,11 @@ def _nothing_dormant():
                    rate_close_remark=1.0,
                    rate_intraday_live=1.0,
                    # What derivatives read (pt-v22 phase 1): two switches and
-                   # a whole number of sessions.
+                   # a whole number of sessions, as long as the VIX futures'
+                   # sixth contract reads.
                    index_level_listed=1.0,
                    vix_intraday_live=1.0,
-                   forecast_horizon_sessions=21.0,
+                   forecast_horizon_sessions=126.0,
                    # The index futures (pt-v22 phase 1): a switch, a basis
                    # persistent enough that a restore which lost the basis
                    # is still apart a month on, and a whole number of night
@@ -1119,6 +1120,12 @@ def _nothing_dormant():
                    basis_sd=3.7,
                    basis_persistence=0.9,
                    night_session_steps=4.0,
+                   # The VIX futures (pt-v22 phase 1), on a forecast long
+                   # enough to price them, with their intraday loading.
+                   futures_vix_listed=1.0,
+                   futures_vix_live_fast_share=0.27,
+                   futures_vix_live_fast_half_life=1.3,
+                   futures_vix_live_slow_half_life=28.6,
                    # Two switches read only under a macro pin (r13).
                    macro_pins_hold=1.0,
                    pinned_vix_feedback=1.0,
@@ -1344,6 +1351,16 @@ UNREACHED_SNAPSHOT_FIELDS = {
         "first close on. What it takes to see it is a read before that "
         "close. tests/test_derivative_foundations.py holds it in the state "
         "hash and across a restore.",
+    "vix_futures":
+        "the VIX futures (`futures_vix_listed`). They move no price, and every "
+        "close marks them afresh from the forecast and the published VIX, so "
+        "an untraded continuation's marks are the copy's from its first close "
+        "on. What the key alone carries is agents' flow's mark and the "
+        "consumed depth, which wait on a trade, the settlements made, which "
+        "wait on an expiry inside the window, and the listing within a "
+        "session, which waits on a read before the close. "
+        "tests/test_vix_futures.py holds each in the state hash and across a "
+        "restore.",
     "attribution":
         "the day's decomposition of the change in `s`. This model splits the "
         "day (`overnight_market_share`), and under a split the close's GJR "

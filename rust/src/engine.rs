@@ -77,6 +77,7 @@ mod foundations;
 /// The index futures and their night session (`futures_index_listed`,
 /// `night_session_steps`).
 mod futures;
+mod vix_futures;
 
 /// The reference MAIN stream's sequence. Not 0 and not 1 —
 /// both are different streams from the same seed, and picking the wrong one
@@ -1155,6 +1156,10 @@ pub struct Engine {
     /// switch off; carried in the snapshot and the state hash only while it
     /// is set. See `engine::futures`.
     futures: futures::FuturesState,
+    /// The VIX futures (`futures_vix_listed`): empty and never touched with
+    /// the switch off; carried in the snapshot and the state hash only while
+    /// it is set. See `engine::vix_futures`.
+    vix_futures: vix_futures::VixFuturesState,
     /// `fed_stress_cut`: the highest published VIX since the last meeting.
     /// 0.0 and never touched with the cut off; carried in the snapshot and
     /// the state hash only while it is set.
@@ -2288,6 +2293,7 @@ impl Engine {
             vix_live: None,
             forecast: None,
             futures: futures::FuturesState::new(seed),
+            vix_futures: vix_futures::VixFuturesState::default(),
             stress_vix_max: 0.0,
             stress_hold_age: STRESS_HOLD_NEVER,
             drawdown_returns: std::collections::VecDeque::new(),
@@ -2433,6 +2439,10 @@ impl Engine {
         // back prices' state alone, so its copy lists none.
         pre.params.futures_index_listed = 0.0;
         pre.params.night_session_steps = 0.0;
+        pre.params.futures_vix_listed = 0.0;
+        pre.params.futures_vix_live_fast_share = 0.0;
+        pre.params.futures_vix_live_fast_half_life = 0.0;
+        pre.params.futures_vix_live_slow_half_life = 0.0;
         pre.earnings_key = crate::rng::prehistory_key(self.earnings_key);
         pre.cycle_publication.key = crate::rng::prehistory_key(self.cycle_publication.key);
         let opening = (self.economy.cycle_phase, self.economy.months_in_current_phase);
@@ -4346,6 +4356,9 @@ impl Engine {
         // resting orders the moved book crosses fill. Nothing with it off.
         if open {
             self.futures_session_step();
+            // The VIX futures' minute (`futures_vix_listed`): their flow's
+            // mark steps and resting orders the moved books cross fill.
+            self.vix_futures_session_step();
         }
         if population_open {
             if let Some(pop) = self.population.as_mut() {
@@ -5668,12 +5681,17 @@ impl Engine {
                 return Err(format!("limit_price must be finite and greater than zero, got {p}"));
             }
         }
-        // A listed contract trades in its own book (`futures_index_listed`).
-        if self.futures_on()
+        // A listed contract trades in its own book (`futures_index_listed`,
+        // `futures_vix_listed`).
+        if (self.futures_on() || self.vix_futures_on())
             && !self.companies.iter().any(|c| c.ticker == ticker)
-            && crate::derivatives::ContractSymbol::parse(ticker).is_ok()
         {
-            return self.submit_contract_order(agent, ticker, side, quantity, limit, order_id);
+            if let Ok(symbol) = crate::derivatives::ContractSymbol::parse(ticker) {
+                if self.vix_futures_on() && symbol.root == crate::derivatives::ContractKind::VixFuture.root() {
+                    return self.submit_vix_future_order(agent, ticker, side, quantity, limit, order_id);
+                }
+                return self.submit_contract_order(agent, ticker, side, quantity, limit, order_id);
+            }
         }
         // The rate indices quote their own ladder (`crate::rates`) and take
         // their flow from `run_session`'s `fills`; the agent-facing book
@@ -5705,6 +5723,7 @@ impl Engine {
         };
         if self.book.orders.iter().any(|o| o.id == id)
             || self.futures.book.orders.iter().any(|o| o.id == id)
+            || self.vix_futures_orders().iter().any(|o| o.id == id)
         {
             return Err(format!("order id {id:?} is already waiting in the book"));
         }
@@ -5769,24 +5788,27 @@ impl Engine {
         if self.book.orders.len() != before {
             return true;
         }
-        self.cancel_contract_order(order_id, agent)
+        self.cancel_contract_order(order_id, agent) || self.cancel_vix_future_order(order_id, agent)
     }
 
     /// Waiting orders, in arrival order, for one agent or all: the names'
-    /// first, then the contracts' (`futures_index_listed`).
+    /// first, then the index futures' (`futures_index_listed`), then the VIX
+    /// futures' (`futures_vix_listed`).
     pub fn open_orders(&self, agent: Option<&str>) -> Vec<crate::agent_book::AgentOrder> {
         self.book
             .orders
             .iter()
             .chain(self.futures.book.orders.iter())
+            .chain(self.vix_futures_orders().iter())
             .filter(|o| agent.is_none_or(|a| a == o.agent))
             .cloned()
             .collect()
     }
 
     /// Collect fills, for one agent or all, in the order they happened: the
-    /// names' first, then the contracts' (`futures_index_listed`), whose
-    /// `sequence` counts the contracts' fills alone.
+    /// names' first, then the index futures' (`futures_index_listed`), then
+    /// the VIX futures' (`futures_vix_listed`); each family's `sequence`
+    /// counts its own fills alone.
     pub fn take_fills(&mut self, agent: Option<&str>) -> Vec<crate::agent_book::AgentFill> {
         let (mut taken, kept): (Vec<_>, Vec<_>) = std::mem::take(&mut self.book.fills)
             .into_iter()
@@ -5799,6 +5821,8 @@ impl Engine {
             self.futures.book.fills = kept;
             taken.extend(contracts);
         }
+        // The VIX futures' fills (`futures_vix_listed`), on their own counter.
+        taken.extend(self.take_vix_futures_fills(agent));
         taken
     }
 
@@ -6992,6 +7016,9 @@ impl Engine {
         // an expiring contract settles on them and the next is listed.
         // Nothing with the switch off.
         self.futures_open();
+        // The VIX futures at the open (`futures_vix_listed`): an expiring
+        // contract settles on the published VIX and the next is listed.
+        self.vix_futures_open();
     }
 
     /// The overnight move, applied once per name at the open, before the
@@ -10289,6 +10316,9 @@ impl Engine {
         // The forecast on the state the close leaves (`forecast_horizon_sessions`).
         // Nothing with the dial at 0.0.
         self.refresh_forecast(Some(game_day));
+        // The VIX futures' marks on that forecast and the VIX the close
+        // published (`futures_vix_listed`). Nothing with the switch off.
+        self.vix_futures_close_marks();
         // The night's path for the index futures, to the next open as a copy
         // runs it (`night_session_steps`). Nothing with the dial at 0.0.
         self.futures_night_setup();
@@ -12228,6 +12258,20 @@ impl Engine {
         if self.carries_vix_fear() {
             hash_f64(&mut buf, 47.0);
             hash_f64(&mut buf, self.vix_fear);
+        }
+        // The VIX futures, only while `futures_vix_listed` is set, behind
+        // their own tag, length-prefixed; their book behind another once an
+        // agent has traded one.
+        if let Some(words) = self.vix_futures_words() {
+            hash_f64(&mut buf, 48.0);
+            hash_u32(&mut buf, words.len() as u32);
+            for value in words {
+                hash_f64(&mut buf, value);
+            }
+        }
+        if let Some(book) = self.vix_futures_book_state() {
+            hash_f64(&mut buf, 49.0);
+            hash_book(&mut buf, book);
         }
         // LENGTH-PREFIXED, because these two are EMPTY between the tape row
         // that consumes them and the close that fills them again, where

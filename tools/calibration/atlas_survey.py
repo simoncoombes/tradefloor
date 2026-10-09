@@ -472,6 +472,12 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "basis_sd": (0.0, 10.0),
     "basis_persistence": (0.0, 0.9),
     "night_session_steps": (0.0, 30.0),
+    # The VIX futures (pt-v22 phase 1): a switch and the intraday loading's
+    # share and half-lives (sessions). None of them moves a stock price.
+    "futures_vix_listed": (0.0, 1.0),
+    "futures_vix_live_fast_share": (0.0, 1.0),
+    "futures_vix_live_fast_half_life": (0.0, 10.0),
+    "futures_vix_live_slow_half_life": (0.0, 120.0),
     # The central bank's stress cut, points per step: 0.5 is a half-point
     # step, two steps a point, which is 2001's and 2008's emergency size.
     "fed_stress_cut": (0.0, 0.5),

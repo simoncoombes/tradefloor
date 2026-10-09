@@ -1168,6 +1168,15 @@ PERTURBATIONS = [
     ("basis_sd", 3.7, False),
     ("basis_persistence", 0.42, False),
     ("night_session_steps", 10.0, False),
+    # The VIX futures (pt-v22 phase 1). INERT by construction: a VIX future
+    # reads the published and live VIX and the forecast, draws nothing and
+    # writes only its own state, so no stock price or VIX moves
+    # (tests/test_vix_futures.py). The switch carries the forecast's horizon
+    # it requires; the loading's dials, the switch.
+    ("futures_vix_listed", 1.0, False),
+    ("futures_vix_live_fast_share", 0.27, False),
+    ("futures_vix_live_fast_half_life", 1.3, False),
+    ("futures_vix_live_slow_half_life", 28.6, False),
     # The VIX's fear memory (pt-v22 phase 1). LIVE: the first close's VIX
     # sits off its target, the memory takes up a share of the gap, and the
     # target the step reverts to moves, which the factor's VIX-coupled
@@ -1990,6 +1999,12 @@ COMPANIONS: dict[str, dict[str, float]] = {
     # futures: each is refused without the switch it reads.
     "futures_index_listed": {"index_level_listed": 1.0},
     "night_session_steps": {"index_level_listed": 1.0, "futures_index_listed": 1.0},
+    # A VIX future is priced on the forecast, out to its sixth contract's
+    # 126 sessions; the loading's dials are refused without the switch.
+    "futures_vix_listed": {"forecast_horizon_sessions": 126.0},
+    "futures_vix_live_fast_share": {"forecast_horizon_sessions": 126.0, "futures_vix_listed": 1.0},
+    "futures_vix_live_fast_half_life": {"forecast_horizon_sessions": 126.0, "futures_vix_listed": 1.0},
+    "futures_vix_live_slow_half_life": {"forecast_horizon_sessions": 126.0, "futures_vix_listed": 1.0},
     # The stress cut's start at 15, where the probe's burn-in reads it (see
     # the rows), and the cut on for the two dials read only with it.
     "fed_stress_cut": {"fed_stress_vix": 15.0},

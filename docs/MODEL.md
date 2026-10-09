@@ -3942,6 +3942,108 @@ index by 11 to 13 bp sd, against about 4 bp at the tenth tick.
 On 40 names the futures and their night add under 2 per cent to the time
 of a session with the three switches above on.
 
+## VIX futures
+
+`futures_vix_listed` lists monthly futures on the published VIX. It is 0.0
+on every shipped preset and left out of the model's digest there, with its
+three companions, the intraday loading's `futures_vix_live_fast_share`,
+`futures_vix_live_fast_half_life` and `futures_vix_live_slow_half_life`. It
+requires `forecast_horizon_sessions` of at least 126, which the sixth
+contract's expectation reads. A VIX future reads the published VIX, the live
+VIX and the forecast, and draws nothing. Nothing a stock price or the VIX
+reads is written, so an untraded run with it on prints the stock prices,
+closes, economy and VIX of the run without it, with the index futures on as
+well, across an expiry and a pin, and a run whose agents trade only VIX
+futures prints the stocks of a run nobody trades (`tests/test_vix_futures.py`,
+seeds 3, 17, 101 and 9001 of pt-v21).
+
+The contracts are monthly. Each expires at session 15 of its 21-session
+month, `21m + 14` counted from 0, where the month's index options expire,
+so every quarterly index-future expiry is also a VIX expiry
+(`derivatives::calendar::monthly_expiry`). The next six are listed, from the
+first close on: before it there is no forecast to price them. The sixth is
+at most 126 sessions out, the furthest horizon VF6 reads. A contract is
+$1,000 a VIX point on a 0.05 grid, `VIX.F0035` for the one expiring at
+session 35, and it settles at its expiry session's open, in cash, on the
+published VIX then: the previous close's value, since the VIX moves only at
+a close (VF7).
+
+At the close of session `s`, a contract `n = expiry - s` sessions out is
+marked at
+
+$$F = E_n + a(n) + b(n)\,(P - c)$$
+
+where $P$ is the published VIX the close leaves and $E_n$ the forecast's
+expected published VIX after $n - 1$ closes ($P$ itself at $n = 1$, when the
+contract settles at the next open on it). The premium is frozen in
+`derivatives::VIX_FUTURE`, fitted once to the CFE VX monthly settlements,
+266 contracts from May 2004, and to nothing the model prints:
+$a(n) = 0.26\,(n - 1)^{0.4925}$ is the settlement $n$ sessions before expiry
+less the final settlement, mean over contracts, and
+$b(n) = 0.36\,(1 - e^{-(n - 1)/148})$ its slope on the VIX's close that day,
+about the VIX's mean over those days, $c = 19.3197$. The close marks
+are the curve the pt-v22 VIX-law screen priced and read, to 1e-12 over
+every horizon from 1 to 126 sessions.
+
+Within the next session a contract is `m = n - 1` sessions from expiry
+counted from tonight's close, and moves with what the session says about
+tonight's VIX:
+
+$$F = E_n + \lambda(m)\,(V - E_1) + (1 - k)\,\pi(n, P) + k\,\pi(m, V)$$
+
+where $\pi(n, v) = a(n) + b(n)(v - c)$ is the premium, $V$ the live VIX
+(`vix_intraday_live`; without it $E_1$, so the surprise is 0), $E_1$ the
+forecast's expectation of tonight's published VIX, and $k$ the share of the
+session's 390 ticks run, over which the premium rolls to the one tonight's
+close will give. The loading is
+$\lambda(m) = w\,0.5^{(m - 1)/H_1} + (1 - w)\,0.5^{(m - 1)/H_2}$, with
+$\lambda(1) = 1$, so
+the contract that settles on tonight's VIX ends the session on the live VIX
+and the close marks it on the VIX it publishes. With the three dials at 0.0
+only that contract follows the live VIX, and the rest hold their marks but
+for the premium's roll. `tools/calibration/vix_futures_dials.py derive`
+fits the dials as the projection of each close's revision of a contract's
+expected settlement on the close's surprise, horizon by horizon, on 40
+held-out histories of 2,000 sessions (seeds 3001 to 3040) with the
+forecast's derived dials; the two-part form misses the slopes by at most
+0.03. On pt-v21's law it gives 0.713, 5.96 and 71.7; on R22V3, the law the
+VIX-law screen settled on, 0.254, 1.25 and 30.0. On 96 other histories of
+R22V3, each with the forecast's dials derived under its law, the slopes read
+1.0, 0.87, 0.78, 0.67, 0.58, 0.45, 0.25, 0.15 and 0.065 at 1, 2, 3, 6, 12,
+22, 43, 64 and 126 sessions, and the dials fitted there are 0.27, 1.27 and
+28.6.
+
+The front three contracts have an agent-facing book: a maker's ladder ten
+levels a side one tick apart at 0.3 per cent of the contract's daily
+volume a level, latent square-root depth at 0.75 and 0.5 out to a day's
+volume at a daily sigma of 5 per cent, and agents' resting orders, with
+daily volumes of 110,000, 55,000 and 25,000 contracts, about CFE VX's by
+position. The other three quote the maker's ladder alone, sized to 8,000.
+Agents' net taker flow against the house marks the price by 0.15 times the
+sigma times the flow over the daily volume, decaying at a half-life of 30
+steps, as an index future's basis does. VIX futures trade in the session
+only: between a close and the next open nothing moves the VIX, and an order
+then is refused. Between sessions a contract is worth its close's value on
+the standing forecast and published VIX, so a pin moves it at once.
+
+On the VIX-law screen's 48 held-out histories (seeds 61001 to 61016 and
+62001 to 62032), each law with the forecast's dials derived under it:
+
+| Row | pt-v21 | R22V3 | Band |
+|---|---|---|---|
+| VF1, contango share | 0.685 | 0.678 | 0.779 to 0.888 |
+| VF2, median annualised F2/F1 slope | 0.425 | 0.473 | 0.601 to 0.868 |
+| VF3, backwardation at a VIX of 30 or more | 0.860 | 0.877 | 0.676 to 0.905 |
+| VF5, constant 21-session long, annual log return | -0.47 | -0.48 | -1.632 to 0.578 |
+| VF6, settlement less final at 21, 63, 126 sessions | 0.74, 1.46, 2.11 | 0.97, 1.59, 2.24 | 0.32-1.80, 0.53-3.66, 0.88-4.91 |
+| VF7, settlement less the published VIX at the expiry open | 0 | 0 | at most 1e-12 |
+
+VF1 and VF2 are out of band on both: the model's curve is in contango on
+fewer sessions, and less steeply, than CFE's.
+
+On 40 names the VIX futures add under 1 per cent to the time of a session
+with the three switches above on.
+
 ## Scenarios
 
 A scenario is a file of changes to the economy or the market, applied once

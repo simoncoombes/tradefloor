@@ -46,6 +46,33 @@ same with them on as off.
   carries them, and the `forecast` buffer, which it could not encode
   before. Every known-answer digest is where it was.
 
+### VIX futures
+
+- `futures_vix_listed` is a new dial, with three companions
+  (`futures_vix_live_fast_share`, `futures_vix_live_fast_half_life` and
+  `futures_vix_live_slow_half_life`), all 0.0 on every preset and left out
+  of the digest there. Off zero the engine lists the next six monthly VIX
+  futures from the first close, each expiring at session `21m + 14` and
+  settling at its expiry's open on the published VIX. A contract is marked
+  at the forecast's expected published VIX at its expiry plus the premium
+  fitted once to the CFE VX settlements and frozen in
+  `derivatives::VIX_FUTURE`. Within a session it moves by the fitted loading
+  times the live VIX's surprise, and its premium rolls. The front three have
+  agent-facing books and the rest a maker's ladder, in the session only.
+  The switch requires `forecast_horizon_sessions` of at least 126.
+- `tools/calibration/vix_futures_dials.py derive` fits the loading's three
+  dials on held-out histories, with `--law` for a candidate law.
+- New API: `ContractKind::VixFuture`, `SettlementRule::PublishedVixAtOpen`,
+  `derivatives::VIX_FUTURE`, `VixFutureSpec`, `VixPremium`,
+  `vix_future_symbol` and `calendar::monthly_expiry` and
+  `vix_future_expiries` in Rust. `Engine.contracts()`, `quote(symbol)` and
+  `settlements(day)` list VIX futures beside the index futures, a VIX
+  future's quote carries `expected`, `premium` and `loading`, and `submit`,
+  `cancel`, `book`, `open_orders` and `take_fills` take them.
+- A snapshot carries `vix_futures` and `vix_futures_book` only under the
+  switch, and the state hash and `manifest.state_hash` cover them behind tags
+  48 and 49 only then. Every known-answer digest is where it was.
+
 ### The VIX's fear memory
 
 - `vix_fear_uptake` and `vix_fear_half_life` are new dials, 0.0 on every
