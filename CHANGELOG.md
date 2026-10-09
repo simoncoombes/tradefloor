@@ -46,6 +46,22 @@ same with them on as off.
   carries them, and the `forecast` buffer, which it could not encode
   before. Every known-answer digest is where it was.
 
+### Margin
+
+- `margin_scan_coverage` and `margin_scan_tail` are new dials, 0.0 on every
+  preset and left out of the digest there. Off zero each listed contract's
+  initial margin, set at each close, is its multiplier times the normal
+  quantile for the coverage times the tail allowance times its one-session
+  sd, an exponentially weighted mean of its squared mark changes at a
+  seven-session half-life; maintenance is initial over 1.1. A quote's
+  `initial_margin` carries it, and the new `maintenance_margin` its
+  maintenance level.
+- `tools/calibration/margin_dials.py derive` fits the tail allowance on
+  held-out histories (1.762 with every phase 1 contract listed), and
+  `measure` reads row MG1: 1.05 per cent on 16 fresh histories.
+- A snapshot carries `margin` only under the coverage, hashed behind tag 54
+  only then. Every known-answer digest is where it was.
+
 ### Oil futures
 
 - `futures_oil_listed` is a new dial, 0.0 on every preset and left out of

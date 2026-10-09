@@ -1185,6 +1185,11 @@ PERTURBATIONS = [
     # reads the oil price and the forecast, draws nothing and writes only its
     # own state (tests/test_oil_futures.py).
     ("futures_oil_listed", 1.0, False),
+    # The contracts' margin (pt-v22 phase 1). INERT by construction: it reads
+    # the marks and writes only its own state (tests/test_margin.py). The
+    # tail allowance carries the coverage it requires.
+    ("margin_scan_coverage", 0.99, False),
+    ("margin_scan_tail", 1.3, False),
     # The VIX's fear memory (pt-v22 phase 1). LIVE: the first close's VIX
     # sits off its target, the memory takes up a share of the gap, and the
     # target the step reverts to moves, which the factor's VIX-coupled
@@ -2010,6 +2015,8 @@ COMPANIONS: dict[str, dict[str, float]] = {
     # A VIX future is priced on the forecast, out to its sixth contract's
     # 126 sessions; the loading's dials are refused without the switch.
     "futures_vix_listed": {"forecast_horizon_sessions": 126.0},
+    # The tail allowance scales the margin, which the coverage sets.
+    "margin_scan_tail": {"margin_scan_coverage": 0.99},
     "futures_vix_live_fast_share": {"forecast_horizon_sessions": 126.0, "futures_vix_listed": 1.0},
     "futures_vix_live_fast_half_life": {"forecast_horizon_sessions": 126.0, "futures_vix_listed": 1.0},
     "futures_vix_live_slow_half_life": {"forecast_horizon_sessions": 126.0, "futures_vix_listed": 1.0},

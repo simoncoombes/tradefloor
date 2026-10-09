@@ -202,8 +202,13 @@ pub struct Quote {
     pub tick: f64,
     /// The daily volume the book's depth is sized to, contracts.
     pub daily_volume: f64,
-    /// The initial margin a contract asks. `None` until margin is listed.
+    /// The initial margin a contract asks, dollars, as the last close set it
+    /// (`margin_scan_coverage`). `None` with no margin and before the
+    /// contract's first close.
     pub initial_margin: Option<f64>,
+    /// The maintenance margin, dollars: the initial over 1.1. `None` where
+    /// `initial_margin` is.
+    pub maintenance_margin: Option<f64>,
     /// A VIX future's expected settlement, the forecast's published VIX at
     /// its expiry as the last close (or pin) expected it; `None` for other
     /// kinds.

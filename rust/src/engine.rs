@@ -80,6 +80,7 @@ mod futures;
 mod vix_futures;
 mod rate_futures;
 mod oil_futures;
+mod margin;
 
 /// The reference MAIN stream's sequence. Not 0 and not 1 —
 /// both are different streams from the same seed, and picking the wrong one
@@ -1170,6 +1171,10 @@ pub struct Engine {
     /// the switch off; carried in the snapshot and the state hash only while
     /// it is set. See `engine::oil_futures`.
     oil_futures: oil_futures::OilFuturesState,
+    /// The listed contracts' margin (`margin_scan_coverage`): empty and never
+    /// touched with the dial off; carried in the snapshot and the state hash
+    /// only while it is set. See `engine::margin`.
+    margin: margin::MarginState,
     /// `fed_stress_cut`: the highest published VIX since the last meeting.
     /// 0.0 and never touched with the cut off; carried in the snapshot and
     /// the state hash only while it is set.
@@ -2306,6 +2311,7 @@ impl Engine {
             vix_futures: vix_futures::VixFuturesState::default(),
             rate_futures: rate_futures::RateFuturesState::default(),
             oil_futures: oil_futures::OilFuturesState::default(),
+            margin: margin::MarginState::default(),
             stress_vix_max: 0.0,
             stress_hold_age: STRESS_HOLD_NEVER,
             drawdown_returns: std::collections::VecDeque::new(),
@@ -2457,6 +2463,8 @@ impl Engine {
         pre.params.futures_vix_live_slow_half_life = 0.0;
         pre.params.futures_rates_listed = 0.0;
         pre.params.futures_oil_listed = 0.0;
+        pre.params.margin_scan_coverage = 0.0;
+        pre.params.margin_scan_tail = 0.0;
         pre.earnings_key = crate::rng::prehistory_key(self.earnings_key);
         pre.cycle_publication.key = crate::rng::prehistory_key(self.cycle_publication.key);
         let opening = (self.economy.cycle_phase, self.economy.months_in_current_phase);
@@ -10360,6 +10368,9 @@ impl Engine {
         self.rate_futures_close_marks();
         // The oil futures' marks on the forecast (`futures_oil_listed`).
         self.oil_futures_close_marks();
+        // The contracts' margin on every family's marks
+        // (`margin_scan_coverage`). Nothing with the dial off.
+        self.margin_close_update();
         // The night's path for the index futures, to the next open as a copy
         // runs it (`night_session_steps`). Nothing with the dial at 0.0.
         self.futures_night_setup();
@@ -12341,6 +12352,15 @@ impl Engine {
         if let Some(book) = self.oil_futures_book_state() {
             hash_f64(&mut buf, 53.0);
             hash_book(&mut buf, book);
+        }
+        // The contracts' margin, only while `margin_scan_coverage` is set,
+        // behind its own tag, length-prefixed.
+        if let Some(words) = self.margin_words() {
+            hash_f64(&mut buf, 54.0);
+            hash_u32(&mut buf, words.len() as u32);
+            for value in words {
+                hash_f64(&mut buf, value);
+            }
         }
         // LENGTH-PREFIXED, because these two are EMPTY between the tape row
         // that consumes them and the close that fills them again, where

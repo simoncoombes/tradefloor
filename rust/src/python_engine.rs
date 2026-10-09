@@ -4765,8 +4765,10 @@ impl PyEngine {
     /// `night_session_steps`); `rate`, the financing rate, fractional;
     /// `dividends`, the present value of the dividends going ex before it
     /// settles, index points; `sessions_to_expiry`; `multiplier`; `tick`;
-    /// `daily_volume`, contracts; `initial_margin` (None: no margin is
-    /// listed yet); and `symbol`, `kind` and `expiry`.
+    /// `daily_volume`, contracts; `initial_margin` and `maintenance_margin`,
+    /// dollars a contract, as the last close set them (`margin_scan_coverage`;
+    /// None without margin and before the contract's first close); and
+    /// `symbol`, `kind` and `expiry`.
     ///
     /// For a VIX future, `fair` is the expected settlement plus the premium,
     /// moved within a session by the live VIX's surprise: `expected` (the
@@ -4810,6 +4812,7 @@ impl PyEngine {
         d.set_item("tick", q.tick)?;
         d.set_item("daily_volume", q.daily_volume)?;
         d.set_item("initial_margin", q.initial_margin)?;
+        d.set_item("maintenance_margin", q.maintenance_margin)?;
         d.set_item("expected", q.expected)?;
         d.set_item("premium", q.premium)?;
         d.set_item("loading", q.loading)?;

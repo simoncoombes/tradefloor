@@ -807,6 +807,7 @@ impl Engine {
             tick: VIX_FUTURE.tick,
             daily_volume: Self::vix_futures_daily_volume(slot),
             initial_margin: None,
+            maintenance_margin: None,
             expected: Some(v.expected),
             premium: Some(v.premium),
             loading: Some(v.loading),
