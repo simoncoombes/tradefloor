@@ -908,6 +908,40 @@ pub struct ModelParams {
     /// meant beside a supply response of 1.0. It takes no draw.
     /// pt-v21 ships 0.002.
     pub oil_inventory_reversion: f64,
+    /// The share of the oil price's gap to its target closed each session.
+    /// 0.0, on every shipped preset, is the standing 0.03 (a half-life of 23
+    /// sessions), a branch to the arithmetic that stood, and a value of 0.0
+    /// is left out of the model's digest.
+    ///
+    /// Futures curves read oil's shocks as far slower to fade: Bessembinder,
+    /// Coughenour, Seguin and Smoller (Journal of Finance 50(1), 1995) find
+    /// 44 per cent of a spot shock reversed over eight months, about 0.0035
+    /// a session, and Schwartz (Journal of Finance 52(3), 1997) a reversion
+    /// of about a year. The forecast steps the same law, so its expectation
+    /// (and the oil futures priced on it) follow the dial. In (0, 1].
+    pub oil_mean_reversion: f64,
+    /// The sd of the oil price's daily noise, dollars, at a volatility of
+    /// 1.0. 0.0, on every shipped preset, is the standing 2.0, a branch to
+    /// the arithmetic that stood, and a value of 0.0 is left out of the
+    /// model's digest. A slower `oil_mean_reversion` widens the price's
+    /// stationary spread, `sd / sqrt(2 k)` before the clamps, so the two are
+    /// set together. In [0, 10]; the draw is taken either way.
+    pub oil_noise_sd: f64,
+    /// How inventory outside its 40 to 60 dead zone moves the oil price.
+    /// 0.0, on every shipped preset, is the standing push: each session adds
+    /// the pressure, 0.08 dollars a unit of inventory outside the zone, so a
+    /// shortage keeps raising the price while it lasts and the expected path
+    /// rises (contango) when stocks are low. A value of 0.0 is left out of
+    /// the model's digest.
+    ///
+    /// Off zero the pressure acts on the price's level: each session adds
+    /// this many times the change in the pressure, so a shortage raises the
+    /// price at once by `G` times its pressure and the premium unwinds as
+    /// inventory refills and as the price reverts to its target. That is
+    /// the convenience yield of Gorton, Hayashi and Rouwenhorst (Review of
+    /// Finance 17(1), 2013): low stocks, a high spot and a curve in
+    /// backwardation (row OF2). In sessions, [0, 2520].
+    pub oil_inventory_level_gain: f64,
     /// Inflation's monthly response to the oil price, the same either side of
     /// oil's anchor, as a multiple of the 0.01 a dollar the release pays
     /// above 80.
@@ -7657,6 +7691,9 @@ impl ModelParams {
             unemployment_okun_coefficient: 0.0,
             unemployment_natural_rate: 0.0,
             oil_inventory_reversion: 0.0,
+            oil_mean_reversion: 0.0,
+            oil_noise_sd: 0.0,
+            oil_inventory_level_gain: 0.0,
             oil_inflation_passthrough: 0.0,
             index_level_listed: 0.0,
             vix_intraday_live: 0.0,
@@ -10264,6 +10301,9 @@ impl ModelParams {
             "unemployment_okun_coefficient" => self.unemployment_okun_coefficient,
             "unemployment_natural_rate" => self.unemployment_natural_rate,
             "oil_inventory_reversion" => self.oil_inventory_reversion,
+            "oil_mean_reversion" => self.oil_mean_reversion,
+            "oil_noise_sd" => self.oil_noise_sd,
+            "oil_inventory_level_gain" => self.oil_inventory_level_gain,
             "oil_inflation_passthrough" => self.oil_inflation_passthrough,
             "index_level_listed" => self.index_level_listed,
             "vix_intraday_live" => self.vix_intraday_live,
@@ -10636,6 +10676,9 @@ impl ModelParams {
             "unemployment_okun_coefficient" => out.unemployment_okun_coefficient = value,
             "unemployment_natural_rate" => out.unemployment_natural_rate = value,
             "oil_inventory_reversion" => out.oil_inventory_reversion = value,
+            "oil_mean_reversion" => out.oil_mean_reversion = value,
+            "oil_noise_sd" => out.oil_noise_sd = value,
+            "oil_inventory_level_gain" => out.oil_inventory_level_gain = value,
             "oil_inflation_passthrough" => out.oil_inflation_passthrough = value,
             "index_level_listed" => out.index_level_listed = value,
             "vix_intraday_live" => out.vix_intraday_live = value,
@@ -11957,6 +12000,25 @@ impl ModelParams {
                  closed, in [0, 1]; 0 is off.",
                 self.oil_inventory_reversion));
         }
+        if !(self.oil_mean_reversion >= 0.0 && self.oil_mean_reversion <= 1.0) {
+            return Err(format!(
+                "oil_mean_reversion is {}. It is the share of the oil price's gap to its target \
+                 closed each session, in [0, 1]; 0 is the standing 0.03.",
+                self.oil_mean_reversion));
+        }
+        if !(0.0..=10.0).contains(&self.oil_noise_sd) {
+            return Err(format!(
+                "oil_noise_sd is {}. It is the sd of the oil price's daily noise in dollars, in \
+                 [0, 10]; 0 is the standing 2.0.",
+                self.oil_noise_sd));
+        }
+        if !(0.0..=2520.0).contains(&self.oil_inventory_level_gain) {
+            return Err(format!(
+                "oil_inventory_level_gain is {}. It is the sessions of pressure a change in \
+                 inventory's pressure moves the oil price's level by, in [0, 2520]; 0 is the \
+                 standing push.",
+                self.oil_inventory_level_gain));
+        }
         if !(self.oil_inflation_passthrough >= 0.0 && self.oil_inflation_passthrough <= 3.0) {
             return Err(format!(
                 "oil_inflation_passthrough is {}. It is the oil pass-through as a multiple of \
@@ -12577,6 +12639,9 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "unemployment_okun_coefficient",
     "unemployment_natural_rate",
     "oil_inventory_reversion",
+    "oil_mean_reversion",
+    "oil_noise_sd",
+    "oil_inventory_level_gain",
     "oil_inflation_passthrough",
     "index_level_listed",
     "vix_intraday_live",
@@ -12770,6 +12835,9 @@ pub fn settable_names() -> Vec<&'static str> {
         "unemployment_okun_coefficient",
         "unemployment_natural_rate",
         "oil_inventory_reversion",
+        "oil_mean_reversion",
+        "oil_noise_sd",
+        "oil_inventory_level_gain",
         "oil_inflation_passthrough",
         "index_level_listed",
         "vix_intraday_live",
