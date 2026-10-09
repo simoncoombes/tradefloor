@@ -4211,8 +4211,29 @@ margin the previous close set (row MG1, 0.5 to 1.5 per cent pooled):
 |---|---|---|---|---|---|---|
 | Past the margin, % | 0.17 | 1.80 | 1.38 | 1.64 | 0.27 | 1.05 |
 
-Accounts do not post or call margin yet: `Portfolio` margin, variation
-margin, calls and liquidation follow.
+A `Portfolio` holds a future at a mark: a trade pays only its distance
+from the mark, so the position is held at it; each close pays the move to
+the new settlement mark in cash (variation margin, `Portfolio.settle_close`);
+and the contract's settlement pays the last move, to the settlement price,
+and closes the position (at the open for index, VIX and oil futures, at the
+close for rate futures; `Portfolio.settled`). A position's value is its
+quantity times its multiplier times its price's distance from the mark, net
+worth counts it, and the leverage limit counts a future at its notional.
+`Portfolio.margin_requirement` is the contracts' initial margin times the
+contracts held, or their maintenance margin. A close that leaves the
+account's equity under the maintenance requirement makes a margin call
+(`Portfolio.margin_calls`); at the next open (`Portfolio.settle_open`) the
+call is met when equity is back at or above the initial requirement, and
+otherwise every futures position is closed at the market through its book
+(`Portfolio.liquidations`), so no account carries a call past an open (row
+MG2). `tf.evaluate`, `tf.rank`, `World`, the gym environment and MCP
+sessions call both hooks; a portfolio that never traded a future asks the
+engine nothing new, so every scorecard without futures is the one it was.
+An agent sees the contracts through `obs.engine.contracts()`,
+`obs.engine.quote(symbol)` and `obs.engine.settlements()`, and trades one by
+its symbol in the mapping `act` returns. The scorecard's impact reads the
+names' prices, which no contract moves. Stock is not liquidated: with the
+futures closed the requirement is nil.
 
 ## Scenarios
 
