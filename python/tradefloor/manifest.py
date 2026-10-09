@@ -589,6 +589,8 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          "oil_futures", "oil_futures_book",
          # The contracts' margin, only while `margin_scan_coverage` is set.
          "margin",
+         # Oil's long factor, only while `oil_target_drift_sd` is set.
+         "oil_target_drift",
          # The dividend states, on a model that pays dividends, and an
          # ex-date's move in `s` waiting for its tape row.
          "dividend", "pending_dividend",
@@ -1052,6 +1054,12 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         _f64(buf, 54.0)
         _u32(buf, len(values))
         for value in values:
+            _f64(buf, value)
+    # Oil's long factor, only while `oil_target_drift_sd` is set, behind its
+    # own tag: its log level and its key's two words.
+    if "oil_target_drift" in snapshot:
+        _f64(buf, 55.0)
+        for value in _column(snapshot["oil_target_drift"], 3, "oil_target_drift"):
             _f64(buf, value)
     # LENGTH-PREFIXED, because these two are empty between the tape row that
     # consumes them and the close that fills them again -- unlike every
@@ -1682,7 +1690,8 @@ _LEDGER_OPTIONAL_BUFFERS = ("fair_value_offset", "opening_z", "pending_fair_valu
                             "pending_dividend", "fed_drawdown_returns",
                             "innovation_day", "forecast", "futures",
                             "night_bridge", "vix_futures", "rate_futures",
-                            "oil_futures", "margin", "shares_outstanding")
+                            "oil_futures", "margin", "shares_outstanding",
+                            "oil_target_drift")
 
 #: The ``fundamentals`` block's buffers, one per company each.
 _LEDGER_FUNDAMENTALS = ("eps", "book_value_per_share", "revenue_growth")

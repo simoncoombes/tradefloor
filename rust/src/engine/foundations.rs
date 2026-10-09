@@ -732,6 +732,10 @@ impl Engine {
         let mut universe_stress = self.universe_stress;
         let mut down = Some(self.market_vol.prev_day_down());
         let (mut var_oil, mut var_inventory) = (0.0, 0.0);
+        // Oil's long factor (`oil_target_drift_sd`): the mean and variance of
+        // its log level, so the step reads the log of the level's
+        // expectation, `m + v / 2`, which stays where it is with no pull.
+        let (mut drift_mean, mut drift_var) = (self.oil_target_drift, 0.0);
         let policy = self.forecast_policy_path(day, horizon);
         let k_curve = intraday_variance_factor();
         // The spread's shape (`forecast_vix_dispersion_skew`), and the stress
@@ -932,10 +936,28 @@ impl Engine {
             // expected safe-haven drift over the VIX's spread.
             let opec_day = econ.oil_last_opec_day;
             let oil_before = econ.oil_price;
-            let mut next = update_economy_daily(&econ, &inputs, &mut crate::economy::daily::MeanDraws);
             let kappa = p.oil_inventory_reversion;
             let sd_before = crate::mathx::sqrt(var_inventory);
-            var_inventory = (1.0 - kappa) * (1.0 - kappa) * var_inventory + 0.25;
+            let var_after = (1.0 - kappa) * (1.0 - kappa) * var_inventory + 0.25;
+            // The convenience premium (`oil_convenience_yield`) is convex in
+            // inventory, so the step reads its expectation over the
+            // inventory's spread, before the step and after it, rather than
+            // its value on the expected path: the expected price is then the
+            // premium-free path times the premium's expectation.
+            if p.oil_convenience_yield != 0.0 {
+                inputs.oil_convenience_inventory_var_before = var_inventory;
+                inputs.oil_convenience_inventory_var = var_after;
+            }
+            if p.oil_target_drift_sd != 0.0 {
+                let sigma = p.oil_target_drift_sd;
+                let pull = 1.0 - p.oil_target_drift_reversion;
+                let before = drift_mean + 0.5 * drift_var;
+                drift_mean = pull * drift_mean - 0.5 * sigma * sigma;
+                drift_var = pull * pull * drift_var + sigma * sigma;
+                inputs.oil_target_drift = Some((before, drift_mean + 0.5 * drift_var));
+            }
+            let mut next = update_economy_daily(&econ, &inputs, &mut crate::economy::daily::MeanDraws);
+            var_inventory = var_after;
             let sd_inv = crate::mathx::sqrt(var_inventory);
             let gap = |level: f64, sd: f64| {
                 crate::economy::daily::inventory_pressure_expected(level, sd)

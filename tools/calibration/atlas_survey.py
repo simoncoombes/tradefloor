@@ -655,6 +655,14 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "oil_mean_reversion": (0.0, 0.03),
     "oil_noise_sd": (0.0, 3.0),
     "oil_inventory_level_gain": (0.0, 100.0),
+    # The convenience premium's elasticity to inventory: 4 is the grid's
+    # steepest, a target 16 times higher at the floor of 25. Refused where
+    # the draw puts oil_inventory_reversion at 0.
+    "oil_convenience_yield": (0.0, 4.0),
+    # Oil's long factor: double EIA's 0.018 a session at the top. The pull
+    # is a share a session; 0.002 is a half-life of a year and a half.
+    "oil_target_drift_sd": (0.0, 0.036),
+    "oil_target_drift_reversion": (0.0, 0.002),
     # The share of oil demand supply answers on the daily step. Bounded by
     # meaning again: 0.0 is the hardcoded zero the reference writes, 1.0 is
     # the value that makes the inventory random walk driftless, and past 1.0

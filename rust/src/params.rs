@@ -942,6 +942,50 @@ pub struct ModelParams {
     /// Finance 17(1), 2013): low stocks, a high spot and a curve in
     /// backwardation (row OF2). In sessions, [0, 2520].
     pub oil_inventory_level_gain: f64,
+    /// The convenience yield of oil inventory, as an elasticity of the oil
+    /// price's target to inventory. 0.0, on every shipped preset, is no
+    /// premium, and a value of 0.0 is left out of the model's digest.
+    ///
+    /// Off zero the price carries a premium on its level, `S = X (I / 50)^-k`
+    /// with `I` read at no lower than 25 and `X` the premium-free price,
+    /// which reverts to the target: each session reverts toward the target
+    /// times the premium it opened with and then moves the level by the
+    /// premium's change to the inventory the step leaves. Low stocks raise
+    /// the price at once and the premium unwinds as inventory refills toward
+    /// 50, so the expected path falls and the curve is in backwardation;
+    /// high stocks put it in contango. A premium on the target alone, which
+    /// the price reaches only at its own reversion, made the expected path
+    /// rise while stocks were low. That is the theory of storage (Working, American Economic
+    /// Review 39(6), 1949; Brennan, American Economic Review 48(1), 1958)
+    /// and Gorton, Hayashi and Rouwenhorst's finding (Review of Finance
+    /// 17(1), 2013) that the curve steepens into backwardation as stocks fall
+    /// (row OF2). The forecast takes the premium's expectation over
+    /// inventory's spread, so the oil futures price it unbiased. Needs
+    /// `oil_inventory_reversion`, without which inventory has no level to
+    /// refill to. In [0, 10].
+    pub oil_convenience_yield: f64,
+    /// The sd, per session, of a random walk on the log of the oil price's
+    /// long-term level: the long factor of Schwartz and Smith (Management
+    /// Science 46(7), 2000), beside the short-term deviation that reverts to
+    /// the target. 0.0, on every shipped preset, is no long factor: the
+    /// price reverts to a fixed target and every move of its level is
+    /// expected to reverse. A value of 0.0 takes no draw and is left out of
+    /// the model's digest.
+    ///
+    /// Off zero each close draws the level's log change, `sigma z - sigma^2
+    /// / 2` (so the level itself is a martingale), on a key of its own, and
+    /// the whole price moves with it: the premium-free price reverts to the
+    /// target times the level, and the level's change moves spot and every
+    /// futures contract alike. The forecast holds the level's expectation,
+    /// so a long-factor move shifts the whole curve. EIA's contracts 1 and 4
+    /// give the long factor a daily sd of 0.018 (the median of seven
+    /// five-year windows, 1987 to 2024). In [0, 0.1].
+    pub oil_target_drift_sd: f64,
+    /// The share of the long factor's log level returned to 0 each session,
+    /// a weak pull that keeps the random walk off the price's clamps. 0.0,
+    /// on every shipped preset, is none. Read only with
+    /// `oil_target_drift_sd`. In [0, 1].
+    pub oil_target_drift_reversion: f64,
     /// Inflation's monthly response to the oil price, the same either side of
     /// oil's anchor, as a multiple of the 0.01 a dollar the release pays
     /// above 80.
@@ -7721,6 +7765,9 @@ impl ModelParams {
             oil_mean_reversion: 0.0,
             oil_noise_sd: 0.0,
             oil_inventory_level_gain: 0.0,
+            oil_convenience_yield: 0.0,
+            oil_target_drift_sd: 0.0,
+            oil_target_drift_reversion: 0.0,
             oil_inflation_passthrough: 0.0,
             index_level_listed: 0.0,
             vix_intraday_live: 0.0,
@@ -10333,6 +10380,9 @@ impl ModelParams {
             "oil_mean_reversion" => self.oil_mean_reversion,
             "oil_noise_sd" => self.oil_noise_sd,
             "oil_inventory_level_gain" => self.oil_inventory_level_gain,
+            "oil_convenience_yield" => self.oil_convenience_yield,
+            "oil_target_drift_sd" => self.oil_target_drift_sd,
+            "oil_target_drift_reversion" => self.oil_target_drift_reversion,
             "oil_inflation_passthrough" => self.oil_inflation_passthrough,
             "index_level_listed" => self.index_level_listed,
             "vix_intraday_live" => self.vix_intraday_live,
@@ -10710,6 +10760,9 @@ impl ModelParams {
             "oil_mean_reversion" => out.oil_mean_reversion = value,
             "oil_noise_sd" => out.oil_noise_sd = value,
             "oil_inventory_level_gain" => out.oil_inventory_level_gain = value,
+            "oil_convenience_yield" => out.oil_convenience_yield = value,
+            "oil_target_drift_sd" => out.oil_target_drift_sd = value,
+            "oil_target_drift_reversion" => out.oil_target_drift_reversion = value,
             "oil_inflation_passthrough" => out.oil_inflation_passthrough = value,
             "index_level_listed" => out.index_level_listed = value,
             "vix_intraday_live" => out.vix_intraday_live = value,
@@ -12052,6 +12105,38 @@ impl ModelParams {
                  standing push.",
                 self.oil_inventory_level_gain));
         }
+        if !(0.0..=10.0).contains(&self.oil_convenience_yield) {
+            return Err(format!(
+                "oil_convenience_yield is {}. It is the elasticity of the oil price's target to \
+                 inventory, in [0, 10]; 0 is no premium.",
+                self.oil_convenience_yield));
+        }
+        if self.oil_convenience_yield != 0.0 && self.oil_inventory_reversion == 0.0 {
+            return Err(format!(
+                "oil_inventory_reversion is 0 but oil_convenience_yield is {}. The premium unwinds \
+                 as inventory refills to its normal level, which only oil_inventory_reversion \
+                 gives it: set oil_inventory_reversion first.",
+                self.oil_convenience_yield));
+        }
+        if !(0.0..=0.1).contains(&self.oil_target_drift_sd) {
+            return Err(format!(
+                "oil_target_drift_sd is {}. It is the daily sd of the log of oil's long-term \
+                 level, in [0, 0.1]; 0 is no long factor.",
+                self.oil_target_drift_sd));
+        }
+        if !(0.0..=1.0).contains(&self.oil_target_drift_reversion) {
+            return Err(format!(
+                "oil_target_drift_reversion is {}. It is the share of the long factor's log \
+                 level returned to 0 each session, in [0, 1]; 0 is none.",
+                self.oil_target_drift_reversion));
+        }
+        if self.oil_target_drift_reversion != 0.0 && self.oil_target_drift_sd == 0.0 {
+            return Err(format!(
+                "oil_target_drift_sd is 0 but oil_target_drift_reversion is {}. The pull acts \
+                 on the long factor, which only oil_target_drift_sd makes: set \
+                 oil_target_drift_sd first.",
+                self.oil_target_drift_reversion));
+        }
         if !(self.oil_inflation_passthrough >= 0.0 && self.oil_inflation_passthrough <= 3.0) {
             return Err(format!(
                 "oil_inflation_passthrough is {}. It is the oil pass-through as a multiple of \
@@ -12696,6 +12781,9 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "oil_mean_reversion",
     "oil_noise_sd",
     "oil_inventory_level_gain",
+    "oil_convenience_yield",
+    "oil_target_drift_sd",
+    "oil_target_drift_reversion",
     "oil_inflation_passthrough",
     "index_level_listed",
     "vix_intraday_live",
@@ -12894,6 +12982,9 @@ pub fn settable_names() -> Vec<&'static str> {
         "oil_mean_reversion",
         "oil_noise_sd",
         "oil_inventory_level_gain",
+        "oil_convenience_yield",
+        "oil_target_drift_sd",
+        "oil_target_drift_reversion",
         "oil_inflation_passthrough",
         "index_level_listed",
         "vix_intraday_live",

@@ -1525,8 +1525,23 @@ With `oil_inventory_level_gain` $G > 0$ inventory's pressure $p(I)$ moves
 the price by $G\,(p(I') - p(I))$ a session in place of $p(I')$, so a
 shortage raises the price at once and the premium unwinds as inventory
 refills: the convenience yield of the theory of storage, low stocks with a
-curve in backwardation. The forecast steps the same law, so its expected
-oil, and the oil futures priced on it, follow each dial.
+curve in backwardation. With `oil_convenience_yield` $k > 0$ the price
+carries a premium on its level, $S = X\,(I/50)^{-k}$ with inventory read at no
+lower than 25 and $X$ the premium-free price reverting to the target: the
+convenience yield of the theory of storage (Working 1949; Brennan 1958),
+which low stocks raise at once and refilling unwinds, so the curve is in backwardation when
+stocks are low and in contango when they are high (Gorton, Hayashi and
+Rouwenhorst 2013, row OF2). It needs `oil_inventory_reversion`, which gives
+inventory the level it refills to. The forecast steps the same law, so its
+expected oil, and the oil futures priced on it, follow each dial; for the
+premium it takes the expectation over inventory's spread, since the
+premium is convex in inventory. With `oil_target_drift_sd` $\sigma > 0$ the
+price also carries a long factor, $S = X\,e^{D} f(I)$, with $D$ a random walk
+on its own key, $D' = (1-r) D - \sigma^2/2 + \sigma z$: the long-term level of
+Schwartz and Smith (Management Science 46(7), 2000), which moves spot and
+every contract alike while $X$ reverts. With no pull ($r = 0$) $e^D$ is a
+martingale and the forecast holds it; `oil_target_drift_reversion` $r$ is a
+weak pull that keeps the walk off the clamps.
 
 | Dial | pt-v20 | pt-v21 | Kind | Source |
 |---|---|---|---|---|
@@ -1538,6 +1553,9 @@ oil, and the oil futures priced on it, follow each dial.
 | `oil_mean_reversion` $\lambda$ | 0 (0.03); up to 1 | same | not set | Bessembinder et al. (1995), about 0.0035 a session; Schwartz (1997) |
 | `oil_noise_sd` $\sigma$ | 0 (2.0); up to 10 | same | not set | set with $\lambda$: the stationary spread before the clamps is $\sigma / \sqrt{2\lambda}$ |
 | `oil_inventory_level_gain` $G$ | 0 (the daily push); up to 2520 | same | not set | Gorton, Hayashi and Rouwenhorst (2013): low inventories, a high spot and backwardation |
+| `oil_target_drift_sd` $\sigma$ | 0 (no long factor); up to 0.1 | same | not set | EIA's contracts 1 and 4: the long factor's daily sd, 0.018 (median of seven five-year windows, 1987 to 2024) |
+| `oil_target_drift_reversion` $r$ | 0 (no pull); up to 1 | same | not set | none: a stated guard against the clamps |
+| `oil_convenience_yield` $k$ | 0 (no premium); up to 10 | same | not set | Working (1949), Brennan (1958); EIA's US crude stocks: the curve's slope on stocks' deviation from their 5-year mean, correlation 0.557 and slope 0.33, 1987 to 2024 |
 
 ### The fear and greed index
 

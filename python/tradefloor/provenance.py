@@ -515,6 +515,19 @@ OUT_OF_SCOPE = {
         "inventory's pressure each session as the shipped step does, and the "
         "forecast's expected push is the standing one; at 0.0 it is also left "
         "out of the model's digest",
+    "oil_target_drift_sd":
+        "inert at 0.0: the close takes no draw for it (`Engine::oil_drift_step` "
+        "returns None) and `update_economy_daily` steps the price that stood; "
+        "nothing is snapshotted or hashed, and at 0.0 it is also left out of "
+        "the model's digest",
+    "oil_target_drift_reversion":
+        "unread while `oil_target_drift_sd` is 0.0, as every preset ships it, "
+        "and refused without it; at 0.0 it is also left out of the model's "
+        "digest",
+    "oil_convenience_yield":
+        "inert at 0.0: `update_economy_daily` branches on `== 0.0` and reverts "
+        "oil to the target that stood, and the forecast takes no premium's "
+        "expectation; at 0.0 it is also left out of the model's digest",
     # The VIX's fear memory (pt-v22 phase 1, the VIX law), inert on every
     # shipped preset.
     "vix_fear_uptake":

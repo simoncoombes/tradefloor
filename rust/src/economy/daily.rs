@@ -318,6 +318,20 @@ pub struct DailyInputs<'a> {
     /// Inventory's pressure on oil's level, sessions. 0.0 is the shipped
     /// daily push. See `ModelParams::oil_inventory_level_gain`.
     pub oil_inventory_level_gain: f64,
+    /// The convenience yield's elasticity of oil's target to inventory. 0.0
+    /// is no premium. See `ModelParams::oil_convenience_yield`.
+    pub oil_convenience_yield: f64,
+    /// The variance of the inventory the premium reads after the step, about
+    /// the level the step computes: 0.0 at a close, which reads the
+    /// inventory it has; the forecast's spread on its expected path, so the
+    /// step reads the premium's expectation. See [`oil_convenience_factor`].
+    pub oil_convenience_inventory_var: f64,
+    /// The same before the step, about the inventory the step starts from.
+    pub oil_convenience_inventory_var_before: f64,
+    /// The oil price's long factor (`ModelParams::oil_target_drift_sd`): the
+    /// log of its level before the step and after it. `None` is no long
+    /// factor. The forecast passes the log of the level's expectation.
+    pub oil_target_drift: Option<(f64, f64)>,
     /// The business-cycle phase and the GDP growth (percent) the fear/greed
     /// index reads, as PUBLISHED (`ModelParams::fear_greed_published_inputs`),
     /// or `None` for the economy's own, as it always read them.
@@ -482,6 +496,10 @@ impl<'a> Default for DailyInputs<'a> {
             oil_mean_reversion: 0.0,
             oil_noise_sd: 0.0,
             oil_inventory_level_gain: 0.0,
+            oil_convenience_yield: 0.0,
+            oil_convenience_inventory_var: 0.0,
+            oil_convenience_inventory_var_before: 0.0,
+            oil_target_drift: None,
             oil_inflation_passthrough: 0.0,
             fear_greed_published: None,
             yields: YieldDials::default(),
@@ -795,6 +813,41 @@ pub fn unemployment_drive(unemployment_trend: f64, phase: CyclePhase, growth: f6
 /// which inventory puts no pressure on the oil price, and the level it
 /// opens at. Read only under `ModelParams::oil_inventory_reversion`.
 pub const OIL_INVENTORY_NORMAL: f64 = 50.0;
+
+/// The lowest inventory the convenience premium reads
+/// (`ModelParams::oil_convenience_yield`): half the normal level, where the
+/// premium is `2^k`. Below it the target is pinned at its steepest, so a
+/// premium that grows without bound as stocks run out cannot carry the price
+/// past what its clamps hold.
+pub const OIL_CONVENIENCE_FLOOR: f64 = 25.0;
+
+/// The convenience premium's factor on oil's target, `exp(-k ln(I / 50))`
+/// with `I` read at no lower than [`OIL_CONVENIENCE_FLOOR`] and no higher
+/// than 100. With `var` above 0 it is the factor's expectation over an
+/// inventory normal about `inventory` with that variance, as the forecast
+/// needs it: the factor is convex, so its value at the expected inventory is
+/// below its expected value. The expectation is a trapezoid sum over six
+/// standard deviations either side at a tenth of one, which the floor's kink
+/// costs nothing to (a Gauss-Hermite rule, exact for smooth polynomials,
+/// was 0.6 per cent off at the floor).
+pub fn oil_convenience_factor(kappa: f64, inventory: f64, var: f64) -> f64 {
+    let at = |i: f64| {
+        let i = clamp(i, OIL_CONVENIENCE_FLOOR, 100.0);
+        mathx::exp(-kappa * mathx::log(i / OIL_INVENTORY_NORMAL))
+    };
+    if !(var > 0.0) {
+        return at(inventory);
+    }
+    let sd = mathx::sqrt(var);
+    let (mut total, mut mass) = (0.0, 0.0);
+    for i in -60..=60 {
+        let z = i as f64 / 10.0;
+        let w = mathx::exp(-0.5 * z * z);
+        total += w * at(inventory + z * sd);
+        mass += w;
+    }
+    total / mass
+}
 
 /// The oil price at which inflation takes no oil term under
 /// `ModelParams::oil_inflation_passthrough`: the level oil's reversion
@@ -2080,26 +2133,57 @@ pub fn update_economy_daily(
             1.0 + (1.0 - g) * oil_seasonal_amplitude,
         )
     };
+    // `oil_convenience_yield`: the premium low stocks put on the price's
+    // LEVEL, `S = X f(I)` with `X` the premium-free price that reverts to
+    // the target. The step reverts toward the target carrying the premium
+    // the session opened with, `f(I)`, and then moves the level by the
+    // premium's change to the inventory the step leaves, `f(I') / f(I)`. So
+    // a shortage raises the price at once and the premium unwinds as stocks
+    // refill: the expected path falls, backwardation. A premium on the
+    // target alone, which the price reaches only at its own slow reversion,
+    // made the expected path RISE while stocks were low: contango, the
+    // wrong sign. A branch, so 0.0 is the step that stood.
+    //
+    // `oil_target_drift_sd`: the long factor rides on the level the same
+    // way, `S = X e^D f(I)`, so its change moves spot and the whole curve
+    // alike while `X` reverts to the target.
+    let (oil_reversion_target, oil_premium_ratio) =
+        if inputs.oil_convenience_yield == 0.0 && inputs.oil_target_drift.is_none() {
+            (oil_target, None)
+        } else {
+            let (mut opened, mut left) = (1.0, 1.0);
+            if inputs.oil_convenience_yield != 0.0 {
+                let k = inputs.oil_convenience_yield;
+                opened = oil_convenience_factor(k, oil_inventory, inputs.oil_convenience_inventory_var_before);
+                left = oil_convenience_factor(k, new_oil_inventory, inputs.oil_convenience_inventory_var);
+            }
+            if let Some((d, d_next)) = inputs.oil_target_drift {
+                opened *= mathx::exp(d);
+                left *= mathx::exp(d_next);
+            }
+            (oil_target * opened, Some(left / opened))
+        };
     // `oil_mean_reversion` and `oil_noise_sd`: branches, so 0.0 multiplies
     // by the standing 0.03 and 2.0 as the reference always did.
     let oil_mean_rev = if inputs.oil_mean_reversion == 0.0 {
-        (oil_target - economy.oil_price) * 0.03
+        (oil_reversion_target - economy.oil_price) * 0.03
     } else {
-        (oil_target - economy.oil_price) * inputs.oil_mean_reversion
+        (oil_reversion_target - economy.oil_price) * inputs.oil_mean_reversion
     };
     let oil_volatility = if inputs.oil_noise_sd == 0.0 { 2.0 * volatility } else { inputs.oil_noise_sd * volatility };
-    new_state.oil_price = clamp(
-        (economy.oil_price
-            + oil_mean_rev
-            + oil_inventory_pressure
-            + oil_usd_drag
-            + opec_impact
-            + random_normal(rng, 0.0, oil_volatility)
-            + shock_oil_impact * 0.1)
-            * oil_level_seasonality,
-        35.0,
-        150.0,
-    );
+    let oil_level = (economy.oil_price
+        + oil_mean_rev
+        + oil_inventory_pressure
+        + oil_usd_drag
+        + opec_impact
+        + random_normal(rng, 0.0, oil_volatility)
+        + shock_oil_impact * 0.1)
+        * oil_level_seasonality;
+    let oil_level = match oil_premium_ratio {
+        None => oil_level,
+        Some(ratio) => oil_level * ratio,
+    };
+    new_state.oil_price = clamp(oil_level, 35.0, 150.0);
 
     // ── Gold ──────────────────────────────────────────────────────────────
     let real_rate = economy.federal_funds_rate - economy.inflation_rate;
@@ -4301,6 +4385,53 @@ mod macro_anchors {
         // Up to the seasonal factor on the level, within 3 per cent of 1.
         let ratio = (level.oil_price - push.oil_price) / moved;
         assert!((ratio - 1.0).abs() <= 0.031, "{ratio}");
+    }
+
+    /// The convenience premium raises the price when stocks are low and
+    /// lowers it when they are high, by `(I / 50)^-k` on its level;
+    /// inventory at its normal level moves nothing, and an expectation over
+    /// a spread is above the value at its centre.
+    #[test]
+    fn the_convenience_premium_moves_the_target_with_inventory() {
+        let mut e = economy();
+        e.oil_price = 80.0;
+        let day = DailyInputs { game_day: MONTH + 3, oil_inventory_reversion: 0.002, ..Default::default() };
+        // At 50 after the step's own move the factor is near 1 and the price
+        // near the premium-free one.
+        e.oil_inventory_level = 50.0;
+        let off = step(&e, day);
+        let on = step(&e, DailyInputs { oil_convenience_yield: 2.0, ..day });
+        let f = oil_convenience_factor(2.0, off.oil_inventory_level, 0.0);
+        assert!((f - 1.0).abs() < 0.05, "{f}");
+        // Low stocks: a premium, so the price rises against the premium-free
+        // step; high stocks: a discount.
+        e.oil_inventory_level = 35.0;
+        let low_off = step(&e, day);
+        let low_on = step(&e, DailyInputs { oil_convenience_yield: 2.0, ..day });
+        assert!(low_on.oil_price > low_off.oil_price);
+        e.oil_inventory_level = 70.0;
+        let high_off = step(&e, day);
+        let high_on = step(&e, DailyInputs { oil_convenience_yield: 2.0, ..day });
+        assert!(high_on.oil_price < high_off.oil_price);
+        // The same draws either way: the premium moves no draw count.
+        assert_eq!(on.oil_inventory_level.to_bits(), off.oil_inventory_level.to_bits());
+        // The factor itself, and its floor at 25.
+        assert!((oil_convenience_factor(2.0, 25.0, 0.0) - 4.0).abs() < 1e-12);
+        assert_eq!(oil_convenience_factor(2.0, 5.0, 0.0), oil_convenience_factor(2.0, 25.0, 0.0));
+        assert!((oil_convenience_factor(1.0, 100.0, 0.0) - 0.5).abs() < 1e-12);
+        // The expectation over a spread, against a fine sum over the normal.
+        let (k, m, sd) = (3.0, 45.0, 8.0);
+        let mut fine = 0.0;
+        let mut mass = 0.0;
+        for i in -4000..=4000 {
+            let z = i as f64 / 500.0;
+            let w = mathx::exp(-0.5 * z * z);
+            fine += w * oil_convenience_factor(k, m + z * sd, 0.0);
+            mass += w;
+        }
+        let quad = oil_convenience_factor(k, m, sd * sd);
+        assert!((quad / (fine / mass) - 1.0).abs() < 1e-4, "{quad} {}", fine / mass);
+        assert!(quad > oil_convenience_factor(k, m, 0.0));
     }
 
     /// The shipped pass-through pays a rise from 75 and not the matching

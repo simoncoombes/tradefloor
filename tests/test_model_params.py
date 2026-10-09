@@ -943,6 +943,13 @@ PERTURBATIONS = [
     ("oil_mean_reversion", 0.0035, True),
     ("oil_noise_sd", 1.4, True),
     ("oil_inventory_level_gain", 30.0, True),
+    # The convenience premium on oil's target (pt-v22, the oil law's
+    # storage), LIVE: it moves the oil price the burn-in's inflation reads.
+    ("oil_convenience_yield", 2.0, True),
+    # Oil's long factor and its pull (Schwartz and Smith 2000), LIVE: the
+    # random walk moves the oil price the burn-in's inflation reads.
+    ("oil_target_drift_sd", 0.018, True),
+    ("oil_target_drift_reversion", 0.001, True),
     # INERT by construction: nothing a price reads is downstream of the
     # index (tests/test_fear_greed_published.py). RE-VALUED 2026-09-26: 1.0
     # is pt-v20's own value since its graded arm, so the row perturbs back
@@ -1928,6 +1935,16 @@ ECONOMY_STREAM_MOVERS = frozenset({
     # ordinary day, 1 to 3 on a decision day by the price band) follow the
     # band the price is in. The noise's scale at 1.4 moves no draw count.
     "oil_mean_reversion", "oil_inventory_level_gain",
+    # The convenience premium (2026-10-09), measured on this probe at 2.0:
+    # it moves the burn-in's oil price through its target, and the OPEC
+    # decision's conditional draws follow the band, as the two above.
+    "oil_convenience_yield",
+    # Oil's long factor (2026-10-09): its draws are keyed and take nothing
+    # from the economy stream, but the price it moves sets the OPEC
+    # decision's band, and that decision's conditional draws follow. Its
+    # pull at 0.001, beside the factor at 0.018, keeps the probe's burn-in
+    # in the same OPEC bands, so it is not here.
+    "oil_target_drift_sd",
     # The risk-management cut (r13 macro-clock, 2026-09-26), measured on
     # this probe: `fed_growth_cut` 2.0 moves the economy stream by +34 draws
     # (9172 to 9206), the market stream by 0. It acts on the 755-day
@@ -2030,6 +2047,11 @@ COMPANIONS: dict[str, dict[str, float]] = {
     "futures_vix_listed": {"forecast_horizon_sessions": 126.0},
     # The tail allowance scales the margin, which the coverage sets.
     "margin_scan_tail": {"margin_scan_coverage": 0.99},
+    # The convenience premium unwinds as inventory refills, which only the
+    # inventory's reversion gives it; refused without it.
+    "oil_convenience_yield": {"oil_inventory_reversion": 0.002},
+    # The pull acts on the long factor, and is refused without it.
+    "oil_target_drift_reversion": {"oil_target_drift_sd": 0.018},
     "futures_vix_live_fast_share": {"forecast_horizon_sessions": 126.0, "futures_vix_listed": 1.0},
     "futures_vix_live_fast_half_life": {"forecast_horizon_sessions": 126.0, "futures_vix_listed": 1.0},
     "futures_vix_live_slow_half_life": {"forecast_horizon_sessions": 126.0, "futures_vix_listed": 1.0},

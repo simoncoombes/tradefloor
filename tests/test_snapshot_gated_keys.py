@@ -174,6 +174,8 @@ CASES = {
     "oil_futures": (dict(futures_oil_listed=1.0), ("oil_futures",), (), (), {}),
     # The contracts' margin, carried whenever its dial is set.
     "margin": (dict(futures_oil_listed=1.0, margin_scan_coverage=0.99), ("oil_futures", "margin"), (), (), {}),
+    "oil_target_drift": (dict(oil_target_drift_sd=0.018, oil_target_drift_reversion=0.001),
+                         ("oil_target_drift",), (), (), {}),
     "every_r21_dial": (dict(EVERY_R21_DIAL, **MACRO),
                        ("market_vol_leverage_memory", "vix_stress_memory",
                         "cycle_nowcast_rng", "fed_stress_vix_max", "fed_stress_hold_age",

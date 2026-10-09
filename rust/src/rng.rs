@@ -653,6 +653,18 @@ pub fn prehistory_key(key: u64) -> u64 {
     splitmix64_mix(key ^ (PREHISTORY_TAG << 32 | PREHISTORY_TAG))
 }
 
+/// The tag of the oil price's long factor (`oil_target_drift_sd`), ASCII
+/// "OILD".
+pub const OIL_DRIFT_TAG: u32 = 0x4F49_4C44;
+
+/// The key of a root seed's oil long-factor draws: as [`publication_key`]
+/// under [`OIL_DRIFT_TAG`]. Each session's normal is the first of
+/// `GameRng::keyed(key, OIL_DRIFT_TAG, session)`, so it takes nothing from
+/// any stream and moves no other draw.
+pub fn oil_drift_key(root_seed: u64) -> u64 {
+    splitmix64_mix(root_seed ^ (((OIL_DRIFT_TAG as u64) << 32) | 0xFFFF_FFFF))
+}
+
 pub fn publication_key(root_seed: u64) -> u64 {
     splitmix64_mix(root_seed ^ (((PUBLICATION_TAG as u64) << 32) | 0xFFFF_FFFF))
 }

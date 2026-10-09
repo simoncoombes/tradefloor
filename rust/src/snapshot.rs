@@ -1655,6 +1655,10 @@ impl Engine {
         if let Some(words) = self.margin_words() {
             out.put("margin", V::from_f64s(&words));
         }
+        // Oil's long factor (`oil_target_drift_sd`).
+        if let Some(words) = self.oil_drift_words() {
+            out.put("oil_target_drift", V::from_f64s(&words));
+        }
         // The spread a `corporate_spread` pin holds tonight, only while its
         // mark stands.
         if let Some(spread) = self.pinned_corporate_spread() {
@@ -2006,6 +2010,7 @@ impl Engine {
             Gated::dial("oil_futures", "futures_oil_listed", p.futures_oil_listed),
             Gated::held("oil_futures_book", "futures_oil_listed", p.futures_oil_listed),
             Gated::dial("margin", "margin_scan_coverage", p.margin_scan_coverage),
+            Gated::dial("oil_target_drift", "oil_target_drift_sd", p.oil_target_drift_sd),
             Gated::when(
                 "buyback_log_shares",
                 self.carries_buyback_log_shares(),
@@ -2718,6 +2723,14 @@ impl Engine {
                 None => None,
             };
             inner.set_margin_state(words.as_deref()).map_err(core)?;
+        }
+        // Oil's long factor (`oil_target_drift_sd`).
+        {
+            let words = match snapshot.get("oil_target_drift") {
+                Some(_) => Some(read_buffer(snapshot, "", "oil_target_drift")?),
+                None => None,
+            };
+            inner.set_oil_drift_state(words.as_deref()).map_err(core)?;
         }
         inner.set_nominal_output_base(read_finite(snapshot, "", "nominal_output_base")?);
         let variance = read_numbers(snapshot, "", "market_variance")?;

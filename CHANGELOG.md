@@ -86,6 +86,18 @@ same with them on as off.
   on its level (the gain times the pressure's change) in place of a daily
   push. The forecast steps the same law. Every known-answer digest is where
   it was.
+- `oil_convenience_yield` is a new dial, 0.0 on every preset and left out of
+  the digest there. Off zero the oil price carries a premium of
+  `(I/50)^-k` on its level, inventory read at no lower than 25, so low
+  stocks raise the price at once, the premium unwinds as inventory refills
+  and the curve is in backwardation. It needs `oil_inventory_reversion`.
+  The forecast takes the premium's expectation over inventory's spread.
+- `oil_target_drift_sd` and `oil_target_drift_reversion` are new dials, 0.0
+  on every preset and left out of the digest there. Off zero the oil price
+  carries a long factor, a random walk on the log of its level drawn on a
+  key of its own (Schwartz and Smith 2000), which moves spot and the whole
+  curve alike; the pull returns it toward 0. A snapshot carries
+  `oil_target_drift` only under the dial, hashed behind tag 55 only then.
 
 ### Oil futures
 
