@@ -333,6 +333,39 @@ class MarketView:
         nothing, because orders go through the ``act`` mapping."""
         return _WRAPPED[self].book(ticker)
 
+    # The derivatives' public reads (pt-v22 phase 1). Each reads public
+    # state only and writes nothing; a contract trades through the ``act``
+    # mapping by its symbol, as a ticker does.
+
+    def contracts(self) -> list[dict[str, Any]]:
+        """The listed contracts, as ``Engine.contracts`` lists them. Empty on
+        a model that lists none."""
+        return _WRAPPED[self].contracts()
+
+    def quote(self, symbol: str) -> dict[str, Any]:
+        """A listed contract's quote, as ``Engine.quote`` gives it."""
+        return _WRAPPED[self].quote(symbol)
+
+    def settlements(self, day: int | None = None) -> list[dict[str, Any]]:
+        """The contracts' final settlements, as ``Engine.settlements``."""
+        return _WRAPPED[self].settlements(day)
+
+    @property
+    def index_level(self) -> Any:
+        """The price index (``index_level_listed``), as
+        ``Engine.index_level``."""
+        return _WRAPPED[self].index_level
+
+    @property
+    def live_vix(self) -> Any:
+        """The live VIX (``vix_intraday_live``), as ``Engine.live_vix``."""
+        return _WRAPPED[self].live_vix
+
+    def forecast(self) -> Any:
+        """The last close's forecast (``forecast_horizon_sessions``), which
+        reads public state only, as ``Engine.forecast``."""
+        return _WRAPPED[self].forecast()
+
     @property
     def recorded_days(self) -> int:
         """How many days the engine has recorded, which is what

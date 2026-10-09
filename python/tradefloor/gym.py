@@ -285,6 +285,7 @@ class TradingEnv(_Base):
         # The cash dividends the open made payable (none at an episode's
         # first open, and none on a model without dividends).
         portfolio.collect_dividends(engine)
+        portfolio.settle_open(engine)
         self._prev_prices = self._prices()
         self._prev_worth = portfolio.net_worth(engine)
         # The info dict names the episode's market: the seed that drew it
@@ -329,11 +330,15 @@ class TradingEnv(_Base):
         self._step += 1
         if self._step % self.steps_per_day == 0:
             engine.close_market()
+            # Variation margin and a margin call at the close (pt-v22 phase
+            # 1); nothing without futures.
+            portfolio.settle_close(engine)
             if self._step < self.max_steps:
                 engine.open_market()
                 # Collected at the open, before the reward is marked, so the
                 # ex-date drop and what the holder is paid net in one step.
                 portfolio.collect_dividends(engine)
+                portfolio.settle_open(engine)
 
         worth = portfolio.net_worth(engine)
         # Reward is the step's P&L in dollars, measured AFTER the market

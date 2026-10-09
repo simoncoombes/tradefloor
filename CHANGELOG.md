@@ -61,6 +61,20 @@ same with them on as off.
   `measure` reads row MG1: 1.05 per cent on 16 fresh histories.
 - A snapshot carries `margin` only under the coverage, hashed behind tag 54
   only then. Every known-answer digest is where it was.
+- `Portfolio` holds futures (`Portfolio.futures`, `FuturesPosition`): a trade
+  pays only its distance from the position's mark, each close pays
+  variation margin (`settle_close`), and expiry pays the last move to the
+  settlement price (`Portfolio.settled`). Net worth counts futures, and the
+  leverage limit counts them at notional. `margin_requirement` reads the
+  contracts' margins; a close under maintenance makes a margin call
+  (`margin_calls`), and at the next open (`settle_open`) it is met or the
+  futures are closed through their books (`liquidations`). Every harness
+  calls the two hooks; a portfolio without futures asks the engine nothing
+  new.
+- An agent's read-only market view serves `contracts()`, `quote(symbol)`,
+  `settlements(day)`, `index_level`, `live_vix` and `forecast()`, and `act`
+  trades a contract by its symbol. The scorecard's impact leaves contracts
+  out: it reads the names' prices, which no contract moves.
 
 ### Oil futures
 
