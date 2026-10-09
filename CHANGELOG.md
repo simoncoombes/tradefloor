@@ -42,7 +42,7 @@ unchanged.
   writes it back; a value at or under 0 is refused, and a snapshot carrying
   it on a model without the identity is refused by name. A snapshot written
   before 0.10.2 has none and restores onto the anchor the engine derived,
-  which is what every restore read until now.
+  as every restore did before.
 - The state hash and `manifest.state_hash` do not cover `vix_anchor`, as
   they do not cover `session_tick`, so no leaf or digest moves.
 - `rust/tests/host_day_restore.rs` runs a host's day loop (`open_market`,
@@ -60,8 +60,9 @@ unchanged.
 - Each market cap is reset to the current price times the new count, and
   every later tick prices off it, so the market factor's loadings, the
   roster beta normalisation and the cap-weighted market P/E read the
-  host's counts. The float is the host's to keep in step with
-  `set_column(PriceField::FloatShares, ..)`.
+  host's counts. The float is the host's to keep in step, with
+  `set_column` on `PriceField::FloatShares` in Rust and on `float_shares`
+  in Python.
 - A snapshot carries `shares_outstanding`, and the state hash covers it,
   once a count differs from the one the company was built with. A restore
   writes the counts back as carried, puts back the built counts when the
