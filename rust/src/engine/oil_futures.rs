@@ -651,6 +651,7 @@ impl Engine {
             tick: OIL_FUTURE.tick,
             daily_volume: Self::oil_futures_daily_volume(slot),
             initial_margin: None,
+            maintenance_margin: None,
             expected: Some(v.expected),
             premium: Some(0.0),
             loading: None,

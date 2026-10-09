@@ -399,7 +399,8 @@ class Engine:
     # A listed contract's quote: `bid`, `ask`, `mid`, `price`, `fair`,
     # `mark`, `basis_bp`, `index`, `rate` (fractional), `dividends`,
     # `sessions_to_expiry`, `multiplier`, `tick`, `daily_volume`,
-    # `initial_margin`, `symbol`, `kind`, `expiry`, `expected` and `premium`
+    # `initial_margin`, `maintenance_margin`, `symbol`, `kind`, `expiry`,
+    # `expected` and `premium`
     # (a VIX or rate future's; None for an index future) and `loading` (a VIX
     # future's). Raises for a symbol not listed.
     def quote(self, symbol: str) -> dict[str, Any]: ...

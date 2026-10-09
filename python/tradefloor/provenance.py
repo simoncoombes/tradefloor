@@ -487,6 +487,18 @@ OUT_OF_SCOPE = {
         "with the switch off, `Engine::contracts` lists no oil future, "
         "`Engine::quote` returns None for one, and nothing is snapshotted or "
         "hashed; at 0.0 it is also left out of the model's digest",
+    # The contracts' margin (pt-v22 phase 1), inert on every shipped preset:
+    # it reads the marks and writes only its own state.
+    "margin_scan_coverage":
+        "inert at 0.0: `margin_close_update` returns at once and every quote's "
+        "`initial_margin` is None, and nothing is snapshotted or hashed; at "
+        "0.0 it is also left out of the model's digest",
+    "margin_scan_tail":
+        "unread while `margin_scan_coverage` is 0.0, as every preset ships it: "
+        "only `initial_margin` reads it, and refused without the coverage. A "
+        "projection fitted on the model's held-out histories by "
+        "tools/calibration/margin_dials.py; at 0.0 it is also left out of the "
+        "model's digest",
     # The VIX's fear memory (pt-v22 phase 1, the VIX law), inert on every
     # shipped preset.
     "vix_fear_uptake":

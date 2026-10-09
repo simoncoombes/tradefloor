@@ -1130,6 +1130,9 @@ def _nothing_dormant():
                    futures_rates_listed=1.0,
                    # The oil futures (pt-v22 phase 1): a switch.
                    futures_oil_listed=1.0,
+                   # The contracts' margin (pt-v22 phase 1).
+                   margin_scan_coverage=0.99,
+                   margin_scan_tail=1.3,
                    # Two switches read only under a macro pin (r13).
                    macro_pins_hold=1.0,
                    pinned_vix_feedback=1.0,
@@ -1348,13 +1351,6 @@ UNREACHED_SNAPSHOT_FIELDS = {
         "takes to see it is a read between the restore and the next "
         "five-minute refresh. tests/test_derivative_foundations.py holds it "
         "in the state hash and across a mid-session restore.",
-    "forecast":
-        "the forecast the last close computed (`forecast_horizon_sessions`). "
-        "It moves no price, and every close computes it afresh from the "
-        "state, so the continuation's forecasts are the copy's from its "
-        "first close on. What it takes to see it is a read before that "
-        "close. tests/test_derivative_foundations.py holds it in the state "
-        "hash and across a restore.",
     "vix_futures":
         "the VIX futures (`futures_vix_listed`). They move no price, and every "
         "close marks them afresh from the forecast and the published VIX, so "

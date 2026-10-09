@@ -1643,6 +1643,10 @@ impl Engine {
         if let Some(book) = self.oil_futures_book_state() {
             out.put("oil_futures_book", book_value(book));
         }
+        // The contracts' margin (`margin_scan_coverage`).
+        if let Some(words) = self.margin_words() {
+            out.put("margin", V::from_f64s(&words));
+        }
         // The spread a `corporate_spread` pin holds tonight, only while its
         // mark stands.
         if let Some(spread) = self.pinned_corporate_spread() {
@@ -1978,6 +1982,7 @@ impl Engine {
             Gated::held("rate_futures_book", "futures_rates_listed", p.futures_rates_listed),
             Gated::dial("oil_futures", "futures_oil_listed", p.futures_oil_listed),
             Gated::held("oil_futures_book", "futures_oil_listed", p.futures_oil_listed),
+            Gated::dial("margin", "margin_scan_coverage", p.margin_scan_coverage),
             Gated::when(
                 "buyback_log_shares",
                 self.carries_buyback_log_shares(),
@@ -2670,6 +2675,14 @@ impl Engine {
                 None => None,
             };
             inner.set_oil_futures_state(words.as_deref(), book).map_err(core)?;
+        }
+        // The contracts' margin (`margin_scan_coverage`).
+        {
+            let words = match snapshot.get("margin") {
+                Some(_) => Some(read_buffer(snapshot, "", "margin")?),
+                None => None,
+            };
+            inner.set_margin_state(words.as_deref()).map_err(core)?;
         }
         inner.set_nominal_output_base(read_finite(snapshot, "", "nominal_output_base")?);
         let variance = read_numbers(snapshot, "", "market_variance")?;

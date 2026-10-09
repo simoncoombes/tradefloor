@@ -577,6 +577,8 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          # The oil futures, only while `futures_oil_listed` is set, and their
          # book once an agent has traded one.
          "oil_futures", "oil_futures_book",
+         # The contracts' margin, only while `margin_scan_coverage` is set.
+         "margin",
          # The dividend states, on a model that pays dividends, and an
          # ex-date's move in `s` waiting for its tape row.
          "dividend", "pending_dividend",
@@ -1028,6 +1030,19 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     if "oil_futures_book" in snapshot:
         _f64(buf, 53.0)
         _book(buf, snapshot["oil_futures_book"])
+    # The contracts' margin, only while `margin_scan_coverage` is set, behind
+    # its own tag, length-prefixed. `Engine::state_hash`'s order and rule.
+    if "margin" in snapshot:
+        raw = snapshot["margin"]
+        if len(raw) % 8:
+            raise ValidationError(
+                f"snapshot field 'margin' carries {len(raw)} bytes, which is "
+                "not a whole number of f64s.")
+        values = _column(raw, len(raw) // 8, "margin")
+        _f64(buf, 54.0)
+        _u32(buf, len(values))
+        for value in values:
+            _f64(buf, value)
     # LENGTH-PREFIXED, because these two are empty between the tape row that
     # consumes them and the close that fills them again -- unlike every
     # per-slot array above, which always follows the roster. An empty buffer
@@ -1649,7 +1664,7 @@ _LEDGER_OPTIONAL_BUFFERS = ("fair_value_offset", "opening_z", "pending_fair_valu
                             "pending_dividend", "fed_drawdown_returns",
                             "innovation_day", "forecast", "futures",
                             "night_bridge", "vix_futures", "rate_futures",
-                            "oil_futures")
+                            "oil_futures", "margin")
 
 #: The ``fundamentals`` block's buffers, one per company each.
 _LEDGER_FUNDAMENTALS = ("eps", "book_value_per_share", "revenue_growth")
