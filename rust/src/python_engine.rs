@@ -4279,6 +4279,90 @@ impl PyEngine {
         Ok(())
     }
 
+    /// Every company's share count, in roster order. The equities only;
+    /// rate instruments carry no share count. `set_shares_outstanding`
+    /// writes them.
+    fn shares_outstanding(&self) -> Vec<f64> {
+        self.inner.shares_outstanding()
+    }
+
+    /// Replace every company's share count, in roster order: one value per
+    /// equity, each finite and above 0. For a host whose companies buy back
+    /// stock or issue it.
+    ///
+    /// Each market cap follows at once, at the price standing, and every
+    /// tick after reads the new count, so everything the engine weights by
+    /// its own capitalisation -- the market factor's loadings, the roster
+    /// beta normalisation, the cap-weighted market P/E -- weights by it.
+    /// The float is not moved; write
+    /// `float_shares` with `set_column` to keep it in step. It consumes no
+    /// draws, and a refused write writes nothing.
+    ///
+    /// Once the counts differ from the ones the engine was built with,
+    /// `state_snapshot` carries them and `state_hash` covers them, so a
+    /// restore weights by what this wrote.
+    fn set_shares_outstanding(&mut self, shares: Vec<f64>) -> PyResult<()> {
+        self.inner
+            .set_shares_outstanding(&shares)
+            .map_err(ValidationError::new_err)?;
+        // Logged once the engine has taken it, so a refused write leaves no
+        // entry a replay would then fail on.
+        self.log.push(crate::python_log::LogEntry::SetSharesOutstanding { shares });
+        Ok(())
+    }
+
+    /// Put a premium on the VIX target, in VIX points, fading at
+    /// `half_life_sessions` (0.0 holds it until it is written again).
+    ///
+    /// For fear the macro model does not carry, such as a bankruptcy's
+    /// contagion: the premium joins the target beside the inflation and
+    /// shock terms, inside `vix_target_shock_cap`, and the VIX reverts
+    /// toward the target it raises at the engine's own rate. A one-off
+    /// write of the VIX is reverted to the engine's target within days.
+    /// Each close reads the premium and then fades it; one under a
+    /// millionth of a point is cleared.
+    ///
+    /// This replaces the premium standing. To add an event to one still
+    /// fading, read `vix_target_premium()` and write the sum. Consumes no
+    /// draws. While a premium stands, `state_snapshot` carries it and
+    /// `state_hash` covers it.
+    #[pyo3(signature = (points, half_life_sessions = 0.0))]
+    fn set_vix_target_premium(&mut self, points: f64, half_life_sessions: f64) -> PyResult<()> {
+        self.inner
+            .set_vix_target_premium(points, half_life_sessions)
+            .map_err(ValidationError::new_err)?;
+        self.log.push(crate::python_log::LogEntry::SetVixTargetPremium {
+            points,
+            half_life_sessions,
+        });
+        Ok(())
+    }
+
+    /// The premium on the VIX target in points and the half-life it fades
+    /// at, `(0.0, 0.0)` with none standing.
+    fn vix_target_premium(&self) -> (f64, f64) {
+        self.inner.vix_target_premium()
+    }
+
+    /// Put a floor under the VIX target, or clear it with `None`.
+    ///
+    /// For a period that holds fear at a level, such as an election
+    /// campaign: each close's target is at least the floor, so the VIX
+    /// reverts toward it at the engine's own rate, with its noise, jumps
+    /// and ceiling. It holds until cleared. Consumes no draws. While a floor
+    /// is set, `state_snapshot` carries it and `state_hash` covers it.
+    #[pyo3(signature = (floor))]
+    fn set_vix_target_floor(&mut self, floor: Option<f64>) -> PyResult<()> {
+        self.inner.set_vix_target_floor(floor).map_err(ValidationError::new_err)?;
+        self.log.push(crate::python_log::LogEntry::SetVixTargetFloor { floor });
+        Ok(())
+    }
+
+    /// The floor under the VIX target, `None` with none set.
+    fn vix_target_floor(&self) -> Option<f64> {
+        self.inner.vix_target_floor()
+    }
+
     /// Write the `avg_volume` column: one value per instrument, in shares.
     ///
     /// # Why this is the liquidity lever

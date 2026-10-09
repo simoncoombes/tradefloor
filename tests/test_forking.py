@@ -1308,6 +1308,13 @@ REQUIRED_SNAPSHOT_KEYS = ("columns", "rng", "tickers", "tick_components")
 #: dials put the scenario in reach of them: `fed_drawdown_mcap_prev`,
 #: `night_market_factor` and `market_vol_cycle_log`.
 UNREACHED_SNAPSHOT_FIELDS = {
+    "vix_anchor":
+        "the VIX anchor `vix_level_identity` derives from the roster the "
+        "engine was built on. Every copy here is built on the original's "
+        "opening roster, so it derives the same anchor and dropping the key "
+        "changes nothing. What it takes to see it is a copy built on a later "
+        "day's roster, as a host that saves and resumes builds one. "
+        "rust/tests/host_day_restore.rs holds it across that restore (#268).",
     "attribution":
         "the day's decomposition of the change in `s`. This model splits the "
         "day (`overnight_market_share`), and under a split the close's GJR "

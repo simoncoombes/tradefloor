@@ -81,6 +81,11 @@ use crate::rng::{stream, DrawKind, DrawOverlay, DrawRecord, GameRng, Rng, RngSta
 /// `GameRng::new(seed, MAIN_STREAM)`, exactly as before.
 pub const MAIN_STREAM: u32 = 99;
 
+/// A fading VIX target premium under this many points is cleared to 0.0
+/// ([`Engine::set_vix_target_premium`]), so a faded event stops being state
+/// a snapshot carries.
+pub const VIX_TARGET_PREMIUM_CLEARED_UNDER: f64 = 1e-6;
+
 /// `Engine::macro_pins_today`: the VIX was pinned today.
 pub const PIN_VIX: u16 = 1;
 /// `Engine::macro_pins_today`: the corporate yield was pinned today.
@@ -916,6 +921,15 @@ pub struct Engine {
     /// by the snapshot and the state hash only then. See
     /// `ModelParams::vix_stress_premium` and [`Engine::published_vix`].
     vix_stress_memory: f64,
+    /// The host's premium on the VIX target, in VIX points, and the
+    /// half-life in sessions it fades at (0.0 holds it). 0.0 with nothing
+    /// written, where the target reads no term. See
+    /// [`Engine::set_vix_target_premium`].
+    vix_target_premium: f64,
+    vix_target_premium_half_life: f64,
+    /// The host's floor under the VIX target, held until cleared. See
+    /// [`Engine::set_vix_target_floor`].
+    vix_target_floor: Option<f64>,
     /// Whether a crisis EPISODE is running. The episode starts at the open
     /// of the first session whose VIX is above `crisis_vix_threshold` with
     /// no episode running, and ends after `crisis_epicentre_end_sessions`
@@ -1035,6 +1049,11 @@ pub struct Engine {
     /// only once they have moved and every engine that was never told
     /// anything snapshots and hashes as it did before they were carried.
     base_fundamentals: Vec<[Option<f64>; 3]>,
+    /// Each company's share count as it was built or listed. What
+    /// `set_shares_outstanding` changes is measured against this, on the
+    /// same rule as `base_fundamentals`: a snapshot carries the counts, and
+    /// the state hash covers them, only once a host has moved one.
+    base_shares: Vec<f64>,
     /// One mark per opened day: the day, the seven streams' draw positions
     /// at the open, the active company indices and the sector count, and
     /// the ticks the day ran. Together they map a `(day, company)` pair to
@@ -2126,6 +2145,7 @@ impl Engine {
             .iter()
             .map(|c| [c.eps, c.book_value_per_share, c.revenue_growth])
             .collect();
+        let base_shares = companies.iter().map(|c| c.stock.shares_outstanding).collect();
         // Read before the economy moves into the struct, and never
         // recomputed: this is where the run's nominal output starts.
         let nominal_output_base = economy.gdp * economy.cpi;
@@ -2208,6 +2228,9 @@ impl Engine {
             vix_anchor_slow: 0.0,
             market_vol_cycle_log: None,
             vix_stress_memory: 0.0,
+            vix_target_premium: 0.0,
+            vix_target_premium_half_life: 0.0,
+            vix_target_floor: None,
             crisis_in_episode: false,
             crisis_sessions_under: 0,
             crisis_epicentre: -1,
@@ -2235,6 +2258,7 @@ impl Engine {
             elapsed_days: 0,
             carried_ticks: None,
             base_fundamentals,
+            base_shares,
             day_marks: Vec::new(),
             params,
             model_fingerprint: std::sync::OnceLock::new(),
@@ -8929,6 +8953,9 @@ impl Engine {
             inputs.yields.spread_multiplier = Some((spread_before, spread_after_report));
         }
         self.economy = update_economy_daily(&self.economy, &inputs, rng);
+        // The host's premium on the target (`set_vix_target_premium`), read
+        // by the step above, faded for the next close.
+        self.fade_vix_target_premium();
         if let Some(h) = &held {
             let e = &mut self.economy;
             if pins_today & PIN_VIX != 0 { e.vix = h.vix; }
@@ -9199,6 +9226,8 @@ impl Engine {
             vix_anchor_weight_level_knee_fixed: self.params.vix_anchor_weight_level_knee_fixed,
             vix_anchor_level_fixed: self.vix_anchor,
             vix_anchor_slow,
+            vix_target_premium: self.vix_target_premium,
+            vix_target_floor: self.vix_target_floor,
             vix_jump_intensity: self.params.vix_jump_intensity,
             vix_jump_scale: self.params.vix_jump_scale,
             vix_return_level_exponent: self.params.vix_return_level_exponent,
@@ -9571,6 +9600,12 @@ impl Engine {
         self.vix_anchor_slow = value;
     }
 
+    /// Sets the anchor a snapshot carries (`vix_level_identity`), in place
+    /// of the one this engine derived from the roster it was built on.
+    pub fn set_vix_anchor(&mut self, value: f64) {
+        self.vix_anchor = value;
+    }
+
     /// Whether this engine's model carries the published VIX's stress
     /// memory, which is when the snapshot and the state hash carry it: only
     /// with `vix_stress_premium` non-zero, which no preset sets.
@@ -9584,6 +9619,101 @@ impl Engine {
 
     pub fn set_vix_stress_memory(&mut self, value: f64) {
         self.vix_stress_memory = value;
+    }
+
+    /// Put a premium on the VIX target, in VIX points, that fades at
+    /// `half_life_sessions` (0.0 holds it until it is written again).
+    ///
+    /// For fear the macro model does not carry: a bankruptcy's contagion, a
+    /// geopolitical escalation. The premium joins the target beside the
+    /// inflation and shock terms, inside `vix_target_shock_cap`, so the
+    /// engine's own reversion carries the VIX up to it and back down as it
+    /// fades, where a one-off write of the VIX itself is reverted to the
+    /// engine's target within days. Each close reads the premium and then
+    /// fades it by `0.5^(1 / half_life)`; one under a millionth of a point
+    /// is cleared to 0.0.
+    ///
+    /// This REPLACES the premium standing. A host adding an event to one
+    /// still fading reads [`Engine::vix_target_premium`] and writes the sum,
+    /// at whichever half-life it wants the whole to fade on.
+    ///
+    /// Consumes no draws. With nothing written the target is bit for bit
+    /// the one the engine computes.
+    pub fn set_vix_target_premium(&mut self, points: f64, half_life_sessions: f64) -> Result<(), String> {
+        if !points.is_finite() {
+            return Err(format!("the VIX target premium must be finite, got {points}"));
+        }
+        if !(half_life_sessions.is_finite() && half_life_sessions >= 0.0) {
+            return Err(format!(
+                "the VIX target premium's half-life must be 0.0 (held) or a finite number of \
+                 sessions above 0, got {half_life_sessions}"
+            ));
+        }
+        if points == 0.0 {
+            self.vix_target_premium = 0.0;
+            self.vix_target_premium_half_life = 0.0;
+        } else {
+            self.vix_target_premium = points;
+            self.vix_target_premium_half_life = half_life_sessions;
+        }
+        Ok(())
+    }
+
+    /// The host's premium on the VIX target in points, and the half-life it
+    /// fades at: `(0.0, 0.0)` with none standing.
+    pub fn vix_target_premium(&self) -> (f64, f64) {
+        (self.vix_target_premium, self.vix_target_premium_half_life)
+    }
+
+    /// Put a floor under the VIX target, or clear it with `None`.
+    ///
+    /// For a period in which the host's world holds fear at a level, an
+    /// election campaign for one: each close's target is at least the
+    /// floor, so the VIX reverts toward it at the engine's own rate, and its
+    /// noise, jumps and ceiling still apply. The floor holds until it is
+    /// cleared. Consumes no draws.
+    pub fn set_vix_target_floor(&mut self, floor: Option<f64>) -> Result<(), String> {
+        if let Some(f) = floor {
+            if !(f.is_finite() && f > 0.0) {
+                return Err(format!("the VIX target floor must be finite and above 0, got {f}"));
+            }
+        }
+        self.vix_target_floor = floor;
+        Ok(())
+    }
+
+    /// The host's floor under the VIX target, `None` with none set.
+    pub fn vix_target_floor(&self) -> Option<f64> {
+        self.vix_target_floor
+    }
+
+    /// Put the host's input to the VIX target back as a snapshot carries it
+    /// (checked by the restore).
+    pub(crate) fn restore_vix_target_input(&mut self, premium: (f64, f64), floor: Option<f64>) {
+        (self.vix_target_premium, self.vix_target_premium_half_life) = premium;
+        self.vix_target_floor = floor;
+    }
+
+    /// Whether the host's VIX target premium is standing, which is when the
+    /// snapshot and the state hash carry it.
+    pub fn carries_vix_target_premium(&self) -> bool {
+        self.vix_target_premium != 0.0
+    }
+
+    /// The premium one close on: faded at its half-life, cleared under a
+    /// millionth of a point. Nothing with none standing, or one held.
+    fn fade_vix_target_premium(&mut self) {
+        let h = self.vix_target_premium_half_life;
+        if self.vix_target_premium == 0.0 || h == 0.0 {
+            return;
+        }
+        let faded = self.vix_target_premium * crate::mathx::pow(0.5, 1.0 / h);
+        if faded.abs() < VIX_TARGET_PREMIUM_CLEARED_UNDER {
+            self.vix_target_premium = 0.0;
+            self.vix_target_premium_half_life = 0.0;
+        } else {
+            self.vix_target_premium = faded;
+        }
     }
 
     /// A caller wrote the VIX: the stress memory restarts from 0.0, so the
@@ -10969,6 +11099,7 @@ impl Engine {
     pub fn add_company(&mut self, company: TickCompany) -> usize {
         self.base_fundamentals
             .push([company.eps, company.book_value_per_share, company.revenue_growth]);
+        self.base_shares.push(company.stock.shares_outstanding);
         self.companies.push(company);
         self.attribution.push([0.0; crate::market::factors::COMPONENT_COUNT]);
         self.noise_parts.push([0.0; 3]);
@@ -11150,6 +11281,9 @@ impl Engine {
         }
         if index < self.base_fundamentals.len() {
             self.base_fundamentals.remove(index);
+        }
+        if index < self.base_shares.len() {
+            self.base_shares.remove(index);
         }
         Some(self.companies.remove(index))
     }
@@ -11409,6 +11543,96 @@ impl Engine {
             c.book_value_per_share = b[1];
             c.revenue_growth = b[2];
         }
+    }
+
+    /// Write each company's share count, for a host whose companies buy
+    /// back stock or issue it (#274).
+    ///
+    /// Without it the count was the one each company was built or listed
+    /// with for the life of the engine, and every tick sets the market cap
+    /// to `price * shares_outstanding`, so a host that wrote `MarketCap`
+    /// saw it overwritten at the next print. Everything the engine weights
+    /// by its own capitalisation -- the market factor's loadings, the
+    /// roster beta normalisation, the cap-weighted market P/E, the index
+    /// variance -- read the opening counts.
+    ///
+    /// Each market cap follows at once, at the price standing. The float is
+    /// the host's to keep in step (`set_column(FloatShares, ..)`); it is not
+    /// moved here.
+    ///
+    /// Every count must be finite and above 0, and the length must be the
+    /// roster's, on the same rule as [`Engine::set_fundamentals`]. A
+    /// refused write changes nothing. Consumes no draws.
+    pub fn set_shares_outstanding(&mut self, shares: &[f64]) -> Result<(), String> {
+        let n = self.companies.len();
+        if shares.len() != n {
+            return Err(format!("shares_outstanding has {} values for {n} companies", shares.len()));
+        }
+        if let Some((i, v)) = shares.iter().enumerate().find(|(_, v)| !(v.is_finite() && **v > 0.0)) {
+            return Err(format!(
+                "shares_outstanding[{i}] ({}) is {v}; a share count is finite and above 0",
+                self.companies[i].id
+            ));
+        }
+        for (company, &count) in self.companies.iter_mut().zip(shares) {
+            company.stock.shares_outstanding = count;
+            company.stock.market_cap = company.stock.price * count;
+        }
+        Ok(())
+    }
+
+    /// Each company's share count, in roster order.
+    pub fn shares_outstanding(&self) -> Vec<f64> {
+        self.companies.iter().map(|c| c.stock.shares_outstanding).collect()
+    }
+
+    /// Whether any company's share count differs from the one it was built
+    /// or listed with, to the bit. What decides whether a snapshot carries
+    /// the counts and whether the state hash covers them, so an engine
+    /// `set_shares_outstanding` never moved snapshots and hashes as it did
+    /// before they were carried.
+    pub fn shares_outstanding_changed(&self) -> bool {
+        self.companies.len() != self.base_shares.len()
+            || self
+                .companies
+                .iter()
+                .zip(&self.base_shares)
+                .any(|(c, b)| c.stock.shares_outstanding.to_bits() != b.to_bits())
+    }
+
+    /// Put every company's share count back to the one it was built or
+    /// listed with. What a restore does when the snapshot carries none.
+    /// Moves nothing else: the market caps and the index divisor a restore
+    /// writes come from the snapshot.
+    pub fn reset_shares_outstanding(&mut self) {
+        for (c, b) in self.companies.iter_mut().zip(&self.base_shares) {
+            c.stock.shares_outstanding = *b;
+        }
+    }
+
+    /// Write the share counts a snapshot carries, raw: no market cap is
+    /// recomputed and the index divisor is not reset, because a restore
+    /// writes both from the snapshot. The length must be the roster's.
+    pub fn restore_shares_outstanding(&mut self, shares: &[f64]) -> Result<(), String> {
+        if shares.len() != self.companies.len() {
+            return Err(format!(
+                "this snapshot carries {} share counts and the roster holds {} \
+                 companies. They are positional against the roster, so this \
+                 restore is refused rather than padded or truncated.",
+                shares.len(),
+                self.companies.len()
+            ));
+        }
+        if let Some((i, v)) = shares.iter().enumerate().find(|(_, v)| !(v.is_finite() && **v > 0.0)) {
+            return Err(format!(
+                "this snapshot's shares_outstanding[{i}] is {v}; a share count is \
+                 finite and above 0"
+            ));
+        }
+        for (c, &v) in self.companies.iter_mut().zip(shares) {
+            c.stock.shares_outstanding = v;
+        }
+        Ok(())
     }
 
     pub fn set_column(&mut self, field: PriceField, values: &[f64]) -> Result<(), String> {
@@ -12180,6 +12404,28 @@ impl Engine {
                 hash_f64(&mut buf, c.book_value_per_share.unwrap_or(f64::NAN));
                 hash_f64(&mut buf, c.revenue_growth.unwrap_or(f64::NAN));
             }
+        }
+        // The share counts, once `set_shares_outstanding` has moved them off
+        // the ones each company was built or listed with: every tick's market
+        // cap is the price times the count.
+        if self.shares_outstanding_changed() {
+            hash_str(&mut buf, "shares_outstanding");
+            hash_u32(&mut buf, n as u32);
+            for c in &self.companies {
+                hash_f64(&mut buf, c.stock.shares_outstanding);
+            }
+        }
+        // The host's input to the VIX target, each behind its name and only
+        // while it stands (`set_vix_target_premium`, `set_vix_target_floor`),
+        // so an engine no host wrote one on hashes as it did before.
+        if self.carries_vix_target_premium() {
+            hash_str(&mut buf, "vix_target_premium");
+            hash_f64(&mut buf, self.vix_target_premium);
+            hash_f64(&mut buf, self.vix_target_premium_half_life);
+        }
+        if let Some(floor) = self.vix_target_floor {
+            hash_str(&mut buf, "vix_target_floor");
+            hash_f64(&mut buf, floor);
         }
         // The variance cascade's components, only on a model that runs it.
         if self.carries_garch_cascade() {

@@ -705,10 +705,13 @@ const SNAPSHOT_KEYS: &[&str] = &[
 /// Top-level keys carried only while they hold something. Their absence is
 /// a value: a pristine book, no close forced tonight, no pins today, no
 /// fair-value shift waiting, the day the counter gives, the fundamentals
-/// the engine was built with.
+/// and the share counts the engine was built with.
 const SNAPSHOT_OPTIONAL_KEYS: &[&str] = &[
     "state_schema", "book", "vix_sets_variance_pending", "macro_pins_today",
     "pending_fair_value", "current_day", "elapsed_days", "fundamentals",
+    "shares_outstanding",
+    // The host's input to the VIX target, while it stands.
+    "vix_target_premium", "vix_target_floor",
     // The spread a `pin_macro(corporate_spread=...)` holds through tonight's
     // close, carried exactly while `macro_pins_today` marks it.
     "pinned_corporate_spread",
@@ -725,6 +728,7 @@ const GDP_PUBLICATION_KEYS: &[&str] =
 const CYCLE_PUBLICATION_KEYS: &[&str] =
     &["key", "published", "last_true", "closes", "turns", "pending_closes", "pending_phases"];
 const FUNDAMENTALS_KEYS: &[&str] = &["eps", "book_value_per_share", "revenue_growth"];
+const VIX_TARGET_PREMIUM_KEYS: &[&str] = &["points", "half_life"];
 const RATES_KEYS: &[&str] = &["instruments", "ig_spread", "last_corporate", "closed_since_open"];
 
 /// Added to a key refusal when the snapshot carries no `state_schema`.
@@ -1484,6 +1488,13 @@ impl Engine {
         out.put("forced_flow_spent", V::Float(self.forced_flow_spent()));
         out.put("market_vol_log_level", V::Float(self.market_vol_log_level()));
         out.put("vix_log_level", V::Float(self.vix_log_level()));
+        // The derived anchor (`vix_level_identity`): a constant of the run,
+        // but derived from the roster the engine was BUILT on, so an engine
+        // rebuilt on a later day's roster derives another one. Carried so a
+        // restore reads the run's own (#268).
+        if p.vix_level_identity != 0.0 {
+            out.put("vix_anchor", V::Float(self.vix_anchor()));
+        }
         // Only where the hash covers it: the memory moves only with
         // `vix_anchor_memory` nonzero.
         if p.vix_anchor_memory != 0.0 {
@@ -1819,6 +1830,22 @@ impl Engine {
             block.put("revenue_growth", V::from_f64s(&growth));
             out.put("fundamentals", V::Map(block));
         }
+        // The share counts, once `set_shares_outstanding` has moved them.
+        if self.shares_outstanding_changed() {
+            out.put("shares_outstanding", V::from_f64s(&self.shares_outstanding()));
+        }
+        // The host's input to the VIX target, only while it stands: the
+        // premium and its half-life, and the floor.
+        if self.carries_vix_target_premium() {
+            let (points, half_life) = self.vix_target_premium();
+            let mut block = SnapshotMap::new();
+            block.put("points", V::Float(points));
+            block.put("half_life", V::Float(half_life));
+            out.put("vix_target_premium", V::Map(block));
+        }
+        if let Some(floor) = self.vix_target_floor() {
+            out.put("vix_target_floor", V::Float(floor));
+        }
         // The variance cascade, only on a model that runs it.
         if self.carries_garch_cascade() {
             out.put("garch_cascade", V::from_f64s(&self.garch_cascade()));
@@ -1872,6 +1899,17 @@ impl Engine {
         );
         let gated = [
             Gated::dial("vix_anchor_slow", "vix_anchor_memory", p.vix_anchor_memory),
+            // Optional where wanted: a snapshot from before #268 has none.
+            Gated {
+                key: "vix_anchor",
+                wanted: p.vix_level_identity != 0.0,
+                held: true,
+                why: format!(
+                    "vix_level_identity is not 0, and this engine's \
+                     vix_level_identity is {}",
+                    p.vix_level_identity
+                ),
+            },
             Gated::when("fair_value_offset", fair_value, fair_value_why.clone()),
             Gated::when("opening_z", fair_value, fair_value_why),
             Gated::when(
@@ -2346,6 +2384,18 @@ impl Engine {
         if inner.params().vix_anchor_memory != 0.0 {
             inner.set_vix_anchor_slow(read_finite(snapshot, "", "vix_anchor_slow")?);
         }
+        // A snapshot from before the anchor was carried keeps the one this
+        // engine derived, which is what every restore read until then.
+        if snapshot.get("vix_anchor").is_some() {
+            let anchor = read_finite(snapshot, "", "vix_anchor")?;
+            if !(anchor > 0.0) {
+                return Err(SnapshotError::new(
+                    SnapshotErrorKind::Fields,
+                    format!("snapshot field vix_anchor must be above 0, got {anchor}"),
+                ));
+            }
+            inner.set_vix_anchor(anchor);
+        }
         // The cycle's volatility multiplier (`market_vol_cycle_ratio`), unset
         // where the snapshot carries none: taken before the first close set
         // it.
@@ -2679,6 +2729,47 @@ impl Engine {
             }
             None => inner.reset_fundamentals(),
         }
+        // The share counts. Absent means they had not moved, so the counts
+        // each company was built with go back. Written raw: the market caps
+        // and the index divisor come from the snapshot.
+        match snapshot.get("shares_outstanding") {
+            Some(_) => {
+                let shares = read_buffer(snapshot, "", "shares_outstanding")?;
+                inner.restore_shares_outstanding(&shares).map_err(core)?;
+            }
+            None => inner.reset_shares_outstanding(),
+        }
+        // The host's input to the VIX target. Absent means none stood.
+        let premium = match snapshot.get("vix_target_premium") {
+            Some(_) => {
+                let block = read_map(snapshot, "", "vix_target_premium")?;
+                check_keys("snapshot field vix_target_premium", block, VIX_TARGET_PREMIUM_KEYS)?;
+                let points = read_finite(block, "vix_target_premium.", "points")?;
+                let half_life = read_finite(block, "vix_target_premium.", "half_life")?;
+                if points == 0.0 || half_life < 0.0 {
+                    return Err(core(format!(
+                        "this snapshot's vix_target_premium is {points} points at a half-life \
+                         of {half_life}. A snapshot carries the premium only while it stands \
+                         (not 0), and its half-life is 0 (held) or above."
+                    )));
+                }
+                (points, half_life)
+            }
+            None => (0.0, 0.0),
+        };
+        let floor = match snapshot.get("vix_target_floor") {
+            Some(_) => {
+                let f = read_finite(snapshot, "", "vix_target_floor")?;
+                if !(f > 0.0) {
+                    return Err(core(format!(
+                        "this snapshot's vix_target_floor is {f}; a floor is above 0"
+                    )));
+                }
+                Some(f)
+            }
+            None => None,
+        };
+        inner.restore_vix_target_input(premium, floor);
         if inner.carries_garch_cascade() {
             inner.set_garch_cascade(&read_buffer(snapshot, "", "garch_cascade")?).map_err(core)?;
         }
