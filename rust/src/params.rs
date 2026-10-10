@@ -1059,6 +1059,29 @@ pub struct ModelParams {
     /// the expectation of every power of the VIX stays finite. In
     /// [-0.99, 0.99], the skew-normal's reach.
     pub forecast_vix_dispersion_skew: f64,
+    /// Whether the forecast's VIX reads the variance the forecast reports.
+    /// Read only with `forecast_horizon_sessions` and
+    /// `forecast_vix_dispersion` set; 0.0, on every shipped preset, is a
+    /// branch to the VIX step reading the index variance on the first track
+    /// (the laws at the expected VIX alone), and a value of 0.0 is left out
+    /// of the model's digest. 1.0 is the only other value.
+    ///
+    /// The VIX's law reads the index's conditional variance back as its
+    /// target (`vix_level_identity`), and the forecast's VIX path iterates
+    /// that law. The variances the forecast reports take each convex VIX
+    /// coupling as its expectation over the VIX's spread (the factor's
+    /// target at a power of 4 above the anchor among them), but the VIX step
+    /// read the variance at the expected VIX, so the expectation the
+    /// forecast already computes never reached the VIX that depends on it.
+    /// On R22V3 with its derived dials, 48 origins on 7001-7012, 16 forks
+    /// each, the law's own variance stood 8 per cent over the forecast's at
+    /// 21 sessions and 20 per cent at 42, and its VIX 0.4 points over at 42
+    /// (`programme/ptv22/diag/mctruth.py`, tradefloor-design). At 1.0 the
+    /// VIX step reads the second track's variance, for the session's return
+    /// nodes and the read-back the target and the anchor memories take, so
+    /// the forecast iterates the law on the expectation it reports. No
+    /// number is fitted.
+    pub forecast_vix_expected_variance: f64,
     /// The share of the next meeting's shadow change the forecast's policy
     /// path leaves out. The shadow is the change the meeting function makes
     /// on the economy as published, the change `policy_anticipation` prices.
@@ -7691,6 +7714,7 @@ impl ModelParams {
             forecast_vix_dispersion: 0.0,
             forecast_vix_dispersion_half_life: 0.0,
             forecast_vix_dispersion_skew: 0.0,
+            forecast_vix_expected_variance: 0.0,
             forecast_policy_shadow_discount: 0.0,
             forecast_policy_persistence: 0.0,
             forecast_policy_reversion: 0.0,
@@ -10300,6 +10324,7 @@ impl ModelParams {
             "forecast_vix_dispersion" => self.forecast_vix_dispersion,
             "forecast_vix_dispersion_half_life" => self.forecast_vix_dispersion_half_life,
             "forecast_vix_dispersion_skew" => self.forecast_vix_dispersion_skew,
+            "forecast_vix_expected_variance" => self.forecast_vix_expected_variance,
             "forecast_policy_shadow_discount" => self.forecast_policy_shadow_discount,
             "forecast_policy_persistence" => self.forecast_policy_persistence,
             "forecast_policy_reversion" => self.forecast_policy_reversion,
@@ -10674,6 +10699,7 @@ impl ModelParams {
             "forecast_vix_dispersion" => out.forecast_vix_dispersion = value,
             "forecast_vix_dispersion_half_life" => out.forecast_vix_dispersion_half_life = value,
             "forecast_vix_dispersion_skew" => out.forecast_vix_dispersion_skew = value,
+            "forecast_vix_expected_variance" => out.forecast_vix_expected_variance = value,
             "forecast_policy_shadow_discount" => out.forecast_policy_shadow_discount = value,
             "forecast_policy_persistence" => out.forecast_policy_persistence = value,
             "forecast_policy_reversion" => out.forecast_policy_reversion = value,
@@ -12037,6 +12063,12 @@ impl ModelParams {
                  spread as normal.",
                 self.forecast_vix_dispersion_skew));
         }
+        if !(self.forecast_vix_expected_variance == 0.0 || self.forecast_vix_expected_variance == 1.0) {
+            return Err(format!(
+                "forecast_vix_expected_variance is {}. It is a switch, 0 or 1: at 1 the \
+                 forecast's VIX reads the variance the forecast reports.",
+                self.forecast_vix_expected_variance));
+        }
         if !(self.forecast_policy_persistence >= 0.0 && self.forecast_policy_persistence < 1.0) {
             return Err(format!(
                 "forecast_policy_persistence is {}. It is the share of a meeting's expected \
@@ -12638,6 +12670,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "forecast_vix_dispersion",
     "forecast_vix_dispersion_half_life",
     "forecast_vix_dispersion_skew",
+    "forecast_vix_expected_variance",
     "forecast_policy_shadow_discount",
     "forecast_policy_persistence",
     "forecast_policy_reversion",
@@ -12833,6 +12866,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "forecast_vix_dispersion",
         "forecast_vix_dispersion_half_life",
         "forecast_vix_dispersion_skew",
+        "forecast_vix_expected_variance",
         "forecast_policy_shadow_discount",
         "forecast_policy_persistence",
         "forecast_policy_reversion",

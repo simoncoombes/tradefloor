@@ -795,8 +795,17 @@ impl Engine {
             for (n, v) in names.iter().zip(per_name.iter()) {
                 out.name_variance[n.slot].push(*v);
             }
-            let (v_session, _) = self.forecast_identity(
-                &names, &garch, &sector_states, &idio, faces, vix, universe_stress, down, &econ);
+            // Under `forecast_vix_expected_variance` the VIX's step reads the
+            // variance the forecast reports, which carries each convex
+            // coupling's expectation over the VIX's spread; otherwise the
+            // first track's, at the expected VIX alone.
+            let expected_variance = p.forecast_vix_expected_variance != 0.0 && p.forecast_vix_dispersion != 0.0;
+            let v_session = if expected_variance {
+                v_report
+            } else {
+                self.forecast_identity(
+                    &names, &garch, &sector_states, &idio, faces, vix, universe_stress, down, &econ).0
+            };
 
             // Its close. The factor on both tracks: the expected update over
             // the day's factor (four nodes) and the believed phase's regimes.
@@ -873,9 +882,18 @@ impl Engine {
             faces_e = next_faces_e;
             down = None;
 
-            // The step's read-back, at the VIX before the step.
-            let (v_next, _) = self.forecast_identity(
-                &names, &garch, &sector_states, &idio, faces, vix, universe_stress, None, &econ);
+            // The step's read-back, at the VIX before the step: on the
+            // expectation track under `forecast_vix_expected_variance`, with
+            // the return memory's multiplier after this close.
+            let v_next = if expected_variance {
+                let lev_next = self.forecast_leverage_factor(step + 1);
+                self.forecast_identity(
+                    &names, &garch_e, &sector_states, &idio, (faces_e.0 * lev_next, faces_e.1 * lev_next),
+                    vix_sq, universe_stress, None, &econ_sq).0
+            } else {
+                self.forecast_identity(
+                    &names, &garch, &sector_states, &idio, faces, vix, universe_stress, None, &econ).0
+            };
             let mut scale_bar = 0.0;
             for &(w, _, scale) in &regimes {
                 scale_bar += w * scale;

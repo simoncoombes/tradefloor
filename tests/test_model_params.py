@@ -1155,6 +1155,7 @@ PERTURBATIONS = [
     ("forecast_vix_dispersion", 0.3, False),
     ("forecast_vix_dispersion_half_life", 21.0, False),
     ("forecast_vix_dispersion_skew", 0.8, False),
+    ("forecast_vix_expected_variance", 1.0, False),
     ("forecast_policy_shadow_discount", 0.25, False),
     ("forecast_policy_persistence", 0.5, False),
     ("forecast_policy_reversion", 0.1, False),
