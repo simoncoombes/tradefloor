@@ -679,6 +679,8 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "usd_mean_reversion": (0.0, 0.02),
     "usd_noise_sd": (0.0, 0.86),
     "usd_safe_haven_gain": (0.0, 0.1),
+    # The funds > 5 term of the cycle's ladder; 0.0 is the legacy 0.1.
+    "cycle_hazard_funds_gain": (0.0, 0.2),
     # Oil's bounds: WTI deflated by CPIAUCSL, 1987 to 2024, at the model's
     # centre of 81 gives 16.4 and 279; the standing 35 and 150 inside.
     "oil_price_floor": (0.0, 35.0),

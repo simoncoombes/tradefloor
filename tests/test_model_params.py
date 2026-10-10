@@ -969,6 +969,9 @@ PERTURBATIONS = [
     # The dollar's crisis drift at FRED DTWEXM's measured 0.001, LIVE: the
     # probe's VIX crosses the threshold, and the dollar reaches oil's drag.
     ("usd_safe_haven_gain", 0.001, True),
+    # The funds > 5 term of the cycle's ladder. INERT on the probe: its
+    # funds rate never reaches 5, so the term is never read.
+    ("cycle_hazard_funds_gain", 0.03, False),
     # Oil's bounds from WTI in real terms. INERT on the probe: its burn-in's
     # oil stays inside 35 to 150, so moving the bounds outward moves nothing.
     ("oil_price_floor", 16.4, False),

@@ -4005,6 +4005,7 @@ impl Engine {
             } else {
                 0.0
             },
+            funds_gain: self.params.cycle_hazard_funds_gain,
         }
     }
 

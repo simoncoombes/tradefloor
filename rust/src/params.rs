@@ -3015,6 +3015,19 @@ pub struct ModelParams {
     /// (1500 openings, docs/MODEL.md).
     /// pt-v21 ships 0.011.
     pub cycle_equity_hazard_opening: f64,
+    /// The monthly hazard an expansion adds while the funds rate is above 5
+    /// per cent (`adjust_transition_probability`, economy/cycle.rs). 0.0, on
+    /// every preset, is the legacy 0.1 and is left out of the model's digest;
+    /// a value replaces it (1e-9 stands for off).
+    ///
+    /// Why. The 0.1 is the reference implementation's constant, never
+    /// measured. Post-war (FRED FEDFUNDS and USREC, 1954-2026), a recession
+    /// starts within six months of a non-recession month with the funds rate
+    /// above 5 in 0.132 of them against 0.051 below, an excess of +0.081
+    /// (se 0.048, whole-cycle bootstrap). R22O5 at 0.1 reads +0.343 (se
+    /// 0.067) on 60 gen-stage histories (tradefloor-design ptv22/ph5,
+    /// TARGET-FUNDS.md). In [0, 1].
+    pub cycle_hazard_funds_gain: f64,
     /// Sessions of market the run has lived before day zero: the last this many
     /// days of the economy's burn-in (`macro_burn_in_days`), played on a copy
     /// of the opening engine with the economy's recorded phase set each day and
@@ -8024,6 +8037,7 @@ impl ModelParams {
             cycle_equity_hazard: 0.0,
             cycle_equity_hazard_knee: 0.0,
             cycle_equity_hazard_opening: 0.0,
+            cycle_hazard_funds_gain: 0.0,
             market_prehistory_sessions: 0.0,
             market_prehistory_valuation: 0.0,
             fed_put_carry: 0.0,
@@ -10649,6 +10663,7 @@ impl ModelParams {
             "cycle_equity_hazard" => self.cycle_equity_hazard,
             "cycle_equity_hazard_knee" => self.cycle_equity_hazard_knee,
             "cycle_equity_hazard_opening" => self.cycle_equity_hazard_opening,
+            "cycle_hazard_funds_gain" => self.cycle_hazard_funds_gain,
             "market_prehistory_sessions" => self.market_prehistory_sessions,
             "market_prehistory_valuation" => self.market_prehistory_valuation,
             "fed_put_carry" => self.fed_put_carry,
@@ -11039,6 +11054,7 @@ impl ModelParams {
             "cycle_equity_hazard" => out.cycle_equity_hazard = value,
             "cycle_equity_hazard_knee" => out.cycle_equity_hazard_knee = value,
             "cycle_equity_hazard_opening" => out.cycle_equity_hazard_opening = value,
+            "cycle_hazard_funds_gain" => out.cycle_hazard_funds_gain = value,
             "market_prehistory_sessions" => out.market_prehistory_sessions = value,
             "market_prehistory_valuation" => out.market_prehistory_valuation = value,
             "fed_put_carry" => out.fed_put_carry = value,
@@ -12316,6 +12332,12 @@ impl ModelParams {
                  [0, 5]; 0 is the standing 0.3.",
                 self.usd_noise_sd));
         }
+        if !(0.0..=1.0).contains(&self.cycle_hazard_funds_gain) {
+            return Err(format!(
+                "cycle_hazard_funds_gain is {}. It is the monthly hazard an expansion adds while the \
+                 funds rate is above 5, in [0, 1]; 0 is the legacy 0.1.",
+                self.cycle_hazard_funds_gain));
+        }
         if !(0.0..=1.0).contains(&self.usd_safe_haven_gain) {
             return Err(format!(
                 "usd_safe_haven_gain is {}. It is the dollar's daily drift per VIX point above \
@@ -12911,6 +12933,7 @@ fn shipped_digests() -> &'static [(&'static str, String)] {
 /// recorded state hash of a custom model moves. Only a switch whose zero is
 /// a branch belongs here; a dial whose zero is arithmetic does not.
 pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
+    "cycle_hazard_funds_gain",
     "book_arrival_shuffle",
     "book_cross_at_limit",
     "book_depth_nesting",
@@ -13341,6 +13364,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "cycle_equity_hazard",
         "cycle_equity_hazard_knee",
         "cycle_equity_hazard_opening",
+        "cycle_hazard_funds_gain",
         "market_prehistory_sessions",
         "market_prehistory_valuation",
         "fed_put_carry",

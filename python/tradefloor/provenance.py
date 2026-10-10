@@ -532,6 +532,11 @@ OUT_OF_SCOPE = {
         "inert at 0.0: `update_economy_daily` branches on `== 0.0` and draws "
         "the standing 0.3 a unit of volatility, the same draw either way; at "
         "0.0 it is also left out of the model's digest",
+    "cycle_hazard_funds_gain":
+        "inert at 0.0: `adjust_transition_probability` in economy/cycle.rs "
+        "branches on `!= 0.0` to the legacy 0.1 an expansion adds while the "
+        "funds rate is above 5; at 0.0 it is also left out of the model's "
+        "digest",
     "usd_safe_haven_gain":
         "inert at 0.0: `usd_safe_haven_gain` in economy/daily.rs branches on "
         "`== 0.0` to the standing 0.05, read by the dollar's step and the "

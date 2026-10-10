@@ -866,6 +866,7 @@ PARAM_SPECS: dict[str, dict] = {
     "usd_mean_reversion": {"kind": "abs", "step_unit": 0.0001, "hard_range": (0.0, 1.0)},
     "usd_noise_sd": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 5.0)},
     "usd_safe_haven_gain": {"kind": "abs", "step_unit": 0.001, "hard_range": (0.0, 1.0)},
+    "cycle_hazard_funds_gain": {"kind": "abs", "step_unit": 0.005, "hard_range": (0.0, 1.0)},
     "oil_price_floor": {"kind": "abs", "step_unit": 0.5, "hard_range": (0.0, 35.0)},
     "oil_price_ceiling": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1000.0)},
     "oil_forecast_clamp": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0), "derived": False},
