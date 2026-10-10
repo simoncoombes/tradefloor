@@ -198,6 +198,17 @@ _LABELS: dict[str, dict[str, str]] = {
                          "standing panel follows the table."),
         "detail_intro": ("{shown} of {n} symbols, being every name you "
                         "hold plus a standing panel."),
+        "futures": "Futures",
+        "index_level": "price index",
+        "front": "front",
+        "fair": "  fair value",
+        "mark": "  last settlement",
+        "to_expiry": "  sessions to expiry",
+        "contracts": "contracts",
+        "margin_initial": "margin, initial",
+        "margin_maintenance": "margin, maintenance",
+        "margin_call": "margin call",
+        "call_day": "made at the close of day {day}",
     },
     "fr": {
         "title": "MARCHE SIMULE",
@@ -246,6 +257,17 @@ _LABELS: dict[str, dict[str, str]] = {
                          "panneau permanent suit le tableau."),
         "detail_intro": ("{shown} symboles sur {n}, soit chaque nom "
                         "detenu et un panneau permanent."),
+        "futures": "Contrats a terme",
+        "index_level": "indice de prix",
+        "front": "echeance proche",
+        "fair": "  valeur theorique",
+        "mark": "  dernier cours de compensation",
+        "to_expiry": "  seances avant echeance",
+        "contracts": "contrats",
+        "margin_initial": "marge initiale",
+        "margin_maintenance": "marge de maintien",
+        "margin_call": "appel de marge",
+        "call_day": "emis a la cloture du jour {day}",
     },
 }
 
@@ -566,7 +588,47 @@ class TextRenderer:
             out.append(f"  {order['symbol']:<8} {order['side']:<4} "
                        f"{_qty(order['remaining'])} {L['shares']} "
                        f"{L['at']} {_money(order['limit_price'])}")
+        # Only on a model that lists futures, whose payload carries the key
+        # (observation schema 3); every other payload renders the bytes it
+        # did.
+        if "futures" in payload:
+            out += self._futures_block(payload, L)
         return "\n".join(out)
+
+    def _futures_block(self, payload: dict[str, Any],
+                       L: dict[str, str]) -> list[str]:
+        """The listed futures, the price index and the account's margin."""
+        out = ["", L["futures"], "-" * len(L["futures"])]
+        index = payload.get("index")
+        if index is not None:
+            out.append(f"{L['index_level']:<23}{_num(index['level'])}")
+        for c in payload["futures"]:
+            out += [
+                "",
+                c["symbol"] + (f" ({L['front']})" if c["front"] else ""),
+                f"{L['price']:<23}{_num(c['price'])}",
+                f"{L['fair']:<23}{_num(c['fair'])}",
+                f"{L['mark']:<23}{_num(c['mark'])}",
+                f"{L['bid_ask']:<23}{_num(c['best_bid'])}"
+                f" / {_num(c['best_ask'])}",
+                f"{L['to_expiry']:<23}{_num(c['sessions_to_expiry'])}",
+                f"{L['position']:<23}{_qty(c['position'])} {L['contracts']}",
+                f"{L['max_order_shares']:<23}"
+                f"{_qty(c['max_order_contracts'])} {L['contracts']}",
+            ]
+        margin = payload.get("margin")
+        if margin is not None:
+            call = margin["call"]
+            out += [
+                "",
+                f"{L['margin_initial']:<23}{_money(margin['initial'])}",
+                f"{L['margin_maintenance']:<23}"
+                f"{_money(margin['maintenance'])}",
+                f"{L['margin_call']:<23}"
+                + (L["none"] if call is None
+                   else L["call_day"].format(day=call["day"])),
+            ]
+        return out
 
     def _price_line(self, asset: dict[str, Any]) -> tuple[str, str]:
         """The (label, value) for an asset's headline price line."""

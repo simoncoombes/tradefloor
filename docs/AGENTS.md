@@ -30,7 +30,16 @@ future at its last settlement mark and pays the mark's move in cash at each
 close; a close that leaves equity under the contracts' maintenance margin
 makes a margin call, and if equity is not back at the initial margin by the
 next open, the futures are closed at the market. MODEL.md's Margin section
-has the rules.
+has the rules. `obs.portfolio.margin()` reads the account's initial and
+maintenance requirement, its excess over the initial and any open call, and
+`obs.portfolio.futures` the positions. `tf.contracts.parse` and
+`tf.contracts.format` read and write a symbol. A framework adapter shows its
+model the same: the payload (version 3) gains `index`, `futures` and
+`margin` on such a model, and an action may name a listed future, counted
+in contracts. The MCP server's `list_contracts` and `quote_contracts` read a
+session's futures, and `session_step` trades one by its symbol.
+`Engine.futures_bars()` and `Engine.settlements_table()` give them as Arrow
+tables.
 
 In the mapping `act` returns, a plain number is a market order for that many
 shares, negative to sell. A native Python agent can also return

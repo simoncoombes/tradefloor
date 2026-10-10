@@ -723,6 +723,123 @@ pub fn distributions_batch(rows: &[&crate::engine::Distribution]) -> Result<Reco
     RecordBatch::try_new(distributions_schema(), columns).map_err(|e| e.to_string())
 }
 
+/// The version the futures tables (`futures_bars`, `settlements`) carry in
+/// their schema's `schema_version` metadata key. The older tables carry no
+/// version, and their columns are frozen by the known-answer gate; these
+/// are new in pt-v22 phase 1 and will gain columns as options arrive, so a
+/// reader can tell which layout it holds from the stream alone. One key per
+/// schema, for the reason [`prints_schema`] gives.
+pub const FUTURES_TABLES_SCHEMA_VERSION: &str = "1";
+
+fn versioned(fields: Vec<Field>) -> SchemaRef {
+    let metadata = std::collections::HashMap::from([(
+        "schema_version".to_string(),
+        FUTURES_TABLES_SCHEMA_VERSION.to_string(),
+    )]);
+    Arc::new(Schema::new_with_metadata(fields, metadata))
+}
+
+/// `futures_bars`: one row per listed contract per recorded day, read when
+/// `record` is called. Every day loop in the package records a day after
+/// its last session and before its close, so `price` is the contract's
+/// price at the day's last print and `mark` the settlement mark the
+/// previous close set. `bid`, `ask`, `mark` and `initial_margin` are null
+/// where the contract has none (an empty side, before its first close,
+/// without `margin_scan_coverage`). Contracts are named by symbol: there
+/// are at most a few dozen a day, so the string costs nothing.
+pub fn futures_bars_schema() -> SchemaRef {
+    versioned(vec![
+        Field::new("day", DataType::UInt32, false),
+        Field::new("symbol", DataType::Utf8, false),
+        Field::new("root", DataType::Utf8, false),
+        Field::new("expiry", DataType::Int64, false),
+        Field::new("front", DataType::Boolean, false),
+        Field::new("price", DataType::Float64, false),
+        Field::new("fair", DataType::Float64, false),
+        Field::new("basis_bp", DataType::Float64, false),
+        Field::new("bid", DataType::Float64, true),
+        Field::new("ask", DataType::Float64, true),
+        Field::new("mark", DataType::Float64, true),
+        Field::new("index", DataType::Float64, false),
+        Field::new("sessions_to_expiry", DataType::Float64, false),
+        Field::new("initial_margin", DataType::Float64, true),
+    ])
+}
+
+/// One contract's row of [`futures_bars_schema`].
+#[derive(Debug, Clone)]
+pub struct FuturesBarRow {
+    pub day: u32,
+    pub symbol: String,
+    pub root: String,
+    pub expiry: i64,
+    pub front: bool,
+    pub price: f64,
+    pub fair: f64,
+    pub basis_bp: f64,
+    pub bid: Option<f64>,
+    pub ask: Option<f64>,
+    pub mark: Option<f64>,
+    pub index: f64,
+    pub sessions_to_expiry: f64,
+    pub initial_margin: Option<f64>,
+}
+
+pub fn futures_bars_batch(rows: &[&FuturesBarRow]) -> Result<RecordBatch, String> {
+    use arrow::array::{BooleanArray, Int64Array, StringArray};
+    let f = |g: fn(&FuturesBarRow) -> f64| -> ArrayRef {
+        Arc::new(Float64Array::from(rows.iter().map(|r| g(r)).collect::<Vec<_>>()))
+    };
+    let o = |g: fn(&FuturesBarRow) -> Option<f64>| -> ArrayRef {
+        Arc::new(Float64Array::from(rows.iter().map(|r| g(r)).collect::<Vec<_>>()))
+    };
+    let columns: Vec<ArrayRef> = vec![
+        Arc::new(UInt32Array::from(rows.iter().map(|r| r.day).collect::<Vec<_>>())),
+        Arc::new(StringArray::from(rows.iter().map(|r| r.symbol.as_str()).collect::<Vec<_>>())),
+        Arc::new(StringArray::from(rows.iter().map(|r| r.root.as_str()).collect::<Vec<_>>())),
+        Arc::new(Int64Array::from(rows.iter().map(|r| r.expiry).collect::<Vec<_>>())),
+        Arc::new(BooleanArray::from(rows.iter().map(|r| r.front).collect::<Vec<_>>())),
+        f(|r| r.price),
+        f(|r| r.fair),
+        f(|r| r.basis_bp),
+        o(|r| r.bid),
+        o(|r| r.ask),
+        o(|r| r.mark),
+        f(|r| r.index),
+        f(|r| r.sessions_to_expiry),
+        o(|r| r.initial_margin),
+    ];
+    RecordBatch::try_new(futures_bars_schema(), columns).map_err(|e| e.to_string())
+}
+
+/// `settlements`: one row per contract's final settlement, in session
+/// order, as `Engine.settlements` lists them: `session` (counted from 0,
+/// the open or close it settled at), `symbol`, `root`, `kind` (`"future"`),
+/// `value` (the settlement price) and `reference` (what it settles on).
+pub fn settlements_schema() -> SchemaRef {
+    versioned(vec![
+        Field::new("session", DataType::Int64, false),
+        Field::new("symbol", DataType::Utf8, false),
+        Field::new("root", DataType::Utf8, false),
+        Field::new("kind", DataType::Utf8, false),
+        Field::new("value", DataType::Float64, false),
+        Field::new("reference", DataType::Float64, false),
+    ])
+}
+
+pub fn settlements_batch(rows: &[crate::derivatives::Settlement]) -> Result<RecordBatch, String> {
+    use arrow::array::{Int64Array, StringArray};
+    let columns: Vec<ArrayRef> = vec![
+        Arc::new(Int64Array::from(rows.iter().map(|r| r.session).collect::<Vec<_>>())),
+        Arc::new(StringArray::from(rows.iter().map(|r| r.symbol.as_str()).collect::<Vec<_>>())),
+        Arc::new(StringArray::from(rows.iter().map(|r| r.root.as_str()).collect::<Vec<_>>())),
+        Arc::new(StringArray::from(rows.iter().map(|r| r.kind.family()).collect::<Vec<_>>())),
+        Arc::new(Float64Array::from(rows.iter().map(|r| r.value).collect::<Vec<_>>())),
+        Arc::new(Float64Array::from(rows.iter().map(|r| r.reference).collect::<Vec<_>>())),
+    ];
+    RecordBatch::try_new(settlements_schema(), columns).map_err(|e| e.to_string())
+}
+
 /// `fills`: one row per execution.
 ///
 /// The trader's own record, not the market's. It exists so a study can join

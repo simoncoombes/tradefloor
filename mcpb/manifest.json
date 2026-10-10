@@ -114,6 +114,14 @@
       "description": "Read an open session without changing it: the clock, every price, the published macro figures, today's news by name, each agent's portfolio and open orders, and the checkpoints session_rewind can return to."
     },
     {
+      "name": "list_contracts",
+      "description": "List the futures an open session's market lists now: each contract's symbol (IDX.F0119 is the index future expiring at session 119), root, expiry session, roll session, whether it is the front contract, its multiplier in dollars a point, its tick and what it settles on, with the price index level."
+    },
+    {
+      "name": "quote_contracts",
+      "description": "Quote listed futures in an open session now: the book's best bid and ask, the price, the fair value it is quoted around and the basis between them, the last settlement mark, the underlying level and the carry the fair value holds, sessions to expiry, the multiplier, the daily volume the book is sized to, and the initial and maintenance margin a contract asks."
+    },
+    {
       "name": "session_fork",
       "description": "Copy an open session, at its present state, into a new session with its own id, so you can try two different actions from the same market and compare them."
     },

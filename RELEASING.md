@@ -427,12 +427,14 @@ baseline to regenerate. The combined `sha256` in that file moves with the
 new row.
 
 `tests/known_answer_traded.json` runs the reference agents through
-`evaluate` on the default preset by name, pt-v21 from 0.10.0
-(`TRADED_KAT_VERSION` 2) and pt-v20 before it, so adding a preset leaves it
-where it was until that preset becomes the default. It moves when the
-default preset changes before it ships, when a reference agent changes, or
-when `evaluate` scores differently, and `test_known_answer.py` names the
-agent and the part (orders, fills or scorecard). Re-base it by bumping
+`evaluate` on the default preset by name: pt-v21 from 0.10.0
+(`TRADED_KAT_VERSION` 2), as the script's `PRESET` and the JSON's
+`preset` say, and pt-v20 only in 0.8.5 to 0.9.1 (version 1). So adding a
+preset leaves it where it was until that preset becomes the default. It
+moves when the default preset changes before it ships, when a reference
+agent changes, or when `evaluate` scores differently, and
+`test_known_answer.py` names the agent and the part (orders, fills or
+scorecard). Re-base it by bumping
 `TRADED_KAT_VERSION`, running `python tests/known_answer_traded.py --write`
 and adding a sentence to its note saying what moved. Its `presetRow` must
 equal the default preset's row in `known_answer_presets.json`, so re-basing

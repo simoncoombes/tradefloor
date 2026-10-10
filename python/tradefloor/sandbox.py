@@ -337,6 +337,13 @@ class MarketView:
     # state only and writes nothing; a contract trades through the ``act``
     # mapping by its symbol, as a ticker does.
 
+    @property
+    def lists_futures(self) -> bool:
+        """Whether the model lists futures of any family, as
+        ``Engine.lists_futures``: a property of the model, True before the
+        first close lists a VIX future. False on every shipped preset."""
+        return _WRAPPED[self].lists_futures
+
     def contracts(self) -> list[dict[str, Any]]:
         """The listed contracts, as ``Engine.contracts`` lists them. Empty on
         a model that lists none."""
@@ -678,6 +685,39 @@ class PortfolioView:
     def open_orders(self, engine: Any = None) -> list[dict]:
         portfolio, live = _WRAPPED[self]
         return [dict(o) for o in portfolio.open_orders(live)]
+
+    # The futures (pt-v22 phase 1), as copies: the view's holder cannot
+    # move a mark or a quantity.
+
+    @property
+    def futures(self) -> dict[str, Any]:
+        """The futures held, by symbol, as copies of the portfolio's
+        :class:`~tradefloor.portfolio.FuturesPosition`. Empty without
+        futures."""
+        from .portfolio import FuturesPosition
+
+        out: dict[str, FuturesPosition] = {}
+        for symbol, held in _WRAPPED[self][0].futures.items():
+            twin = FuturesPosition(symbol, held.multiplier, held.mark)
+            twin.quantity = held.quantity
+            twin.variation = held.variation
+            out[symbol] = twin
+        return out
+
+    def margin(self, engine: Any = None) -> dict[str, Any]:
+        """The account's margin now, as :meth:`Portfolio.margin
+        <tradefloor.Portfolio.margin>` gives it."""
+        portfolio, live = _WRAPPED[self]
+        return portfolio.margin(live)
+
+    def margin_requirement(self, engine: Any = None, *,
+                           maintenance: bool = False) -> float:
+        portfolio, live = _WRAPPED[self]
+        return portfolio.margin_requirement(live, maintenance=maintenance)
+
+    @property
+    def margin_calls(self) -> list[dict]:
+        return [dict(c) for c in _WRAPPED[self][0].margin_calls]
 
     def __getattr__(self, name: str) -> Any:
         raise SandboxError(

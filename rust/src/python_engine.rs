@@ -1575,6 +1575,9 @@ pub struct PyEngine {
     /// meeting schedule -- differently from the engine it forked from.
     day_count: u32,
     recorded_macro: Vec<crate::python_arrow::MacroRow>,
+    /// The listed contracts' rows, one per contract per recorded day, on a
+    /// model that lists futures (`futures_bars`); empty on every other.
+    recorded_futures: Vec<crate::python_arrow::FuturesBarRow>,
     /// Recorded order-book depth. Empty unless a caller asks for it.
     recorded_book: Vec<crate::python_arrow::BookRow>,
     /// Every input that crossed into this engine, in order.
@@ -1746,6 +1749,7 @@ impl PyEngine {
             // day it runs, which is the day being explained.
             copy.recorded.clear();
             copy.recorded_macro.clear();
+            copy.recorded_futures.clear();
             copy.recorded_book.clear();
             copy.day_buffer.clear();
             // And the draw log, which is the size of the tape. Without
@@ -2131,6 +2135,7 @@ impl PyEngine {
             tickers,
             recorded: Vec::new(),
             recorded_macro: Vec::new(),
+            recorded_futures: Vec::new(),
             recorded_book: Vec::new(),
             log: Vec::new(),
             explanations: Explanations::default(),
@@ -4771,6 +4776,16 @@ impl PyEngine {
         self.inner.live_vix()
     }
 
+    /// Whether the model lists futures of any family
+    /// (`futures_index_listed`, `futures_vix_listed`, `futures_rates_listed`
+    /// or `futures_oil_listed`). A property of the model: True on a model
+    /// that lists VIX futures before its first close, while `contracts()` is
+    /// still empty. False on every shipped preset.
+    #[getter]
+    fn lists_futures(&self) -> bool {
+        self.inner.lists_futures()
+    }
+
     /// The forecast the last close computed (`forecast_horizon_sessions`), or
     /// None with the dial at 0 and before the first close. Entry `h - 1` of
     /// each list is the expectation `h` sessions ahead: `vix`, the published
@@ -5278,6 +5293,30 @@ impl PyEngine {
             fear_greed_index: e.fear_greed_index,
             universe_stress: self.inner.universe_stress(),
         });
+        // The listed contracts as they stand, on a model that lists futures
+        // only: `contracts` and `quote` are reads, so recording moves
+        // nothing, and every other model records what it did.
+        if self.inner.lists_futures() {
+            for c in self.inner.contracts() {
+                let Some(q) = self.inner.quote(&c.symbol) else { continue };
+                self.recorded_futures.push(crate::python_arrow::FuturesBarRow {
+                    day,
+                    symbol: c.symbol.clone(),
+                    root: c.root.clone(),
+                    expiry: c.expiry,
+                    front: c.front,
+                    price: q.price,
+                    fair: q.fair,
+                    basis_bp: q.basis_bp,
+                    bid: q.bid,
+                    ask: q.ask,
+                    mark: q.mark,
+                    index: q.index,
+                    sessions_to_expiry: q.sessions_to_expiry,
+                    initial_margin: q.initial_margin,
+                });
+            }
+        }
         Ok(())
     }
 
@@ -5285,6 +5324,7 @@ impl PyEngine {
     fn clear_recording(&mut self) {
         self.recorded.clear();
         self.recorded_macro.clear();
+        self.recorded_futures.clear();
         self.recorded_book.clear();
     }
 
@@ -5706,6 +5746,46 @@ impl PyEngine {
         Ok(crate::python_arrow::PyArrowStream::new(
             "macro",
             crate::python_arrow::macro_schema(),
+            vec![batch],
+        ))
+    }
+
+    /// The `futures_bars` table (pt-v22 phase 1): one row per listed
+    /// contract per recorded day, read at `record`. Every day loop in the
+    /// package records after the day's last session and before its close,
+    /// so `price` is the contract's price at the day's last print, `fair`
+    /// its fair value then, `basis_bp` the gap in basis points, `bid` and
+    /// `ask` its book's touch, `mark` the previous close's settlement mark,
+    /// `index` what `fair` reads, `sessions_to_expiry`, and
+    /// `initial_margin`, dollars a contract as the last close set it.
+    /// Nullable where a quote's field is None. `day = N` is that recorded
+    /// day alone. Empty on a model that lists no futures, which is every
+    /// shipped preset. The schema's `schema_version` metadata key is "1".
+    #[pyo3(signature = (day = None))]
+    fn futures_bars(&self, day: Option<u32>) -> PyResult<crate::python_arrow::PyArrowStream> {
+        let rows: Vec<&crate::python_arrow::FuturesBarRow> =
+            self.recorded_futures.iter().filter(|r| day.is_none_or(|d| r.day == d)).collect();
+        let batch = crate::python_arrow::futures_bars_batch(&rows).map_err(crate::python_arrow::arrow_err)?;
+        Ok(crate::python_arrow::PyArrowStream::new(
+            "futures_bars",
+            crate::python_arrow::futures_bars_schema(),
+            vec![batch],
+        ))
+    }
+
+    /// The `settlements` table (pt-v22 phase 1): `Engine.settlements(day)`
+    /// as Arrow, one row per final settlement in session order, with
+    /// `session`, `symbol`, `root`, `kind`, `value` and `reference`. Read
+    /// from the engine, not from a recording, so it holds every settlement
+    /// the run has made. Empty on a model that lists no futures. The
+    /// schema's `schema_version` metadata key is "1".
+    #[pyo3(signature = (day = None))]
+    fn settlements_table(&self, day: Option<i64>) -> PyResult<crate::python_arrow::PyArrowStream> {
+        let rows = self.inner.settlements(day);
+        let batch = crate::python_arrow::settlements_batch(&rows).map_err(crate::python_arrow::arrow_err)?;
+        Ok(crate::python_arrow::PyArrowStream::new(
+            "settlements",
+            crate::python_arrow::settlements_schema(),
             vec![batch],
         ))
     }
