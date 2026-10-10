@@ -1030,6 +1030,15 @@ impl Engine {
                     lognormal_excess(vix, spread, k)
                 };
                 let haven = crate::economy::daily::USD_SAFE_HAVEN_GAIN * (excess - at_mean);
+                // Under `oil_dollar_elasticity` the law rescales the oil
+                // price's reverting part by the day's whole dollar move, the
+                // bid included, so the expected bid's excess over the bid at
+                // the expected VIX moves oil by the same ratio.
+                if p.oil_dollar_elasticity != 0.0 && next.usd_index > 0.0 {
+                    let push = if p.oil_pushes_in_target != 0.0 { next.oil_push_level } else { 0.0 };
+                    let ratio = crate::mathx::pow((next.usd_index + haven) / next.usd_index, -p.oil_dollar_elasticity);
+                    next.oil_price = (next.oil_price - push) * ratio + push;
+                }
                 next.usd_index += haven;
                 // Under `usd_mean_reversion` the expected bid joins the part of
                 // the dollar that decays at 0.02, as the step's own does.
