@@ -148,11 +148,12 @@ def test_a_built_wheel_carries_its_types(wheel):
 def test_every_test_file_is_in_exactly_one_ci_batch():
     """A test file in no batch runs nowhere, and nothing says so.
 
-    The nightly suite is split four ways because it takes over half an hour in
-    one process. The split is by first letter, which is stable but not
-    self-maintaining: a file whose name starts with a letter no batch claims
-    would simply never run, and the suite would keep reporting green over a
-    smaller and smaller fraction of itself.
+    The suite is split four ways because it takes over half an hour in one
+    process. The split is by alphabetical range, which covers every name only
+    while the ranges start at the beginning and are in order: a range written
+    out of order would claim nothing past it, and a file it should have
+    claimed would simply never run while the suite kept reporting green over
+    a smaller and smaller fraction of itself.
 
     That is the same shape as the `0*.py` example glob that silently stopped
     at example nine, and as every stale path the rename left behind. So the
@@ -167,9 +168,13 @@ def test_every_test_file_is_in_exactly_one_ci_batch():
     finally:
         sys.path.pop(0)
 
+    starts = list(batches.STARTS.values())
+    assert starts[0] == "" and starts == sorted(starts), (
+        f"the batch ranges in tools/ci/batches.py must start at the beginning "
+        f"and be in order: {batches.STARTS}")
     assert batches.uncovered() == [], (
-        f"these test files are in no CI batch: {batches.uncovered()}. Add a "
-        "letter to tools/ci/batches.py rather than leaving them unrun."
+        f"these test files are in no CI batch: {batches.uncovered()}. Fix "
+        "STARTS in tools/ci/batches.py rather than leaving them unrun."
     )
 
     # And no file in two, which would double a nightly's cost quietly.
