@@ -29,6 +29,7 @@ pub mod calendar;
 pub mod contract;
 pub mod forecast;
 pub mod pricing;
+pub mod surface;
 pub mod symbol;
 
 pub use contract::{
@@ -38,4 +39,5 @@ pub use contract::{
 };
 pub use forecast::Forecast;
 pub use pricing::Greeks;
+pub use surface::{Ssvi, StripMoments, Surface};
 pub use symbol::{ContractSymbol, Right, SymbolKind};
