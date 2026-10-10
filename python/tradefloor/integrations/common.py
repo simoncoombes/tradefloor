@@ -171,7 +171,13 @@ MAX_PARTICIPATION = 0.02
 #: while the rest of the decision trades. Version 1 was market orders only,
 #: and one bad action refused the whole decision. Fixed for the 0.8.x line
 #: (``docs/SUPPORT.md``).
-DECISION_SCHEMA_VERSION = "2"
+#:
+#: Version 3 (pt-v22 phase 1): an action's ``symbol`` may name a listed
+#: future (``IDX.F0119``, ``Engine.contracts()``), its ``quantity`` then
+#: counted in contracts and capped at ``MAX_PARTICIPATION`` of the
+#: contract's stated daily volume. The shape is version 2's: no field is
+#: added, and a decision valid under 2 is valid and means the same under 3.
+DECISION_SCHEMA_VERSION = "3"
 
 #: Version of the observation payload :func:`serialize_observation` builds
 #: and every adapter shows its framework. Stamped into every saved
@@ -189,13 +195,20 @@ DECISION_SCHEMA_VERSION = "2"
 #: earnings calendar. pt-v21, the default from 0.10.0, does both. On every
 #: other model the payload is version 1's to the byte, so a version-1
 #: recording still replays there (`REPLAYABLE_SCHEMA_VERSIONS`).
-OBSERVATION_SCHEMA_VERSION = "2"
+#:
+#: Version 3 (pt-v22 phase 1) adds three top-level keys, `index`,
+#: `futures` and `margin`, on a model that lists futures (any of
+#: `futures_index_listed`, `futures_vix_listed`, `futures_rates_listed`,
+#: `futures_oil_listed`), and nothing else. No shipped preset lists any, so
+#: on every shipped preset the payload is version 2's (or 1's) to the byte.
+OBSERVATION_SCHEMA_VERSION = "3"
 
-#: The recorded payload versions a replay looks up. Version 2 only adds
-#: keys, and only on a model with dividends or the earnings calendar, so a
-#: version-1 recording's keys are still the digests of what this build sends
-#: on any model without them; on one with them the lookup misses and says so.
-REPLAYABLE_SCHEMA_VERSIONS = ("1", "2")
+#: The recorded payload versions a replay looks up. Versions 2 and 3 only
+#: add keys, each only on a model with what the keys describe (dividends or
+#: the earnings calendar; listed futures), so an older recording's keys are
+#: still the digests of what this build sends on any model without them; on
+#: one with them the lookup misses and says so.
+REPLAYABLE_SCHEMA_VERSIONS = ("1", "2", "3")
 
 
 # -- errors -------------------------------------------------------------------
@@ -636,12 +649,21 @@ def decision_schema() -> dict[str, Any]:
                     "type": "object",
                     "additionalProperties": False,
                     "properties": {
-                        "symbol": {"type": "string", "minLength": 1},
+                        "symbol": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "A ticker from the observation's "
+                                           "assets, or on a model that "
+                                           "lists futures a contract "
+                                           "symbol from its futures, such "
+                                           "as IDX.F0119.",
+                        },
                         "side": {"enum": list(SIDES)},
                         "quantity": {
                             "type": "number",
                             "minimum": 0,
-                            "description": "Shares, non-negative. The side "
+                            "description": "Shares, or contracts for a "
+                                           "future; non-negative. The side "
                                            "carries the direction. Omit or "
                                            "zero for HOLD and CANCEL.",
                         },
@@ -735,7 +757,8 @@ def decision_model() -> Any:
         model_config = pydantic.ConfigDict(extra="forbid")
 
         symbol: str = pydantic.Field(
-            min_length=props["symbol"]["minLength"])
+            min_length=props["symbol"]["minLength"],
+            description=props["symbol"]["description"])
         side: Side
         # allow_inf_nan=False, explicitly: pydantic's default admits an
         # INFINITE quantity through a field whose schema says minimum 0,
@@ -1118,13 +1141,19 @@ def _orders_from(decision: Decision, obs: Any, *, max_participation: float,
     from ..portfolio import Cancel, Limit
 
     listed = list(obs.tickers)
+    # The futures listed now, by symbol, with the daily volume each one's
+    # book is sized to (decision schema 3); empty, asking the engine
+    # nothing, on a model that lists none.
+    contracts = _listed_contracts(obs.engine)
     orders: dict[str, Any] = {}
     notes: list[str] = []
 
     for action in decision.actions:
-        if action.symbol not in listed:
+        if action.symbol not in listed and action.symbol not in contracts:
             message = (f"{action.symbol!r} is not listed in this market. The "
-                       f"universe is {', '.join(listed)}.")
+                       f"universe is {', '.join(listed)}."
+                       + (f" The futures listed are {', '.join(contracts)}."
+                          if contracts else ""))
             if refused is None:
                 raise unlisted(message)
             refused.append({"action": action.as_dict(), "reason": message})
@@ -1142,10 +1171,14 @@ def _orders_from(decision: Decision, obs: Any, *, max_participation: float,
         # agent max_order_shares of exactly 0.0 -- the observation and the
         # enforcement stating opposite things. Clipped to zero, the order
         # falls out as dust below and the note says what happened.
-        cap = max(0.0, max_participation * obs.avg_volume(action.symbol))
+        if action.symbol in contracts:
+            volume, unit = contracts[action.symbol], "contracts"
+        else:
+            volume, unit = obs.avg_volume(action.symbol), "shares"
+        cap = max(0.0, max_participation * volume)
         if abs(delta) > cap:
             notes.append(
-                f"{action.symbol}: asked for {abs(delta):,.0f} shares, "
+                f"{action.symbol}: asked for {abs(delta):,.0f} {unit}, "
                 f"clipped to {cap:,.0f} ({max_participation:.1%} of average "
                 "daily volume)")
             delta = cap if delta > 0 else -cap
@@ -1197,6 +1230,108 @@ def _dividends_paid(engine: Any) -> list[float] | None:
         except Exception:
             return None
     return list(engine.dividends_today()) if on else None
+
+
+def _lists_futures(engine: Any) -> bool:
+    """Whether the model lists futures (``Engine.lists_futures``), from a
+    :class:`~tradefloor.sandbox.MarketView` or a live engine; False on an
+    engine without the property, a test proxy say."""
+    try:
+        return bool(engine.lists_futures)
+    except AttributeError:
+        return False
+
+
+def _listed_contracts(engine: Any) -> dict[str, float]:
+    """The futures listed now, symbol to the daily volume (contracts) each
+    one's book is sized to, in the engine's order; empty on a model that
+    lists none, which asks the engine nothing beyond the flag."""
+    if not _lists_futures(engine):
+        return {}
+    return {c["symbol"]: float(engine.quote(c["symbol"])["daily_volume"])
+            for c in engine.contracts()}
+
+
+def derivatives_payload(obs: Any, *,
+                        max_participation: float = MAX_PARTICIPATION,
+                        ) -> dict[str, Any]:
+    """The observation payload's derivative keys, version 3: ``index``,
+    ``futures`` and ``margin``, on a model that lists futures, and an empty
+    dict on every other model, so its payload is the one version 2 sent.
+
+    ``index`` is the price index (``index_level_listed``) as ``level`` now
+    and ``close`` at the last close, or None on a model without it.
+
+    ``futures`` lists each contract the engine lists now, in its order:
+    ``symbol``, ``root``, ``expiry`` (the session it settles at),
+    ``sessions_to_expiry``, ``front``, ``settlement`` (what it settles on),
+    ``price``, ``fair``, ``basis_bp``, ``mark`` (the last close's settlement
+    mark), ``best_bid``, ``best_ask``, ``underlying`` (what ``fair`` reads:
+    the index, the VIX, the policy rate or oil), ``rate`` and ``dividends``
+    (the carry ``fair`` holds), ``expected`` and ``premium`` (a VIX, rate or
+    oil future's expected settlement and premium, None for an index
+    future), ``multiplier`` (dollars a point), ``tick``, ``daily_volume``
+    and ``max_order_contracts`` (contracts), ``initial_margin`` and
+    ``maintenance_margin`` (dollars a contract), and ``position``
+    (contracts held, signed). Every value is the engine's quote, which reads
+    public state only.
+
+    ``margin`` is the account's: ``initial`` and ``maintenance`` (dollars
+    the futures held ask), ``excess`` (net worth less ``initial``) and
+    ``call`` (the margin call the last close made and the next open
+    decides, or None). None for a portfolio that cannot say.
+
+    Shared by :func:`serialize_observation` and the FinRobot adapter's own
+    serializer, so both payloads carry the same keys on every model.
+    """
+    engine = obs.engine
+    if not _lists_futures(engine):
+        return {}
+    level = engine.index_level
+    futures = []
+    for contract in engine.contracts():
+        symbol = contract["symbol"]
+        q = engine.quote(symbol)
+        futures.append({
+            "symbol": symbol,
+            "root": contract["root"],
+            "expiry": contract["expiry"],
+            "sessions_to_expiry": q["sessions_to_expiry"],
+            "front": contract["front"],
+            "settlement": contract["settlement"],
+            "price": q["price"],
+            "fair": q["fair"],
+            "basis_bp": q["basis_bp"],
+            "mark": q["mark"],
+            "best_bid": q["bid"],
+            "best_ask": q["ask"],
+            "underlying": q["index"],
+            "rate": q["rate"],
+            "dividends": q["dividends"],
+            "expected": q["expected"],
+            "premium": q["premium"],
+            "multiplier": q["multiplier"],
+            "tick": q["tick"],
+            "daily_volume": q["daily_volume"],
+            "max_order_contracts": max_participation * q["daily_volume"],
+            "initial_margin": q["initial_margin"],
+            "maintenance_margin": q["maintenance_margin"],
+            "position": obs.position(symbol),
+        })
+    reader = getattr(type(obs.portfolio), "margin", None)
+    margin = None
+    if reader is not None:
+        held = obs.portfolio.margin(engine)
+        margin = {"initial": held["initial"],
+                  "maintenance": held["maintenance"],
+                  "excess": held["excess"],
+                  "call": held["call"]}
+    return {
+        "index": (None if level is None
+                  else {"level": level["level"], "close": level["close"]}),
+        "futures": futures,
+        "margin": margin,
+    }
 
 
 def serialize_observation(obs: Any, *,
@@ -1261,11 +1396,16 @@ def serialize_observation(obs: Any, *,
     orders needs to see which of them are still working before it sends
     another or a CANCEL.
 
+    On a model that lists futures the payload also carries ``index``,
+    ``futures`` and ``margin`` (:func:`derivatives_payload`), and an agent
+    trades a future by naming its symbol in an action, the quantity in
+    contracts.
+
     The payload is version ``OBSERVATION_SCHEMA_VERSION``: no key is added,
     removed or renamed, and no value changes meaning, in a patch release
     (``docs/SUPPORT.md``). Version 2 (0.10.0) added the two conditional
-    asset keys below to version 1.
-    ``tests/test_integrations.py`` pins every key.
+    asset keys below to version 1, and version 3 the three conditional
+    derivative keys. ``tests/test_integrations.py`` pins every key.
     """
     macro_state = obs.engine.macro_state
     macro = {field: getattr(macro_state, field) for field in OBSERVABLE_MACRO}
@@ -1337,6 +1477,7 @@ def serialize_observation(obs: Any, *,
             "buying_power": headroom,
             "open_orders": open_orders_of(obs),
         },
+        **derivatives_payload(obs, max_participation=max_participation),
     }
 
 

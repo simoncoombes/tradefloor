@@ -32,6 +32,13 @@ try {
   refusedUnsafe = String(e.message ?? e).includes('2**64 - 1');
 }
 
+// The derivatives' getters (pt-v22 phase 1): no shipped preset lists the
+// index or a future, so a page reads `undefined` and an empty list.
+const sim = new pt.Sim(12, 7, 3, 'pt-v21');
+sim.runDay(65);
+const fronts = sim.frontFutures;
+const getters = sim.indexLevel === undefined && Array.isArray(fronts) && fronts.length === 0;
+
 console.log(`  tradefloor ${pt.version()}, fixed simulation v${FIXED_SIMULATION_KAT_VERSION}`);
 console.log(`  presets   ${pt.preset_names().join(', ')}`);
 console.log(`  wasm      ${got}`);
@@ -47,6 +54,11 @@ if (got !== EXPECTED || high !== HIGH_EXPECTED) {
 if (!sameAsNumber || !refusedUnsafe) {
   console.error('\nSEEDS: a BigInt seed must give the Number seed\'s market, ' +
                 'and a Number past MAX_SAFE_INTEGER must be refused.');
+  process.exit(1);
+}
+if (!getters) {
+  console.error('\nGETTERS: on a shipped preset Sim.indexLevel is undefined ' +
+                'and Sim.frontFutures an empty array.');
   process.exit(1);
 }
 console.log('\n  bit-identical with the native build.');

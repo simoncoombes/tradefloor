@@ -11,6 +11,7 @@
 // the macros generate.
 
 use pyo3::prelude::*;
+use pyo3::types::PyDict;
 
 /// The seed range every surface states, in the words its errors use.
 pub const SEED_RANGE: &str = "an integer from 0 to 2**64 - 1 (18446744073709551615)";
@@ -245,6 +246,72 @@ fn version() -> &'static str {
     env!("CARGO_PKG_VERSION")
 }
 
+/// A contract symbol read in its canonical spelling, as a dict: `symbol`
+/// (the text, which is canonical when this returns), `root`, `expiry` (the
+/// session it expires at), `kind` (`"future"` or `"option"`), and for an
+/// option `right` (`"C"` or `"P"`) and `strike` (dollars), both None for a
+/// future. Refuses anything [`crate::derivatives::ContractSymbol::parse`]
+/// refuses, naming why. `tradefloor.contracts.parse` is the public name.
+#[pyfunction]
+fn parse_contract_symbol<'py>(py: Python<'py>, symbol: &str) -> PyResult<Bound<'py, PyDict>> {
+    let parsed = crate::derivatives::ContractSymbol::parse(symbol).map_err(ValidationError::new_err)?;
+    contract_symbol_dict(py, &parsed)
+}
+
+/// The canonical symbol for a future on `root` expiring at session
+/// `expiry`, or with `right` (`"C"` or `"P"`) and `strike` (dollars, whole
+/// cents) for an option. `tradefloor.contracts.format` is the public name.
+#[pyfunction]
+#[pyo3(signature = (root, expiry, right = None, strike = None))]
+fn format_contract_symbol(root: &str, expiry: i64, right: Option<&str>, strike: Option<f64>) -> PyResult<String> {
+    use crate::derivatives::{ContractSymbol, Right};
+    let symbol = match (right, strike) {
+        (None, None) => ContractSymbol::future(root, expiry),
+        (Some(r), Some(k)) => {
+            let right = match r {
+                "C" => Right::Call,
+                "P" => Right::Put,
+                other => {
+                    return Err(ValidationError::new_err(format!(
+                        "an option's right is \"C\" or \"P\", got {other:?}"
+                    )))
+                }
+            };
+            ContractSymbol::option(root, expiry, right, k)
+        }
+        _ => {
+            return Err(ValidationError::new_err(
+                "an option needs both right and strike, and a future neither".to_string(),
+            ))
+        }
+    };
+    symbol.map(|s| s.to_string()).map_err(ValidationError::new_err)
+}
+
+fn contract_symbol_dict<'py>(
+    py: Python<'py>,
+    s: &crate::derivatives::ContractSymbol,
+) -> PyResult<Bound<'py, PyDict>> {
+    use crate::derivatives::SymbolKind;
+    let d = PyDict::new_bound(py);
+    d.set_item("symbol", s.to_string())?;
+    d.set_item("root", &s.root)?;
+    d.set_item("expiry", s.expiry)?;
+    match s.kind {
+        SymbolKind::Option { right, .. } => {
+            d.set_item("kind", "option")?;
+            d.set_item("right", right.letter().to_string())?;
+            d.set_item("strike", s.strike())?;
+        }
+        _ => {
+            d.set_item("kind", "future")?;
+            d.set_item("right", py.None())?;
+            d.set_item("strike", py.None())?;
+        }
+    }
+    Ok(d)
+}
+
 /// Validate a fractional rate, raising `ValueError` if it looks wrong.
 ///
 /// Exposed now, before the valuation surface that will call it, because the
@@ -268,6 +335,8 @@ fn check_rate(name: &str, fraction: f64) -> PyResult<f64> {
 fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyGameRng>()?;
     m.add_function(wrap_pyfunction!(version, m)?)?;
+    m.add_function(wrap_pyfunction!(parse_contract_symbol, m)?)?;
+    m.add_function(wrap_pyfunction!(format_contract_symbol, m)?)?;
     m.add_function(wrap_pyfunction!(fixed_simulation_digest, m)?)?;
     m.add_function(wrap_pyfunction!(check_rate, m)?)?;
     m.add_function(wrap_pyfunction!(check_seed, m)?)?;

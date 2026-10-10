@@ -911,6 +911,27 @@ class Portfolio:
             total += abs(f.quantity) * (per or 0.0)
         return total
 
+    def margin(self, engine: Engine) -> dict[str, Any]:
+        """The account's margin now, a dict: ``initial`` and ``maintenance``,
+        the requirements the futures held ask (:meth:`margin_requirement`),
+        dollars; ``equity``, the net worth they are measured against;
+        ``excess``, equity less the initial requirement, the room left
+        before a close could call; and ``call``, the margin call the last
+        close made and the next open decides (``day``, ``equity``,
+        ``maintenance``, ``initial``), or None. The calls already decided
+        are in :attr:`margin_calls`.
+
+        Every figure is 0.0 for an account without futures, which asks the
+        engine nothing new: ``equity`` is then its net worth."""
+        equity = self.net_worth(engine)
+        initial = self.margin_requirement(engine)
+        maintenance = self.margin_requirement(engine, maintenance=True)
+        call = self._margin_call
+        return {"initial": initial, "maintenance": maintenance,
+                "equity": equity, "excess": equity - initial,
+                "call": None if call is None else
+                {k: call[k] for k in ("day", "equity", "maintenance", "initial")}}
+
     def _settle_expired(self, engine: Engine, day: int) -> None:
         """Pay out every held contract that has settled, its last variation
         margin to the settlement price, and close it."""

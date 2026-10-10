@@ -20,7 +20,62 @@ priced at its carry fair value plus a basis, with its own book, and settled
 on the index of its expiry session's opening prints. Stock prices are the
 same with them on as off.
 
+The MCP server, the agent payload (version 3), Arrow tables and the
+browser build now show the futures, and agents can trade them by symbol.
+
 <!-- release-note-ends -->
+
+### The futures' public API
+
+- MCP: `list_contracts(session_id)` lists the futures a session's market
+  lists now, with the price index; `quote_contracts(session_id, symbols)`
+  quotes them (the front of each family when no symbol is named), with the
+  book's touch, fair value, basis, settlement mark, carry, daily volume and
+  margins. Both are read-only, so the server has 21 tools, 15 of them
+  read-only. `session_step` takes a listed contract's symbol in `orders`,
+  counted in contracts, in the three order forms a ticker takes, and a
+  contract symbol on a preset that lists none is refused with the reason.
+  On a market that lists futures `session_state` (and every session
+  result) adds the price index and the number of contracts listed to
+  `market`, and each agent's `futures` (quantity, mark, multiplier,
+  variation paid) and `margin` (initial, maintenance, excess, the open call
+  and the count of calls). `describe_simulator` gains `instruments`:
+  equities, the rate indices, and the futures families with the switch that
+  lists each and the shipped presets that set one (none).
+- Payloads: `OBSERVATION_SCHEMA_VERSION` and `DECISION_SCHEMA_VERSION` go
+  to "3", and `REPLAYABLE_SCHEMA_VERSIONS` gains "3". On a model that lists
+  futures the observation gains top-level `index` (`level`, `close`),
+  `futures` (one entry per listed contract, read off its quote, with
+  `position` and `max_order_contracts`) and `margin` (`initial`,
+  `maintenance`, `excess`, `call`), built by the new
+  `integrations.common.derivatives_payload`, which the FinRobot serializer
+  shares; on every other model the payload is version 2's to the byte, and
+  every committed recording replays. A decision's action may name a listed
+  future, its quantity in contracts and capped at 2% of the contract's
+  daily volume; the schema's shape is version 2's and only its
+  descriptions say so. `TextRenderer` renders a `Futures` block (English
+  and French) when the payload has the keys.
+- Arrow: `Engine.futures_bars(day=None)`, one row per listed contract per
+  recorded day, read at `record` (price, fair value, basis, touch, mark,
+  underlying, sessions to expiry, initial margin), and
+  `Engine.settlements_table(day=None)`, the settlements as a table. Each
+  schema carries a `schema_version` metadata key, "1". Recording them is a
+  read: a recorded run's prices and state hash are the unrecorded run's.
+- WASM: `Sim.indexLevel` (undefined with `index_level_listed` off) and
+  `Sim.frontFutures`, the front contract of each listed family as a
+  `FutureQuote` (`symbol`, `root`, `expiry`, `price`, `fair`, `bid`, `ask`,
+  `mark`, `basisBp`, `sessionsToExpiry`, `multiplier`). A page reaches the
+  switches only through a shipped preset, so both read nothing today.
+- Python: `tradefloor.contracts` with `parse`, `format`, `is_contract` and
+  `FUTURE_ROOTS`, calling the engine's own symbol reader;
+  `Engine.lists_futures` and `MarketView.lists_futures`, a property of the
+  model; `Portfolio.margin(engine)` (`initial`, `maintenance`, `equity`,
+  `excess`, `call`); and `PortfolioView.futures`, `margin()`,
+  `margin_requirement()` and `margin_calls`, as copies.
+- Rust: `Engine::lists_futures`, and `wasm::FutureQuote`.
+- RELEASING.md's traded known-answer line names the preset from the script
+  and its JSON: pt-v21 from 0.10.0, pt-v20 only in 0.8.5 to 0.9.1.
+- Every known-answer digest is where it was.
 
 ### Index futures
 

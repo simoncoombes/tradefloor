@@ -926,11 +926,15 @@ def test_the_payload_is_frozen_for_the_lts_line():
     removes or renames one fails here and has to bump
     OBSERVATION_SCHEMA_VERSION, update SUPPORT.md and re-record every
     fixture, on purpose."""
-    # 2 from 0.10.0, when the default's payload gained the two conditional
-    # asset keys (docs/SUPPORT.md); "1" through 0.9.x.
-    assert ci.OBSERVATION_SCHEMA_VERSION == "2"
-    assert ci.REPLAYABLE_SCHEMA_VERSIONS == ("1", "2")
-    assert ci.DECISION_SCHEMA_VERSION == "2"
+    # 3 from pt-v22 phase 1, when a model that lists futures gained the
+    # three conditional derivative keys (tests/test_futures_api.py pins
+    # them); 2 from 0.10.0, when the default's payload gained the two
+    # conditional asset keys (docs/SUPPORT.md); "1" through 0.9.x. Every
+    # key below is the payload on a model without futures, every shipped
+    # preset's.
+    assert ci.OBSERVATION_SCHEMA_VERSION == "3"
+    assert ci.REPLAYABLE_SCHEMA_VERSIONS == ("1", "2", "3")
+    assert ci.DECISION_SCHEMA_VERSION == "3"
     world = World(seed=7, universe=universe(), agent=callable_agent(rest),
                   cash=1_000_000.0, max_leverage=2.0)
     world.run(days=1)
@@ -2126,7 +2130,8 @@ def test_a_recording_is_stamped_with_both_schema_versions():
     assert len(recorder) == 1
     assert (recorder.meta["observation_schema_version"]
             == ci.OBSERVATION_SCHEMA_VERSION)
-    assert recorder.meta["decision_schema_version"] == "2"
+    assert (recorder.meta["decision_schema_version"]
+            == ci.DECISION_SCHEMA_VERSION)
 
 
 def test_a_replay_under_another_payload_version_is_refused_by_name():

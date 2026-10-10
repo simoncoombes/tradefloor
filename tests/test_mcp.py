@@ -58,8 +58,8 @@ def test_the_readme_counts_the_tools_the_server_registers():
     import re
     readme = (pathlib.Path(__file__).resolve().parent.parent
               / "README.md").read_text(encoding="utf-8")
-    row = re.search(r"^\| MCP server \| (\w+) tools for a coding agent, "
-                    r"(\w+) of them read-only", readme, re.M)
+    row = re.search(r"^\| MCP server \| ([\w-]+) tools for a coding agent, "
+                    r"([\w-]+) of them read-only", readme, re.M)
     assert row, "README.md's Contents table has no MCP server row"
     words = ["zero", "one", "two", "three", "four", "five", "six", "seven",
              "eight", "nine", "ten", "eleven", "twelve", "thirteen",
@@ -1406,7 +1406,7 @@ def test_every_tool_says_what_it_does_to_the_world():
     tool. Every other tool builds its own engine and only reads, or reads a
     session without changing it."""
     tools = asyncio.run(mcp.server.list_tools())
-    assert len(tools) == 19
+    assert len(tools) == 21
     assert set(NOT_READ_ONLY) <= {t.name for t in tools}
     for t in tools:
         a = t.annotations

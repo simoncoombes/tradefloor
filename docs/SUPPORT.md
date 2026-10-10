@@ -82,14 +82,15 @@ A replay refuses a recording made under another payload version before it
 looks anything up, and names both versions. A recording made before 0.8.5
 carries neither field, predates this payload, and does not replay on 0.8.5.
 
-**Observation payload, version 2** (`OBSERVATION_SCHEMA_VERSION`, built by
-`serialize_observation`, from 0.10.0):
+**Observation payload, version 3** (`OBSERVATION_SCHEMA_VERSION`, built by
+`serialize_observation`, from pt-v22 phase 1; version 2 from 0.10.0):
 
 - Top level: `step`, `day`, `steps_per_day`, `macro`, `assets`, `portfolio`.
 - `macro`: the fields in `tradefloor.counterfactual.MACRO_FIELDS`.
 - Each entry of `assets`: `symbol`, `price`, `return_1d`, `return_5d`, `volatility`, `best_bid`, `best_ask`, `avg_daily_volume`, `max_order_shares`, `position`, `fundamentals`. `fundamentals` holds whatever the caller supplied for that symbol. On a model that pays dividends an entry also carries `dividend`, the cash per share the name went ex for at that day's open, and on a model that runs the earnings calendar `next_earnings_in_sessions`, the sessions to its next report. pt-v21, the default from 0.10.0, does both; no earlier preset does either.
 - `portfolio`: `cash`, `net_worth`, `leverage`, `max_leverage`, `buying_power`, `open_orders`. `leverage` is gross exposure as a multiple of net worth. `cash`, `net_worth` and `buying_power` are dollars.
 - Each entry of `open_orders`, one per limit order of the agent's still waiting in the book: `symbol`, `side`, `limit_price`, `remaining`.
+- On a model that lists futures (any of `futures_index_listed`, `futures_vix_listed`, `futures_rates_listed`, `futures_oil_listed`; no shipped preset sets one), three more top-level keys. `index`: `level` and `close` of the price index, or `null` without `index_level_listed`. `futures`: one entry per contract listed now, `symbol`, `root`, `expiry`, `sessions_to_expiry`, `front`, `settlement`, `price`, `fair`, `basis_bp`, `mark`, `best_bid`, `best_ask`, `underlying`, `rate`, `dividends`, `expected`, `premium`, `multiplier`, `tick`, `daily_volume`, `max_order_contracts`, `initial_margin`, `maintenance_margin`, `position` (contracts, signed). `margin`: `initial`, `maintenance`, `excess` (net worth less `initial`) and `call` (the margin call the last close made, or `null`), dollars.
 
 A return or volatility the agent has not yet seen enough prices for is
 `null`. `return_5d` covers 30 steps, five days at six steps a day.
@@ -97,20 +98,26 @@ A return or volatility the agent has not yet seen enough prices for is
 Compared with version 1, the 0.8.x and 0.9.x payload: each asset gains
 `dividend` and `next_earnings_in_sessions` on a model that has them, and
 nothing else changes. On a model with neither the payload is version 1's,
-so a version-1 recording still replays there.
+so a version-1 recording still replays there. Compared with version 2,
+version 3 adds only `index`, `futures` and `margin`, and only on a model
+that lists futures, so on every shipped preset the payload is version 2's
+and a version-2 recording replays.
 
 Compared with 0.8.1: `portfolio.gross_exposure` is renamed `leverage` (same
 value), `portfolio.open_orders` is new, and `return_5d` covers five days
 where it covered 4.83.
 
-**Decision contract, version 2** (`DECISION_SCHEMA_VERSION`,
+**Decision contract, version 3** (`DECISION_SCHEMA_VERSION`,
 `decision_schema()`): an `actions` list and an optional `rationale`. Each
 action has a `symbol`, a `side` (`BUY`, `SELL`, `HOLD` or `CANCEL`), a
 `quantity` in shares, and optionally an `order_type` (`market` or `limit`)
 and a `limit_price`. An action with a `limit_price` is a `tf.Limit`, and
 `CANCEL` is a `tf.Cancel`. An action that breaks a rule is refused on its
 own, with the reason in the decision's `refused` list and the scorecard's
-`errors`, and the other actions in the decision trade.
+`errors`, and the other actions in the decision trade. Version 3 keeps
+version 2's shape: on a model that lists futures, `symbol` may name a
+listed contract (`IDX.F0119`), its `quantity` counted in contracts and
+capped at 2% of the contract's `daily_volume`.
 
 ### Errata for trajectory bugs
 
