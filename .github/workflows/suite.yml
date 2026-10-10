@@ -197,7 +197,11 @@ jobs:
           # in no batch would run nowhere and nothing would say so.
           FILES=$(python tools/ci/batches.py "${{ matrix.batch }}")
           echo "batch ${{ matrix.batch }}: $FILES"
-          python -m pytest -q -rf $FILES
+          # --durations so the cost of every test of a second or more is in
+          # the log. The batches are balanced by measured cost, and without
+          # this the only measurement was the timestamps on pytest's dot
+          # lines, about seventy tests to a line.
+          python -m pytest -q -rf --durations=0 --durations-min=1 $FILES
 
   versions:
     name: python ${{ matrix.python }}
