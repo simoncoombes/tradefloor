@@ -2035,7 +2035,7 @@ COMPANIONS: dict[str, dict[str, float]] = {
     "margin_scan_tail": {"margin_scan_coverage": 0.99},
     # The surface is on the price index; its companions are refused without
     # it, the earnings term without the forecast; the options and the
-    # dealer's spread need each other and the surface.
+    # dealer's spread needs the options, and they the surface.
     "surface_ssvi": {"index_level_listed": 1.0},
     **{name: {"index_level_listed": 1.0, "surface_ssvi": 1.0}
        for name in ("surface_skew_physical", "surface_skew_physical_slope", "surface_skew_premium",
@@ -2043,8 +2043,7 @@ COMPANIONS: dict[str, dict[str, float]] = {
                     "surface_term_premium_long")},
     "surface_earnings_weight": {"index_level_listed": 1.0, "surface_ssvi": 1.0,
                                 "forecast_horizon_sessions": 21.0},
-    "options_index_listed": {"index_level_listed": 1.0, "surface_ssvi": 1.0,
-                             "option_dealer_spread": 0.004},
+    "options_index_listed": {"index_level_listed": 1.0, "surface_ssvi": 1.0},
     "option_dealer_spread": {"index_level_listed": 1.0, "surface_ssvi": 1.0,
                              "options_index_listed": 1.0},
     "futures_vix_live_fast_share": {"forecast_horizon_sessions": 126.0, "futures_vix_listed": 1.0},

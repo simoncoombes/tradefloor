@@ -1289,8 +1289,8 @@ pub struct ModelParams {
     /// the at-the-money sd to expiry apart at the VIX then, rounded to 1, 2,
     /// 2.5 or 5 times a power of ten, twenty either side of the index, and
     /// widened at each open to keep twenty either side. The dealer
-    /// (`option_dealer_spread`, which this requires) quotes every option from
-    /// the surface (`surface_ssvi`, which this requires) and takes the other
+    /// (`option_dealer_spread`) quotes every option from the surface
+    /// (`surface_ssvi`, which this requires) and takes the other
     /// side of every trade, in the session only. An option's price feeds
     /// nothing a stock price reads. A switch.
     pub options_index_listed: f64,
@@ -1374,9 +1374,10 @@ pub struct ModelParams {
     /// The options dealer's half-spread at the money, in volatility (0.005
     /// is half a vol point), before the equity maker's VIX multiplier and the
     /// widening away from the money (`derivatives::INDEX_OPTION_DEALER`).
-    /// 0.0, on every shipped preset, quotes nothing, and a value of 0.0 is
-    /// left out of the model's digest. Off zero the dealer quotes every
-    /// listed option from the surface: ten levels of 50 contracts a side,
+    /// Read only with `options_index_listed` set; 0.0, on every shipped
+    /// preset, is a dealer quoting one tick either side of its mid, and a
+    /// value of 0.0 is left out of the model's digest. The dealer quotes
+    /// every listed option from the surface: ten levels of 50 contracts a side,
     /// each further out by half the half-spread, its quoted volatility moved
     /// by the vega-weighted inventory agents' trades leave it, which decays
     /// at the rate maker's 15-tick half-life. Requires
@@ -12353,12 +12354,12 @@ impl ModelParams {
                  forecast_horizon_sessions first.",
                 self.surface_earnings_weight));
         }
-        if self.options_index_listed != 0.0 && (self.surface_ssvi == 0.0 || self.option_dealer_spread == 0.0) {
+        if self.options_index_listed != 0.0 && self.surface_ssvi == 0.0 {
             return Err(format!(
-                "options_index_listed is {} but surface_ssvi is {} and option_dealer_spread is {}. \
-                 The dealer quotes every option from the surface: with options_index_listed on, \
-                 surface_ssvi is 1.0 and option_dealer_spread is above 0.",
-                self.options_index_listed, self.surface_ssvi, self.option_dealer_spread));
+                "surface_ssvi is 0 but options_index_listed is {}. The dealer quotes every option \
+                 from the surface, which only surface_ssvi keeps: with options_index_listed on, \
+                 surface_ssvi is 1.0.",
+                self.options_index_listed));
         }
         if self.option_dealer_spread != 0.0 && self.options_index_listed == 0.0 {
             return Err(format!(

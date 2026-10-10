@@ -508,9 +508,8 @@ OUT_OF_SCOPE = {
         "listing in `options_open` in engine/options.rs return at once with the "
         "switch off, `Engine::contracts` lists no option, `Engine::chain` and "
         "`Engine::option_quote` return None, and no options book is "
-        "snapshotted or hashed; refused without `surface_ssvi` and "
-        "`option_dealer_spread`; at 0.0 it is also left out of the model's "
-        "digest",
+        "snapshotted or hashed; refused without `surface_ssvi`; at 0.0 it is "
+        "also left out of the model's digest",
     "surface_ssvi":
         "inert at 0.0: `Engine::surface` returns None, `options_open` and "
         "`options_close` in engine/options.rs return at once, and the "

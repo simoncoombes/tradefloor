@@ -318,6 +318,7 @@ pub fn fit_smile(target_vix: f64, target_skewness: Option<f64>, years: f64, eta:
 
 /// The term structure's inputs, as the engine reads them.
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct TermInputs<'a> {
     /// The index's expected one-session variance `h` sessions ahead, `h`
     /// from 1 (the forecast's `index_variance`); empty for a flat expected
@@ -337,6 +338,20 @@ pub struct TermInputs<'a> {
     pub events: &'a [(usize, f64)],
     /// The weight on the events' variance (`surface_earnings_weight`).
     pub event_weight: f64,
+}
+
+impl<'a> TermInputs<'a> {
+    /// The inputs, field by field.
+    pub fn new(
+        variance: &'a [f64],
+        elapsed: f64,
+        premium_short: f64,
+        premium_long: f64,
+        events: &'a [(usize, f64)],
+        event_weight: f64,
+    ) -> Self {
+        TermInputs { variance, elapsed, premium_short, premium_long, events, event_weight }
+    }
 }
 
 /// The log premium on implied variance at `t` sessions: 0 at the VIX's 21,

@@ -4278,8 +4278,8 @@ to the model:
   `vix_intraday_live`, the published VIX otherwise. The strip is 400
   out-of-the-money prices spread evenly in log-moneyness over eight
   at-the-money sds either side of the forward, each strike's width half the
-  distance between its neighbours, $K_0$ the forward, the strip
-  `programme/longrun/ptv22.py` reads. So row SV1 holds by construction: the
+  distance between its neighbours, $K_0$ the forward, the strip the pt-v22
+  measurement reads. So row SV1 holds by construction: the
   fit solves the strip's VIX to a relative $10^{-13}$, and the surface's
   21-session strip reads the published VIX at every close to within
   $10^{-6}$ points.

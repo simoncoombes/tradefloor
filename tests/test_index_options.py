@@ -78,7 +78,7 @@ def test_every_dial_is_off_on_every_shipped_preset_and_silent_in_the_digest():
     (dict(index_level_listed=1.0, surface_ssvi=1.0, surface_curvature=2.0), "surface_curvature"),
     (dict(index_level_listed=1.0, surface_ssvi=1.0, surface_curvature_exponent=0.6), "surface_curvature_exponent"),
     (dict(index_level_listed=1.0, surface_ssvi=1.0, surface_earnings_weight=1.0), "forecast_horizon_sessions"),
-    (dict(index_level_listed=1.0, surface_ssvi=1.0, options_index_listed=1.0), "option_dealer_spread"),
+    (dict(index_level_listed=1.0, options_index_listed=1.0), "surface_ssvi"),
     (dict(index_level_listed=1.0, option_dealer_spread=0.004), "options_index_listed"),
 ])
 def test_a_dial_without_what_it_reads_is_refused(dials, words):
