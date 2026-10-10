@@ -91,13 +91,17 @@ pub struct CycleSpec {
     pub equity_hazard: f64,
     pub equity_knee: f64,
     pub equity_opening: f64,
+    /// `cycle_hazard_funds_gain`: the monthly hazard an expansion adds while
+    /// the funds rate is above 5. 0.0 is the legacy 0.1. Read by the ladder
+    /// only, so the hazard-only law (and its memo) never sees it.
+    pub funds_gain: f64,
 }
 
 impl CycleSpec {
     pub const fn shipped(per_month: f64) -> Self {
         CycleSpec {
             per_month, month_days: 30.0, us: false,
-            equity_hazard: 0.0, equity_knee: 0.0, equity_opening: 0.0,
+            equity_hazard: 0.0, equity_knee: 0.0, equity_opening: 0.0, funds_gain: 0.0,
         }
     }
 }
@@ -197,8 +201,10 @@ fn adjust_transition_probability(economy: &EconomyState, mut p: f64, spec: &Cycl
             if economy.inflation_rate > 4.0 {
                 p += 0.1;
             }
+            // `cycle_hazard_funds_gain`: 0.0 is the legacy 0.1, operation for
+            // operation; a value replaces it.
             if economy.federal_funds_rate > 5.0 {
-                p += 0.1;
+                p += if spec.funds_gain != 0.0 { spec.funds_gain } else { 0.1 };
             }
             // Curve inversion has preceded every US recession since 1955.
             if economy.treasury_yield_2y > economy.treasury_yield_10y {
@@ -810,7 +816,8 @@ mod stationary_law {
     #[test]
     fn the_equity_hazard_adds_in_an_expansion_and_at_a_peak_above_the_knee() {
         let base = CycleSpec { per_month: 1.0, month_days: 21.0, us: true,
-                               equity_hazard: 0.0, equity_knee: 0.0, equity_opening: 0.0 };
+                               equity_hazard: 0.0, equity_knee: 0.0, equity_opening: 0.0,
+                               funds_gain: 0.0 };
         let on = CycleSpec { equity_hazard: 4.0, equity_knee: 0.05, ..base };
         for phase in phase_cycle() {
             let mut e = ladder_free_economy();
@@ -839,9 +846,29 @@ mod stationary_law {
     /// addition of 0.1 on a hazard near 0.003 leaves the probability at 0.0,
     /// where the guard put it without the gap.
     #[test]
+    fn the_funds_gain_replaces_the_legacy_tenth_only_when_set() {
+        let base = CycleSpec { per_month: 1.0, month_days: 21.0, us: true,
+                               equity_hazard: 0.0, equity_knee: 0.0, equity_opening: 0.0,
+                               funds_gain: 0.0 };
+        let set = CycleSpec { funds_gain: 0.03, ..base };
+        let mut e = ladder_free_economy();
+        e.cycle_phase = CyclePhase::Expansion;
+        let quiet = adjust_transition_probability(&e, 0.01, &base);
+        e.federal_funds_rate = 6.0;
+        let legacy = adjust_transition_probability(&e, 0.01, &base);
+        let solved = adjust_transition_probability(&e, 0.01, &set);
+        assert_eq!(legacy.to_bits(), (quiet + 0.1).to_bits());
+        assert!((solved - (quiet + 0.03)).abs() < 1e-15);
+        e.cycle_phase = CyclePhase::Peak;
+        assert_eq!(adjust_transition_probability(&e, 0.01, &set).to_bits(),
+                   adjust_transition_probability(&e, 0.01, &base).to_bits());
+    }
+
+    #[test]
     fn the_expansion_guard_still_applies_to_the_equity_hazard() {
         let base = CycleSpec { per_month: 1.0, month_days: 21.0, us: true,
-                               equity_hazard: 0.0, equity_knee: 0.0, equity_opening: 0.0 };
+                               equity_hazard: 0.0, equity_knee: 0.0, equity_opening: 0.0,
+                               funds_gain: 0.0 };
         let on = CycleSpec { equity_hazard: 1.0, equity_knee: 0.0, ..base };
         let mut e = ladder_free_economy();
         e.cycle_phase = CyclePhase::Expansion;
@@ -862,7 +889,8 @@ mod stationary_law {
     #[test]
     fn the_opening_stand_in_adds_to_the_law_and_the_ladder() {
         let base = CycleSpec { per_month: 1.0, month_days: 21.0, us: true,
-                               equity_hazard: 0.0, equity_knee: 0.0, equity_opening: 0.0 };
+                               equity_hazard: 0.0, equity_knee: 0.0, equity_opening: 0.0,
+                               funds_gain: 0.0 };
         let on = CycleSpec { equity_opening: 0.01, ..base };
         for phase in phase_cycle() {
             let mut e = ladder_free_economy();
