@@ -9109,7 +9109,7 @@ impl Engine {
                 if pins_today & PIN_VIX != 0 {
                     self.vix_stress_memory = 0.0;
                 } else if implied > 0.0 && anchor > 0.0 {
-                    let h = self.params.vix_anchor_memory;
+                    let h = self.params.vix_stress_memory_rate();
                     self.vix_stress_memory = (1.0 - h) * self.vix_stress_memory
                         + h * crate::mathx::log(implied / anchor);
                 }
@@ -9969,6 +9969,11 @@ impl Engine {
         let excess = memory - p.vix_stress_premium_knee;
         if !(excess > 0.0) {
             return 0.0;
+        }
+        // The anchor's pull undone above the knee (`vix_stress_premium_undo`);
+        // guarded, so with the switch at 0.0 this is the capped hinge exactly.
+        if p.vix_stress_premium_undo != 0.0 {
+            return p.vix_anchor_weight * excess;
         }
         let cap = p.vix_stress_premium_cap;
         cap * (1.0 - crate::mathx::exp(-p.vix_stress_premium * excess / cap))
@@ -10991,7 +10996,8 @@ impl Engine {
                 } else if self.macro_pins_today & PIN_VIX != 0 {
                     0.0
                 } else {
-                    (1.0 - h) * self.vix_stress_memory + h * crate::mathx::log(implied / anchor)
+                    let hs = self.params.vix_stress_memory_rate();
+                    (1.0 - hs) * self.vix_stress_memory + hs * crate::mathx::log(implied / anchor)
                 };
                 (slow, stress)
             } else {
