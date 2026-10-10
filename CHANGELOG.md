@@ -145,6 +145,16 @@ same with them on as off.
   switch, and the state hash and `manifest.state_hash` cover them behind tags
   48 and 49 only then. Every known-answer digest is where it was.
 
+### The published VIX's stress memory at its own rate
+
+- `vix_stress_premium_memory` is a new dial, 0.0 on every preset and left
+  out of the digest there. At 0.0 the published VIX's stress memory steps at
+  `vix_anchor_memory`'s rate, as it always has. Off zero it steps at this
+  rate at the close, in the projection of tonight's close and in the
+  forecast; the anchor's memory, the VIX state and every price are
+  untouched, so only the published quote moves. Every known-answer digest is
+  where it was.
+
 ### The VIX's fear memory
 
 - `vix_fear_uptake` and `vix_fear_half_life` are new dials, 0.0 on every

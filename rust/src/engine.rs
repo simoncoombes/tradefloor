@@ -9109,7 +9109,7 @@ impl Engine {
                 if pins_today & PIN_VIX != 0 {
                     self.vix_stress_memory = 0.0;
                 } else if implied > 0.0 && anchor > 0.0 {
-                    let h = self.params.vix_anchor_memory;
+                    let h = self.params.vix_stress_memory_rate();
                     self.vix_stress_memory = (1.0 - h) * self.vix_stress_memory
                         + h * crate::mathx::log(implied / anchor);
                 }
@@ -10991,7 +10991,8 @@ impl Engine {
                 } else if self.macro_pins_today & PIN_VIX != 0 {
                     0.0
                 } else {
-                    (1.0 - h) * self.vix_stress_memory + h * crate::mathx::log(implied / anchor)
+                    let hs = self.params.vix_stress_memory_rate();
+                    (1.0 - hs) * self.vix_stress_memory + hs * crate::mathx::log(implied / anchor)
                 };
                 (slow, stress)
             } else {

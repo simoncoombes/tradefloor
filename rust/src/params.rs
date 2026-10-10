@@ -2402,6 +2402,25 @@ pub struct ModelParams {
     /// otherwise. In [0, 1].
     /// pt-v21 ships 0.35.
     pub vix_stress_premium_cap: f64,
+    /// The stress memory's own per-session rate: the rate at which the
+    /// published VIX's stress memory `m` (`vix_stress_premium`) takes up the
+    /// read-back's log deviation from the anchor's centre. 0.0, which every
+    /// preset carries, is the anchor's rate (`vix_anchor_memory`), bit for
+    /// bit, so in a free run the stress memory is the anchor's memory, as it
+    /// has been since pt-v20.
+    ///
+    /// The two memories do different jobs. The anchor's pulls a persistent
+    /// deviation of the VIX state back, for the loop's stability and the
+    /// long horizon of the futures curve; the stress memory sets how far the
+    /// quote stands over the state in a stress spell, against the tape's
+    /// VIX over trailing 21-session realised volatility (V2, 0.831). Slowing
+    /// the anchor, as the pt-v22 VIX law does (0.0556 to 0.035), slows the
+    /// premium with it: it arrives later in a spell and the forecast carries
+    /// it further out. Off zero, the stress memory steps at this rate at the
+    /// close, in the projection of tonight's close and in the forecast; the
+    /// anchor's memory is untouched. Read only with `vix_stress_premium`
+    /// non-zero. In [0, 1].
+    pub vix_stress_premium_memory: f64,
     /// The VIX's fear memory: the share of the VIX's log excursion over its
     /// target that the target takes up each session. 0.0, which every preset
     /// carries, is off: the target is the anchor's and no state is written.
@@ -7461,6 +7480,18 @@ const PT_V2_BITS: &[(&str, u64)] = &[
 ];
 
 impl ModelParams {
+    /// The published VIX's stress memory's per-session rate:
+    /// `vix_stress_premium_memory`, or the anchor's (`vix_anchor_memory`)
+    /// with it at 0.0, as every preset ships, so the memory steps exactly as
+    /// it did.
+    pub fn vix_stress_memory_rate(&self) -> f64 {
+        if self.vix_stress_premium_memory != 0.0 {
+            self.vix_stress_premium_memory
+        } else {
+            self.vix_anchor_memory
+        }
+    }
+
     /// The shipped preset. `const fn`, so `PT_V1` is a compile-time value
     /// and reading a field is exactly as cheap as reading the const it
     /// mirrors.
@@ -7772,6 +7803,7 @@ impl ModelParams {
             vix_stress_premium: 0.0,
             vix_stress_premium_knee: 0.0,
             vix_stress_premium_cap: 0.0,
+            vix_stress_premium_memory: 0.0,
             vix_fear_uptake: 0.0,
             vix_fear_half_life: 0.0,
             fed_put_gain: 0.0,
@@ -10381,6 +10413,7 @@ impl ModelParams {
             "vix_stress_premium" => self.vix_stress_premium,
             "vix_stress_premium_knee" => self.vix_stress_premium_knee,
             "vix_stress_premium_cap" => self.vix_stress_premium_cap,
+            "vix_stress_premium_memory" => self.vix_stress_premium_memory,
             "vix_fear_uptake" => self.vix_fear_uptake,
             "vix_fear_half_life" => self.vix_fear_half_life,
             "fed_put_gain" => self.fed_put_gain,
@@ -10755,6 +10788,7 @@ impl ModelParams {
             "vix_stress_premium" => out.vix_stress_premium = value,
             "vix_stress_premium_knee" => out.vix_stress_premium_knee = value,
             "vix_stress_premium_cap" => out.vix_stress_premium_cap = value,
+            "vix_stress_premium_memory" => out.vix_stress_premium_memory = value,
             "vix_fear_uptake" => out.vix_fear_uptake = value,
             "vix_fear_half_life" => out.vix_fear_half_life = value,
             "fed_put_gain" => out.fed_put_gain = value,
@@ -11635,6 +11669,12 @@ impl ModelParams {
                 "vix_stress_premium_cap is {}. It is the largest log premium of the \
                  published VIX over the state, in [0, 1].",
                 self.vix_stress_premium_cap));
+        }
+        if !(self.vix_stress_premium_memory >= 0.0 && self.vix_stress_premium_memory <= 1.0) {
+            return Err(format!(
+                "vix_stress_premium_memory is {}. It is the stress memory's per-session \
+                 rate, in [0, 1]; 0 is the anchor's rate (vix_anchor_memory).",
+                self.vix_stress_premium_memory));
         }
         if self.vix_stress_premium != 0.0 {
             if self.vix_stress_premium_cap == 0.0 {
@@ -12624,6 +12664,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "treasury_put_pricing",
     "vix_stress_premium",
     "vix_stress_premium_cap",
+    "vix_stress_premium_memory",
     "vix_stress_premium_knee",
     "vix_fear_uptake",
     "vix_fear_half_life",
@@ -12914,6 +12955,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "vix_stress_premium",
         "vix_stress_premium_knee",
         "vix_stress_premium_cap",
+        "vix_stress_premium_memory",
         "vix_fear_uptake",
         "vix_fear_half_life",
         "fed_put_gain",

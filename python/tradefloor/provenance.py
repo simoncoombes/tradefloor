@@ -501,6 +501,11 @@ OUT_OF_SCOPE = {
         "model's digest",
     # The VIX's fear memory (pt-v22 phase 1, the VIX law), inert on every
     # shipped preset.
+    "vix_stress_premium_memory":
+        "unread while `vix_stress_premium` is 0.0; at 0.0 the stress memory "
+        "steps at `vix_anchor_memory`'s rate exactly (`vix_stress_memory_rate`), "
+        "so every preset that ships the premium reproduces; at 0.0 it is also "
+        "left out of the model's digest",
     "vix_fear_uptake":
         "inert at 0.0: `vix_close` takes the identity's target as the anchor "
         "makes it (a branch on the dial), the close and the forecast do not "
