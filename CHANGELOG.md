@@ -203,6 +203,32 @@ same with them on as off.
   the live VIX again at once, as a pin does, and the forecast reads the
   premium fading and the floor held.
 
+### An American options pricer
+
+- New module `derivatives::american`, the pricer pt-v22's single-stock
+  options will quote from. It is library code that the engine does not
+  call yet: no dial reads it, it takes no draw, and every known-answer
+  digest is where it was. It provides a Leisen-Reimer binomial tree
+  (`price`, `steps_for`, `OptionSpec`, `Style`, `Lattice`, `TreeValue`),
+  with cash dividends on the escrowed price (`CashDividend`,
+  `CashDividend::from_ex_day`), the early-exercise boundary at each step
+  (`BoundaryPoint`), and the dealer's exercise decision (`early_exercise`,
+  `ExerciseDecision`). That decision exercises a call only on the session
+  before an ex-date, and a put whenever the tree says to. It also holds
+  the OCC's exercise-by-exception rule at expiry (`exercised_at_expiry`,
+  `EXERCISE_BY_EXCEPTION`).
+- `market::dividends::lookahead` lists a name's ex-dates up to a session,
+  with their amounts: the declared amount inside the 21-session
+  declaration lead, and beyond it the declaration rule applied again on
+  today's EMA of closes. It reads only past closes and the public target
+  yield. The index futures' carry (`futures_index_listed`) now reads its
+  dividends through it, with the same arithmetic in the same order, so
+  every futures price is the same to the bit.
+- Checked against Hull's worked examples: the five-step American put
+  4.49, the put with a known dividend 4.44, the converged put 4.28, and
+  the dividend call's 3.67. A European tree is within 1e-4 of
+  Black-Scholes at 401 steps.
+
 ## 0.10.2
 
 A patch release with three changes for programs that host the engine. No
