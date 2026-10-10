@@ -1,31 +1,42 @@
 """How the test suite is split so it can run in CI at all.
 
 The whole suite is about 2,900 seconds of pytest in one process on a GitHub
-runner (PR #282's first suite run, 2026-10-10: the four old batches read
-392-576s, 1,189-1,203s, 773-978s and 304-390s across 3.11 and 3.13). That is
-too slow to put in front of every pull request in one job, so it is split.
+runner (PR #282's first suite run, 2026-10-10, on the old split: a-e 392s
+and 576s on 3.11 and 3.13, f-p 1,189s and 1,203s, q-z 773s and 978s, facts
+304s and 390s). That is too slow for one job in front of every pull request,
+so it is split.
 
-THE LONG POLE IS NOT `test_facts.py`. It used to be, at nine minutes of a
-half-hour suite, and it had a batch of its own for that reason. By 0.10.2
-it was 304-390s and its batch finished first, while `f-p`, holding the
-futures, the market and the MCP files, ran twenty minutes and set the wall
-time of the whole workflow. The split below is by measured cost.
+`f-p` WAS THE LONG POLE, NOT `test_facts.py`. This docstring called facts
+the long pole from when it was nine minutes of a half-hour suite, and by
+0.10.2 its batch finished first while `f-p`, holding the futures, market
+and MCP files, ran twenty minutes and set the wall time of the workflow.
 
-Two things share the work out. Within a batch, pytest-xdist runs the tests
-on every core the runner has (`-n auto`, four on a GitHub runner), so one
-expensive file is spread over four workers rather than holding a batch
-behind it. Across batches, the cut points are where the measured cost
-divides into four nearly equal parts: 837, 693, 775 and 603 seconds of
-single-process time on that run, against 2,908 in all. The longest single
-test is `test_facts.py`'s leverage effect at 114s, which bounds how fast any
-batch can go however it is split.
+Two things share the work out now.
 
-The batches are still alphabetical ranges rather than a list of files,
-because a list of files needs editing every time a file is added and a range
-only needs to stay exhaustive. A file sorts into exactly one range, so it is
-in exactly one batch by construction. Re-balance by moving a cut point when
-the `--durations` table in the batch logs says one batch has drifted well
-past the others; the comment on `STARTS` says how to read it.
+Within a batch, pytest-xdist runs the tests on every core the runner has
+(`-n auto`, four on a GitHub runner), so a batch takes roughly a third of
+its single-process time. Not a quarter: a runner's four vCPUs are two
+cores with hyper-threading, and every test reads about 1.5 times slower
+with four workers beside it.
+
+Across batches, the ranges are cut where the measured cost of the files
+outside `test_facts.py` divides evenly: 683, 637, 637 and 603 seconds of
+single-process time on that run, against 2,560 in all.
+
+`test_facts.py` keeps a batch of its own for a narrower reason than before.
+Its two longest tests, the volume and leverage effects at 81s and 114s
+single-process, are adjacent in the file, and xdist hands a worker
+neighbouring tests, so they run one after the other on one worker wherever
+the file goes. In a batch of four ranges that chain ended the first one:
+PR #282's second run put the file in an `a-fa` range and that batch's last
+two per cent took 93s on 3.11 and 280s on 3.13, against 4-5 minutes for
+the whole of every other batch. Alone, the chain is the batch, and it is
+about as long as the others.
+
+The ranges are alphabetical rather than a list of files, because a list of
+files needs editing every time a file is added and a range only needs to
+stay exhaustive. Re-balance by moving a cut when the `--durations` table in
+the batch logs says one batch has drifted well past the others.
 
 Exhaustive is the property that matters. A test file in no batch would run
 nowhere and nothing would say so, which is the failure this project keeps
@@ -41,26 +52,25 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
 TESTS = ROOT / "tests"
 
-#: Batch name -> where its range starts, as a prefix of the file name after
-#: `test_`. A file belongs to the last batch whose start sorts at or before
-#: its name, so every file is in exactly one. The starts must be in order.
-#:
-#: Chosen on single-process cost per file, measured from the timestamps on
-#: pytest's progress lines in each batch log and averaged over 3.11 and
-#: 3.13. `fe` keeps `test_facts.py` (309s) in the first batch;
-#: `mc` falls between `test_market_*` and `test_mcp*`.
+#: The file with a batch of its own, for the reason the docstring gives.
+ALONE = "test_facts.py"
+
+#: Range batch name -> the first letter of its range, of the file name after
+#: `test_`. A file belongs to the last range whose start sorts at or before
+#: its name, so every file but `ALONE` is in exactly one. The starts must
+#: begin at "" and be in order, which `tests/test_packaging.py` checks.
 STARTS: dict[str, str] = {
-    "a-fa": "",
-    "fe-ma": "fe",
-    "mc-r": "mc",
+    "a-f": "",
+    "g-m": "g",
+    "n-r": "n",
     "s-z": "s",
 }
 
-BATCHES: tuple[str, ...] = tuple(STARTS)
+BATCHES: tuple[str, ...] = (*STARTS, "facts")
 
 
-def batch_of(name: str) -> str:
-    """The batch a test file named `name` (`test_<something>.py`) is in."""
+def range_of(name: str) -> str:
+    """The range batch a test file named `name` (`test_<x>.py`) sorts into."""
     stem = name[len("test_"):]
     return [b for b, start in STARTS.items() if stem >= start][-1]
 
@@ -71,7 +81,12 @@ def files(batch: str) -> list[str]:
         raise SystemExit(
             f"unknown batch {batch!r}; the batches are {', '.join(BATCHES)}")
     everything = sorted(p.name for p in TESTS.glob("test_*.py"))
-    return [f"tests/{name}" for name in everything if batch_of(name) == batch]
+    if batch == "facts":
+        chosen = [ALONE] if ALONE in everything else []
+    else:
+        chosen = [name for name in everything
+                  if name != ALONE and range_of(name) == batch]
+    return [f"tests/{name}" for name in chosen]
 
 
 def uncovered() -> list[str]:

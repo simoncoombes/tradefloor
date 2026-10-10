@@ -10,9 +10,9 @@
 # and "too slow for a PR" quietly became "runs on nobody's machine but the
 # author's". Split four ways they finished in about ten minutes, which was
 # fine for a nightly. By 0.10.2 the suite had grown to ~7,700 tests and the
-# alphabetical split took twenty-two minutes, so the batches are now cut by
-# measured cost and each runs on all of its runner's cores
-# (tools/ci/batches.py has the numbers).
+# alphabetical split took twenty-two minutes, so the ranges are now cut by
+# measured cost, there are five batches, and each runs on all of its
+# runner's cores (tools/ci/batches.py has the numbers).
 #
 # Nightly rather than weekly because the runners are free on a public
 # repository and the value is finding a regression next to the change that
@@ -140,7 +140,7 @@ jobs:
       matrix:
         # tools/ci/batches.py says where each range starts and why there;
         # tests/test_ci_gates.py holds this list to that module's.
-        batch: [a-fa, fe-ma, mc-r, s-z]
+        batch: [a-f, g-m, n-r, s-z, facts]
         # The floor and the newest supported version. The builtin sum() over
         # floats compensates from 3.12, and two exact-equality tests failed by
         # one ulp on 3.13 for releases while every job here ran 3.11. The
