@@ -498,22 +498,11 @@ impl Engine {
             if !c.is_public || c.is_bankrupt {
                 continue;
             }
-            let Some(d) = c.stock.dividend else {
-                continue;
-            };
-            if !(d.target_yield > 0.0) {
-                continue;
-            }
-            let k = dv::sessions_since_ex(&c.ticker, after);
-            let mut ex = after + dv::DIVIDEND_PERIOD - k;
-            let mut state = d;
-            let mut amount = if d.declared { d.amount } else { dv::declare(&self.params, &d, c.stock.price) };
-            while ex <= expiry {
-                let points = c.stock.shares_outstanding * amount / self.index_divisor;
-                total += points * crate::mathx::exp(-rate * (ex as f64 - now) / SESSIONS_PER_YEAR as f64);
-                state.amount = amount;
-                amount = dv::declare(&self.params, &state, c.stock.price);
-                ex += dv::DIVIDEND_PERIOD;
+            // The same lookahead the American options' pricer reads, so a
+            // name's projected dividends are one number wherever they enter.
+            for u in dv::lookahead(&self.params, &c.ticker, c.stock.dividend.as_ref(), after, c.stock.price, expiry) {
+                let points = c.stock.shares_outstanding * u.amount / self.index_divisor;
+                total += points * crate::mathx::exp(-rate * (u.ex_day as f64 - now) / SESSIONS_PER_YEAR as f64);
             }
         }
         total

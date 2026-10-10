@@ -21,10 +21,15 @@
 //! [`crate::engine::Engine::settlements`],
 //! [`crate::engine::Engine::night_tick`]).
 //!
+//! The American options' pricer ([`american`]: a Leisen-Reimer tree with
+//! cash dividends, its early-exercise boundary and the dealer's exercise
+//! decision) is library code the engine does not call yet.
+//!
 //! Everything here reads state and writes nothing back, so a model that
 //! turns these switches on prints the same stock prices as one that does
 //! not.
 
+pub mod american;
 pub mod calendar;
 pub mod contract;
 pub mod forecast;
