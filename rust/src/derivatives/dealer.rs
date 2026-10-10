@@ -15,8 +15,8 @@
 //! The dealer's mid is Black's price at the surface's implied volatility
 //! shifted by its inventory ([`OptionDealerSpec::inventory_shift`]). Its
 //! half-spread, in volatility, is `option_dealer_spread` times the equity
-//! maker's VIX multiplier (`microstructure::vix_spread_multiplier`) times `1
-//! + moneyness_slope |z|`, `z` the strike's distance from the forward in
+//! maker's VIX multiplier (`microstructure::vix_spread_multiplier`) times
+//! `1 + moneyness_slope |z|`, `z` the strike's distance from the forward in
 //! at-the-money total sds; in price it is that times the option's vega, so
 //! it grows with vega, distance from the money, time to expiry and the VIX.
 //! Each side shows [`OptionDealerSpec::levels`] levels of
