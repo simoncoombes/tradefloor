@@ -399,6 +399,11 @@ OUT_OF_SCOPE = {
         "`forecast_vix_dispersion` is 0.0. Off zero it is the skewness of the "
         "log VIX's spread about the forecast, measured with the sd on held-out "
         "histories; at 0.0 it is also left out of the model's digest",
+    "forecast_vix_expected_variance":
+        "unread while `forecast_horizon_sessions` or `forecast_vix_dispersion` "
+        "is 0.0. A switch: at 1.0 the forecast's VIX step reads the variance "
+        "the forecast reports, the expectation over the VIX's spread; at 0.0 "
+        "it is also left out of the model's digest",
     "forecast_policy_shadow_discount":
         "unread while `forecast_horizon_sessions` is 0.0: "
         "`forecast_policy_path` does not run. A projection fitted on the "
