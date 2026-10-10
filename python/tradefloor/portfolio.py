@@ -83,6 +83,23 @@ def is_future_symbol(ticker: object) -> bool:
     return isinstance(ticker, str) and bool(_FUTURE_SYMBOL.match(ticker))
 
 
+#: A listed option's symbol, ``ROOT.Onnnn.Rk.cc`` (pt-v22 phase 2): the root,
+#: the expiry session, the right and the strike in dollars and cents.
+_OPTION_SYMBOL = re.compile(
+    r"^[A-Za-z0-9_\-]+(?:\.[A-Za-z0-9_\-]+)*\.O(\d{4,})\.[CP]\d+\.\d{2}$")
+
+
+def is_option_symbol(ticker: object) -> bool:
+    """Whether ``ticker`` is spelled as a listed option's symbol."""
+    return isinstance(ticker, str) and bool(_OPTION_SYMBOL.match(ticker))
+
+
+def _option_expiry(symbol: str) -> int:
+    match = _OPTION_SYMBOL.match(symbol)
+    assert match is not None, symbol
+    return int(match.group(1))
+
+
 class LeverageError(OrderError):
     """An order refused because it would take the portfolio past
     ``max_leverage``.
@@ -373,6 +390,34 @@ class FuturesPosition:
                 f"multiplier={self.multiplier:g}, mark={self.mark:.4f})")
 
 
+class OptionPosition:
+    """A holding in one listed option (pt-v22 phase 2).
+
+    ``quantity`` is signed contracts. The premium moves cash when a trade
+    fills, ``quantity * multiplier * price``, and the position is worth its
+    dealer's mid until it settles in cash at expiry. ``cost`` is the average
+    premium per contract the open quantity was traded at, and ``realised``
+    the premium gained on what was closed.
+    """
+
+    __slots__ = ("symbol", "quantity", "multiplier", "cost", "realised")
+
+    def __init__(self, symbol: str, multiplier: float) -> None:
+        self.symbol = symbol
+        self.quantity = 0.0
+        self.multiplier = float(multiplier)
+        self.cost = 0.0
+        self.realised = 0.0
+
+    def value(self, price: float) -> float:
+        """What the position is worth at ``price`` a contract."""
+        return self.quantity * self.multiplier * price
+
+    def __repr__(self) -> str:
+        return (f"OptionPosition({self.symbol!r}, quantity={self.quantity:g}, "
+                f"multiplier={self.multiplier:g}, cost={self.cost:.4f})")
+
+
 class Portfolio:
     """Cash, positions and P&L for one trader."""
 
@@ -380,7 +425,7 @@ class Portfolio:
                  "max_leverage", "_stamp", "cash_interest", "interest",
                  "owner", "_in_book", "margin_interest", "dividends", "distributions",
                  "_collected", "reinvest_dividends", "futures", "margin_calls",
-                 "_margin_call", "liquidations", "settled")
+                 "_margin_call", "liquidations", "settled", "options")
 
     def __init__(self, cash: float = 1_000_000.0,
                  *, max_leverage: float | None = None,
@@ -472,9 +517,13 @@ class Portfolio:
         #: One entry per contract liquidated on an unmet call: ``day``,
         #: ``symbol``, ``quantity`` asked and ``filled``.
         self.liquidations: list[dict] = []
-        #: One entry per futures position settled at expiry: ``day``,
-        #: ``symbol``, ``quantity``, ``price`` and ``cash``.
+        #: One entry per futures or options position settled at expiry:
+        #: ``day``, ``symbol``, ``quantity``, ``price`` and ``cash``.
         self.settled: list[dict] = []
+        #: Option positions by symbol (pt-v22 phase 2). Empty, and every
+        #: option hook a no-op that asks the engine nothing, for a portfolio
+        #: that never traded one.
+        self.options: dict[str, OptionPosition] = {}
 
     # -- trading ----------------------------------------------------------
 
@@ -501,9 +550,10 @@ class Portfolio:
                 f"quantity must be non-zero and finite, got {quantity}"
             )
 
-        if is_future_symbol(ticker) and ticker not in engine.tickers:
-            # A listed future trades in its own book in the engine, whatever
-            # `book_live` says (pt-v22 phase 1).
+        if (is_future_symbol(ticker) or is_option_symbol(ticker)) and ticker not in engine.tickers:
+            # A listed future trades in its own book in the engine, and a
+            # listed option with its dealer, whatever `book_live` says
+            # (pt-v22 phases 1 and 2).
             return self._execute_in_book(engine, ticker, float(quantity), None)
         if getattr(engine, "book_live", False) and ticker not in _RATE_TICKERS:
             return self._execute_in_book(engine, ticker, float(quantity), None)
@@ -625,7 +675,9 @@ class Portfolio:
         for f in taken:
             signed = f["quantity"] if f["side"] == "buy" else -f["quantity"]
             multiplier = 1.0
-            if f["ticker"] in engine.tickers or not is_future_symbol(f["ticker"]):
+            if f["ticker"] not in engine.tickers and is_option_symbol(f["ticker"]):
+                multiplier = self._apply_option(engine, f["ticker"], signed, f["price"])
+            elif f["ticker"] in engine.tickers or not is_future_symbol(f["ticker"]):
                 position = self.positions.setdefault(f["ticker"], Position(f["ticker"]))
                 self._apply(position, signed, f["price"])
                 self.cash -= signed * f["price"]
@@ -677,14 +729,17 @@ class Portfolio:
             filled = expected if side == "buy" else -expected
             if is_future_symbol(ticker) and ticker not in engine.tickers:
                 projected = self._projected_futures_leverage(engine, ticker, filled, price)
+            elif is_option_symbol(ticker) and ticker not in engine.tickers:
+                projected = self._projected_options_leverage(engine, ticker, filled, price)
             else:
                 projected = self._projected_leverage(engine, ticker, filled, price,
                                                      filled * price)
             if projected > self.max_leverage:
                 raise LeverageError(_leverage_refusal(projected, self.max_leverage))
-        # A future's notional is its price times its multiplier.
+        # A future's or an option's notional is its price times its multiplier.
         multiplier = (float(engine.quote(ticker)["multiplier"])
-                      if is_future_symbol(ticker) and ticker not in engine.tickers else 1.0)
+                      if (is_future_symbol(ticker) or is_option_symbol(ticker))
+                      and ticker not in engine.tickers else 1.0)
         out = engine.submit(self.owner, ticker, quantity, limit_price=limit)
         self._in_book = True
         self._drain(engine, skip_order=out["order_id"])
@@ -808,11 +863,14 @@ class Portfolio:
             for p in self.positions.values()
             if p.ticker in prices
         )
-        if not self.futures:
+        if not self.futures and not self.options:
             return stocks
-        # A future counts at its notional, as a broker's leverage limit does.
-        return stocks + ordered_sum(f.notional(self._future_price(engine, f))
-                                    for f in self.futures.values())
+        # A future counts at its notional, as a broker's leverage limit does,
+        # and an option at its delta-notional.
+        return (stocks
+                + ordered_sum(f.notional(self._future_price(engine, f))
+                              for f in self.futures.values())
+                + self._options_exposure(engine))
 
     def leverage(self, engine: Engine) -> float:
         """Gross exposure as a multiple of net worth."""
@@ -831,6 +889,8 @@ class Portfolio:
         held = self.positions.get(ticker)
         if held is None and ticker in self.futures:
             return self.futures[ticker].quantity
+        if held is None and ticker in self.options:
+            return self.options[ticker].quantity
         return held.quantity if held else 0.0
 
     def marks(self, engine: Engine) -> dict[str, float]:
@@ -849,9 +909,10 @@ class Portfolio:
     def net_worth(self, engine: Engine) -> float:
         """Cash plus the marked value of every position, and each futures
         position's value over its mark at the contract's price now."""
-        if not self.futures:
+        if not self.futures and not self.options:
             return self.cash + self.market_value(engine)
-        return self.cash + self.market_value(engine) + self.futures_value(engine)
+        return (self.cash + self.market_value(engine) + self.futures_value(engine)
+                + self.options_value(engine))
 
     # -- futures (pt-v22 phase 1) -----------------------------------------
 
@@ -897,10 +958,11 @@ class Portfolio:
         return float("inf") if equity <= 0 else gross / equity
 
     def margin_requirement(self, engine: Engine, *, maintenance: bool = False) -> float:
-        """The initial (or maintenance) margin the futures positions ask,
-        dollars: each contract's margin as the last close set it, times the
-        contracts held. 0.0 on a model without margin
-        (``margin_scan_coverage``)."""
+        """The initial (or maintenance) margin the futures and option
+        positions ask, dollars: each future's margin as the last close set
+        it, times the contracts held, plus the option positions' scan
+        (:meth:`Engine.option_margin`), which nets offsetting options. 0.0 on
+        a model without margin (``margin_scan_coverage``)."""
         key = "maintenance_margin" if maintenance else "initial_margin"
         total = 0.0
         for f in self.futures.values():
@@ -909,7 +971,91 @@ class Portfolio:
             except ValidationError:
                 per = None
             total += abs(f.quantity) * (per or 0.0)
+        if self.options:
+            scan = engine.option_margin([(o.symbol, o.quantity) for o in self.options.values()])
+            if scan is not None:
+                total += scan / 1.1 if maintenance else scan
         return total
+
+    # -- options (pt-v22 phase 2) ------------------------------------------
+
+    def _option_price(self, engine: Engine, position: OptionPosition) -> float:
+        """A held option's value a contract now: its dealer's mid, or its
+        settlement once it has settled and before the next hook pays it."""
+        try:
+            return float(engine.quote(position.symbol)["mid"])
+        except ValidationError:
+            pass
+        for s in engine.settlements(_option_expiry(position.symbol)):
+            if s["symbol"] == position.symbol:
+                return float(s["value"])
+        return 0.0
+
+    def options_value(self, engine: Engine) -> float:
+        """The option positions at their dealer's mids, dollars."""
+        return ordered_sum(o.value(self._option_price(engine, o)) for o in self.options.values())
+
+    def _options_exposure(self, engine: Engine) -> float:
+        """The option positions' delta-notional: contracts times the
+        multiplier times the absolute delta times the index."""
+        total = 0.0
+        for o in self.options.values():
+            try:
+                q = engine.quote(o.symbol)
+            except ValidationError:
+                continue
+            total += abs(o.quantity) * o.multiplier * abs(q["delta"]) * q["index"]
+        return total
+
+    def _apply_option(self, engine: Engine, symbol: str, filled: float, price: float) -> float:
+        """A fill of ``filled`` contracts at ``price``: the premium moves
+        cash at once. Returns the contract's multiplier."""
+        held = self.options.get(symbol)
+        if held is None:
+            held = self.options[symbol] = OptionPosition(symbol, engine.quote(symbol)["multiplier"])
+        self.cash -= filled * held.multiplier * price
+        existing = held.quantity
+        if existing == 0 or (existing > 0) == (filled > 0):
+            total = existing + filled
+            held.cost = (held.cost * existing + price * filled) / total if total else 0.0
+            held.quantity = total
+        else:
+            closing = min(abs(filled), abs(existing))
+            direction = 1.0 if existing > 0 else -1.0
+            held.realised += (price - held.cost) * closing * direction * held.multiplier
+            held.quantity = existing + filled
+            if held.quantity != 0 and (held.quantity > 0) != (existing > 0):
+                held.cost = price
+        if held.quantity == 0:
+            del self.options[symbol]
+        return held.multiplier
+
+    def _projected_options_leverage(self, engine: Engine, symbol: str, filled: float,
+                                    price: float) -> float:
+        """Leverage an option trade would produce: the premium leaves cash
+        for the position, so equity moves only by the spread, and the
+        position's delta-notional joins the gross exposure."""
+        equity = self.net_worth(engine)
+        q = engine.quote(symbol)
+        held = self.options.get(symbol)
+        before = held.quantity if held else 0.0
+        per = q["multiplier"] * abs(q["delta"]) * q["index"]
+        gross = self.gross_exposure(engine) - abs(before) * per + abs(before + filled) * per
+        equity -= filled * q["multiplier"] * (price - q["mid"])
+        return float("inf") if equity <= 0 else gross / equity
+
+    def _settle_options(self, engine: Engine, day: int) -> None:
+        """Pay out every held option whose expiry has settled, at its
+        settlement value, and close it."""
+        for symbol in [s for s, o in self.options.items() if _option_expiry(s) <= day]:
+            values = {s["symbol"]: s["value"] for s in engine.settlements(_option_expiry(symbol))}
+            if symbol not in values:
+                continue
+            held = self.options.pop(symbol)
+            cash = held.quantity * held.multiplier * values[symbol]
+            self.cash += cash
+            self.settled.append({"day": day, "symbol": symbol, "quantity": held.quantity,
+                                 "price": values[symbol], "cash": cash})
 
     def _settle_expired(self, engine: Engine, day: int) -> None:
         """Pay out every held contract that has settled, its last variation
@@ -933,18 +1079,21 @@ class Portfolio:
         otherwise every futures position is closed at the market through
         its book. A no-op, asking the engine nothing, for a portfolio with
         no futures and no call open. The harnesses call it after the open."""
-        if not self.futures and self._margin_call is None:
+        if not self.futures and not self.options and self._margin_call is None:
             return
         day = int(engine.day_count)
         self._settle_expired(engine, day)
+        if self.options:
+            self._settle_options(engine, day)
         call, self._margin_call = self._margin_call, None
         if call is None:
             return
         call["met"] = self.net_worth(engine) >= self.margin_requirement(engine)
         if call["met"]:
             return
-        for symbol in list(self.futures):
-            quantity = self.futures[symbol].quantity
+        held = [(s, f.quantity) for s, f in self.futures.items()]
+        held += [(s, o.quantity) for s, o in self.options.items()]
+        for symbol, quantity in held:
             filled = 0.0
             try:
                 filled = self._execute_in_book(engine, symbol, -quantity, None)["quantity"]
@@ -960,7 +1109,7 @@ class Portfolio:
         the maintenance requirement. A no-op, asking the engine nothing, for
         a portfolio with no futures. The harnesses call it after the
         close."""
-        if not self.futures:
+        if not self.futures and not self.options:
             return
         day = int(engine.day_count)
         for held in self.futures.values():
@@ -975,7 +1124,7 @@ class Portfolio:
             held.variation += cash
             held.mark = float(mark)
         self._settle_expired(engine, day)
-        if not self.futures:
+        if not self.futures and not self.options:
             return
         maintenance = self.margin_requirement(engine, maintenance=True)
         equity = self.net_worth(engine)

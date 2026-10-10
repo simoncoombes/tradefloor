@@ -499,6 +499,63 @@ OUT_OF_SCOPE = {
         "projection fitted on the model's held-out histories by "
         "tools/calibration/margin_dials.py; at 0.0 it is also left out of the "
         "model's digest",
+    # The index options, their surface and their dealer (pt-v22 phase 2),
+    # inert on every shipped preset. An option and the surface read public
+    # state, draw nothing and write only their own state, so off zero they
+    # leave every price where it was as well.
+    "options_index_listed":
+        "inert at 0.0: `options_list_initial`, `options_session_step` and the "
+        "listing in `options_open` in engine/options.rs return at once with the "
+        "switch off, `Engine::contracts` lists no option, `Engine::chain` and "
+        "`Engine::option_quote` return None, and no options book is "
+        "snapshotted or hashed; refused without `surface_ssvi` and "
+        "`option_dealer_spread`; at 0.0 it is also left out of the model's "
+        "digest",
+    "surface_ssvi":
+        "inert at 0.0: `Engine::surface` returns None, `options_open` and "
+        "`options_close` in engine/options.rs return at once, and the "
+        "options' key is neither snapshotted nor hashed; refused without "
+        "`index_level_listed`; at 0.0 it is also left out of the model's "
+        "digest",
+    "surface_skew_physical":
+        "unread while `surface_ssvi` is 0.0, as every preset ships it: only "
+        "`surface_at` reads it, and refused without the switch. A derived dial "
+        "for the model's own physical skew, not yet measured; at 0.0 it is "
+        "also left out of the model's digest",
+    "surface_skew_physical_slope":
+        "unread while `surface_ssvi` is 0.0: only `surface_at` reads it, and "
+        "refused without the switch; at 0.0 it is also left out of the model's "
+        "digest",
+    "surface_skew_premium":
+        "unread while `surface_ssvi` is 0.0: only `surface_at` reads it, and "
+        "refused without the switch; at 0.0 it is also left out of the model's "
+        "digest",
+    "surface_curvature":
+        "unread while `surface_ssvi` is 0.0: only `surface_at` and "
+        "`surface_fit` read it, and refused without the switch; at 0.0 it is "
+        "also left out of the model's digest",
+    "surface_curvature_exponent":
+        "unread while `surface_ssvi` is 0.0: only `surface_at` and "
+        "`surface_fit` read it, and refused without the switch; at 0.0 it is "
+        "also left out of the model's digest",
+    "surface_term_premium_short":
+        "unread while `surface_ssvi` is 0.0: only `surface_at` reads it, and "
+        "refused without the switch; at 0.0 it is also left out of the model's "
+        "digest",
+    "surface_term_premium_long":
+        "unread while `surface_ssvi` is 0.0: only `surface_at` reads it, and "
+        "refused without the switch; at 0.0 it is also left out of the model's "
+        "digest",
+    "surface_earnings_weight":
+        "unread while `surface_ssvi` is 0.0: only `surface_events` and "
+        "`surface_at` read it, and refused without the switch and without "
+        "`forecast_horizon_sessions`; at 0.0 it is also left out of the "
+        "model's digest",
+    "option_dealer_spread":
+        "unread while `options_index_listed` is 0.0, as every preset ships it: "
+        "only `option_priced` and `option_thetas` in engine/options.rs read it, "
+        "and refused without the switch; at 0.0 it is also left out of the "
+        "model's digest",
     # The VIX's fear memory (pt-v22 phase 1, the VIX law), inert on every
     # shipped preset.
     "vix_fear_uptake":

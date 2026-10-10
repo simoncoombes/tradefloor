@@ -775,6 +775,8 @@ impl Engine {
                 tick: VIX_FUTURE.tick,
                 settlement: kind.settlement(),
                 front: front == Some(k),
+                right: None,
+                strike: None,
             })
             .collect()
     }

@@ -6,12 +6,13 @@
 //! Each is named by its [`crate::derivatives::ContractSymbol`], which does not
 //! depend on the order contracts were listed in.
 
-use super::symbol::{ContractSymbol, SymbolKind};
+use super::symbol::{ContractSymbol, Right, SymbolKind};
 
 /// What kind of contract this is: index futures (`futures_index_listed`),
 /// VIX futures (`futures_vix_listed`), policy-rate and term-rate futures
-/// (`futures_rates_listed`) and oil futures (`futures_oil_listed`) so far;
-/// the enum is non-exhaustive so the options of later releases join it.
+/// (`futures_rates_listed`), oil futures (`futures_oil_listed`) and index
+/// options (`options_index_listed`) so far; the enum is non-exhaustive so
+/// the single-stock options of a later release join it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum ContractKind {
@@ -32,6 +33,9 @@ pub enum ContractKind {
     /// A future on the oil price, cash-settled on the oil price at its expiry
     /// session's open: the previous close's.
     OilFuture,
+    /// A European call or put on the engine's price index, cash-settled on
+    /// the index of its expiry session's opening prints.
+    IndexOption,
 }
 
 impl ContractKind {
@@ -43,6 +47,7 @@ impl ContractKind {
             ContractKind::PolicyRateFuture => "FF",
             ContractKind::TermRateFuture => "TR3",
             ContractKind::OilFuture => "OIL",
+            ContractKind::IndexOption => "IDX",
         }
     }
 
@@ -54,6 +59,7 @@ impl ContractKind {
             | ContractKind::PolicyRateFuture
             | ContractKind::TermRateFuture
             | ContractKind::OilFuture => true,
+            ContractKind::IndexOption => false,
         }
     }
 
@@ -74,6 +80,7 @@ impl ContractKind {
             ContractKind::PolicyRateFuture => SettlementRule::AveragePolicyRateAtClose,
             ContractKind::TermRateFuture => SettlementRule::CompoundedPolicyRateAtClose,
             ContractKind::OilFuture => SettlementRule::OilPriceAtOpen,
+            ContractKind::IndexOption => SettlementRule::OpeningPrintIndex,
         }
     }
 }
@@ -139,8 +146,11 @@ pub struct ContractSpec {
     pub tick: f64,
     pub settlement: SettlementRule,
     /// Whether it is the front contract by the roll rule: the first listed
-    /// contract whose roll date has not come.
+    /// contract whose roll date has not come. False for an option.
     pub front: bool,
+    /// An option's right and strike (index points); `None` for a future.
+    pub right: Option<Right>,
+    pub strike: Option<f64>,
 }
 
 /// A contract's quote, as [`crate::engine::Engine::quote`] reads it.
@@ -529,4 +539,61 @@ pub fn vix_future_symbol(expiry: i64) -> String {
 pub fn index_future_symbol(expiry: i64) -> String {
     ContractSymbol { root: ContractKind::IndexFuture.root().to_string(), expiry, kind: SymbolKind::Future }
         .to_string()
+}
+
+/// The index option's specification: constants of the contract, not dials.
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
+pub struct IndexOptionSpec {
+    /// Dollars per index point: 100, as SPX.
+    pub multiplier: f64,
+    /// Strikes listed either side of the index.
+    pub strikes_each_side: i64,
+    /// The strike grid at listing, as a share of the at-the-money sd to
+    /// expiry at the VIX then, before rounding to 1, 2, 2.5 or 5 times a
+    /// power of ten.
+    pub strike_step_sd: f64,
+}
+
+/// The index option's specification.
+pub const INDEX_OPTION: IndexOptionSpec = IndexOptionSpec { multiplier: 100.0, strikes_each_side: 20, strike_step_sd: 0.2 };
+
+impl IndexOptionSpec {
+    /// The strike grid an expiry `sessions` away is listed on, at the index
+    /// `index` and the volatility `vol` (a fraction a year): a
+    /// [`IndexOptionSpec::strike_step_sd`] share of the at-the-money sd in
+    /// index points, rounded in log to the nearest of 1, 2, 2.5 and 5 times
+    /// a power of ten, and at least 0.05.
+    pub fn strike_step(&self, index: f64, vol: f64, sessions: f64) -> f64 {
+        let raw = self.strike_step_sd * index * vol * crate::mathx::sqrt(crate::mathx::max(sessions, 1.0) / 252.0);
+        if !(raw > 0.05 && raw.is_finite()) {
+            return 0.05;
+        }
+        let decade = (crate::mathx::log(raw) / std::f64::consts::LN_10).floor();
+        let power = crate::mathx::pow(10.0, decade);
+        let mut best = power;
+        let mut gap = f64::INFINITY;
+        // Ties go to the finer grid.
+        for m in [1.0, 2.0, 2.5, 5.0, 10.0] {
+            let step = m * power;
+            let d = (crate::mathx::log(step) - crate::mathx::log(raw)).abs();
+            if d < gap {
+                gap = d;
+                best = step;
+            }
+        }
+        crate::mathx::max(0.05, best)
+    }
+}
+
+/// The symbol of the index option of right `right` struck at `strike`
+/// (whole cents) expiring at session `expiry`.
+pub fn index_option_symbol(expiry: i64, right: Right, strike: f64) -> String {
+    let cents = (strike * 100.0).round() as u64;
+    ContractSymbol {
+        root: ContractKind::IndexOption.root().to_string(),
+        expiry,
+        kind: SymbolKind::Option { right, strike_cents: cents },
+    }
+    .to_string()
 }

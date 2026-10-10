@@ -34,9 +34,10 @@ pub mod surface;
 pub mod symbol;
 
 pub use contract::{
-    index_future_symbol, oil_future_symbol, rate_future_symbol, vix_future_symbol, ContractKind, ContractSpec,
-    IndexFutureSpec, OilFutureSpec, Quote, RateFutureSpec, RatePremium, Settlement, SettlementRule, VixFutureSpec,
-    VixPremium, INDEX_FUTURE, OIL_FUTURE, POLICY_RATE_FUTURE, RATE_PREMIUM, TERM_RATE_FUTURE, VIX_FUTURE,
+    index_future_symbol, index_option_symbol, oil_future_symbol, rate_future_symbol, vix_future_symbol, ContractKind,
+    ContractSpec, IndexFutureSpec, IndexOptionSpec, OilFutureSpec, Quote, RateFutureSpec, RatePremium, Settlement,
+    SettlementRule, VixFutureSpec, VixPremium, INDEX_FUTURE, INDEX_OPTION, OIL_FUTURE, POLICY_RATE_FUTURE,
+    RATE_PREMIUM, TERM_RATE_FUTURE, VIX_FUTURE,
 };
 pub use dealer::{OptionDealerSpec, OptionQuote, INDEX_OPTION_DEALER};
 pub use forecast::Forecast;

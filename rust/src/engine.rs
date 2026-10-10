@@ -81,6 +81,9 @@ mod vix_futures;
 mod rate_futures;
 mod oil_futures;
 mod margin;
+/// The index options, their surface and their dealer (`options_index_listed`,
+/// `surface_ssvi`, `option_dealer_spread`).
+mod options;
 
 /// The reference MAIN stream's sequence. Not 0 and not 1 —
 /// both are different streams from the same seed, and picking the wrong one
@@ -1194,6 +1197,11 @@ pub struct Engine {
     /// touched with the dial off; carried in the snapshot and the state hash
     /// only while it is set. See `engine::margin`.
     margin: margin::MarginState,
+    /// The index options and the surface's clock (`surface_ssvi`,
+    /// `options_index_listed`): empty and never touched with both off;
+    /// carried in the snapshot and the state hash only while `surface_ssvi`
+    /// is set. See `engine::options`.
+    options: options::OptionsState,
     /// `fed_stress_cut`: the highest published VIX since the last meeting.
     /// 0.0 and never touched with the cut off; carried in the snapshot and
     /// the state hash only while it is set.
@@ -2336,6 +2344,7 @@ impl Engine {
             rate_futures: rate_futures::RateFuturesState::default(),
             oil_futures: oil_futures::OilFuturesState::default(),
             margin: margin::MarginState::default(),
+            options: options::OptionsState::default(),
             stress_vix_max: 0.0,
             stress_hold_age: STRESS_HOLD_NEVER,
             drawdown_returns: std::collections::VecDeque::new(),
@@ -2361,6 +2370,9 @@ impl Engine {
         // The front two index futures (`futures_index_listed`); nothing with
         // the switch off.
         engine.futures_list_initial();
+        // The index options' first expiries (`options_index_listed`);
+        // nothing with the switch off.
+        engine.options_list_initial();
         // The opening meeting interval, 45 calendar days, onto the macro
         // calendar's steps. Only a fresh schedule is moved, and never on
         // the shipped calendar, where `scale_days` is the literal anyway.
@@ -2489,6 +2501,18 @@ impl Engine {
         pre.params.futures_oil_listed = 0.0;
         pre.params.margin_scan_coverage = 0.0;
         pre.params.margin_scan_tail = 0.0;
+        pre.params.options_index_listed = 0.0;
+        pre.params.option_dealer_spread = 0.0;
+        pre.params.surface_ssvi = 0.0;
+        pre.params.surface_skew_physical = 0.0;
+        pre.params.surface_skew_physical_slope = 0.0;
+        pre.params.surface_skew_premium = 0.0;
+        pre.params.surface_curvature = 0.0;
+        pre.params.surface_curvature_exponent = 0.0;
+        pre.params.surface_term_premium_short = 0.0;
+        pre.params.surface_term_premium_long = 0.0;
+        pre.params.surface_earnings_weight = 0.0;
+        pre.options = options::OptionsState::default();
         pre.earnings_key = crate::rng::prehistory_key(self.earnings_key);
         pre.cycle_publication.key = crate::rng::prehistory_key(self.cycle_publication.key);
         let opening = (self.economy.cycle_phase, self.economy.months_in_current_phase);
@@ -4409,6 +4433,9 @@ impl Engine {
             self.rate_futures_session_step();
             // The oil futures' minute (`futures_oil_listed`).
             self.oil_futures_session_step();
+            // The options dealer's minute (`options_index_listed`): its
+            // pressure decays and waiting orders its quote crosses fill.
+            self.options_session_step();
         }
         if population_open {
             if let Some(pop) = self.population.as_mut() {
@@ -5732,11 +5759,19 @@ impl Engine {
             }
         }
         // A listed contract trades in its own book (`futures_index_listed`,
-        // `futures_vix_listed`).
-        if (self.futures_on() || self.vix_futures_on() || self.rate_futures_on() || self.oil_futures_on())
+        // `futures_vix_listed`), and an option with the dealer
+        // (`options_index_listed`).
+        if (self.futures_on()
+            || self.vix_futures_on()
+            || self.rate_futures_on()
+            || self.oil_futures_on()
+            || self.options_on())
             && !self.companies.iter().any(|c| c.ticker == ticker)
         {
             if let Ok(symbol) = crate::derivatives::ContractSymbol::parse(ticker) {
+                if let crate::derivatives::SymbolKind::Option { .. } = symbol.kind {
+                    return self.submit_option_order(agent, ticker, side, quantity, limit, order_id);
+                }
                 if self.vix_futures_on() && symbol.root == crate::derivatives::ContractKind::VixFuture.root() {
                     return self.submit_vix_future_order(agent, ticker, side, quantity, limit, order_id);
                 }
@@ -5845,6 +5880,7 @@ impl Engine {
             || self.cancel_vix_future_order(order_id, agent)
             || self.cancel_rate_future_order(order_id, agent)
             || self.cancel_oil_future_order(order_id, agent)
+            || self.cancel_option_order(order_id, agent)
     }
 
     /// Waiting orders, in arrival order, for one agent or all: the names'
@@ -5858,6 +5894,7 @@ impl Engine {
             .chain(self.vix_futures_orders().iter())
             .chain(self.rate_futures_orders().iter())
             .chain(self.oil_futures_orders().iter())
+            .chain(self.option_orders().iter())
             .filter(|o| agent.is_none_or(|a| a == o.agent))
             .cloned()
             .collect()
@@ -5885,6 +5922,8 @@ impl Engine {
         taken.extend(self.take_rate_futures_fills(agent));
         // The oil futures' fills (`futures_oil_listed`), on their own counter.
         taken.extend(self.take_oil_futures_fills(agent));
+        // The options' fills (`options_index_listed`), on their own counter.
+        taken.extend(self.take_option_fills(agent));
         taken
     }
 
@@ -7086,6 +7125,10 @@ impl Engine {
         // The oil futures at the open (`futures_oil_listed`): an expiring
         // contract settles on the oil price and the next is listed.
         self.oil_futures_open();
+        // The index options on the opening prints (`options_index_listed`):
+        // an expiry due settles on them and the next is listed; the
+        // surface's clock starts the session (`surface_ssvi`).
+        self.options_open();
     }
 
     /// The overnight move, applied once per name at the open, before the
@@ -8123,6 +8166,8 @@ impl Engine {
         // The index futures' settlement marks on that index
         // (`futures_index_listed`). Nothing with the switch off.
         self.futures_close_marks();
+        // The options' session ends (`surface_ssvi`).
+        self.options_close();
         // WHAT THE FACTOR'S VARIANCE TARGET MEASURES THE VIX AGAINST, and
         // it has to be read HERE, before the per-name GARCH loop below
         // moves a single name's variance.
@@ -12607,6 +12652,20 @@ impl Engine {
             for value in words {
                 hash_f64(&mut buf, value);
             }
+        }
+        // The index options and the surface's clock, only while
+        // `surface_ssvi` is set, behind their own tag, length-prefixed; their
+        // book behind another once an agent has traded an option.
+        if let Some(words) = self.options_words() {
+            hash_f64(&mut buf, 55.0);
+            hash_u32(&mut buf, words.len() as u32);
+            for value in words {
+                hash_f64(&mut buf, value);
+            }
+        }
+        if let Some(book) = self.options_book_state() {
+            hash_f64(&mut buf, 56.0);
+            hash_book(&mut buf, book);
         }
         // LENGTH-PREFIXED, because these two are EMPTY between the tape row
         // that consumes them and the close that fills them again, where

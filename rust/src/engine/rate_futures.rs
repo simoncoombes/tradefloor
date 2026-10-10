@@ -749,6 +749,8 @@ impl Engine {
                     tick: spec.tick,
                     settlement: c.kind.settlement(),
                     front: k == 0 || self.rate_futures.contracts[k - 1].kind != c.kind,
+                    right: None,
+                    strike: None,
                 }
             })
             .collect()

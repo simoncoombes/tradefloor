@@ -37,6 +37,7 @@ fn kind_code(kind: ContractKind) -> f64 {
         ContractKind::VixFuture => 1.0,
         ContractKind::PolicyRateFuture => 2.0,
         ContractKind::TermRateFuture => 3.0,
+        // Options are margined by the scan and keep no record here.
         _ => 4.0,
     }
 }
@@ -272,6 +273,18 @@ impl Engine {
             kept.push(entry);
         }
         self.margin.entries = kept;
+    }
+
+    /// The option scan's size at the VIX `vix` and the index `index`: the
+    /// index move, `z * t` times the index's one-session sd the VIX implies
+    /// (`VIX = (1 + vix_variance_premium) 100 sqrt(252 V)`) in index points,
+    /// and the volatility shift, `z * t` times [`SCAN_VOL_SD`].
+    pub(super) fn option_scan_size(&self, vix: f64, index: f64) -> (f64, f64) {
+        let p = &self.params;
+        let tail = if p.margin_scan_tail == 0.0 { 1.0 } else { p.margin_scan_tail };
+        let z = normal_quantile(0.5 + 0.5 * p.margin_scan_coverage) * tail;
+        let sigma = vix / (100.0 * (1.0 + p.vix_variance_premium) * crate::mathx::sqrt(252.0));
+        (z * sigma * index, z * SCAN_VOL_SD)
     }
 
     /// A listed contract's initial margin, dollars a contract: `None` with
