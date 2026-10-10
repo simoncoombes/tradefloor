@@ -51,6 +51,14 @@ jobs:
         with:
           python-version: "3.11"
       - uses: dtolnay/rust-toolchain@stable
+      # Every test job waits for this one, so its build is on the critical
+      # path of the whole workflow. Uncached it was 98s, 52 of them compiling
+      # dependencies (arrow most of all) that do not change between runs.
+      # rust-cache keeps the dependencies only and drops the workspace crate
+      # before saving, so `tradefloor` itself is compiled fresh every time.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
       - name: Build
         shell: bash
         run: |
