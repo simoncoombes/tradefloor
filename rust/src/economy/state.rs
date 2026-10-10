@@ -477,6 +477,24 @@ pub struct EconomyState {
     /// 0.0, and never read or written, while that dial is 0.0, which every
     /// preset carries; snapshotted and hashed only while it is set.
     pub unemployment_impulse: f64,
+    /// The part of the oil price that the daily pushes made, decaying at the
+    /// shipped 0.03 (`ModelParams::oil_pushes_in_target`). 0.0, and never
+    /// read or written, while that switch is 0.0, which every preset
+    /// carries; snapshotted and hashed only while it is set.
+    pub oil_push_level: f64,
+    /// The dollar's safe-haven bid, decaying at the shipped 0.02
+    /// (`ModelParams::usd_mean_reversion`). 0.0, and never read or written,
+    /// while that dial is 0.0, which every preset carries; snapshotted and
+    /// hashed only while it is set.
+    pub usd_haven_level: f64,
+    /// The log of the oil price's truncation at its bounds on the last step,
+    /// ln(clamped / unclamped), 0.0 where no bound bound it. TRANSIENT: set
+    /// by every step that runs the long factor (`oil_target_drift_sd`) and
+    /// read by the close straight after it, which adds it to the long
+    /// factor, so a bound limits the long-run level rather than opening a
+    /// gap in the short factor. Never snapshotted or hashed: no reading of
+    /// it outlives the step that wrote it.
+    pub oil_bound_log_ratio: f64,
     /// `economy.marketPE ?? 18` at the cycle-transition sites. Kept optional
     /// because the reference implementation genuinely leaves it unset before the first market
     /// tick, and the `?? 18` there is a real fallback rather than a
@@ -644,6 +662,9 @@ pub fn create_initial_economy_state(options: &InitialEconomyOptions) -> EconomyS
         spread_equity_gap: 0.0,
         earnings_anticipation: 0.0,
         unemployment_impulse: 0.0,
+        oil_push_level: 0.0,
+        usd_haven_level: 0.0,
+        oil_bound_log_ratio: 0.0,
         market_pe: Some(18.0),
 
         qe_pe_boost: 0.0,

@@ -1129,7 +1129,7 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         {"earnings_cycle", "cycle_history", "gdp_publication",
          "unemployment_impulse", "vix_feedback", "qe_assets_ratio",
          "cycle_nowcast", "cycle_publication", "anticipation_drift",
-         "anticipation_raw", "spread_equity_gap"}
+         "anticipation_raw", "spread_equity_gap", "oil_push_level", "usd_haven_level"}
         & set(economy))
     if "fed_put" in economy:
         economy_expected |= {"intermeeting_return", "fed_put", "fed_put_owed",
@@ -1196,6 +1196,13 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # is set: `Engine::state_hash`'s order and rule.
     if "unemployment_impulse" in economy:
         _f64(buf, economy["unemployment_impulse"])
+    # The oil pushes' part of the price, only while `oil_pushes_in_target`
+    # is set: `Engine::state_hash`'s order and rule.
+    if "oil_push_level" in economy:
+        _f64(buf, economy["oil_push_level"])
+    # The dollar's safe-haven bid, only while `usd_mean_reversion` is set.
+    if "usd_haven_level" in economy:
+        _f64(buf, economy["usd_haven_level"])
     # The published GDP growth figure's state, only while
     # `gdp_publication_lag` is set: `Engine::state_hash`'s order and rule,
     # the pending releases LENGTH-PREFIXED, each its day then its figure.

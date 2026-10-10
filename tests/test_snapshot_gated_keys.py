@@ -176,6 +176,12 @@ CASES = {
     "margin": (dict(futures_oil_listed=1.0, margin_scan_coverage=0.99), ("oil_futures", "margin"), (), (), {}),
     "oil_target_drift": (dict(oil_target_drift_sd=0.018, oil_target_drift_reversion=0.001),
                          ("oil_target_drift",), (), (), {}),
+    # The oil pushes' part of the price, in the economy, under its switch.
+    "oil_push_level": (dict(oil_pushes_in_target=1.0, oil_noise_log_sd=0.017),
+                       (), ("oil_push_level",), (), {}),
+    # The dollar's safe-haven bid, in the economy, under the measured dollar.
+    "usd_haven_level": (dict(usd_mean_reversion=0.00095, usd_noise_sd=0.43),
+                        (), ("usd_haven_level",), (), {}),
     "every_r21_dial": (dict(EVERY_R21_DIAL, **MACRO),
                        ("market_vol_leverage_memory", "vix_stress_memory",
                         "cycle_nowcast_rng", "fed_stress_vix_max", "fed_stress_hold_age",

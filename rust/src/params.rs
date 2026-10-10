@@ -946,8 +946,11 @@ pub struct ModelParams {
     /// price's target to inventory. 0.0, on every shipped preset, is no
     /// premium, and a value of 0.0 is left out of the model's digest.
     ///
-    /// Off zero the price carries a premium on its level, `S = X (I / 50)^-k`
-    /// with `I` read at no lower than 25 and `X` the premium-free price,
+    /// Off zero the price carries a premium on its level,
+    /// `S = X (1 - k ln(I / 50))`, linear in log inventory as the convenience
+    /// yield of Gibson and Schwartz (1990) is (an exponential form's
+    /// convexity tilted the curve into contango), floored at a quarter, with
+    /// `I` read at no lower than 25 and `X` the premium-free price,
     /// which reverts to the target: each session reverts toward the target
     /// times the premium it opened with and then moves the level by the
     /// premium's change to the inventory the step leaves. Low stocks raise
@@ -981,6 +984,126 @@ pub struct ModelParams {
     /// give the long factor a daily sd of 0.018 (the median of seven
     /// five-year windows, 1987 to 2024). In [0, 0.1].
     pub oil_target_drift_sd: f64,
+    /// Whether the oil price's daily pushes keep the long-run response they
+    /// had under the shipped reversion. A switch, 0.0 on every shipped
+    /// preset and left out of the model's digest there.
+    ///
+    /// The step adds the dollar's drag (0.08 a dollar-index point), OPEC's
+    /// decision, inventory's push and an oil shock's level term to the price
+    /// each session, and the price reverts at 0.03, so each push's effect on
+    /// the price's level is the push over 0.03: the dollar's is -2.67 a
+    /// point. A slower `oil_mean_reversion` multiplies every one of them by
+    /// 0.03 over the slower rate (five at 0.006), so the curve the forecast
+    /// extends from them was five times as steep, and the price's gap to its
+    /// target three times as wide as the short factor of Schwartz and Smith
+    /// (Management Science 46(7), 2000).
+    ///
+    /// At 1.0 the price is the sum of two parts: one that reverts to the
+    /// target at `oil_mean_reversion`, carrying the noise, the convenience
+    /// premium and the long factor, and one that collects the pushes and
+    /// decays at the shipped 0.03 (`EconomyState::oil_push_level`). At a
+    /// reversion of 0.03 the sum is the shipped step exactly; at any other
+    /// it keeps each push's long-run response and its decay, while the rest
+    /// of the price reverts at the slower rate.
+    pub oil_pushes_in_target: f64,
+    /// The oil price's daily noise as a share of the price, the sd of its log
+    /// change a session at a volatility of 1.0. 0.0, on every shipped preset,
+    /// is the noise in dollars (`oil_noise_sd`, or the standing 2.0), and a
+    /// value of 0.0 is left out of the model's digest.
+    ///
+    /// Dollar noise is a constant amount at any price, 4 per cent of a $35
+    /// price and 0.9 per cent of a $150 one, so once the long factor
+    /// (`oil_target_drift_sd`) carries the price across its range its log
+    /// volatility moves with the level. Off zero the noise is this share of
+    /// the price, the short factor of Schwartz and Smith (Management Science
+    /// 46(7), 2000): EIA's contracts 1 and 4 give it 0.017 a session (the
+    /// median of seven five-year windows, at a reversion of 0.006), and
+    /// Schwartz and Smith's 0.286 a year is 0.018. In [0, 0.1]; it takes the
+    /// same draw the dollar noise does.
+    pub oil_noise_log_sd: f64,
+    /// The oil price's elasticity to the dollar index, as a level the whole
+    /// curve carries. 0.0, on every shipped preset, is the dollar's daily
+    /// drag on the price (0.08 a session a point above 100), and a value of
+    /// 0.0 is left out of the model's digest.
+    ///
+    /// The drag is a push the price takes a session at a time, so a dollar
+    /// move reaches the price over weeks and the forecast prices it as a
+    /// slope of the curve. EIA's contracts 1 and 4 against FRED's
+    /// trade-weighted dollar move together instead: on daily changes over
+    /// 1987 to 2019 the elasticity is -0.69 for contract 1 and -0.66 for
+    /// contract 4, and the slope ln(F4/F1) responds by +0.03; over 21
+    /// sessions it is -1.20 and -1.05. Off zero the dollar's drag is dropped
+    /// and the price carries `(usd / 100)^-e` on its level, the target it
+    /// reverts to included, so a stronger dollar lowers spot and every
+    /// contract at once. In [0, 5].
+    pub oil_dollar_elasticity: f64,
+    /// The sd of oil inventory's daily noise, units at a volatility of 1.0.
+    /// 0.0, on every shipped preset, is the standing 0.5, and a value of 0.0
+    /// is left out of the model's digest. At the shipped 0.5 and
+    /// `oil_inventory_reversion` 0.002 inventory's log deviation from its
+    /// trailing five-year mean has an sd of 0.139 against EIA's 0.087 for US
+    /// crude stocks (WCESTUS1, 1987 to 2024), with a half-life (about 200
+    /// sessions) inside the real 170 to 320; the sd scales with this noise.
+    /// In [0, 5]; the draw is taken either way.
+    pub oil_inventory_noise_sd: f64,
+    /// Whether the forecast's oil sees the price's clamps (35 and 150). A
+    /// switch, 0.0 on every shipped preset and left out of the model's
+    /// digest there: the forecast steps the price's expectation, which the
+    /// clamps never touch, and that is what it publishes.
+    ///
+    /// The clamps are in the law, so a price that reaches one is held there
+    /// and its expectation is lower (or higher) than the unclamped path's.
+    /// Once the long factor and the convenience premium widen the price's
+    /// spread, that gap is a bias the oil futures inherit (row OF4). At 1.0
+    /// the forecast keeps stepping the unclamped expectation and publishes,
+    /// each session, the expectation of the price truncated at the clamps,
+    /// over a normal spread: the short factor's (its reversion and noise)
+    /// plus the level carriers' (the long factor, the premium over
+    /// inventory's spread, the dollar over its own) at the price.
+    pub oil_forecast_clamp: f64,
+    /// The share of the dollar index's gap to its target closed each
+    /// session. 0.0, on every shipped preset, is the standing 0.02, and a
+    /// value of 0.0 is left out of the model's digest.
+    ///
+    /// At 0.02 the dollar's gap has a half-life of 34 sessions. FRED's
+    /// trade-weighted dollar (DTWEXM, 1987 to 2019) has an AR(1) half-life
+    /// of its log level of 729 sessions (0.00095 a session), and 540 to 580
+    /// against its trailing five-year mean. Read with
+    /// `oil_dollar_elasticity`, a dollar that reverts within weeks is one
+    /// the oil forecast expects to unwind, and it prices that as a slope of
+    /// the curve that EIA's contracts do not show.
+    ///
+    /// Off zero the dollar is the sum of a base that reverts at this rate
+    /// and the safe-haven bid (`EconomyState::usd_haven_level`), which takes
+    /// each session's crisis drift and decays at the shipped 0.02: a real
+    /// safe-haven bid unwinds within months, and at the slower rate alone
+    /// the one-sided drift accumulated and held the dollar at its 130 cap.
+    /// In [0, 1].
+    pub usd_mean_reversion: f64,
+    /// The sd of the dollar index's daily noise, points at a volatility of
+    /// 1.0. 0.0, on every shipped preset, is the standing 0.3, and a value
+    /// of 0.0 is left out of the model's digest. DTWEXM's daily log change
+    /// has an sd of 0.0043, 0.43 points at 100; with `usd_mean_reversion`
+    /// at 0.00095 that gives a stationary sd of 9.9 points against the
+    /// series' 0.108 in log over 1987 to 2019. In [0, 5]; the draw is taken
+    /// either way.
+    pub usd_noise_sd: f64,
+    /// The oil price's lower and upper bounds, dollars. 0.0, on every shipped
+    /// preset, is the standing 35 and 150, and a value of 0.0 is left out of
+    /// the model's digest.
+    ///
+    /// At 35 and 150 the price's log range is 1.46, and once the long factor
+    /// and the convenience premium carry it, months pinned at a bound make
+    /// most of the sessions row O2 reads as near a five-year extreme (85 per
+    /// cent on held-out histories). WTI has no hard bounds: EIA's front
+    /// month over 1987 to 2024, deflated by FRED's CPIAUCSL, ran from 0.203
+    /// to 3.44 times its median (a log range of 2.83). The model's target at
+    /// trend growth, 81, does not inflate, so those ratios give 16.4 and 279.
+    /// The forecast's clamp (`oil_forecast_clamp`) reads the same bounds.
+    /// The floor in (0, 35]: the bounds only widen, so they cannot cross.
+    pub oil_price_floor: f64,
+    /// See `oil_price_floor`. 0.0 is the standing 150; in [150, 1000].
+    pub oil_price_ceiling: f64,
     /// The share of the long factor's log level returned to 0 each session,
     /// a weak pull that keeps the random walk off the price's clamps. 0.0,
     /// on every shipped preset, is none. Read only with
@@ -7767,6 +7890,15 @@ impl ModelParams {
             oil_inventory_level_gain: 0.0,
             oil_convenience_yield: 0.0,
             oil_target_drift_sd: 0.0,
+            oil_pushes_in_target: 0.0,
+            oil_noise_log_sd: 0.0,
+            oil_dollar_elasticity: 0.0,
+            oil_inventory_noise_sd: 0.0,
+            oil_forecast_clamp: 0.0,
+            usd_mean_reversion: 0.0,
+            usd_noise_sd: 0.0,
+            oil_price_floor: 0.0,
+            oil_price_ceiling: 0.0,
             oil_target_drift_reversion: 0.0,
             oil_inflation_passthrough: 0.0,
             index_level_listed: 0.0,
@@ -10382,6 +10514,15 @@ impl ModelParams {
             "oil_inventory_level_gain" => self.oil_inventory_level_gain,
             "oil_convenience_yield" => self.oil_convenience_yield,
             "oil_target_drift_sd" => self.oil_target_drift_sd,
+            "oil_pushes_in_target" => self.oil_pushes_in_target,
+            "oil_noise_log_sd" => self.oil_noise_log_sd,
+            "oil_dollar_elasticity" => self.oil_dollar_elasticity,
+            "oil_inventory_noise_sd" => self.oil_inventory_noise_sd,
+            "oil_forecast_clamp" => self.oil_forecast_clamp,
+            "usd_mean_reversion" => self.usd_mean_reversion,
+            "usd_noise_sd" => self.usd_noise_sd,
+            "oil_price_floor" => self.oil_price_floor,
+            "oil_price_ceiling" => self.oil_price_ceiling,
             "oil_target_drift_reversion" => self.oil_target_drift_reversion,
             "oil_inflation_passthrough" => self.oil_inflation_passthrough,
             "index_level_listed" => self.index_level_listed,
@@ -10762,6 +10903,15 @@ impl ModelParams {
             "oil_inventory_level_gain" => out.oil_inventory_level_gain = value,
             "oil_convenience_yield" => out.oil_convenience_yield = value,
             "oil_target_drift_sd" => out.oil_target_drift_sd = value,
+            "oil_pushes_in_target" => out.oil_pushes_in_target = value,
+            "oil_noise_log_sd" => out.oil_noise_log_sd = value,
+            "oil_dollar_elasticity" => out.oil_dollar_elasticity = value,
+            "oil_inventory_noise_sd" => out.oil_inventory_noise_sd = value,
+            "oil_forecast_clamp" => out.oil_forecast_clamp = value,
+            "usd_mean_reversion" => out.usd_mean_reversion = value,
+            "usd_noise_sd" => out.usd_noise_sd = value,
+            "oil_price_floor" => out.oil_price_floor = value,
+            "oil_price_ceiling" => out.oil_price_ceiling = value,
             "oil_target_drift_reversion" => out.oil_target_drift_reversion = value,
             "oil_inflation_passthrough" => out.oil_inflation_passthrough = value,
             "index_level_listed" => out.index_level_listed = value,
@@ -12118,6 +12268,60 @@ impl ModelParams {
                  gives it: set oil_inventory_reversion first.",
                 self.oil_convenience_yield));
         }
+        if !(self.oil_pushes_in_target == 0.0 || self.oil_pushes_in_target == 1.0) {
+            return Err(format!(
+                "oil_pushes_in_target is {}. It is a switch: 0 (the pushes join the price \
+                 that reverts at oil_mean_reversion) or 1 (they decay at the shipped 0.03).",
+                self.oil_pushes_in_target));
+        }
+        if !(0.0..=1.0).contains(&self.usd_mean_reversion) {
+            return Err(format!(
+                "usd_mean_reversion is {}. It is the share of the dollar index's gap to its \
+                 target closed each session, in [0, 1]; 0 is the standing 0.02.",
+                self.usd_mean_reversion));
+        }
+        if !(self.oil_price_floor == 0.0 || (self.oil_price_floor > 0.0 && self.oil_price_floor <= 35.0)) {
+            return Err(format!(
+                "oil_price_floor is {}. It is the oil price's lower bound in dollars, in (0, 35], \
+                 or 0.0 for the standing 35.",
+                self.oil_price_floor));
+        }
+        if !(self.oil_price_ceiling == 0.0 || (150.0..=1000.0).contains(&self.oil_price_ceiling)) {
+            return Err(format!(
+                "oil_price_ceiling is {}. It is the oil price's upper bound in dollars, in \
+                 [150, 1000], or 0.0 for the standing 150.",
+                self.oil_price_ceiling));
+        }
+        if !(0.0..=5.0).contains(&self.usd_noise_sd) {
+            return Err(format!(
+                "usd_noise_sd is {}. It is the sd of the dollar index's daily noise, points, in \
+                 [0, 5]; 0 is the standing 0.3.",
+                self.usd_noise_sd));
+        }
+        if !(self.oil_forecast_clamp == 0.0 || self.oil_forecast_clamp == 1.0) {
+            return Err(format!(
+                "oil_forecast_clamp is {}. It is a switch: 0 (the forecast publishes the \
+                 unclamped expectation) or 1 (the expectation truncated at the clamps).",
+                self.oil_forecast_clamp));
+        }
+        if !(0.0..=5.0).contains(&self.oil_inventory_noise_sd) {
+            return Err(format!(
+                "oil_inventory_noise_sd is {}. It is the sd of oil inventory's daily noise, in \
+                 [0, 5]; 0 is the standing 0.5.",
+                self.oil_inventory_noise_sd));
+        }
+        if !(0.0..=5.0).contains(&self.oil_dollar_elasticity) {
+            return Err(format!(
+                "oil_dollar_elasticity is {}. It is the oil price's elasticity to the dollar \
+                 index as a level, in [0, 5]; 0 is the dollar's daily drag.",
+                self.oil_dollar_elasticity));
+        }
+        if !(0.0..=0.1).contains(&self.oil_noise_log_sd) {
+            return Err(format!(
+                "oil_noise_log_sd is {}. It is the sd of the oil price's daily log change from \
+                 its noise, in [0, 0.1]; 0 is the noise in dollars.",
+                self.oil_noise_log_sd));
+        }
         if !(0.0..=0.1).contains(&self.oil_target_drift_sd) {
             return Err(format!(
                 "oil_target_drift_sd is {}. It is the daily sd of the log of oil's long-term \
@@ -12784,6 +12988,15 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "oil_convenience_yield",
     "oil_target_drift_sd",
     "oil_target_drift_reversion",
+    "oil_pushes_in_target",
+    "oil_noise_log_sd",
+    "oil_dollar_elasticity",
+    "oil_inventory_noise_sd",
+    "oil_forecast_clamp",
+    "usd_mean_reversion",
+    "usd_noise_sd",
+    "oil_price_floor",
+    "oil_price_ceiling",
     "oil_inflation_passthrough",
     "index_level_listed",
     "vix_intraday_live",
@@ -12985,6 +13198,15 @@ pub fn settable_names() -> Vec<&'static str> {
         "oil_convenience_yield",
         "oil_target_drift_sd",
         "oil_target_drift_reversion",
+        "oil_pushes_in_target",
+        "oil_noise_log_sd",
+        "oil_dollar_elasticity",
+        "oil_inventory_noise_sd",
+        "oil_forecast_clamp",
+        "usd_mean_reversion",
+        "usd_noise_sd",
+        "oil_price_floor",
+        "oil_price_ceiling",
         "oil_inflation_passthrough",
         "index_level_listed",
         "vix_intraday_live",

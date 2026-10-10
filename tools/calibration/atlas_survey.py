@@ -663,6 +663,26 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # is a share a session; 0.002 is a half-life of a year and a half.
     "oil_target_drift_sd": (0.0, 0.036),
     "oil_target_drift_reversion": (0.0, 0.002),
+    # A switch, and the short factor's log sd: EIA's 0.017 a session, double
+    # it at the top.
+    "oil_pushes_in_target": (0.0, 1.0),
+    "oil_noise_log_sd": (0.0, 0.034),
+    # The oil curve's elasticity to the dollar as a level: EIA against FRED
+    # gives 0.69 (daily) to 2.3 (broad dollar, 2006 on); 2.4 at the top.
+    "oil_dollar_elasticity": (0.0, 2.4),
+    # Inventory's daily noise: 0.35 matches EIA's deviation sd; the shipped
+    # 0.5 at the top. The forecast's clamp is a switch.
+    "oil_inventory_noise_sd": (0.0, 0.5),
+    # The dollar's reversion: DTWEXM's AR(1) half-life of 729 sessions is
+    # 0.00095; the shipped 0.02 at the top. Its noise: DTWEXM's 0.43 a
+    # session at 100, double it at the top.
+    "usd_mean_reversion": (0.0, 0.02),
+    "usd_noise_sd": (0.0, 0.86),
+    # Oil's bounds: WTI deflated by CPIAUCSL, 1987 to 2024, at the model's
+    # centre of 81 gives 16.4 and 279; the standing 35 and 150 inside.
+    "oil_price_floor": (0.0, 35.0),
+    "oil_price_ceiling": (150.0, 300.0),
+    "oil_forecast_clamp": (0.0, 1.0),
     # The share of oil demand supply answers on the daily step. Bounded by
     # meaning again: 0.0 is the hardcoded zero the reference writes, 1.0 is
     # the value that makes the inventory random walk driftless, and past 1.0

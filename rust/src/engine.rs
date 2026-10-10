@@ -9135,7 +9135,10 @@ impl Engine {
         }
         self.economy = update_economy_daily(&self.economy, &inputs, rng);
         if let Some(next) = oil_drift_next {
-            self.oil_target_drift = next;
+            // A bound that truncated tonight's price moved the long-run level
+            // with it (`EconomyState::oil_bound_log_ratio`), so the factor
+            // does not walk past the bounds while the price is pinned.
+            self.oil_target_drift = next + self.economy.oil_bound_log_ratio;
         }
         if let Some(h) = &held {
             let e = &mut self.economy;
@@ -9507,6 +9510,14 @@ impl Engine {
             oil_convenience_inventory_var: 0.0,
             oil_convenience_inventory_var_before: 0.0,
             oil_target_drift: None,
+            oil_pushes_in_target: self.params.oil_pushes_in_target != 0.0,
+            oil_noise_log_sd: self.params.oil_noise_log_sd,
+            oil_dollar_elasticity: self.params.oil_dollar_elasticity,
+            oil_inventory_noise_sd: self.params.oil_inventory_noise_sd,
+            usd_mean_reversion: self.params.usd_mean_reversion,
+            usd_noise_sd: self.params.usd_noise_sd,
+            oil_price_floor: self.params.oil_price_floor,
+            oil_price_ceiling: self.params.oil_price_ceiling,
             oil_inflation_passthrough: self.params.oil_inflation_passthrough,
             // The phase and growth as an observer reads them tonight,
             // before the step: the same moment the economy's own are
@@ -12664,6 +12675,15 @@ impl Engine {
         // `unemployment_adjustment_half_life` is set.
         if self.params.unemployment_adjustment_half_life != 0.0 {
             hash_f64(&mut buf, e.unemployment_impulse);
+        }
+        // The oil pushes' part of the price, only while
+        // `oil_pushes_in_target` is set.
+        if self.params.oil_pushes_in_target != 0.0 {
+            hash_f64(&mut buf, e.oil_push_level);
+        }
+        // The dollar's safe-haven bid, only while `usd_mean_reversion` is set.
+        if self.params.usd_mean_reversion != 0.0 {
+            hash_f64(&mut buf, e.usd_haven_level);
         }
         // The published GDP growth figure's state, only while
         // `gdp_publication_lag` is set, so every other engine's hash is the

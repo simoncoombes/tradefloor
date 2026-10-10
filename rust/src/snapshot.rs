@@ -1781,6 +1781,12 @@ impl Engine {
         if p.unemployment_adjustment_half_life != 0.0 {
             econ.put("unemployment_impulse", V::Float(economy.unemployment_impulse));
         }
+        if p.oil_pushes_in_target != 0.0 {
+            econ.put("oil_push_level", V::Float(economy.oil_push_level));
+        }
+        if p.usd_mean_reversion != 0.0 {
+            econ.put("usd_haven_level", V::Float(economy.usd_haven_level));
+        }
         if p.gdp_publication_lag != 0.0 {
             let g = self.gdp_publication();
             let mut block = SnapshotMap::new();
@@ -2149,6 +2155,8 @@ impl Engine {
                 p.unemployment_adjustment_half_life,
             ),
             Gated::dial("gdp_publication", "gdp_publication_lag", p.gdp_publication_lag),
+            Gated::dial("oil_push_level", "oil_pushes_in_target", p.oil_pushes_in_target),
+            Gated::dial("usd_haven_level", "usd_mean_reversion", p.usd_mean_reversion),
         ];
         if let Some(message) = key_mismatch("this snapshot's economy", economy, &required, &gated, &[]) {
             return Err(refuse(message));
@@ -2864,6 +2872,12 @@ impl Engine {
         if params.unemployment_adjustment_half_life != 0.0 {
             inner.economy_mut().unemployment_impulse =
                 read_finite(d, "economy.", "unemployment_impulse")?;
+        }
+        if params.oil_pushes_in_target != 0.0 {
+            inner.economy_mut().oil_push_level = read_finite(d, "economy.", "oil_push_level")?;
+        }
+        if params.usd_mean_reversion != 0.0 {
+            inner.economy_mut().usd_haven_level = read_finite(d, "economy.", "usd_haven_level")?;
         }
         let gdp_publication = if params.gdp_publication_lag != 0.0 {
             let block = read_map(d, "economy.", "gdp_publication")?;

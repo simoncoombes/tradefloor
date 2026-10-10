@@ -98,6 +98,31 @@ same with them on as off.
   key of its own (Schwartz and Smith 2000), which moves spot and the whole
   curve alike; the pull returns it toward 0. A snapshot carries
   `oil_target_drift` only under the dial, hashed behind tag 55 only then.
+- `oil_pushes_in_target` and `oil_noise_log_sd` are new dials, 0.0 on every
+  preset and left out of the digest there. The switch splits the oil price
+  into a part that reverts at `oil_mean_reversion` and a part the daily
+  pushes make, which decays at the shipped 0.03, so a slower reversion no
+  longer multiplies each push's long-run effect; the economy carries
+  `oil_push_level` only under it. `oil_noise_log_sd` draws the noise as a
+  share of the price.
+- `oil_dollar_elasticity` is a new dial, 0.0 on every preset and left out of
+  the digest there. Off zero the dollar's daily drag on oil is dropped and
+  the oil price carries `(usd/100)^-e` on its level, so a stronger dollar
+  lowers spot and every contract at once, as EIA's contracts do against
+  FRED's trade-weighted dollar.
+- `oil_inventory_noise_sd` and `oil_forecast_clamp` are new dials, 0.0 on
+  every preset and left out of the digest there: the sd of oil inventory's
+  daily noise (0.0 the standing 0.5), and a switch that has the forecast
+  publish oil's expectation truncated at its clamps.
+- `usd_mean_reversion` and `usd_noise_sd` are new dials, 0.0 on every
+  preset and left out of the digest there: the dollar index's daily
+  reversion share (0.0 the standing 0.02) and its daily noise sd (0.0 the
+  standing 0.3), measured on FRED's trade-weighted dollar. Under the
+  reversion the dollar's safe-haven bid decays at the shipped 0.02 on its
+  own; the economy carries `usd_haven_level` only then.
+- `oil_price_floor` and `oil_price_ceiling` are new dials, 0.0 on every
+  preset and left out of the digest there: oil's bounds, the standing 35
+  and 150 at 0.0, read by the step and by the forecast's clamp.
 
 ### Oil futures
 
