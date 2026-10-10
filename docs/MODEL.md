@@ -1566,7 +1566,12 @@ sessions and a daily log change of 0.0043, so the dollar the oil curve carries
 persists as the real one does rather than unwinding within weeks. Under
 `usd_mean_reversion` the dollar's safe-haven bid is a part of its own that
 decays at the shipped 0.02, so a crisis lifts the dollar for months as it did
-and the bid does not accumulate. `oil_price_floor` and `oil_price_ceiling`
+and the bid does not accumulate. `usd_safe_haven_gain` sets that bid's daily
+drift per VIX point above the threshold (0.0 the standing 0.05, never
+measured): FRED's trade-weighted dollar gains 0.0010 per cent a session per
+point (DTWEXM against CBOE's VIX, 1990 to 2019, se 0.0012) and gives it back
+within 21 sessions, so at 0.001 a crisis barely moves the dollar and the oil
+curve does not price the bid's unwinding as a slope. `oil_price_floor` and `oil_price_ceiling`
 set oil's bounds (0.0 the standing 35 and 150): WTI deflated by CPIAUCSL ran
 0.203 to 3.44 times its median over 1987 to 2024, which at the model's
 centre of 81 is 16.4 and 279.
@@ -1585,6 +1590,7 @@ centre of 81 is 16.4 and 279.
 | `oil_pushes_in_target` | 0 (the pushes revert with the price); 1 | same | not set | at a reversion of 0.03 it is the shipped step; a stated split, not a fit |
 | `usd_mean_reversion` | 0 (0.02); up to 1 | same | not set | FRED DTWEXM, 1987 to 2019: AR(1) half-life of the log level 729 sessions (0.00095); 540 to 580 against the trailing five-year mean |
 | `usd_noise_sd` | 0 (0.3); up to 5 | same | not set | FRED DTWEXM: daily log change sd 0.0043, 0.43 points at 100 |
+| `usd_safe_haven_gain` | 0 (0.05); up to 1 | same | not set | FRED DTWEXM on CBOE VIX, 1990 to 2019: drift 0.0010 per cent a session per VIX point above 25.5 (se 0.0012), unwound within 21 sessions; DTWEXBGS 2006 on: 0.003 |
 | `oil_price_floor`, `oil_price_ceiling` | 0 (35 and 150); the floor in (0, 35], the ceiling in [150, 1000] | same | not set | EIA RCLC1 deflated by FRED CPIAUCSL, 1987 to 2024: 0.203 and 3.44 times the median, at the model's 81 |
 | `oil_inventory_noise_sd` | 0 (0.5); up to 5 | same | not set | EIA WCESTUS1, 1987 to 2024: sd 0.087 of the log deviation from the trailing 260-week mean |
 | `oil_forecast_clamp` | 0 (unclamped); 1 | same | not set | none: the clamps are in the law |

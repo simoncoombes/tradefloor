@@ -678,6 +678,7 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # session at 100, double it at the top.
     "usd_mean_reversion": (0.0, 0.02),
     "usd_noise_sd": (0.0, 0.86),
+    "usd_safe_haven_gain": (0.0, 0.1),
     # Oil's bounds: WTI deflated by CPIAUCSL, 1987 to 2024, at the model's
     # centre of 81 gives 16.4 and 279; the standing 35 and 150 inside.
     "oil_price_floor": (0.0, 35.0),

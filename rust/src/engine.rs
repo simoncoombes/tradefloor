@@ -9516,6 +9516,7 @@ impl Engine {
             oil_inventory_noise_sd: self.params.oil_inventory_noise_sd,
             usd_mean_reversion: self.params.usd_mean_reversion,
             usd_noise_sd: self.params.usd_noise_sd,
+            usd_safe_haven_gain: self.params.usd_safe_haven_gain,
             oil_price_floor: self.params.oil_price_floor,
             oil_price_ceiling: self.params.oil_price_ceiling,
             oil_inflation_passthrough: self.params.oil_inflation_passthrough,

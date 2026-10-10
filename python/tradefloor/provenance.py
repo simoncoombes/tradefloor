@@ -532,6 +532,11 @@ OUT_OF_SCOPE = {
         "inert at 0.0: `update_economy_daily` branches on `== 0.0` and draws "
         "the standing 0.3 a unit of volatility, the same draw either way; at "
         "0.0 it is also left out of the model's digest",
+    "usd_safe_haven_gain":
+        "inert at 0.0: `usd_safe_haven_gain` in economy/daily.rs branches on "
+        "`== 0.0` to the standing 0.05, read by the dollar's step and the "
+        "forecast's expected bid; at 0.0 it is also left out of the model's "
+        "digest",
     "oil_price_floor":
         "inert at 0.0: `oil_bounds` in economy/daily.rs branches on `== 0.0` "
         "to the standing 35; at 0.0 it is also left out of the model's digest",

@@ -350,6 +350,10 @@ pub struct DailyInputs<'a> {
     /// The dollar index's daily noise sd; 0.0 is the standing 0.3. See
     /// `ModelParams::usd_noise_sd`.
     pub usd_noise_sd: f64,
+    /// The dollar's daily drift per VIX point above
+    /// `usd_crisis_vix_threshold`; 0.0 is the standing
+    /// [`USD_SAFE_HAVEN_GAIN`]. See `ModelParams::usd_safe_haven_gain`.
+    pub usd_safe_haven_gain: f64,
     /// The oil price's bounds, dollars; 0.0 is the standing 35 and 150. See
     /// `ModelParams::oil_price_floor`.
     pub oil_price_floor: f64,
@@ -528,6 +532,7 @@ impl<'a> Default for DailyInputs<'a> {
             oil_inventory_noise_sd: 0.0,
             usd_mean_reversion: 0.0,
             usd_noise_sd: 0.0,
+            usd_safe_haven_gain: 0.0,
             oil_price_floor: 0.0,
             oil_price_ceiling: 0.0,
             oil_inflation_passthrough: 0.0,
@@ -1626,6 +1631,17 @@ pub fn inventory_pressure_expected(mean: f64, sd: f64) -> f64 {
 /// The dollar's daily drift per VIX point above `usd_crisis_vix_threshold`.
 pub const USD_SAFE_HAVEN_GAIN: f64 = 0.05;
 
+/// The safe-haven gain the dollar's step and the forecast read: the standing
+/// [`USD_SAFE_HAVEN_GAIN`] at 0.0, or `usd_safe_haven_gain` where set. A
+/// branch, so 0.0 is the literal.
+pub fn usd_safe_haven_gain(dial: f64) -> f64 {
+    if dial == 0.0 {
+        USD_SAFE_HAVEN_GAIN
+    } else {
+        dial
+    }
+}
+
 /// The oil price OPEC's rule defends, and the distance from it past which
 /// a decision is a cut or a raise rather than a small adjustment.
 const OPEC_TARGET: f64 = 80.0;
@@ -2454,7 +2470,7 @@ pub fn update_economy_daily(
     // regime: a crisis is the same crisis whether you watch gold or the
     // dollar. No behaviour changes at the default, where the two agree.
     let safe_haven_drift = if economy.vix > inputs.usd_crisis_vix_threshold {
-        (economy.vix - inputs.usd_crisis_vix_threshold) * USD_SAFE_HAVEN_GAIN
+        (economy.vix - inputs.usd_crisis_vix_threshold) * usd_safe_haven_gain(inputs.usd_safe_haven_gain)
     } else {
         0.0
     };
@@ -4715,6 +4731,33 @@ mod macro_anchors {
             assert!((oil_lognormal_log_truncation(mean, v, (35.0, 150.0)) - trunc / mass).abs() < 1e-6);
         }
         assert_eq!(oil_bounds(16.4, 279.0), (16.4, 279.0));
+    }
+
+    /// `usd_safe_haven_gain`: 0.0 is the standing 0.05 to the bit, and off
+    /// zero the dollar's crisis drift is the dial times the VIX's excess over
+    /// the threshold, on either dollar law, with the same draws.
+    #[test]
+    fn the_safe_haven_gain_sets_the_dollars_crisis_drift() {
+        let mut e = economy();
+        e.vix = 35.0;
+        e.usd_index = 100.0;
+        let day = |g: f64, r: f64| DailyInputs {
+            game_day: MONTH + 3, usd_safe_haven_gain: g, usd_mean_reversion: r, ..Default::default() };
+        let excess = 35.0 - day(0.0, 0.0).usd_crisis_vix_threshold;
+        assert!(excess > 0.0);
+        for r in [0.0, 0.00095] {
+            let shipped = step(&e, day(0.0, r));
+            assert_eq!(shipped.usd_index.to_bits(), step(&e, day(USD_SAFE_HAVEN_GAIN, r)).usd_index.to_bits());
+            let measured = step(&e, day(0.001, r));
+            let gap = shipped.usd_index - measured.usd_index;
+            assert!((gap - (USD_SAFE_HAVEN_GAIN - 0.001) * excess).abs() < 1e-9, "{gap}");
+            if r != 0.0 {
+                assert!((measured.usd_haven_level - 0.001 * excess).abs() < 1e-12);
+            }
+        }
+        // Below the threshold the gain is never read.
+        e.vix = 15.0;
+        assert_eq!(step(&e, day(0.0, 0.0)).usd_index.to_bits(), step(&e, day(0.001, 0.0)).usd_index.to_bits());
     }
 
     /// Under `oil_dollar_elasticity` a stronger dollar lowers the oil price

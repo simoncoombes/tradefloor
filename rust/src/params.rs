@@ -1075,7 +1075,7 @@ pub struct ModelParams {
     ///
     /// Off zero the dollar is the sum of a base that reverts at this rate
     /// and the safe-haven bid (`EconomyState::usd_haven_level`), which takes
-    /// each session's crisis drift and decays at the shipped 0.02: a real
+    /// each session's crisis drift and decays at 0.02 (the dollar's standing reversion): a real
     /// safe-haven bid unwinds within months, and at the slower rate alone
     /// the one-sided drift accumulated and held the dollar at its 130 cap.
     /// In [0, 1].
@@ -1088,6 +1088,21 @@ pub struct ModelParams {
     /// series' 0.108 in log over 1987 to 2019. In [0, 5]; the draw is taken
     /// either way.
     pub usd_noise_sd: f64,
+    /// The dollar's daily drift per VIX point above
+    /// `usd_crisis_vix_threshold`, index points. 0.0, on every shipped
+    /// preset, is the standing 0.05, and a value of 0.0 is left out of the
+    /// model's digest. Read by the dollar's step and by the forecast's
+    /// expected bid.
+    ///
+    /// The standing 0.05 was never measured. FRED's trade-weighted dollar
+    /// against CBOE's VIX, 1990 to 2019, drifts 0.0010 per cent a session
+    /// per VIX point above 25.5 (se 0.0012; DTWEXM, the series the dollar's
+    /// persistence and noise are measured on), 0.003 on DTWEXBGS from 2006,
+    /// and what it gains has unwound within 21 sessions. At 0.05 the bid
+    /// averaged 2.2 points, widened the dollar's log sd within a history to
+    /// 0.087 (DTWEXM 0.071), and tilted the oil curve on the dollar's
+    /// deviation by +0.10 against EIA's +0.014. In [0, 1].
+    pub usd_safe_haven_gain: f64,
     /// The oil price's lower and upper bounds, dollars. 0.0, on every shipped
     /// preset, is the standing 35 and 150, and a value of 0.0 is left out of
     /// the model's digest.
@@ -7897,6 +7912,7 @@ impl ModelParams {
             oil_forecast_clamp: 0.0,
             usd_mean_reversion: 0.0,
             usd_noise_sd: 0.0,
+            usd_safe_haven_gain: 0.0,
             oil_price_floor: 0.0,
             oil_price_ceiling: 0.0,
             oil_target_drift_reversion: 0.0,
@@ -10521,6 +10537,7 @@ impl ModelParams {
             "oil_forecast_clamp" => self.oil_forecast_clamp,
             "usd_mean_reversion" => self.usd_mean_reversion,
             "usd_noise_sd" => self.usd_noise_sd,
+            "usd_safe_haven_gain" => self.usd_safe_haven_gain,
             "oil_price_floor" => self.oil_price_floor,
             "oil_price_ceiling" => self.oil_price_ceiling,
             "oil_target_drift_reversion" => self.oil_target_drift_reversion,
@@ -10910,6 +10927,7 @@ impl ModelParams {
             "oil_forecast_clamp" => out.oil_forecast_clamp = value,
             "usd_mean_reversion" => out.usd_mean_reversion = value,
             "usd_noise_sd" => out.usd_noise_sd = value,
+            "usd_safe_haven_gain" => out.usd_safe_haven_gain = value,
             "oil_price_floor" => out.oil_price_floor = value,
             "oil_price_ceiling" => out.oil_price_ceiling = value,
             "oil_target_drift_reversion" => out.oil_target_drift_reversion = value,
@@ -12298,6 +12316,12 @@ impl ModelParams {
                  [0, 5]; 0 is the standing 0.3.",
                 self.usd_noise_sd));
         }
+        if !(0.0..=1.0).contains(&self.usd_safe_haven_gain) {
+            return Err(format!(
+                "usd_safe_haven_gain is {}. It is the dollar's daily drift per VIX point above \
+                 usd_crisis_vix_threshold, index points, in [0, 1]; 0 is the standing 0.05.",
+                self.usd_safe_haven_gain));
+        }
         if !(self.oil_forecast_clamp == 0.0 || self.oil_forecast_clamp == 1.0) {
             return Err(format!(
                 "oil_forecast_clamp is {}. It is a switch: 0 (the forecast publishes the \
@@ -12995,6 +13019,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "oil_forecast_clamp",
     "usd_mean_reversion",
     "usd_noise_sd",
+    "usd_safe_haven_gain",
     "oil_price_floor",
     "oil_price_ceiling",
     "oil_inflation_passthrough",
@@ -13205,6 +13230,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "oil_forecast_clamp",
         "usd_mean_reversion",
         "usd_noise_sd",
+        "usd_safe_haven_gain",
         "oil_price_floor",
         "oil_price_ceiling",
         "oil_inflation_passthrough",

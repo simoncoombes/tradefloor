@@ -1029,7 +1029,7 @@ impl Engine {
                 } else {
                     lognormal_excess(vix, spread, k)
                 };
-                let haven = crate::economy::daily::USD_SAFE_HAVEN_GAIN * (excess - at_mean);
+                let haven = crate::economy::daily::usd_safe_haven_gain(p.usd_safe_haven_gain) * (excess - at_mean);
                 // Under `oil_dollar_elasticity` the law rescales the oil
                 // price's reverting part by the day's whole dollar move, the
                 // bid included, so the expected bid's excess over the bid at

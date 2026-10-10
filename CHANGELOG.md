@@ -120,6 +120,11 @@ same with them on as off.
   standing 0.3), measured on FRED's trade-weighted dollar. Under the
   reversion the dollar's safe-haven bid decays at the shipped 0.02 on its
   own; the economy carries `usd_haven_level` only then.
+- `usd_safe_haven_gain` is a new dial, 0.0 on every preset and left out of
+  the digest there: the dollar's daily drift per VIX point above
+  `usd_crisis_vix_threshold` (0.0 the standing 0.05), read by the dollar's
+  step and by the forecast's expected bid. FRED DTWEXM against CBOE's VIX
+  measures 0.001.
 - `oil_price_floor` and `oil_price_ceiling` are new dials, 0.0 on every
   preset and left out of the digest there: oil's bounds, the standing 35
   and 150 at 0.0, read by the step and by the forecast's clamp.
