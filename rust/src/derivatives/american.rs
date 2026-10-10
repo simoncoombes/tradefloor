@@ -2,9 +2,8 @@
 //! dividends, its early-exercise boundary, and the exercise decision the
 //! option dealer will take from it.
 //!
-//! Library code for pt-v22's single-stock options (phase 3 of
-//! `programme/PLAN-pt-v22.md`). Nothing in the engine calls it yet: no
-//! switch reads it, no state holds it, and no draw is taken, so every preset
+//! Library code for pt-v22's single-stock options (its third phase).
+//! Nothing in the engine calls it yet: no switch reads it, no state holds it, and no draw is taken, so every preset
 //! is bit-identical with it compiled in.
 //!
 //! # The lattice
