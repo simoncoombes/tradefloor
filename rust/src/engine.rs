@@ -9970,6 +9970,11 @@ impl Engine {
         if !(excess > 0.0) {
             return 0.0;
         }
+        // The anchor's pull undone above the knee (`vix_stress_premium_undo`);
+        // guarded, so with the switch at 0.0 this is the capped hinge exactly.
+        if p.vix_stress_premium_undo != 0.0 {
+            return p.vix_anchor_weight * excess;
+        }
         let cap = p.vix_stress_premium_cap;
         cap * (1.0 - crate::mathx::exp(-p.vix_stress_premium * excess / cap))
     }

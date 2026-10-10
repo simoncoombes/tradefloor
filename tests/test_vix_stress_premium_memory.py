@@ -68,3 +68,36 @@ def test_out_of_range_is_refused():
     for v in (-0.1, 1.5, float("nan")):
         with pytest.raises(ValueError):
             tf.ModelParams.from_preset("pt-v20", vix_stress_premium_memory=v)
+
+
+# The anchor's pull undone above the knee (`vix_stress_premium_undo`).
+
+def test_undo_is_off_on_every_preset_and_silent():
+    for preset in tf.preset_names():
+        assert tf.ModelParams.from_preset(preset).to_dict()["vix_stress_premium_undo"] == 0.0
+    assert "vix_stress_premium_undo" in set(tf.ModelParams.digest_silent_at_zero())
+    assert tf.ModelParams.from_preset("pt-v21", vix_stress_premium_undo=0.0).fingerprint == "pt-v21"
+
+
+def test_undo_at_zero_is_the_hinge():
+    assert record(engine(**LIVE, vix_stress_premium_undo=0.0)) == record(engine(**LIVE))
+
+
+def test_undo_is_the_anchor_weight_above_the_knee_and_moves_only_the_quote():
+    import math
+    base = record(engine(**LIVE))
+    e = engine(**LIVE, vix_stress_premium_undo=1.0)
+    w = e.params().to_dict()["vix_anchor_weight"] if hasattr(e, "params") else \
+        tf.ModelParams.from_preset("pt-v20").to_dict()["vix_anchor_weight"]
+    assert w > 0.0
+    moved = 0
+    for i in range(120):
+        e.run_days(1)
+        m = e.state_snapshot()["vix_stress_memory"]
+        state = e.economy()["vix"]
+        want = state * math.exp(w * max(0.0, m - LIVE["vix_stress_premium_knee"]))
+        assert e.macro_fields["vix"] == pytest.approx(want, rel=1e-12)
+        assert state == base[i][1]
+        assert struct.unpack("<6d", e.prices()[:48]) == base[i][2]
+        moved += e.macro_fields["vix"] != base[i][0]
+    assert moved > 0

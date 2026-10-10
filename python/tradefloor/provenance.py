@@ -501,6 +501,11 @@ OUT_OF_SCOPE = {
         "model's digest",
     # The VIX's fear memory (pt-v22 phase 1, the VIX law), inert on every
     # shipped preset.
+    "vix_stress_premium_undo":
+        "unread while `vix_stress_premium` is 0.0; at 0.0 the premium is the "
+        "capped hinge exactly (a branch on the switch in "
+        "`vix_stress_premium_at`); at 0.0 it is also left out of the model's "
+        "digest",
     "vix_stress_premium_memory":
         "unread while `vix_stress_premium` is 0.0; at 0.0 the stress memory "
         "steps at `vix_anchor_memory`'s rate exactly (`vix_stress_memory_rate`), "

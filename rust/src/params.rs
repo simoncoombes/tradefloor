@@ -2421,6 +2421,26 @@ pub struct ModelParams {
     /// anchor's memory is untouched. Read only with `vix_stress_premium`
     /// non-zero. In [0, 1].
     pub vix_stress_premium_memory: f64,
+    /// The stress premium as the anchor's own pull, undone above the knee.
+    /// 0.0, which every preset carries, is the shipped form, the capped hinge
+    /// `cap * (1 - exp(-g * max(0, m - knee) / cap))`. Off zero (a switch, in
+    /// [0, 1]; any value above 0.0 is on) the premium is
+    /// `vix_anchor_weight * max(0, m - knee)`, uncapped (the quote still never
+    /// passes `vix_ceiling`), and `vix_stress_premium`'s gain and the cap are
+    /// not read.
+    ///
+    /// The anchor pulls the VIX's target down by `exp(-a s)` against its slow
+    /// memory `s`, which the stress memory `m` equals in a free run. The
+    /// premium exists to give the quote back what that pull takes in stress.
+    /// The hinge saturates at its cap, so in a long spell the state keeps
+    /// falling against realised volatility and the quote falls with it: the
+    /// tape's VIX over trailing 21-session realised volatility is flat in the
+    /// spell's age (0.80 to 0.88 from the first session to the 63rd and
+    /// after, S&P 500 and ^VIX 1990-2025), where the hinge's quote falls
+    /// from 0.95 to 0.59 on the pt-v22 VIX law. This form undoes the pull
+    /// beyond the knee exactly, with the anchor's weight and no fitted
+    /// number. Read only with `vix_stress_premium` non-zero.
+    pub vix_stress_premium_undo: f64,
     /// The VIX's fear memory: the share of the VIX's log excursion over its
     /// target that the target takes up each session. 0.0, which every preset
     /// carries, is off: the target is the anchor's and no state is written.
@@ -7804,6 +7824,7 @@ impl ModelParams {
             vix_stress_premium_knee: 0.0,
             vix_stress_premium_cap: 0.0,
             vix_stress_premium_memory: 0.0,
+            vix_stress_premium_undo: 0.0,
             vix_fear_uptake: 0.0,
             vix_fear_half_life: 0.0,
             fed_put_gain: 0.0,
@@ -10414,6 +10435,7 @@ impl ModelParams {
             "vix_stress_premium_knee" => self.vix_stress_premium_knee,
             "vix_stress_premium_cap" => self.vix_stress_premium_cap,
             "vix_stress_premium_memory" => self.vix_stress_premium_memory,
+            "vix_stress_premium_undo" => self.vix_stress_premium_undo,
             "vix_fear_uptake" => self.vix_fear_uptake,
             "vix_fear_half_life" => self.vix_fear_half_life,
             "fed_put_gain" => self.fed_put_gain,
@@ -10789,6 +10811,7 @@ impl ModelParams {
             "vix_stress_premium_knee" => out.vix_stress_premium_knee = value,
             "vix_stress_premium_cap" => out.vix_stress_premium_cap = value,
             "vix_stress_premium_memory" => out.vix_stress_premium_memory = value,
+            "vix_stress_premium_undo" => out.vix_stress_premium_undo = value,
             "vix_fear_uptake" => out.vix_fear_uptake = value,
             "vix_fear_half_life" => out.vix_fear_half_life = value,
             "fed_put_gain" => out.fed_put_gain = value,
@@ -11675,6 +11698,12 @@ impl ModelParams {
                 "vix_stress_premium_memory is {}. It is the stress memory's per-session \
                  rate, in [0, 1]; 0 is the anchor's rate (vix_anchor_memory).",
                 self.vix_stress_premium_memory));
+        }
+        if !(self.vix_stress_premium_undo >= 0.0 && self.vix_stress_premium_undo <= 1.0) {
+            return Err(format!(
+                "vix_stress_premium_undo is {}. It is a switch in [0, 1]: off at 0, and \
+                 any value above 0 makes the premium the anchor's pull above the knee.",
+                self.vix_stress_premium_undo));
         }
         if self.vix_stress_premium != 0.0 {
             if self.vix_stress_premium_cap == 0.0 {
@@ -12665,6 +12694,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "vix_stress_premium",
     "vix_stress_premium_cap",
     "vix_stress_premium_memory",
+    "vix_stress_premium_undo",
     "vix_stress_premium_knee",
     "vix_fear_uptake",
     "vix_fear_half_life",
@@ -12956,6 +12986,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "vix_stress_premium_knee",
         "vix_stress_premium_cap",
         "vix_stress_premium_memory",
+        "vix_stress_premium_undo",
         "vix_fear_uptake",
         "vix_fear_half_life",
         "fed_put_gain",

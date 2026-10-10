@@ -154,6 +154,11 @@ same with them on as off.
   forecast; the anchor's memory, the VIX state and every price are
   untouched, so only the published quote moves. Every known-answer digest is
   where it was.
+- `vix_stress_premium_undo` is a new switch, 0.0 on every preset and left
+  out of the digest there. On, the published VIX's premium is the anchor's
+  pull undone above the knee, `vix_anchor_weight * max(0, m - knee)`, in
+  place of the capped hinge; the gain and the cap are then unread. Only the
+  quote moves.
 
 ### The VIX's fear memory
 
