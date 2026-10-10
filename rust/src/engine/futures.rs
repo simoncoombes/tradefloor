@@ -415,10 +415,10 @@ impl FuturesMemoryLaw {
     }
 }
 
-/// `futures_impact_memory`: no contract the house sells (or buys) against
-/// the memory's lean is priced better than the memory's own price once
-/// that contract is in it, the equity book's `MemoryBound` on the
-/// contract's grid. `reference` is the contract's price now, which carries
+/// `futures_impact_memory`: no contract the house sells or buys is priced
+/// better than the memory's own price once that contract is in it, the
+/// equity book's `MemoryBound` on the contract's grid, applied on both
+/// sides. `reference` is the contract's price now, which carries
 /// `booked`, the displacement the last step put in it as a log price;
 /// `scale` turns a displacement of the memory into one of the price (the
 /// convergence on the index as the contract expires, and index over price).
@@ -823,17 +823,17 @@ impl Engine {
         remove_front(&mut book, Side::Sell, MARKET_MAKER_ID, c.taken[TAKEN_MAKER_ASK]);
         remove_front(&mut book, Side::Buy, DEPTH_OWNER, c.taken[TAKEN_DEPTH_BID]);
         remove_front(&mut book, Side::Sell, DEPTH_OWNER, c.taken[TAKEN_DEPTH_ASK]);
-        // `futures_impact_memory`: against the memory's lean, no house
-        // contract is better than the memory's price after it, so selling
-        // back walks the displacement down rather than cashing it at the
-        // spread. Only with flow in the memory; a fresh book is the book.
+        // `futures_impact_memory`: no house contract on either side is
+        // better than the memory's price after it, the book of Alfonsi,
+        // Fruth and Schied (2010) with the maker's ladder over it: an order
+        // pays the curve it books, and selling back walks it down.
         if self.futures_memory_on() {
             let row = self.futures_memory_row(slot);
             let law = FuturesMemoryLaw::of(&self.params, sigma);
             let position = crate::agent_book::memory_position(&self.params, &row)
                 + if volume > 0.0 { row[crate::agent_book::MEMORY_FLOW] / volume } else { 0.0 };
             let scale = convergence(v.sessions) * v.index / v.price;
-            if position != 0.0 && volume > 0.0 && v.price > 0.0 && scale > 0.0 {
+            if volume > 0.0 && v.price > 0.0 && scale > 0.0 && law.sigma > 0.0 && law.y > 0.0 {
                 let bound = FuturesMemoryBound {
                     law,
                     volume,
@@ -843,11 +843,8 @@ impl Engine {
                     scale,
                     tick: spec.tick,
                 };
-                if position > 0.0 {
-                    book.bids = bound.apply(std::mem::take(&mut book.bids), Side::Buy, &symbol);
-                } else {
-                    book.asks = bound.apply(std::mem::take(&mut book.asks), Side::Sell, &symbol);
-                }
+                book.bids = bound.apply(std::mem::take(&mut book.bids), Side::Buy, &symbol);
+                book.asks = bound.apply(std::mem::take(&mut book.asks), Side::Sell, &symbol);
             }
         }
         for o in &self.futures.book.orders {
@@ -1134,9 +1131,9 @@ impl Engine {
     /// memories decay (`impact_memory_half_life`,
     /// `impact_memory_slow_half_life`; none at night, so it holds over the
     /// night as the equity memory does); the flow against the house since
-    /// the last step, over the daily volume, is added to both, moving the
-    /// displacement at most `(1 + delta)` times what it paid per contract;
-    /// and the contract's mark on the basis is the displacement, in index
+    /// the last step, over the daily volume, is added to both (the book
+    /// priced it on the curve it moves along, so no cap is needed); and the
+    /// contract's mark on the basis is the displacement, in index
     /// basis points. An empty memory reads nothing.
     fn futures_memory_step(&mut self, open_now: bool) {
         use crate::agent_book::{
@@ -1171,21 +1168,14 @@ impl Engine {
             let mut next = row;
             next[MEMORY_FAST] = snap(row[MEMORY_FAST] * fast);
             next[MEMORY_SLOW] = if slow_on { snap(row[MEMORY_SLOW] * slow) } else { 0.0 };
-            let at = memory_position(&self.params, &next);
-            let decayed = law.displacement(at);
             next[MEMORY_PAID] = 0.0;
             next[MEMORY_FLOW] = 0.0;
+            // No cap on what the flow adds: the book priced it on the
+            // curve it moves along (`futures_book`), so it paid for it.
             if net != 0.0 {
-                let mut add = net;
-                let cap = (1.0 + law.delta) * row[MEMORY_PAID] / shares.abs();
-                let uncapped = law.displacement(at + add);
-                if (uncapped - decayed).abs() > cap {
-                    let target = decayed + if net > 0.0 { cap } else { -cap };
-                    add = law.inverse(target) - at;
-                }
-                next[MEMORY_FAST] += add;
+                next[MEMORY_FAST] += net;
                 if slow_on {
-                    next[MEMORY_SLOW] += add;
+                    next[MEMORY_SLOW] += net;
                 }
             }
             let d = law.displacement(memory_position(&self.params, &next));
