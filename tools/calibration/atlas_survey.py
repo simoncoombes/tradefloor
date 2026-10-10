@@ -652,6 +652,9 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # applied both sides, and 2.0 is twice it.
     "oil_inventory_reversion": (0.0, 0.01),
     "oil_inflation_passthrough": (0.0, 2.0),
+    "oil_mean_reversion": (0.0, 0.03),
+    "oil_noise_sd": (0.0, 3.0),
+    "oil_inventory_level_gain": (0.0, 100.0),
     # The share of oil demand supply answers on the daily step. Bounded by
     # meaning again: 0.0 is the hardcoded zero the reference writes, 1.0 is
     # the value that makes the inventory random walk driftless, and past 1.0

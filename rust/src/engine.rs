@@ -9503,6 +9503,9 @@ impl Engine {
             unemployment_okun_coefficient: self.params.unemployment_okun_coefficient,
             unemployment_natural_rate: self.params.unemployment_natural_rate,
             oil_inventory_reversion: self.params.oil_inventory_reversion,
+            oil_mean_reversion: self.params.oil_mean_reversion,
+            oil_noise_sd: self.params.oil_noise_sd,
+            oil_inventory_level_gain: self.params.oil_inventory_level_gain,
             oil_inflation_passthrough: self.params.oil_inflation_passthrough,
             // The phase and growth as an observer reads them tonight,
             // before the step: the same moment the economy's own are

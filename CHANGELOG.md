@@ -76,6 +76,17 @@ same with them on as off.
   trades a contract by its symbol. The scorecard's impact leaves contracts
   out: it reads the names' prices, which no contract moves.
 
+### The oil law
+
+- `oil_mean_reversion`, `oil_noise_sd` and `oil_inventory_level_gain` are
+  new dials, 0.0 on every preset and left out of the digest there, each a
+  branch to the standing oil step at 0.0. Off zero the oil price closes the
+  dial's share of its gap to the target a session in place of 0.03, draws
+  its noise at the dial's sd in place of 2.0, and takes inventory's pressure
+  on its level (the gain times the pressure's change) in place of a daily
+  push. The forecast steps the same law. Every known-answer digest is where
+  it was.
+
 ### Oil futures
 
 - `futures_oil_listed` is a new dial, 0.0 on every preset and left out of

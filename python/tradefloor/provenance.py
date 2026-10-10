@@ -499,6 +499,22 @@ OUT_OF_SCOPE = {
         "projection fitted on the model's held-out histories by "
         "tools/calibration/margin_dials.py; at 0.0 it is also left out of the "
         "model's digest",
+    # The oil law (pt-v22, decision 3), inert on every shipped preset: each a
+    # branch to the standing arithmetic at 0.0.
+    "oil_mean_reversion":
+        "inert at 0.0: `update_economy_daily` in economy/daily.rs branches on "
+        "`== 0.0` and closes the standing 0.03 of oil's gap to its target, and "
+        "the forecast's oil spread keeps 0.97; at 0.0 it is also left out of "
+        "the model's digest",
+    "oil_noise_sd":
+        "inert at 0.0: `update_economy_daily` branches on `== 0.0` and draws "
+        "the standing 2.0 a unit of volatility, the same draw either way; at "
+        "0.0 it is also left out of the model's digest",
+    "oil_inventory_level_gain":
+        "inert at 0.0: `update_economy_daily` branches on `== 0.0` and adds "
+        "inventory's pressure each session as the shipped step does, and the "
+        "forecast's expected push is the standing one; at 0.0 it is also left "
+        "out of the model's digest",
     # The VIX's fear memory (pt-v22 phase 1, the VIX law), inert on every
     # shipped preset.
     "vix_fear_uptake":

@@ -853,6 +853,9 @@ PARAM_SPECS: dict[str, dict] = {
     "unemployment_natural_rate": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 8.0)},
     "oil_inventory_reversion": {"kind": "abs", "step_unit": 0.0005, "hard_range": (0.0, 1.0)},
     "oil_inflation_passthrough": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 3.0)},
+    "oil_mean_reversion": {"kind": "abs", "step_unit": 0.0005, "hard_range": (0.0, 1.0)},
+    "oil_noise_sd": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 10.0)},
+    "oil_inventory_level_gain": {"kind": "abs", "step_unit": 5.0, "hard_range": (0.0, 2520.0)},
     "fear_greed_published_inputs": {"kind": "abs", "step_unit": 1.0,
                                     "hard_range": (0.0, 1.0), "derived": False},
     # A switch whose identity is the value: 1.0 prices a macro decision the

@@ -315,6 +315,15 @@ pub struct DailyInputs<'a> {
     /// both sides, as a multiple of the shipped 0.01 a dollar. 0.0 is the
     /// shipped three-way branch. See `ModelParams::oil_inflation_passthrough`.
     pub oil_inflation_passthrough: f64,
+    /// The share of oil's gap to its target closed each session. 0.0 is the
+    /// shipped 0.03. See `ModelParams::oil_mean_reversion`.
+    pub oil_mean_reversion: f64,
+    /// The sd of oil's daily noise, dollars at a volatility of 1.0. 0.0 is
+    /// the shipped 2.0. See `ModelParams::oil_noise_sd`.
+    pub oil_noise_sd: f64,
+    /// Inventory's pressure on oil's level, sessions. 0.0 is the shipped
+    /// daily push. See `ModelParams::oil_inventory_level_gain`.
+    pub oil_inventory_level_gain: f64,
     /// The business-cycle phase and the GDP growth (percent) the fear/greed
     /// index reads, as PUBLISHED (`ModelParams::fear_greed_published_inputs`),
     /// or `None` for the economy's own, as it always read them.
@@ -476,6 +485,9 @@ impl<'a> Default for DailyInputs<'a> {
             unemployment_okun_coefficient: 0.0,
             unemployment_natural_rate: 0.0,
             oil_inventory_reversion: 0.0,
+            oil_mean_reversion: 0.0,
+            oil_noise_sd: 0.0,
+            oil_inventory_level_gain: 0.0,
             oil_inflation_passthrough: 0.0,
             fear_greed_published: None,
             yields: YieldDials::default(),
@@ -2004,7 +2016,13 @@ pub fn update_economy_daily(
     };
     new_state.oil_inventory_level = new_oil_inventory;
 
-    let oil_inventory_pressure = inventory_pressure(new_oil_inventory);
+    // `oil_inventory_level_gain`: a branch, so 0.0 is the push that stood;
+    // off it the pressure moves the level by its change.
+    let oil_inventory_pressure = if inputs.oil_inventory_level_gain == 0.0 {
+        inventory_pressure(new_oil_inventory)
+    } else {
+        inputs.oil_inventory_level_gain * (inventory_pressure(new_oil_inventory) - inventory_pressure(oil_inventory))
+    };
 
     // Summer driving season peaks ~day 180, winter valley ~day 90.
     //
@@ -2085,8 +2103,14 @@ pub fn update_economy_daily(
             1.0 + (1.0 - g) * oil_seasonal_amplitude,
         )
     };
-    let oil_mean_rev = (oil_target - economy.oil_price) * 0.03;
-    let oil_volatility = 2.0 * volatility;
+    // `oil_mean_reversion` and `oil_noise_sd`: branches, so 0.0 multiplies
+    // by the standing 0.03 and 2.0 as the reference always did.
+    let oil_mean_rev = if inputs.oil_mean_reversion == 0.0 {
+        (oil_target - economy.oil_price) * 0.03
+    } else {
+        (oil_target - economy.oil_price) * inputs.oil_mean_reversion
+    };
+    let oil_volatility = if inputs.oil_noise_sd == 0.0 { 2.0 * volatility } else { inputs.oil_noise_sd * volatility };
     new_state.oil_price = clamp(
         (economy.oil_price
             + oil_mean_rev
@@ -4265,6 +4289,41 @@ mod macro_anchors {
         let off = step(&e, day);
         let on = step(&e, DailyInputs { oil_inventory_reversion: 0.01, ..day });
         assert!((on.oil_inventory_level - off.oil_inventory_level - 0.4).abs() < 1e-12);
+    }
+
+    /// The oil law's reversion and noise at their standing values are the
+    /// branch to the bit, and off them the reversion closes its share of the
+    /// gap; the inventory level effect moves the price by the change in the
+    /// pressure.
+    #[test]
+    fn the_oil_laws_dials_branch_at_their_standing_values_and_act_as_stated() {
+        let mut e = economy();
+        e.oil_price = 110.0;
+        let day = DailyInputs { game_day: MONTH + 3, ..Default::default() };
+        let off = step(&e, day);
+        let same = step(&e, DailyInputs { oil_mean_reversion: 0.03, oil_noise_sd: 2.0, ..day });
+        assert_eq!(same.oil_price.to_bits(), off.oil_price.to_bits());
+        // The same draws, so slowing the reversion moves the price by the
+        // reversion's change alone: 0.03 - 0.0035 of the gap to the target,
+        // times the seasonal factor the level carries.
+        let slow = step(&e, DailyInputs { oil_mean_reversion: 0.0035, ..day });
+        assert!(slow.oil_price > off.oil_price);
+        // Inventory inside its dead zone: no pressure either way.
+        e.oil_inventory_level = 50.0;
+        let flat_off = step(&e, day);
+        let flat_on = step(&e, DailyInputs { oil_inventory_level_gain: 30.0, ..day });
+        assert_eq!(flat_on.oil_price.to_bits(), flat_off.oil_price.to_bits());
+        // Below it, the standing step adds the pressure; the level form adds
+        // the gain times its change, which is 0 for an inventory that does
+        // not move into a new pressure.
+        e.oil_inventory_level = 30.0;
+        let push = step(&e, day);
+        let level = step(&e, DailyInputs { oil_inventory_level_gain: 30.0, ..day });
+        let p_new = inventory_pressure(push.oil_inventory_level);
+        let moved = 30.0 * (p_new - inventory_pressure(30.0)) - p_new;
+        // Up to the seasonal factor on the level, within 3 per cent of 1.
+        let ratio = (level.oil_price - push.oil_price) / moved;
+        assert!((ratio - 1.0).abs() <= 0.031, "{ratio}");
     }
 
     /// The shipped pass-through pays a rise from 75 and not the matching

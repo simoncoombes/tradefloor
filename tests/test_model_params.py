@@ -937,6 +937,12 @@ PERTURBATIONS = [
     ("unemployment_natural_rate", 4.5, True),
     ("oil_inventory_reversion", 0.002, True),
     ("oil_inflation_passthrough", 1.0, True),
+    # The oil law's reversion, noise and inventory level effect (pt-v22, the
+    # oil law), each a branch at 0.0 on every preset. LIVE: each moves the
+    # oil price the burn-in's inflation and the bank read.
+    ("oil_mean_reversion", 0.0035, True),
+    ("oil_noise_sd", 1.4, True),
+    ("oil_inventory_level_gain", 30.0, True),
     # INERT by construction: nothing a price reads is downstream of the
     # index (tests/test_fear_greed_published.py). RE-VALUED 2026-09-26: 1.0
     # is pt-v20's own value since its graded arm, so the row perturbs back
@@ -1915,6 +1921,13 @@ ECONOMY_STREAM_MOVERS = frozenset({
     # follow the path the two dials move. Both were here at 0.8.0 and left
     # with pt-v20's first composition.
     "oil_supply_response", "oil_opec_symmetry",
+    # The oil law (pt-v22, 2026-10-09), measured on this probe: the reversion
+    # at 0.0035 and the inventory level effect at 30 each move the economy
+    # stream and not the market stream. Each moves the burn-in's oil price,
+    # and the OPEC decision's conditional draws (economy/daily.rs: 0 on an
+    # ordinary day, 1 to 3 on a decision day by the price band) follow the
+    # band the price is in. The noise's scale at 1.4 moves no draw count.
+    "oil_mean_reversion", "oil_inventory_level_gain",
     # The risk-management cut (r13 macro-clock, 2026-09-26), measured on
     # this probe: `fed_growth_cut` 2.0 moves the economy stream by +34 draws
     # (9172 to 9206), the market stream by 0. It acts on the 755-day

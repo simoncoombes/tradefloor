@@ -1512,6 +1512,22 @@ of $0.5 / \sqrt{2\kappa}$. With `oil_inflation_passthrough` $c > 0$ the
 pass-through is $\Omega = 0.01\,c\,(o - 81)$, where 81 is oil's reversion
 target at the 2 per cent trend growth Okun's law pivots on.
 
+Three dials reach the oil price's own step, each 0.0 on every shipped preset
+and a branch to the step above at 0.0. With `oil_mean_reversion` $\lambda >
+0$ the price closes $\lambda$ of its gap to the target a session in place of
+0.03, and with `oil_noise_sd` $\sigma > 0$ its noise is $\sigma$ dollars a
+unit of volatility in place of 2. Futures curves put the reversion of oil
+shocks far slower than 0.03, a half-life of 23 sessions: Bessembinder,
+Coughenour, Seguin and Smoller (Journal of Finance 50(1), 1995) find 44 per
+cent of a spot shock reversed over eight months, about 0.0035 a session,
+and Schwartz (Journal of Finance 52(3), 1997) a reversion of about a year.
+With `oil_inventory_level_gain` $G > 0$ inventory's pressure $p(I)$ moves
+the price by $G\,(p(I') - p(I))$ a session in place of $p(I')$, so a
+shortage raises the price at once and the premium unwinds as inventory
+refills: the convenience yield of the theory of storage, low stocks with a
+curve in backwardation. The forecast steps the same law, so its expected
+oil, and the oil futures priced on it, follow each dial.
+
 | Dial | pt-v20 | pt-v21 | Kind | Source |
 |---|---|---|---|---|
 | `unemployment_okun_coefficient` $\beta$ | 0 (off); up to 2.4 | 0.75 | not set | Okun (1962) about 1/3; Ball, Leigh and Loungani (2017) about 0.4 to 0.5 for the US |
@@ -1519,6 +1535,9 @@ target at the 2 per cent trend growth Okun's law pivots on.
 | `unemployment_natural_rate` $u_0$ | 0 (4.0); up to 8 | same | not set | FRED NROU: 4.40 to 4.75 over 2015 to 2026, mean 4.97 over 1990 to 2026 |
 | `oil_inventory_reversion` $\kappa$ | 0 (off); up to 1 | 0.002 | not set | the theory of storage (Working 1949; Brennan 1958; Pindyck 1994); the coefficient is not identified there |
 | `oil_inflation_passthrough` $c$ | 0 (off); up to 3 | 1 | not set | Kilian and Vigfusson (2011) find no asymmetry; 1.0 is the shipped 0.01 a dollar above 80 |
+| `oil_mean_reversion` $\lambda$ | 0 (0.03); up to 1 | same | not set | Bessembinder et al. (1995), about 0.0035 a session; Schwartz (1997) |
+| `oil_noise_sd` $\sigma$ | 0 (2.0); up to 10 | same | not set | set with $\lambda$: the stationary spread before the clamps is $\sigma / \sqrt{2\lambda}$ |
+| `oil_inventory_level_gain` $G$ | 0 (the daily push); up to 2520 | same | not set | Gorton, Hayashi and Rouwenhorst (2013): low inventories, a high spot and backwardation |
 
 ### The fear and greed index
 
