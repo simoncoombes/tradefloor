@@ -20,7 +20,59 @@ priced at its carry fair value plus a basis, with its own book, and settled
 on the index of its expiry session's opening prints. Stock prices are the
 same with them on as off.
 
+Three more switches, off on every preset, list European index options,
+quoted by one dealer from an arbitrage-free surface.
+
 <!-- release-note-ends -->
+
+### Index options
+
+- `surface_ssvi`, `options_index_listed` and `option_dealer_spread` are new
+  switches, with `surface_skew_physical`, `surface_skew_physical_slope`,
+  `surface_skew_premium`, `surface_curvature`, `surface_curvature_exponent`,
+  `surface_term_premium_short`, `surface_term_premium_long` and
+  `surface_earnings_weight` beside them, all 0.0 on every preset and left out
+  of the digest there. None is fitted yet.
+- The surface is SSVI (Gatheral and Jacquier 2014) with the paper's
+  no-arbitrage conditions checked at every knot. Its 21-session strip,
+  priced by the Cboe VIX formula, returns the VIX (row SV1, by
+  construction); its correlation is solved so the strip's Cboe SKEW
+  skewness is the physical skew at the VIX plus a premium; its term
+  structure follows the forecast's expected index variance, two log premia
+  and the earnings reports before each tenor.
+- Options are European, cash-settled at $100 a point on the index of the
+  expiry session's opening prints: the next six monthly expiries and the
+  quarterlies after them, forty-odd strikes each on a grid fixed at listing.
+  One dealer quotes every option: Black's price at the surface's volatility
+  moved by a decaying, vega-weighted inventory, a half-spread in volatility
+  that grows with moneyness and the VIX, ten levels of 50 contracts on
+  Cboe's SPX grid. Quoted chains carry no static arbitrage (row SV2).
+- Margin extends to options through a scan: the worst loss over seven index
+  moves and three volatility shifts sized to `margin_scan_coverage`.
+  `Portfolio` holds options (`Portfolio.options`, `OptionPosition`): the
+  premium moves cash, positions are marked at the dealer's mid, settle at
+  expiry, count at delta-notional against the leverage limit and add the
+  scan to `margin_requirement`; an unmet margin call closes them too.
+- New API in Rust: `Engine::surface`, `Engine::surface_carry`,
+  `Engine::chain`, `Engine::option_quote`, `Engine::option_margin` and
+  `Engine::option_arbitrage`; `derivatives::pricing` (`black_price`,
+  `black_greeks`, `implied_vol`, `Greeks`), `derivatives::surface` (`Ssvi`,
+  `Surface`, `ThetaCurve`, `StripMoments`, `fit_smile`, `strip_moments`,
+  `term_shape`), `derivatives::dealer` (`OptionQuote`, `OptionDealerSpec`,
+  `INDEX_OPTION_DEALER`, `ladder`, `chain_violations`),
+  `derivatives::calendar::index_option_expiries`, `IndexOptionSpec`,
+  `INDEX_OPTION`, `index_option_symbol` and `ContractKind::IndexOption`;
+  `ContractSpec` gains `right` and `strike`. `submit_order`, `cancel_order`,
+  `open_orders`, `take_fills`, `contracts`, `settlements` and `contract_book`
+  take options. In Python: `Engine.chain(root, expiry)`,
+  `Engine.surface(root)` (a `VolSurface`), `Engine.option_margin(positions)`
+  and `Engine.option_arbitrage(root)`; `quote`, `submit`, `cancel` and `book`
+  take an option symbol, and `contracts()` gives an option's `right` and
+  `strike`. An agent's market view serves `chain`, `surface` and
+  `option_margin`.
+- A snapshot carries `options` under `surface_ssvi` and `options_book` once
+  an agent has traded an option, hashed behind tags 55 and 56 only then, as
+  `manifest.state_hash` does. Every known-answer digest is where it was.
 
 ### Index futures
 

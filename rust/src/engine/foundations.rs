@@ -189,7 +189,7 @@ impl Engine {
     /// at `price * shares_outstanding`, marked when bankrupt; the public,
     /// solvent names' ids as the components; and their capitalisation,
     /// summed in roster order as that function sums it.
-    fn index_constituents(&self) -> (Vec<IndexConstituent>, Vec<String>, f64) {
+    pub(super) fn index_constituents(&self) -> (Vec<IndexConstituent>, Vec<String>, f64) {
         let mut roster = Vec::with_capacity(self.companies.len());
         let mut ids = Vec::with_capacity(self.companies.len());
         let mut cap = 0.0;

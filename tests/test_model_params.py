@@ -1190,6 +1190,22 @@ PERTURBATIONS = [
     # tail allowance carries the coverage it requires.
     ("margin_scan_coverage", 0.99, False),
     ("margin_scan_tail", 1.3, False),
+    # The index options, their surface and their dealer (pt-v22 phase 2).
+    # INERT by construction: the surface and the options read public state,
+    # draw nothing and write only their own state, so no stock price moves
+    # (tests/test_index_options.py). Each carries what it requires as its
+    # companion.
+    ("surface_ssvi", 1.0, False),
+    ("surface_skew_physical", -0.8, False),
+    ("surface_skew_physical_slope", 0.3, False),
+    ("surface_skew_premium", -1.0, False),
+    ("surface_curvature", 1.0, False),
+    ("surface_curvature_exponent", 0.5, False),
+    ("surface_term_premium_short", -0.03, False),
+    ("surface_term_premium_long", 0.1, False),
+    ("surface_earnings_weight", 1.0, False),
+    ("options_index_listed", 1.0, False),
+    ("option_dealer_spread", 0.004, False),
     # The VIX's fear memory (pt-v22 phase 1). LIVE: the first close's VIX
     # sits off its target, the memory takes up a share of the gap, and the
     # target the step reverts to moves, which the factor's VIX-coupled
@@ -2017,6 +2033,19 @@ COMPANIONS: dict[str, dict[str, float]] = {
     "futures_vix_listed": {"forecast_horizon_sessions": 126.0},
     # The tail allowance scales the margin, which the coverage sets.
     "margin_scan_tail": {"margin_scan_coverage": 0.99},
+    # The surface is on the price index; its companions are refused without
+    # it, the earnings term without the forecast; the options and the
+    # dealer's spread needs the options, and they the surface.
+    "surface_ssvi": {"index_level_listed": 1.0},
+    **{name: {"index_level_listed": 1.0, "surface_ssvi": 1.0}
+       for name in ("surface_skew_physical", "surface_skew_physical_slope", "surface_skew_premium",
+                    "surface_curvature", "surface_curvature_exponent", "surface_term_premium_short",
+                    "surface_term_premium_long")},
+    "surface_earnings_weight": {"index_level_listed": 1.0, "surface_ssvi": 1.0,
+                                "forecast_horizon_sessions": 21.0},
+    "options_index_listed": {"index_level_listed": 1.0, "surface_ssvi": 1.0},
+    "option_dealer_spread": {"index_level_listed": 1.0, "surface_ssvi": 1.0,
+                             "options_index_listed": 1.0},
     "futures_vix_live_fast_share": {"forecast_horizon_sessions": 126.0, "futures_vix_listed": 1.0},
     "futures_vix_live_fast_half_life": {"forecast_horizon_sessions": 126.0, "futures_vix_listed": 1.0},
     "futures_vix_live_slow_half_life": {"forecast_horizon_sessions": 126.0, "futures_vix_listed": 1.0},

@@ -291,6 +291,7 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<crate::python_book::PySweepCost>()?;
     m.add_class::<crate::python_params::PyModelParams>()?;
     m.add_class::<crate::python_engine::PyEngine>()?;
+    m.add_class::<crate::python_engine::PySurface>()?;
     m.add_class::<crate::python_engine::PyInstrument>()?;
     m.add_class::<crate::python_engine::PyMacro>()?;
     m.add_class::<crate::python_engine::PyTickResult>()?;

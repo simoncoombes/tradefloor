@@ -1910,13 +1910,14 @@ impl PyEngine {
             )));
         }
         // A contract symbol goes to the core, which lists the contracts
-        // (`futures_index_listed`, `futures_vix_listed`) and says when one is
-        // not listed.
+        // (`futures_index_listed`, `futures_vix_listed`, the index options'
+        // `options_index_listed`) and says when one is not listed.
         let p = self.inner.params();
         let contract = (p.futures_index_listed != 0.0
             || p.futures_vix_listed != 0.0
             || p.futures_rates_listed != 0.0
-            || p.futures_oil_listed != 0.0)
+            || p.futures_oil_listed != 0.0
+            || p.options_index_listed != 0.0)
             && crate::derivatives::ContractSymbol::parse(ticker).is_ok();
         if !self.tickers.iter().any(|t| t == ticker) && !contract {
             return Err(ValidationError::new_err(format!(
@@ -4819,7 +4820,11 @@ impl PyEngine {
     /// `"average_policy_rate_at_close"`, `"compounded_policy_rate_at_close"`
     /// or `"oil_price_at_open"`)
     /// and `front` (the first of its family whose roll has not come; a rate
-    /// future's period in progress).
+    /// future's period in progress). Then the index options
+    /// (`options_index_listed`), by expiry, strike and right, `kind`
+    /// `"option"`, symbols such as `IDX.O0035.C1050.00`, with `right` (`"C"`
+    /// or `"P"`) and `strike` (index points) beside the rest; their `tick` is
+    /// the grid's smallest, 0.05.
     fn contracts<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyDict>>> {
         self.inner
             .contracts()
@@ -4835,6 +4840,11 @@ impl PyEngine {
                 d.set_item("tick", c.tick)?;
                 d.set_item("settlement", c.settlement.as_str())?;
                 d.set_item("front", c.front)?;
+                // An option's right and strike (`options_index_listed`).
+                if let (Some(right), Some(strike)) = (c.right, c.strike) {
+                    d.set_item("right", right.letter().to_string())?;
+                    d.set_item("strike", strike)?;
+                }
                 Ok(d)
             })
             .collect()
@@ -4870,7 +4880,18 @@ impl PyEngine {
     /// settlement, `premium` 0, `index` the oil price now and `rate` the
     /// mean policy rate expected to expiry. `expected`, `premium`
     /// and `loading` are None for an index future. A read.
+    ///
+    /// For an index option (`options_index_listed`) the dict is the dealer's
+    /// quote, as a row of `chain`, with `initial_margin` and
+    /// `maintenance_margin` the scan's on one short contract
+    /// (`margin_scan_coverage`) and `mark` None.
     fn quote<'py>(&self, py: Python<'py>, symbol: &str) -> PyResult<Bound<'py, PyDict>> {
+        if let Some(q) = self.inner.option_quote(symbol) {
+            let d = option_quote_dict(py, &q)?;
+            d.set_item("initial_margin", q.initial_margin)?;
+            d.set_item("maintenance_margin", q.maintenance_margin)?;
+            return Ok(d);
+        }
         let q = self.inner.quote(symbol).ok_or_else(|| {
             ValidationError::new_err(format!(
                 "{symbol:?} is not a listed contract: Engine.contracts() lists the ones that \
@@ -4928,6 +4949,75 @@ impl PyEngine {
                 Ok(d)
             })
             .collect()
+    }
+
+    /// The index options at one expiry (`options_index_listed`), as a list of
+    /// dicts by strike, the call before the put at each: `symbol`, `root`,
+    /// `kind` (`"option"`), `expiry`, `right` (`"C"` or `"P"`), `strike`;
+    /// `bid` and `ask`, the dealer's touch (None on a side it does not show,
+    /// a bid under one tick), `bid_size` and `ask_size`; `mid`, Black's price
+    /// at `iv`, the dealer's volatility, off the grid so a strike's call and
+    /// put mids meet put-call parity; `fair`, the price at `surface_iv`, the
+    /// surface's volatility without the dealer's inventory; `delta`,
+    /// `gamma` (per index point), `vega` (per unit of volatility) and
+    /// `theta` (per session) at `iv`; `forward`, `index`, `rate`
+    /// (fractional), `dividends` (index points) and `sessions_to_expiry`;
+    /// `multiplier` (100), `tick` (the grid at the mid), `open_interest`
+    /// (contracts); `initial_margin` and `maintenance_margin` None here
+    /// (`quote` and `option_margin` give them); and `mark`, None. Refused
+    /// with the switch off and for an expiry not listed. A read.
+    fn chain<'py>(&self, py: Python<'py>, root: &str, expiry: i64) -> PyResult<Vec<Bound<'py, PyDict>>> {
+        let rows = self.inner.chain(root, expiry).ok_or_else(|| {
+            ValidationError::new_err(format!(
+                "no option chain on {root:?} at expiry {expiry}: Engine.contracts() lists the \
+                 options that trade, and none does with options_index_listed off"
+            ))
+        })?;
+        rows.iter().map(|q| option_quote_dict(py, q)).collect()
+    }
+
+    /// The implied-volatility surface on `root` now (`surface_ssvi`), a
+    /// `VolSurface`: `iv(k, t)` at log-moneyness `k = ln(K / F)` and `t`
+    /// sessions out, `total_variance`, `theta`, `forward(t)`, `rate(t)`,
+    /// `dividends(t)`, the Cboe formulas `strip_vix(t)` and `strip_skew(t)`,
+    /// and its parameters. Only `"IDX"`, the price index. Refused with the
+    /// switch off. A read.
+    #[pyo3(signature = (root = "IDX"))]
+    fn surface(&self, root: &str) -> PyResult<PySurface> {
+        let surface = self.inner.surface(root).ok_or_else(|| {
+            ValidationError::new_err(format!(
+                "no surface on {root:?}: the engine keeps one on \"IDX\", the price index, with \
+                 surface_ssvi on"
+            ))
+        })?;
+        let mut carry = Vec::new();
+        let last = surface.curve.knots.len() + 2;
+        for n in 0..=last {
+            let t = n as f64 - surface.curve.elapsed;
+            carry.push(self.inner.surface_carry(crate::mathx::max(0.0, t)).unwrap_or((f64::NAN, f64::NAN, f64::NAN)));
+        }
+        Ok(PySurface { inner: surface, carry })
+    }
+
+    /// The scan's initial margin on a portfolio of index options, dollars
+    /// (`margin_scan_coverage`): `positions` as `(symbol, signed contracts)`
+    /// pairs, symbols not listed left out. The worst loss over seven index
+    /// moves sized to the coverage's quantile of the index's one-session sd
+    /// at the VIX, each at three implied-volatility shifts; a long option
+    /// asks at most its premium and offsetting positions net. None with
+    /// margin or options off. A read.
+    fn option_margin(&self, positions: Vec<(String, f64)>) -> Option<f64> {
+        self.inner.option_margin(&positions)
+    }
+
+    /// Static-arbitrage violations on every listed option chain now (row
+    /// SV2), and the surface's own conditions: a list of sentences, empty
+    /// when there are none. Refused with `options_index_listed` off. A read.
+    #[pyo3(signature = (root = "IDX"))]
+    fn option_arbitrage(&self, root: &str) -> PyResult<Vec<String>> {
+        self.inner.option_arbitrage(root).ok_or_else(|| {
+            ValidationError::new_err("no option chain is listed: options_index_listed is off".to_string())
+        })
     }
 
     /// Walk the night session for index futures (`night_session_steps`),
@@ -6378,4 +6468,180 @@ pub fn stationary_sigma(
         )));
     }
     Ok(crate::mispricing::stationary_sigma(phi, theta, innovation_sigma))
+}
+
+/// An index option's quote as the dict `Engine.chain` rows and
+/// `Engine.quote` read.
+fn option_quote_dict<'py>(py: Python<'py>, q: &crate::derivatives::OptionQuote) -> PyResult<Bound<'py, PyDict>> {
+    let d = PyDict::new_bound(py);
+    d.set_item("symbol", &q.symbol)?;
+    d.set_item("root", &q.root)?;
+    d.set_item("kind", "option")?;
+    d.set_item("expiry", q.expiry)?;
+    d.set_item("right", q.right.letter().to_string())?;
+    d.set_item("strike", q.strike)?;
+    d.set_item("bid", q.bid)?;
+    d.set_item("ask", q.ask)?;
+    d.set_item("bid_size", q.bid_size)?;
+    d.set_item("ask_size", q.ask_size)?;
+    d.set_item("mid", q.mid)?;
+    d.set_item("fair", q.fair)?;
+    d.set_item("iv", q.iv)?;
+    d.set_item("surface_iv", q.surface_iv)?;
+    d.set_item("delta", q.greeks.delta)?;
+    d.set_item("gamma", q.greeks.gamma)?;
+    d.set_item("vega", q.greeks.vega)?;
+    d.set_item("theta", q.greeks.theta)?;
+    d.set_item("forward", q.forward)?;
+    d.set_item("index", q.index)?;
+    d.set_item("rate", q.rate)?;
+    d.set_item("dividends", q.dividends)?;
+    d.set_item("sessions_to_expiry", q.sessions_to_expiry)?;
+    d.set_item("multiplier", q.multiplier)?;
+    d.set_item("tick", q.tick)?;
+    d.set_item("open_interest", q.open_interest)?;
+    d.set_item("initial_margin", py.None())?;
+    d.set_item("maintenance_margin", py.None())?;
+    d.set_item("mark", py.None())?;
+    Ok(d)
+}
+
+/// An implied-volatility surface (`Engine.surface`), fixed at the moment it
+/// was read: `t` is sessions from then, `k` the log-moneyness `ln(K / F)` on
+/// the forward to `t`.
+#[pyclass(name = "VolSurface", module = "tradefloor._core", frozen)]
+pub struct PySurface {
+    inner: crate::derivatives::Surface,
+    /// `(forward, rate, dividends)` at whole sessions from the knots' origin.
+    carry: Vec<(f64, f64, f64)>,
+}
+
+impl PySurface {
+    fn carry_at(&self, t: f64) -> (f64, f64, f64) {
+        let n = (t + self.inner.curve.elapsed).round();
+        let i = if n.is_finite() && n > 0.0 { (n as usize).min(self.carry.len() - 1) } else { 0 };
+        let (_, rate, dividends) = self.carry[i];
+        // The forward to `t` exactly, on the carry of the session it reaches.
+        let index = self.carry[0].0 + self.carry[0].2;
+        let index = if index.is_finite() { index } else { f64::NAN };
+        (
+            (index - dividends) * crate::mathx::exp(rate * crate::mathx::max(0.0, t) / 252.0),
+            rate,
+            dividends,
+        )
+    }
+}
+
+#[pymethods]
+impl PySurface {
+    /// The underlying's root.
+    #[getter]
+    fn root(&self) -> String {
+        self.inner.root.clone()
+    }
+
+    /// The VIX the 21-session point was fitted to.
+    #[getter]
+    fn vix(&self) -> f64 {
+        self.inner.vix
+    }
+
+    /// SSVI's correlation, curvature and curvature exponent.
+    #[getter]
+    fn rho(&self) -> f64 {
+        self.inner.ssvi.rho
+    }
+
+    #[getter]
+    fn eta(&self) -> f64 {
+        self.inner.ssvi.eta
+    }
+
+    #[getter]
+    fn gamma(&self) -> f64 {
+        self.inner.ssvi.gamma
+    }
+
+    /// The risk-neutral skewness the 21-session strip was fitted to, None
+    /// for a flat smile; whether the fit reached it; and the Cboe SKEW
+    /// index the fitted strip reads.
+    #[getter]
+    fn skewness_target(&self) -> Option<f64> {
+        self.inner.skewness_target
+    }
+
+    #[getter]
+    fn reached(&self) -> bool {
+        self.inner.fit.reached
+    }
+
+    #[getter]
+    fn skew(&self) -> f64 {
+        self.inner.fit.moments.skew_index()
+    }
+
+    /// The share of the session in progress already run when it was read.
+    #[getter]
+    fn elapsed(&self) -> f64 {
+        self.inner.curve.elapsed
+    }
+
+    /// The at-the-money total variance `t` sessions out.
+    fn theta(&self, t: f64) -> f64 {
+        self.inner.theta(t)
+    }
+
+    /// Total implied variance at log-moneyness `k`, `t` sessions out.
+    fn total_variance(&self, k: f64, t: f64) -> f64 {
+        self.inner.total_variance(k, t)
+    }
+
+    /// Implied volatility, a fraction a year, at log-moneyness `k`, `t`
+    /// sessions out.
+    fn iv(&self, k: f64, t: f64) -> f64 {
+        self.inner.iv(k, t)
+    }
+
+    /// The index's forward `t` sessions out, `(S - PV(D)) e^{r t / 252}`.
+    fn forward(&self, t: f64) -> f64 {
+        self.carry_at(t).0
+    }
+
+    /// The mean policy rate the forecast expects to `t`, a fraction a year.
+    fn rate(&self, t: f64) -> f64 {
+        self.carry_at(t).1
+    }
+
+    /// The dividends' present value before `t`, index points.
+    fn dividends(&self, t: f64) -> f64 {
+        self.carry_at(t).2
+    }
+
+    /// The Cboe VIX formula on the strip `t` sessions out, volatility points.
+    fn strip_vix(&self, t: f64) -> Option<f64> {
+        self.inner.strip(t).map(|m| m.vix)
+    }
+
+    /// The Cboe SKEW index on the strip `t` sessions out.
+    fn strip_skew(&self, t: f64) -> Option<f64> {
+        self.inner.strip(t).map(|m| m.skew_index())
+    }
+
+    /// Gatheral and Jacquier's conditions at every knot: None when they all
+    /// hold, else the first that fails.
+    fn check(&self) -> Option<String> {
+        self.inner.check().err()
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "VolSurface(root={:?}, vix={:.4}, rho={:.4}, eta={}, gamma={}, skew={:.2})",
+            self.inner.root,
+            self.inner.vix,
+            self.inner.ssvi.rho,
+            self.inner.ssvi.eta,
+            self.inner.ssvi.gamma,
+            self.inner.fit.moments.skew_index()
+        )
+    }
 }

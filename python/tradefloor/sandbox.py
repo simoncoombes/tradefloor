@@ -366,6 +366,22 @@ class MarketView:
         reads public state only, as ``Engine.forecast``."""
         return _WRAPPED[self].forecast()
 
+    # The index options' public reads (pt-v22 phase 2): the dealer's quotes
+    # and the surface they come from, which reads public state only.
+
+    def chain(self, root: str, expiry: int) -> list[dict[str, Any]]:
+        """One expiry's index options, as ``Engine.chain`` quotes them."""
+        return _WRAPPED[self].chain(root, expiry)
+
+    def surface(self, root: str = "IDX") -> Any:
+        """The implied-volatility surface (``surface_ssvi``), as
+        ``Engine.surface``."""
+        return _WRAPPED[self].surface(root)
+
+    def option_margin(self, positions: list[tuple[str, float]]) -> Any:
+        """The scan margin on option positions, as ``Engine.option_margin``."""
+        return _WRAPPED[self].option_margin(positions)
+
     @property
     def recorded_days(self) -> int:
         """How many days the engine has recorded, which is what
