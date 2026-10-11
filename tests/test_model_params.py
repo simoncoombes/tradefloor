@@ -971,6 +971,18 @@ PERTURBATIONS = [
     # (`usd_crisis_vix_threshold`), so the bid never fires; a gain of 0.5
     # moves nothing either. It acts only in a crisis. Measured 2026-10-10.
     ("usd_safe_haven_gain", 0.001, False),
+    # Core inflation for the bank (headline less the oil pass-through's
+    # part), LIVE with its companion pass-through: the probe's oil sits at 98,
+    # off the anchor, so the meeting reads a lower inflation and the prices
+    # move. Without the companion the shipped three-way branch pays nothing
+    # in the 50 to 80 band the probe's burn-in mostly holds.
+    ("fed_core_inflation", 1.0, True),
+    # Core inflation for the curve, INERT on the probe's market columns: its
+    # headline closes at 1.1, under the term premium's 2, the flight to
+    # quality's 3 and the haven's 4, so no gate the three sessions read
+    # changes; the 10-year differs from the burn-in's months above 2 by
+    # 1e-17 and no price reads that. Measured 2026-10-11.
+    ("treasury_core_inflation", 1.0, False),
     # Oil's bounds from WTI in real terms. INERT on the probe: its burn-in's
     # oil stays inside 35 to 150, so moving the bounds outward moves nothing.
     ("oil_price_floor", 16.4, False),
@@ -2071,6 +2083,11 @@ def test_the_perturbation_table_covers_the_whole_settable_surface():
 #: carrying the same companions, none of the three moved. The companions
 #: are the default's 0.375 now, and the three rows are re-valued.
 COMPANIONS: dict[str, dict[str, float]] = {
+    # Core differs from headline only where oil pays inflation, which the
+    # symmetric pass-through does either side of 81 (the shipped branch pays
+    # nothing between 50 and 80).
+    "fed_core_inflation": {"oil_inflation_passthrough": 1.0},
+    "treasury_core_inflation": {"oil_inflation_passthrough": 1.0},
     # The knee pulls at its half-life, and the pair is refused without it.
     "fair_value_relative_knee": {"fair_value_relative_half_life": 252.0},
     # The valuation is carried from the prehistory, and refused without one.

@@ -1790,6 +1790,9 @@ impl Engine {
         if p.usd_mean_reversion != 0.0 {
             econ.put("usd_haven_level", V::Float(economy.usd_haven_level));
         }
+        if self.carries_oil_inflation_level() {
+            econ.put("oil_inflation_level", V::Float(economy.oil_inflation_level));
+        }
         if p.gdp_publication_lag != 0.0 {
             let g = self.gdp_publication();
             let mut block = SnapshotMap::new();
@@ -2172,6 +2175,15 @@ impl Engine {
             Gated::dial("gdp_publication", "gdp_publication_lag", p.gdp_publication_lag),
             Gated::dial("oil_push_level", "oil_pushes_in_target", p.oil_pushes_in_target),
             Gated::dial("usd_haven_level", "usd_mean_reversion", p.usd_mean_reversion),
+            Gated::when(
+                "oil_inflation_level",
+                self.carries_oil_inflation_level(),
+                format!(
+                    "fed_core_inflation or treasury_core_inflation is not 0, and this \
+                     engine's are {} and {}",
+                    p.fed_core_inflation, p.treasury_core_inflation
+                ),
+            ),
         ];
         if let Some(message) = key_mismatch("this snapshot's economy", economy, &required, &gated, &[]) {
             return Err(refuse(message));
@@ -2890,6 +2902,9 @@ impl Engine {
         }
         if params.oil_pushes_in_target != 0.0 {
             inner.economy_mut().oil_push_level = read_finite(d, "economy.", "oil_push_level")?;
+        }
+        if params.fed_core_inflation != 0.0 || params.treasury_core_inflation != 0.0 {
+            inner.economy_mut().oil_inflation_level = read_finite(d, "economy.", "oil_inflation_level")?;
         }
         if params.usd_mean_reversion != 0.0 {
             inner.economy_mut().usd_haven_level = read_finite(d, "economy.", "usd_haven_level")?;

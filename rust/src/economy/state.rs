@@ -487,6 +487,15 @@ pub struct EconomyState {
     /// while that dial is 0.0, which every preset carries; snapshotted and
     /// hashed only while it is set.
     pub usd_haven_level: f64,
+    /// The oil pass-through's accumulated part of headline inflation,
+    /// percentage points: each month-start step adds the term
+    /// `oil_inflation_passthrough` adds to headline and closes the
+    /// headline's own `inflation_reversion` of the gap to 0.0, so headline
+    /// less it is core (`ModelParams::fed_core_inflation`). 0.0, and never
+    /// read or written, while `fed_core_inflation` and
+    /// `treasury_core_inflation` are both 0.0, which every preset carries;
+    /// snapshotted and hashed only while either is set.
+    pub oil_inflation_level: f64,
     /// The log of the oil price's truncation at its bounds on the last step,
     /// ln(clamped / unclamped), 0.0 where no bound bound it. TRANSIENT: set
     /// by every step that runs the long factor (`oil_target_drift_sd`) and
@@ -664,6 +673,7 @@ pub fn create_initial_economy_state(options: &InitialEconomyOptions) -> EconomyS
         unemployment_impulse: 0.0,
         oil_push_level: 0.0,
         usd_haven_level: 0.0,
+        oil_inflation_level: 0.0,
         oil_bound_log_ratio: 0.0,
         market_pe: Some(18.0),
 

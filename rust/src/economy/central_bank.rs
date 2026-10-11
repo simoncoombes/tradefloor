@@ -206,6 +206,14 @@ pub struct PolicyOptions {
     /// formula's base per unit of `EconomyState::spread_equity_gap`. 0.0 is
     /// none.
     pub spread_equity_gain: f64,
+    /// `fed_core_inflation`: the inflation the meeting reads in place of
+    /// headline, core (headline less `EconomyState::oil_inflation_level`).
+    /// `None`, on every preset, is headline.
+    pub policy_inflation: Option<f64>,
+    /// `treasury_core_inflation`: the inflation the meeting's 10-year target
+    /// reads (its term premium and the haven's gate). `None`, on every
+    /// preset, is the inflation the meeting reads.
+    pub curve_inflation: Option<f64>,
 }
 
 /// [`PolicyOptions::shipped`].
@@ -238,6 +246,8 @@ impl PolicyOptions {
             rate_damping: 0.0,
             spread_vix_cut: 0.0,
             spread_equity_gain: 0.0,
+            policy_inflation: None,
+            curve_inflation: None,
         }
     }
 }
@@ -291,6 +301,25 @@ pub fn update_central_bank_with(
     rng: &mut impl Rng,
     options: &PolicyOptions,
 ) -> MeetingOutcome {
+    // THE BANK'S INFLATION (`fed_core_inflation`): the meeting runs on the
+    // economy with core in headline's place, every read below included, and
+    // headline is put back on what it returns (the meeting writes no
+    // inflation). The curve's 10-year target reads the curve's own
+    // inflation, headline unless `treasury_core_inflation` gave core. A
+    // branch: with `None` the meeting is the one that stood.
+    if let Some(pi) = options.policy_inflation {
+        let mut view = economy.clone();
+        view.inflation_rate = pi;
+        let inner = PolicyOptions {
+            policy_inflation: None,
+            curve_inflation: Some(options.curve_inflation.unwrap_or(economy.inflation_rate)),
+            ..*options
+        };
+        let mut outcome = update_central_bank_with(central_bank, &view, current_timestamp, rng, &inner);
+        outcome.economy.inflation_rate = economy.inflation_rate;
+        return outcome;
+    }
+    let curve_inflation = options.curve_inflation.unwrap_or(economy.inflation_rate);
     // An inflation rate running 4pp above the policy rate forces a meeting
     // regardless of the calendar.
     let inflation_rate_gap = economy.inflation_rate - economy.federal_funds_rate;
@@ -651,7 +680,7 @@ pub fn update_central_bank_with(
 
     let treasury_target_10y = new_economy.federal_funds_rate
         + 1.0
-        + mathx::max(0.0, (economy.inflation_rate - 2.0) * 0.3);
+        + mathx::max(0.0, (curve_inflation - 2.0) * 0.3);
     let treasury_target_10y = if path_on { treasury_target_10y + path_after } else { treasury_target_10y };
     let treasury_target_10y = if damp != 0.0 {
         let owed = if put_on { new_economy.fed_put_owed } else { 0.0 };
@@ -664,7 +693,7 @@ pub fn update_central_bank_with(
     // The Treasury haven (`treasury_haven_gain`) in the target too, so the
     // meeting does not undo what the daily anchor has priced.
     let treasury_target_10y = if options.haven_gain != 0.0
-        && economy.inflation_rate < FED_PUT_INFLATION_CEILING
+        && curve_inflation < FED_PUT_INFLATION_CEILING
     {
         treasury_target_10y - super::daily::haven_term_cut(options.haven_gain, economy.vix)
     } else {
@@ -836,6 +865,35 @@ mod tests {
         economy.unemployment_rate = bank.target_unemployment;
         let mut rng = GameRng::new(1, 1);
         update_central_bank_with(&bank, &economy, bank.next_meeting_date, &mut rng, options).decision
+    }
+
+    /// `fed_core_inflation`: the meeting on core is the meeting on an
+    /// economy whose headline is core, decision and rates alike, and it
+    /// hands back the headline it was given.
+    #[test]
+    fn the_core_reading_meeting_is_the_meeting_at_core() {
+        let bank = create_initial_central_bank_state(0);
+        let mut economy = create_initial_economy_state(&InitialEconomyOptions::default());
+        economy.cycle_phase = CyclePhase::Expansion;
+        economy.gdp_growth = 1.0;
+        economy.federal_funds_rate = 2.0;
+        economy.unemployment_rate = bank.target_unemployment;
+        economy.inflation_rate = 3.6;
+        let on = PolicyOptions { growth_cut: 2.0, policy_inflation: Some(2.0), ..PolicyOptions::shipped() };
+        let mut at_core = economy.clone();
+        at_core.inflation_rate = 2.0;
+        let plain = PolicyOptions { growth_cut: 2.0, curve_inflation: Some(3.6), ..PolicyOptions::shipped() };
+        let a = update_central_bank_with(&bank, &economy, bank.next_meeting_date, &mut GameRng::new(1, 1), &on);
+        let b = update_central_bank_with(&bank, &at_core, bank.next_meeting_date, &mut GameRng::new(1, 1), &plain);
+        assert_eq!(a.decision, Some(Decision::Cut));
+        assert_eq!(a.decision, b.decision);
+        assert_eq!(a.economy.federal_funds_rate.to_bits(), b.economy.federal_funds_rate.to_bits());
+        assert_eq!(a.economy.treasury_yield_10y.to_bits(), b.economy.treasury_yield_10y.to_bits());
+        assert_eq!(a.economy.inflation_rate.to_bits(), 3.6f64.to_bits());
+        // Headline read, the growth cut is closed at 3.6.
+        let off = PolicyOptions { growth_cut: 2.0, ..PolicyOptions::shipped() };
+        let c = update_central_bank_with(&bank, &economy, bank.next_meeting_date, &mut GameRng::new(1, 1), &off);
+        assert_ne!(c.decision, Some(Decision::Cut));
     }
 
     /// `fed_growth_cut`: off, the calm meeting holds whatever growth does;

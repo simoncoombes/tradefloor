@@ -548,6 +548,16 @@ OUT_OF_SCOPE = {
         "`== 0.0` to the standing 0.5, the same draw either way, and the "
         "forecast's inventory variance keeps 0.25; at 0.0 it is also left out "
         "of the model's digest",
+    "fed_core_inflation":
+        "inert at 0.0: the meeting, the priced put and the intermeeting "
+        "meeting read headline inflation as they stood (`policy_inflation` is "
+        "`None`), and `oil_inflation_level` is neither written, snapshotted "
+        "nor hashed; at 0.0 it is also left out of the model's digest",
+    "treasury_core_inflation":
+        "inert at 0.0: `close_yields` and the meeting's 10-year target read "
+        "headline inflation as they stood (a branch on `== 0.0`), and "
+        "`oil_inflation_level` is neither written, snapshotted nor hashed; at "
+        "0.0 it is also left out of the model's digest",
     "oil_forecast_clamp":
         "inert at 0.0: the forecast publishes the unclamped expectation it "
         "steps, as it stood; it reads the forecast only, so no price moves at "

@@ -684,6 +684,9 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "oil_price_floor": (0.0, 35.0),
     "oil_price_ceiling": (150.0, 300.0),
     "oil_forecast_clamp": (0.0, 1.0),
+    # Switches: the bank's and the curve's inflation, headline or core.
+    "fed_core_inflation": (0.0, 1.0),
+    "treasury_core_inflation": (0.0, 1.0),
     # The share of oil demand supply answers on the daily step. Bounded by
     # meaning again: 0.0 is the hardcoded zero the reference writes, 1.0 is
     # the value that makes the inventory random walk driftless, and past 1.0
