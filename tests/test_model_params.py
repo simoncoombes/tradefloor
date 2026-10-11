@@ -966,9 +966,11 @@ PERTURBATIONS = [
     # dollar reaches oil's drag, and through it inflation and the bank.
     ("usd_mean_reversion", 0.00095, True),
     ("usd_noise_sd", 0.43, True),
-    # The dollar's crisis drift at FRED DTWEXM's measured 0.001, LIVE: the
-    # probe's VIX crosses the threshold, and the dollar reaches oil's drag.
-    ("usd_safe_haven_gain", 0.001, True),
+    # The dollar's crisis drift at FRED DTWEXM's measured 0.001. INERT on the
+    # probe: its VIX closes at 19.7, 19.3 and 21.6, under the 25.5 threshold
+    # (`usd_crisis_vix_threshold`), so the bid never fires; a gain of 0.5
+    # moves nothing either. It acts only in a crisis. Measured 2026-10-10.
+    ("usd_safe_haven_gain", 0.001, False),
     # Oil's bounds from WTI in real terms. INERT on the probe: its burn-in's
     # oil stays inside 35 to 150, so moving the bounds outward moves nothing.
     ("oil_price_floor", 16.4, False),
