@@ -687,8 +687,12 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "usd_safe_haven_gain": (0.0, 0.1),
     # Oil's bounds: WTI deflated by CPIAUCSL, 1987 to 2024, at the model's
     # centre of 81 gives 16.4 and 279; the standing 35 and 150 inside.
+    # The ceiling's box starts at 0.0, every preset's value (the standing
+    # 150), because the preset must be on the map; the validator takes 0.0
+    # or [150, 1000], so a draw between them is refused, as a draw of
+    # overnight_idio_df between 0 and 3 is.
     "oil_price_floor": (0.0, 35.0),
-    "oil_price_ceiling": (150.0, 300.0),
+    "oil_price_ceiling": (0.0, 300.0),
     "oil_forecast_clamp": (0.0, 1.0),
     # Switches: the bank's and the curve's inflation, headline or core.
     "fed_core_inflation": (0.0, 1.0),
