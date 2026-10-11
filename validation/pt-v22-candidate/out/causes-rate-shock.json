@@ -1,0 +1,303 @@
+{
+ "preset": "pt-v21",
+ "seeds": "270301-270330",
+ "names": 20,
+ "k": 11.0,
+ "loss_makers": 67,
+ "off": {
+  "1d/anchored/loss": {
+   "name_windows": 67,
+   "market_or_repricing": 0.08955223880597014,
+   "market_plus_repricing_as_one": 0.11940298507462686,
+   "fair_value_company": 0.8955223880597015,
+   "top_causes": {
+    "fair_value_company": 60,
+    "fair_value_market": 6,
+    "random_noise": 1
+   }
+  },
+  "1d/anchored/profitable": {
+   "name_windows": 533,
+   "market_or_repricing": 0.9512195121951219,
+   "market_plus_repricing_as_one": 0.9474671669793621,
+   "fair_value_company": 0.04878048780487805,
+   "top_causes": {
+    "fair_value_market": 507,
+    "fair_value_company": 26
+   }
+  },
+  "1d/tiled/loss": {
+   "name_windows": 4020,
+   "market_or_repricing": 0.17338308457711443,
+   "market_plus_repricing_as_one": 0.17238805970149254,
+   "fair_value_company": 0.16218905472636816,
+   "top_causes": {
+    "random_noise": 1849,
+    "fair_value_market": 675,
+    "overnight": 661,
+    "fair_value_company": 652,
+    "company_news": 132
+   }
+  },
+  "1d/tiled/profitable": {
+   "name_windows": 31980,
+   "market_or_repricing": 0.18749218261413383,
+   "market_plus_repricing_as_one": 0.17895559724828017,
+   "fair_value_company": 0.15722326454033772,
+   "top_causes": {
+    "random_noise": 14517,
+    "fair_value_market": 5715,
+    "overnight": 5298,
+    "fair_value_company": 5028,
+    "company_news": 966
+   }
+  },
+  "5d/anchored/loss": {
+   "name_windows": 67,
+   "market_or_repricing": 0.19402985074626866,
+   "market_plus_repricing_as_one": 0.1791044776119403,
+   "fair_value_company": 0.7313432835820896,
+   "top_causes": {
+    "fair_value_company": 49,
+    "fair_value_market": 13,
+    "random_noise": 3,
+    "overnight": 2
+   }
+  },
+  "5d/anchored/profitable": {
+   "name_windows": 533,
+   "market_or_repricing": 0.9343339587242027,
+   "market_plus_repricing_as_one": 0.9324577861163227,
+   "fair_value_company": 0.039399624765478425,
+   "top_causes": {
+    "fair_value_market": 498,
+    "fair_value_company": 21,
+    "random_noise": 11,
+    "overnight": 2,
+    "jump": 1
+   }
+  },
+  "5d/tiled/loss": {
+   "name_windows": 804,
+   "market_or_repricing": 0.20024875621890548,
+   "market_plus_repricing_as_one": 0.20771144278606965,
+   "fair_value_company": 0.21766169154228857,
+   "top_causes": {
+    "random_noise": 303,
+    "fair_value_company": 175,
+    "fair_value_market": 160,
+    "overnight": 92,
+    "company_news": 54
+   }
+  },
+  "5d/tiled/profitable": {
+   "name_windows": 6396,
+   "market_or_repricing": 0.24921826141338335,
+   "market_plus_repricing_as_one": 0.24734208880550343,
+   "fair_value_company": 0.16353971232020012,
+   "top_causes": {
+    "random_noise": 2349,
+    "fair_value_market": 1590,
+    "fair_value_company": 1046,
+    "overnight": 816,
+    "company_news": 396
+   }
+  },
+  "20d/anchored/loss": {
+   "name_windows": 67,
+   "market_or_repricing": 0.08955223880597014,
+   "market_plus_repricing_as_one": 0.08955223880597014,
+   "fair_value_company": 0.7313432835820896,
+   "top_causes": {
+    "fair_value_company": 49,
+    "random_noise": 9,
+    "fair_value_market": 6,
+    "overnight": 3
+   }
+  },
+  "20d/anchored/profitable": {
+   "name_windows": 533,
+   "market_or_repricing": 0.6829268292682927,
+   "market_plus_repricing_as_one": 0.6791744840525328,
+   "fair_value_company": 0.11632270168855535,
+   "top_causes": {
+    "fair_value_market": 364,
+    "random_noise": 76,
+    "fair_value_company": 62,
+    "overnight": 19,
+    "jump": 8
+   }
+  },
+  "20d/tiled/loss": {
+   "name_windows": 201,
+   "market_or_repricing": 0.15920398009950248,
+   "market_plus_repricing_as_one": 0.15422885572139303,
+   "fair_value_company": 0.417910447761194,
+   "top_causes": {
+    "fair_value_company": 84,
+    "random_noise": 51,
+    "fair_value_market": 32,
+    "overnight": 13,
+    "company_news": 12
+   }
+  },
+  "20d/tiled/profitable": {
+   "name_windows": 1599,
+   "market_or_repricing": 0.3608505315822389,
+   "market_plus_repricing_as_one": 0.3608505315822389,
+   "fair_value_company": 0.17510944340212634,
+   "top_causes": {
+    "fair_value_market": 577,
+    "random_noise": 447,
+    "fair_value_company": 280,
+    "overnight": 150,
+    "company_news": 76
+   }
+  }
+ },
+ "on": {
+  "1d/anchored/loss": {
+   "name_windows": 67,
+   "market_or_repricing": 0.14925373134328357,
+   "market_plus_repricing_as_one": 0.13432835820895522,
+   "fair_value_company": 0.8507462686567164,
+   "top_causes": {
+    "fair_value_company": 57,
+    "fair_value_market": 10
+   }
+  },
+  "1d/anchored/profitable": {
+   "name_windows": 533,
+   "market_or_repricing": 1.0,
+   "market_plus_repricing_as_one": 1.0,
+   "fair_value_company": 0.0,
+   "top_causes": {
+    "fair_value_market": 533
+   }
+  },
+  "1d/tiled/loss": {
+   "name_windows": 4020,
+   "market_or_repricing": 0.16940298507462687,
+   "market_plus_repricing_as_one": 0.16865671641791044,
+   "fair_value_company": 0.15945273631840795,
+   "top_causes": {
+    "random_noise": 1878,
+    "fair_value_market": 662,
+    "overnight": 659,
+    "fair_value_company": 641,
+    "company_news": 132
+   }
+  },
+  "1d/tiled/profitable": {
+   "name_windows": 31980,
+   "market_or_repricing": 0.18764853033145715,
+   "market_plus_repricing_as_one": 0.17961225766103814,
+   "fair_value_company": 0.1558786741713571,
+   "top_causes": {
+    "random_noise": 14550,
+    "fair_value_market": 5722,
+    "overnight": 5301,
+    "fair_value_company": 4985,
+    "company_news": 967
+   }
+  },
+  "5d/anchored/loss": {
+   "name_windows": 67,
+   "market_or_repricing": 0.14925373134328357,
+   "market_plus_repricing_as_one": 0.14925373134328357,
+   "fair_value_company": 0.8507462686567164,
+   "top_causes": {
+    "fair_value_company": 57,
+    "fair_value_market": 10
+   }
+  },
+  "5d/anchored/profitable": {
+   "name_windows": 533,
+   "market_or_repricing": 0.9868667917448405,
+   "market_plus_repricing_as_one": 0.9868667917448405,
+   "fair_value_company": 0.0,
+   "top_causes": {
+    "fair_value_market": 526,
+    "random_noise": 5,
+    "overnight": 1,
+    "jump": 1
+   }
+  },
+  "5d/tiled/loss": {
+   "name_windows": 804,
+   "market_or_repricing": 0.19527363184079602,
+   "market_plus_repricing_as_one": 0.20398009950248755,
+   "fair_value_company": 0.22761194029850745,
+   "top_causes": {
+    "random_noise": 302,
+    "fair_value_company": 183,
+    "fair_value_market": 156,
+    "overnight": 90,
+    "company_news": 54
+   }
+  },
+  "5d/tiled/profitable": {
+   "name_windows": 6396,
+   "market_or_repricing": 0.25359599749843653,
+   "market_plus_repricing_as_one": 0.2518761726078799,
+   "fair_value_company": 0.15916197623514697,
+   "top_causes": {
+    "random_noise": 2348,
+    "fair_value_market": 1618,
+    "fair_value_company": 1018,
+    "overnight": 817,
+    "company_news": 396
+   }
+  },
+  "20d/anchored/loss": {
+   "name_windows": 67,
+   "market_or_repricing": 0.14925373134328357,
+   "market_plus_repricing_as_one": 0.14925373134328357,
+   "fair_value_company": 0.835820895522388,
+   "top_causes": {
+    "fair_value_company": 56,
+    "fair_value_market": 10,
+    "random_noise": 1
+   }
+  },
+  "20d/anchored/profitable": {
+   "name_windows": 533,
+   "market_or_repricing": 0.8442776735459663,
+   "market_plus_repricing_as_one": 0.8442776735459663,
+   "fair_value_company": 0.0150093808630394,
+   "top_causes": {
+    "fair_value_market": 450,
+    "random_noise": 54,
+    "overnight": 15,
+    "fair_value_company": 8,
+    "company_news": 3
+   }
+  },
+  "20d/tiled/loss": {
+   "name_windows": 201,
+   "market_or_repricing": 0.1890547263681592,
+   "market_plus_repricing_as_one": 0.18407960199004975,
+   "fair_value_company": 0.4527363184079602,
+   "top_causes": {
+    "fair_value_company": 91,
+    "random_noise": 46,
+    "fair_value_market": 38,
+    "overnight": 10,
+    "company_news": 9
+   }
+  },
+  "20d/tiled/profitable": {
+   "name_windows": 1599,
+   "market_or_repricing": 0.41901188242651655,
+   "market_plus_repricing_as_one": 0.4208880550343965,
+   "fair_value_company": 0.1425891181988743,
+   "top_causes": {
+    "fair_value_market": 670,
+    "random_noise": 421,
+    "fair_value_company": 228,
+    "overnight": 145,
+    "company_news": 76
+   }
+  }
+ }
+}

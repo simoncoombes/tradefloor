@@ -1,0 +1,78 @@
+{
+ "kind": "crisisext",
+ "rule": {
+  "row": "crisis_sector_dispersion",
+  "need": 10,
+  "block": 30,
+  "first": 1001,
+  "blocks": 9,
+  "last_seed": 1270
+ },
+ "label": "heldout_seeds",
+ "cell": "ptv22c",
+ "cell_file": "/Users/simoncoombes/Dev/tf-lossmaker-grade/g1/out/heldseeds/cells/cell-ptv22c.json",
+ "days": 252,
+ "base": "pt-v21",
+ "overrides": {
+  "lossmaker_rate_sensitivity": 11.0
+ },
+ "fingerprint": "custom-1b953028",
+ "commit": "a1a9758e638a685970b734104ea5e86e03acd512",
+ "held_roster": [
+  40,
+  111
+ ],
+ "own_seeds": [
+  270001,
+  270002,
+  270003,
+  270004,
+  270005,
+  270006,
+  270007,
+  270008,
+  270009,
+  270010,
+  270011,
+  270012,
+  270013,
+  270014,
+  270015,
+  270016,
+  270017,
+  270018,
+  270019,
+  270020,
+  270021,
+  270022,
+  270023,
+  270024,
+  270025,
+  270026,
+  270027,
+  270028,
+  270029,
+  270030
+ ],
+ "own_readings": 5,
+ "blocks": [
+  {
+   "seeds": [
+    1001,
+    1030
+   ],
+   "readings": {
+    "1001": 1.2134086213114719,
+    "1002": 1.2837497539091502,
+    "1017": 1.236931325604806,
+    "1021": 1.213733207910001,
+    "1025": 1.2393734054866188
+   },
+   "absent": 25,
+   "count_after": 10,
+   "elapsed_s": 491.8
+  }
+ ],
+ "status": "reached",
+ "total_readings": 10
+}

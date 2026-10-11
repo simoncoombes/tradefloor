@@ -1,0 +1,567 @@
+{
+ "preset": "pt-v21",
+ "seeds": "9101-9130",
+ "roster": 4022,
+ "names": 200,
+ "real": -10.899009031013634,
+ "grid": {
+  "0.0": {
+   "excess_over_growth_per_100bp": 2.3446763413987024,
+   "se": 0.744722942914829,
+   "excess_over_profitable_per_100bp": 1.8861151960910418,
+   "loss_per_100bp": 0.01850183926674157,
+   "n_loss": 17,
+   "per_seed": {
+    "9101": {
+     "loss": 0.1111230745901842,
+     "growth": 0.037480935016163154,
+     "profitable": 0.027175662260586663,
+     "excess_over_growth_per_100bp": 3.0430636187612,
+     "excess_over_profitable_per_100bp": 3.4689013359337824,
+     "loss_per_100bp": 4.5918625863712474,
+     "n_loss": 17
+    },
+    "9102": {
+     "loss": -0.25648282481874823,
+     "growth": -0.15891356133159004,
+     "profitable": -0.19914389639677701,
+     "excess_over_growth_per_100bp": -4.031787747403231,
+     "excess_over_profitable_per_100bp": -2.369377207519472,
+     "loss_per_100bp": -10.598463835485465,
+     "n_loss": 17
+    },
+    "9103": {
+     "loss": -0.00873305661022112,
+     "growth": -0.06327010809543103,
+     "profitable": -0.04495868477948447,
+     "excess_over_growth_per_100bp": 2.253597168810327,
+     "excess_over_profitable_per_100bp": 1.4969267838538574,
+     "loss_per_100bp": -0.3608701078603768,
+     "n_loss": 17
+    },
+    "9104": {
+     "loss": 0.05834606850347796,
+     "growth": -0.08069198572167842,
+     "profitable": 0.013079936529029354,
+     "excess_over_growth_per_100bp": 5.745374141535388,
+     "excess_over_profitable_per_100bp": 1.870501321258207,
+     "loss_per_100bp": 2.4109945662594203,
+     "n_loss": 17
+    },
+    "9105": {
+     "loss": -0.31707466252903344,
+     "growth": -0.38579855851189737,
+     "profitable": -0.37084158291197744,
+     "excess_over_growth_per_100bp": 2.8398304125150386,
+     "excess_over_profitable_per_100bp": 2.221773569543141,
+     "loss_per_100bp": -13.102258782191464,
+     "n_loss": 17
+    },
+    "9106": {
+     "loss": -0.08472865193841818,
+     "growth": -0.11371709351013004,
+     "profitable": -0.14522070517723104,
+     "excess_over_growth_per_100bp": 1.1978694864343746,
+     "excess_over_profitable_per_100bp": 2.499671621438548,
+     "loss_per_100bp": -3.5011839643974456,
+     "n_loss": 17
+    },
+    "9107": {
+     "loss": 0.14826130071237564,
+     "growth": -0.12743004673469227,
+     "profitable": -0.07774710254251722,
+     "excess_over_growth_per_100bp": 11.392204439961484,
+     "excess_over_profitable_per_100bp": 9.339190217144333,
+     "loss_per_100bp": 6.12650002943701,
+     "n_loss": 17
+    },
+    "9108": {
+     "loss": 0.07861752197324413,
+     "growth": 0.004507638448129397,
+     "profitable": 0.017243534588395556,
+     "excess_over_growth_per_100bp": 3.062391881203088,
+     "excess_over_profitable_per_100bp": 2.53611518119209,
+     "loss_per_100bp": 3.2486579327786833,
+     "n_loss": 17
+    },
+    "9109": {
+     "loss": -0.2156509105916891,
+     "growth": -0.07557452609200623,
+     "profitable": -0.18488446762222263,
+     "excess_over_growth_per_100bp": -5.788280351226565,
+     "excess_over_profitable_per_100bp": -1.2713406185729943,
+     "loss_per_100bp": -8.911194652549137,
+     "n_loss": 17
+    },
+    "9110": {
+     "loss": -0.1502705738222677,
+     "growth": -0.22162683097575717,
+     "profitable": -0.19434293517449383,
+     "excess_over_growth_per_100bp": 2.948605667499565,
+     "excess_over_profitable_per_100bp": 1.8211719567035598,
+     "loss_per_100bp": -6.209527843895359,
+     "n_loss": 17
+    },
+    "9111": {
+     "loss": -0.0643096130194499,
+     "growth": -0.20028828411443858,
+     "profitable": -0.07861295529012471,
+     "excess_over_growth_per_100bp": 5.61895335103259,
+     "excess_over_profitable_per_100bp": 0.5910472012675543,
+     "loss_per_100bp": -2.6574220255971035,
+     "n_loss": 17
+    },
+    "9112": {
+     "loss": -0.17533834367261636,
+     "growth": -0.39970785143967785,
+     "profitable": -0.33214761216682337,
+     "excess_over_growth_per_100bp": 9.271467263101714,
+     "excess_over_profitable_per_100bp": 6.479721838603595,
+     "loss_per_100bp": -7.245386102174231,
+     "n_loss": 17
+    },
+    "9113": {
+     "loss": 0.06723398337018267,
+     "growth": 0.015302147866922501,
+     "profitable": 0.020461967355228098,
+     "excess_over_growth_per_100bp": 2.145943615837197,
+     "excess_over_profitable_per_100bp": 1.9327279345022554,
+     "loss_per_100bp": 2.778263775627383,
+     "n_loss": 17
+    },
+    "9114": {
+     "loss": 0.18749148935505394,
+     "growth": 0.01728962170888983,
+     "profitable": 0.04876704803650776,
+     "excess_over_growth_per_100bp": 7.033135026700997,
+     "excess_over_profitable_per_100bp": 5.732414930518437,
+     "loss_per_100bp": 7.747582204754296,
+     "n_loss": 17
+    },
+    "9115": {
+     "loss": -0.04429611398334283,
+     "growth": 0.010592050022660114,
+     "profitable": -0.04702971469067383,
+     "excess_over_growth_per_100bp": -2.268105950661279,
+     "excess_over_profitable_per_100bp": 0.11295870691450421,
+     "loss_per_100bp": -1.830417933195985,
+     "n_loss": 17
+    },
+    "9116": {
+     "loss": -0.05556398084937529,
+     "growth": -0.0976759238315613,
+     "profitable": -0.13350796637466103,
+     "excess_over_growth_per_100bp": 1.7401629331481823,
+     "excess_over_profitable_per_100bp": 3.2208258481523035,
+     "loss_per_100bp": -2.296032266503111,
+     "n_loss": 17
+    },
+    "9117": {
+     "loss": 0.2453686025802087,
+     "growth": 0.13912591694785026,
+     "profitable": 0.1743434344960646,
+     "excess_over_growth_per_100bp": 4.390193621171837,
+     "excess_over_profitable_per_100bp": 2.9349243009976904,
+     "loss_per_100bp": 10.139198453727632,
+     "n_loss": 17
+    },
+    "9118": {
+     "loss": 0.07157135917958372,
+     "growth": -0.042708846695889126,
+     "profitable": -0.036778748482204165,
+     "excess_over_growth_per_100bp": 4.722322556837722,
+     "excess_over_profitable_per_100bp": 4.477277176106938,
+     "loss_per_100bp": 2.957494180974534,
+     "n_loss": 17
+    },
+    "9119": {
+     "loss": -0.005088564684875223,
+     "growth": 0.09133565390048616,
+     "profitable": 0.06692120388219784,
+     "excess_over_growth_per_100bp": -3.9844718423703047,
+     "excess_over_profitable_per_100bp": -2.9756102713666555,
+     "loss_per_100bp": -0.21027126797005055,
+     "n_loss": 17
+    },
+    "9120": {
+     "loss": 0.05317356107884782,
+     "growth": -0.0843737285148367,
+     "profitable": 0.028457364200691605,
+     "excess_over_growth_per_100bp": 5.683772297259691,
+     "excess_over_profitable_per_100bp": 1.0213304495105873,
+     "loss_per_100bp": 2.197254590035034,
+     "n_loss": 17
+    },
+    "9121": {
+     "loss": 0.0577097221233692,
+     "growth": 0.09474048039197179,
+     "profitable": 0.08050110001498055,
+     "excess_over_growth_per_100bp": -1.5301966226695285,
+     "excess_over_profitable_per_100bp": -0.9417924748599732,
+     "loss_per_100bp": 2.384699261296248,
+     "n_loss": 17
+    },
+    "9122": {
+     "loss": 0.20905477949791076,
+     "growth": 0.21020084311489806,
+     "profitable": 0.20677352835782897,
+     "excess_over_growth_per_100bp": -0.047358000701954436,
+     "excess_over_profitable_per_100bp": 0.09426657603643766,
+     "loss_per_100bp": 8.638627251979784,
+     "n_loss": 17
+    },
+    "9123": {
+     "loss": 0.23300428931858244,
+     "growth": 0.10568429862643848,
+     "profitable": 0.1321439545031128,
+     "excess_over_growth_per_100bp": 5.2611566401712375,
+     "excess_over_profitable_per_100bp": 4.167782430391307,
+     "loss_per_100bp": 9.628276418123242,
+     "n_loss": 17
+    },
+    "9124": {
+     "loss": -0.17693034623354786,
+     "growth": -0.1181959919176727,
+     "profitable": -0.17760276608181694,
+     "excess_over_growth_per_100bp": -2.4270394345402964,
+     "excess_over_profitable_per_100bp": 0.027785944143350148,
+     "loss_per_100bp": -7.311171331964788,
+     "n_loss": 17
+    },
+    "9125": {
+     "loss": -0.3167627818193872,
+     "growth": -0.3511446498844484,
+     "profitable": -0.3573392092252912,
+     "excess_over_growth_per_100bp": 1.4207383497959158,
+     "excess_over_profitable_per_100bp": 1.6767118762770248,
+     "loss_per_100bp": -13.089371149561455,
+     "n_loss": 17
+    },
+    "9126": {
+     "loss": -0.1111396417501257,
+     "growth": -0.20379370898017699,
+     "profitable": -0.1709735590580319,
+     "excess_over_growth_per_100bp": 3.828680464051706,
+     "excess_over_profitable_per_100bp": 2.472475921814307,
+     "loss_per_100bp": -4.59254717975726,
+     "n_loss": 17
+    },
+    "9127": {
+     "loss": 0.05659072919400781,
+     "growth": 0.029871082500059286,
+     "profitable": 0.04049128939854979,
+     "excess_over_growth_per_100bp": 1.104117631981344,
+     "excess_over_profitable_per_100bp": 0.6652661072503314,
+     "loss_per_100bp": 2.3384598840499096,
+     "n_loss": 17
+    },
+    "9128": {
+     "loss": 0.2072470651579935,
+     "growth": 0.10523835996290182,
+     "profitable": 0.06979128429077647,
+     "excess_over_growth_per_100bp": 4.215235751863292,
+     "excess_over_profitable_per_100bp": 5.679990944926323,
+     "loss_per_100bp": 8.56392831231378,
+     "n_loss": 17
+    },
+    "9129": {
+     "loss": 0.21852894076628915,
+     "growth": 0.0784983376355155,
+     "profitable": 0.1860483254649431,
+     "excess_over_growth_per_100bp": 5.786388559122878,
+     "excess_over_profitable_per_100bp": 1.3421741860060352,
+     "loss_per_100bp": 9.030121519268146,
+     "n_loss": 17
+    },
+    "9130": {
+     "loss": -0.007520085770559134,
+     "growth": 0.09624164166119431,
+     "profitable": 0.08304497554099567,
+     "excess_over_growth_per_100bp": -4.287674687262539,
+     "excess_over_profitable_per_100bp": -3.7423579054361498,
+     "loss_per_100bp": -0.3107473458908733,
+     "n_loss": 17
+    }
+   }
+  },
+  "11.0": {
+   "excess_over_growth_per_100bp": -11.141784920600053,
+   "se": 0.7443146909312501,
+   "excess_over_profitable_per_100bp": -11.600968038549127,
+   "loss_per_100bp": -13.47009827529406,
+   "n_loss": 17,
+   "per_seed": {
+    "9101": {
+     "loss": -0.21643895086563897,
+     "growth": 0.03748646160609992,
+     "profitable": 0.027171668115370935,
+     "excess_over_growth_per_100bp": -10.492785639328053,
+     "excess_over_profitable_per_100bp": -10.066554503347518,
+     "loss_per_100bp": -8.943758300233016,
+     "n_loss": 17
+    },
+    "9102": {
+     "loss": -0.5798509805658909,
+     "growth": -0.1588437991771167,
+     "profitable": -0.19910991319698498,
+     "excess_over_growth_per_100bp": -17.396990966478274,
+     "excess_over_profitable_per_100bp": -15.733101957392806,
+     "loss_per_100bp": -23.960784320904583,
+     "n_loss": 17
+    },
+    "9103": {
+     "loss": -0.3327463593383543,
+     "growth": -0.06322321340669342,
+     "profitable": -0.04489869644784308,
+     "excess_over_growth_per_100bp": -11.137320079820697,
+     "excess_over_profitable_per_100bp": -11.894531524401291,
+     "loss_per_100bp": -13.749849559436127,
+     "n_loss": 17
+    },
+    "9104": {
+     "loss": -0.26613464675408316,
+     "growth": -0.08069280073431524,
+     "profitable": 0.013073078760387604,
+     "excess_over_growth_per_100bp": -7.662886199163964,
+     "excess_over_profitable_per_100bp": -11.537509318779783,
+     "loss_per_100bp": -10.997299452648065,
+     "n_loss": 17
+    },
+    "9105": {
+     "loss": -0.6427990469467811,
+     "growth": -0.38673915886694377,
+     "profitable": -0.37136097928196515,
+     "excess_over_growth_per_100bp": -10.580987110737082,
+     "excess_over_profitable_per_100bp": -11.216449077058513,
+     "loss_per_100bp": -26.561944088709964,
+     "n_loss": 17
+    },
+    "9106": {
+     "loss": -0.4061232788440594,
+     "growth": -0.11385637645699571,
+     "profitable": -0.14536740968212492,
+     "excess_over_growth_per_100bp": -12.07714472673817,
+     "excess_over_profitable_per_100bp": -10.775035915782418,
+     "loss_per_100bp": -16.781953671242125,
+     "n_loss": 17
+    },
+    "9107": {
+     "loss": -0.17735945489276092,
+     "growth": -0.12753223135186706,
+     "profitable": -0.07777108334275577,
+     "excess_over_growth_per_100bp": -2.0589761793757795,
+     "excess_over_profitable_per_100bp": -4.115221964876246,
+     "loss_per_100bp": -7.328903094742187,
+     "n_loss": 17
+    },
+    "9108": {
+     "loss": -0.25146478687155005,
+     "growth": 0.004503499400123699,
+     "profitable": 0.01722218388241185,
+     "excess_over_growth_per_100bp": -10.577201912052633,
+     "excess_over_profitable_per_100bp": -11.102767386527352,
+     "loss_per_100bp": -10.391106895518597,
+     "n_loss": 17
+    },
+    "9109": {
+     "loss": -0.5400183200629568,
+     "growth": -0.0755747450831363,
+     "profitable": -0.1848858285935367,
+     "excess_over_growth_per_100bp": -19.191883263628945,
+     "excess_over_profitable_per_100bp": -14.674896341711575,
+     "loss_per_100bp": -22.31480661417177,
+     "n_loss": 17
+    },
+    "9110": {
+     "loss": -0.47733995675977225,
+     "growth": -0.2216187779981663,
+     "profitable": -0.19432768185158042,
+     "excess_over_growth_per_100bp": -10.5669908579176,
+     "excess_over_profitable_per_100bp": -11.69472210364429,
+     "loss_per_100bp": -19.72479160164348,
+     "n_loss": 17
+    },
+    "9111": {
+     "loss": -0.39393387953712394,
+     "growth": -0.2004956425340978,
+     "profitable": -0.07875469838393497,
+     "excess_over_growth_per_100bp": -7.993315578637445,
+     "excess_over_profitable_per_100bp": -13.023933105503678,
+     "loss_per_100bp": -16.278259485005123,
+     "n_loss": 17
+    },
+    "9112": {
+     "loss": -0.5001302503289389,
+     "growth": -0.39969754376653394,
+     "profitable": -0.33216928778618304,
+     "excess_over_growth_per_100bp": -4.150111841421692,
+     "excess_over_profitable_per_100bp": -6.940535642262637,
+     "loss_per_100bp": -20.666539269790864,
+     "n_loss": 17
+    },
+    "9113": {
+     "loss": -0.26122515512262673,
+     "growth": 0.01505877102694322,
+     "profitable": 0.020297824095045523,
+     "excess_over_growth_per_100bp": -11.41669116320537,
+     "excess_over_profitable_per_100bp": -11.633180959407946,
+     "loss_per_100bp": -10.794427897629204,
+     "n_loss": 17
+    },
+    "9114": {
+     "loss": -0.14361984499122152,
+     "growth": 0.017289738042291856,
+     "profitable": 0.048767052972255205,
+     "excess_over_growth_per_100bp": -6.649156323698901,
+     "excess_over_profitable_per_100bp": -7.949871816672592,
+     "loss_per_100bp": -5.934704338480228,
+     "n_loss": 17
+    },
+    "9115": {
+     "loss": -0.37166138920159303,
+     "growth": 0.010686784532550444,
+     "profitable": -0.04686864766835543,
+     "excess_over_growth_per_100bp": -15.799511311328246,
+     "excess_over_profitable_per_100bp": -13.421187666662712,
+     "loss_per_100bp": -15.357908644693929,
+     "n_loss": 17
+    },
+    "9116": {
+     "loss": -0.387559036302588,
+     "growth": -0.09769423867352064,
+     "profitable": -0.13351199143921655,
+     "excess_over_growth_per_100bp": -11.977884199548239,
+     "excess_over_profitable_per_100bp": -10.497811771213696,
+     "loss_per_100bp": -16.014836210850746,
+     "n_loss": 17
+    },
+    "9117": {
+     "loss": -0.08055038396863111,
+     "growth": 0.1391181001815543,
+     "profitable": 0.174342481279428,
+     "excess_over_growth_per_100bp": -9.077210088850638,
+     "excess_over_profitable_per_100bp": -10.532763026779302,
+     "loss_per_100bp": -3.3285282631665747,
+     "n_loss": 17
+    },
+    "9118": {
+     "loss": -0.2510145802975895,
+     "growth": -0.04270869746396921,
+     "profitable": -0.03673695098440432,
+     "excess_over_growth_per_100bp": -8.607681108827284,
+     "excess_over_profitable_per_100bp": -8.85444749228038,
+     "loss_per_100bp": -10.37250331808221,
+     "n_loss": 17
+    },
+    "9119": {
+     "loss": -0.3292369929957302,
+     "growth": 0.09130316294942324,
+     "profitable": 0.06690022133183074,
+     "excess_over_growth_per_100bp": -17.37769239442783,
+     "excess_over_profitable_per_100bp": -16.36930637717194,
+     "loss_per_100bp": -13.604834421311168,
+     "n_loss": 17
+    },
+    "9120": {
+     "loss": -0.2726576172512919,
+     "growth": -0.08438899640341666,
+     "profitable": 0.028441506022094255,
+     "excess_over_growth_per_100bp": -7.779695076358482,
+     "excess_over_profitable_per_100bp": -12.442112531958106,
+     "loss_per_100bp": -11.266843688069914,
+     "n_loss": 17
+    },
+    "9121": {
+     "loss": -0.2715578919808063,
+     "growth": 0.09473921858347097,
+     "profitable": 0.08049709704196925,
+     "excess_over_growth_per_100bp": -15.136244238193278,
+     "excess_over_profitable_per_100bp": -14.547726819122957,
+     "loss_per_100bp": -11.221400495074642,
+     "n_loss": 17
+    },
+    "9122": {
+     "loss": -0.11497623233873225,
+     "growth": 0.21020218104474594,
+     "profitable": 0.20677965924970337,
+     "excess_over_growth_per_100bp": -13.43712451997844,
+     "excess_over_profitable_per_100bp": -13.295697999522135,
+     "loss_per_100bp": -4.75108398093935,
+     "n_loss": 17
+    },
+    "9123": {
+     "loss": -0.090522671704616,
+     "growth": 0.10568435885551292,
+     "profitable": 0.13214403624290458,
+     "excess_over_growth_per_100bp": -8.107728535542519,
+     "excess_over_profitable_per_100bp": -9.201103634195066,
+     "loss_per_100bp": -3.7406062687857857,
+     "n_loss": 17
+    },
+    "9124": {
+     "loss": -0.5040358028593178,
+     "growth": -0.11825933184979309,
+     "profitable": -0.17765335268358395,
+     "excess_over_growth_per_100bp": -15.941176487996891,
+     "excess_over_profitable_per_100bp": -13.486878106435285,
+     "loss_per_100bp": -20.82792573798834,
+     "n_loss": 17
+    },
+    "9125": {
+     "loss": -0.6487612453919758,
+     "growth": -0.35106027273530355,
+     "profitable": -0.3574759366779469,
+     "excess_over_growth_per_100bp": -12.301693084986455,
+     "excess_over_profitable_per_100bp": -12.036583004711938,
+     "loss_per_100bp": -26.808315925288255,
+     "n_loss": 17
+    },
+    "9126": {
+     "loss": -0.4305457470748571,
+     "growth": -0.20379369434799133,
+     "profitable": -0.1709715313593198,
+     "excess_over_growth_per_100bp": -9.369919534168007,
+     "excess_over_profitable_per_100bp": -10.726207260972616,
+     "loss_per_100bp": -17.791146573341205,
+     "n_loss": 17
+    },
+    "9127": {
+     "loss": -0.2687906504789818,
+     "growth": 0.029854410896262562,
+     "profitable": 0.04038871943484923,
+     "excess_over_growth_per_100bp": -12.340705015505966,
+     "excess_over_profitable_per_100bp": -12.776007021232688,
+     "loss_per_100bp": -11.107051672685198,
+     "n_loss": 17
+    },
+    "9128": {
+     "loss": -0.1216392399622416,
+     "growth": 0.10524039009204343,
+     "profitable": 0.06981242160559073,
+     "excess_over_growth_per_100bp": -9.375191324557232,
+     "excess_over_profitable_per_100bp": -7.911225684621171,
+     "loss_per_100bp": -5.026414874472794,
+     "n_loss": 17
+    },
+    "9129": {
+     "loss": -0.11046067631446703,
+     "growth": 0.07841585704788467,
+     "profitable": 0.1859953218413271,
+     "excess_over_growth_per_100bp": -7.804815428196352,
+     "excess_over_profitable_per_100bp": -12.250247857677445,
+     "loss_per_100bp": -4.564490756796158,
+     "n_loss": 17
+    },
+    "9130": {
+     "loss": -0.3361362778583097,
+     "growth": 0.09624109108310244,
+     "profitable": 0.08304216562774554,
+     "excess_over_growth_per_100bp": -17.866833427331077,
+     "excess_over_profitable_per_100bp": -17.321423284547738,
+     "loss_per_100bp": -13.889928837120236,
+     "n_loss": 17
+    }
+   }
+  }
+ }
+}

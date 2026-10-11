@@ -1,0 +1,62 @@
+{
+ "commit": "a1a9758e638a685970b734104ea5e86e03acd512",
+ "build": {
+  "so": "/Users/simoncoombes/Dev/tf-lossmaker/python/tradefloor/_core.pyi",
+  "so_mtime": "2026-10-11 08:25:50",
+  "rust_commit": "2026-10-11 08:27:35 f020c62",
+  "rust_dirty": "",
+  "branch": "feat/lossmaker-duration",
+  "python": "3.13.15",
+  "engine_file": "/Users/simoncoombes/Dev/tf-lossmaker/python/tradefloor/__init__.py"
+ },
+ "base": "pt-v21",
+ "seeds": [
+  270101,
+  270102,
+  270103,
+  270104,
+  270105,
+  270106,
+  270107,
+  270108,
+  270109,
+  270110,
+  270111,
+  270112,
+  270113,
+  270114,
+  270115,
+  270116,
+  270117,
+  270118,
+  270119,
+  270120,
+  270121,
+  270122,
+  270123,
+  270124,
+  270125,
+  270126,
+  270127,
+  270128,
+  270129,
+  270130
+ ],
+ "lever_seeds": [
+  101,
+  102,
+  103,
+  104,
+  105,
+  106,
+  107,
+  108,
+  109,
+  110
+ ],
+ "protocols": {
+  "held": "Universe.random(40, seed=111), market seed s, 252 days",
+  "vary": "Universe.random(40, seed=s), market seed s, 252 days (facts.LEVEL_PROTOCOL)",
+  "lever": "held roster, 252 days after 252 burn, Scenario().hold(vix=5|65), the --lever-seeds"
+ }
+}

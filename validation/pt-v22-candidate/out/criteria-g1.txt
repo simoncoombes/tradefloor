@@ -1,0 +1,48 @@
+PASS CRITERIA (programme/longrun/CRITERIA.md, adopted 2026-09-23, C4 added 2026-09-24), computed by criteria.py
+long run  /Users/simoncoombes/Dev/tf-lossmaker-grade/g1/out/longrun-report.json
+  pt-v21: base pt-v21, 0 dials, 90 seeds x 21 years, engine a1a9758e638a, fingerprint pt-v21
+  ptv22c: base pt-v21, 1 dials, 90 seeds x 21 years, engine a1a9758e638a, fingerprint custom-1b953028
+cert      /Users/simoncoombes/Dev/tf-lossmaker-grade/g1/out/certgrade-g1.json  (arms pt-v21=pt-v21, ptv22c=ptv22c)
+edge      pt-v21=pt-v21 from /Users/simoncoombes/Dev/tf-lossmaker-grade/g1/out/edge.json: base pt-v21, 10 seeds from 270101 x 300 days, 6035 events
+edge      ptv22c=ptv22c from /Users/simoncoombes/Dev/tf-lossmaker-grade/g1/out/edge.json: base pt-v21, 10 seeds from 270101 x 300 days, 6035 events
+c4        pt-v21=pt-v21 from /Users/simoncoombes/Dev/tf-lossmaker-grade/g1/out/c4a.json, /Users/simoncoombes/Dev/tf-lossmaker-grade/g1/out/c4b.json (tradefloor 0.10.2 at a1a9758e638a): c4a, c4b
+c4        ptv22c=ptv22c from /Users/simoncoombes/Dev/tf-lossmaker-grade/g1/out/c4a.json, /Users/simoncoombes/Dev/tf-lossmaker-grade/g1/out/c4b.json (tradefloor 0.10.2 at a1a9758e638a): c4a, c4b
+
+    criterion                                      real/target   pt-v21                    ptv22c                    
+    A1 worst month's volatility within 30%         84 / 95       94 / 73  pass             94 / 73  pass             
+    A2 maximum drawdown within 30%                 0.57 / 0.34   0.50 / 0.32  pass         0.50 / 0.32  pass         
+    A3 peak stock correlation within 0.15          0.75 / 0.87   0.82 / 0.81  pass         0.82 / 0.81  pass         
+    B1 time with VIX above 30, within 1/2x to 2x   8.2%          5.1%  pass                5.2%  pass                
+    B2 fear-spell length above 30, 1/2x to 2x      22            18  pass                  18  pass                  
+    B3 20% bear markets per decade, 1/2x to 2x     1.12          1.62  pass                1.62  pass                
+    B4 10% corrections per decade, 1/2x to 2x      3.65          4.48  pass                4.43  pass                
+    B5 sessions under -5% per decade, 1/2x to 2x   6.2           6.2  pass                 6.3  pass                 
+    B6 time with VIX under 15, 1/2x to 2x          32.6%         34.6%  pass               34.7%  pass               
+    B7 index volatility within 20%                 18.1          18.1  pass                18.1  pass                
+    B8 long-run index return within 2 points       6.25          6.8  pass                 6.7  pass                 
+    C1 crash rate steady, years 3-21 / 1-2         1.0x          1.28x  pass               1.30x  pass               
+    C2 VIX ceiling hits, at most 1 of 30           0             0 of 90  pass             0 of 90  pass             
+    C3 headline edge 5 ticks late, under 20 bp     ~0            +19bp  pass               +19bp  pass               
+    C4a 65-min return ACF1 >= -0.05, or Roll <= 2x ~0 (Roll)     -0.022 / 1.3x  pass       -0.020 / 1.4x  pass       
+    C4b price-only rules: <= +5 pts, <= 14 of 20   ~0            -2.0 pts, 7/20  pass      -1.3 pts, 8/20  pass      
+    D1 every ruled band in, all four cells         --            in  pass                  in  pass                  
+
+Result
+    pt-v21         passes 17 of 17; nearest the edge: C3 (+18.5 bp, 93% of tolerance)
+    ptv22c         passes 17 of 17; nearest the edge: C3 (+18.5 bp, 93% of tolerance)
+
+Reported, not gated (CRITERIA.md): the certification's VIX rows, the mechanism certificate, the lever
+    pt-v21         VIX row: panel_252 k 21/30 refused/above; panel_504 k 9/30 refused/below; heldout_seeds k 22/30 refused/above
+                   mechanisms: panel_252 10/10; heldout_seeds 10/10; lever 5.03x (tape 6.16x)
+    ptv22c         VIX row: panel_252 k 21/30 refused/above; panel_504 k 9/30 refused/below; heldout_seeds k 22/30 refused/above
+                   mechanisms: panel_252 10/10; heldout_seeds 10/10; lever 4.99x (tape 6.16x)
+
+D1's crisis_sector_dispersion, at least 10 readings per cell (own seeds, then blocks of 30 from 1001 to 1270 at most)
+    pt-v21         panel_252         own  5 of 30, 1 block(s) 1001-1030, total 10, median 1.2234, band [0.79, 1.74]: pass
+    pt-v21         panel_504         own  7 of 30, 1 block(s) 1001-1030, total 19, median 1.2354, band [1.03, 1.66]: pass
+    pt-v21         heldout_seeds     own  5 of 30, 1 block(s) 1001-1030, total 10, median 1.2234, band [0.79, 1.74]: pass
+    pt-v21         heldout_universe  own  4 of 30, 2 block(s) 1001-1060, total 14, median 1.2502, band [0.79, 1.74]: pass
+    ptv22c         panel_252         own  5 of 30, 1 block(s) 1001-1030, total 10, median 1.2257, band [0.79, 1.74]: pass
+    ptv22c         panel_504         own  7 of 30, 1 block(s) 1001-1030, total 19, median 1.2336, band [1.03, 1.66]: pass
+    ptv22c         heldout_seeds     own  5 of 30, 1 block(s) 1001-1030, total 10, median 1.2253, band [0.79, 1.74]: pass
+    ptv22c         heldout_universe  own  4 of 30, 2 block(s) 1001-1060, total 14, median 1.2501, band [0.79, 1.74]: pass

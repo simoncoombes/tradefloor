@@ -1,0 +1,1185 @@
+{
+ "kind": "longrun.c4",
+ "tradefloor_version": "0.10.2",
+ "engine_commit": "a1a9758e638a685970b734104ea5e86e03acd512",
+ "arms": {
+  "pt-v21": {
+   "base": "pt-v21",
+   "dials": {},
+   "fingerprint": "pt-v21",
+   "c4b": {
+    "suite": "tf-suite-2026.1",
+    "median_ceiling": 5.0,
+    "wins_ceiling": 14,
+    "specs": {
+     "mean_reversion_1step": {
+      "median_excess": -30.72904967669693,
+      "wins": 1,
+      "markets": 20,
+      "median_return": -32.11458928964613,
+      "beats_oracle": 1,
+      "median_turnover": 415.4473028015955,
+      "graded": true,
+      "pass": true
+     },
+     "mean_reversion_1day": {
+      "median_excess": -16.20372632525289,
+      "wins": 2,
+      "markets": 20,
+      "median_return": -18.164149322189516,
+      "beats_oracle": 1,
+      "median_turnover": 198.59393832408088,
+      "graded": true,
+      "pass": true
+     },
+     "mean_reversion_5day_daily": {
+      "median_excess": -4.488633253493573,
+      "wins": 6,
+      "markets": 20,
+      "median_return": -3.8449177550678666,
+      "beats_oracle": 6,
+      "median_turnover": 34.20756090209515,
+      "graded": true,
+      "pass": true
+     },
+     "momentum_1step": {
+      "median_excess": -43.39748645881771,
+      "wins": 0,
+      "markets": 20,
+      "median_return": -47.215804538130705,
+      "beats_oracle": 0,
+      "median_turnover": 377.7729536845924,
+      "graded": true,
+      "pass": true
+     },
+     "momentum_1day": {
+      "median_excess": -18.305451729833713,
+      "wins": 0,
+      "markets": 20,
+      "median_return": -22.294513278740347,
+      "beats_oracle": 0,
+      "median_turnover": 185.15376606234045,
+      "graded": true,
+      "pass": true
+     },
+     "momentum_5day_daily": {
+      "median_excess": -1.9502652491682326,
+      "wins": 7,
+      "markets": 20,
+      "median_return": -3.0082092491750956,
+      "beats_oracle": 7,
+      "median_turnover": 34.0642176283173,
+      "graded": true,
+      "pass": true
+     },
+     "oracle": {
+      "median_excess": -0.001160920979891511,
+      "wins": 10,
+      "markets": 20,
+      "median_return": 0.7936685915992769,
+      "beats_oracle": 0,
+      "median_turnover": 3.5589964877277596,
+      "graded": false,
+      "pass": true
+     }
+    },
+    "failing": [],
+    "worst": "momentum_5day_daily",
+    "pass": true,
+    "buy_and_hold_median_return": 0.6562490095656424,
+    "cells": [
+     {
+      "seed": 92001,
+      "universe_seed": 93001,
+      "scenario": null,
+      "returns": {
+       "mean_reversion_1step": -28.232305382079993,
+       "mean_reversion_1day": -17.811700807512132,
+       "mean_reversion_5day_daily": -1.4229520313240238,
+       "momentum_1step": -34.38461992908537,
+       "momentum_1day": -12.297250958293782,
+       "momentum_5day_daily": -3.8426929221850585,
+       "buy_and_hold": 4.125887668411119,
+       "oracle": 3.381546333564282
+      },
+      "turnover": {
+       "mean_reversion_1step": 384628930.509006,
+       "mean_reversion_1day": 172598049.5033653,
+       "mean_reversion_5day_daily": 32250400.2590315,
+       "momentum_1step": 377374051.54756415,
+       "momentum_1day": 173731343.13908774,
+       "momentum_5day_daily": 32284173.46842105,
+       "buy_and_hold": 965313.6641340728,
+       "oracle": 3975977.8431491293
+      }
+     },
+     {
+      "seed": 92002,
+      "universe_seed": 93002,
+      "scenario": null,
+      "returns": {
+       "mean_reversion_1step": -28.181807766440976,
+       "mean_reversion_1day": -13.39826434626343,
+       "mean_reversion_5day_daily": -3.1168787108177556,
+       "momentum_1step": -38.3058632129155,
+       "momentum_1day": -16.600262490141844,
+       "momentum_5day_daily": -1.9085313640311359,
+       "buy_and_hold": 2.8405532112641145,
+       "oracle": 3.220919749960163
+      },
+      "turnover": {
+       "mean_reversion_1step": 412579880.8307003,
+       "mean_reversion_1day": 190153141.12240246,
+       "mean_reversion_5day_daily": 32790032.14664156,
+       "momentum_1step": 383261019.58698016,
+       "momentum_1day": 182917492.47155082,
+       "momentum_5day_daily": 32933246.432047945,
+       "buy_and_hold": 1000941.3076503477,
+       "oracle": 2787082.946851766
+      }
+     },
+     {
+      "seed": 92003,
+      "universe_seed": 93003,
+      "scenario": null,
+      "returns": {
+       "mean_reversion_1step": -35.86503862826199,
+       "mean_reversion_1day": -13.972308880937053,
+       "mean_reversion_5day_daily": -3.3117696930356906,
+       "momentum_1step": -46.65235789568032,
+       "momentum_1day": -27.200429187281244,
+       "momentum_5day_daily": -3.768738890719076,
+       "buy_and_hold": 12.409930506735947,
+       "oracle": 11.51870425503475
+      },
+      "turnover": {
+       "mean_reversion_1step": 404641027.1950881,
+       "mean_reversion_1day": 202288774.68802917,
+       "mean_reversion_5day_daily": 34104464.863966435,
+       "momentum_1step": 362930477.6824508,
+       "momentum_1day": 179055122.1553046,
+       "momentum_5day_daily": 33208757.18306665,
+       "buy_and_hold": 1001367.935509364,
+       "oracle": 3224619.258222184
+      }
+     },
+     {
+      "seed": 92004,
+      "universe_seed": 93004,
+      "scenario": null,
+      "returns": {
+       "mean_reversion_1step": -31.481808858190952,
+       "mean_reversion_1day": -18.516597836866904,
+       "mean_reversion_5day_daily": -9.510182560961088,
+       "momentum_1step": -42.70373888911863,
+       "momentum_1day": -18.047857081414385,
+       "momentum_5day_daily": 3.499892951418424,
+       "buy_and_hold": 4.399130355861085,
+       "oracle": 3.6960758812771526
+      },
+      "turnover": {
+       "mean_reversion_1step": 417871940.7903126,
+       "mean_reversion_1day": 193477916.55745342,
+       "mean_reversion_5day_daily": 32888244.387614243,
+       "momentum_1step": 378171855.82162064,
+       "momentum_1day": 187798098.98188797,
+       "momentum_5day_daily": 33703274.93776533,
+       "buy_and_hold": 999146.4469535721,
+       "oracle": 4352563.792869455
+      }
+     },
+     {
+      "seed": 92005,
+      "universe_seed": 93005,
+      "scenario": null,
+      "returns": {
+       "mean_reversion_1step": -44.01060822528964,
+       "mean_reversion_1day": -24.27575093670273,
+       "mean_reversion_5day_daily": -3.9421878485771824,
+       "momentum_1step": -59.643827939858554,
+       "momentum_1day": -29.299958469353882,
+       "momentum_5day_daily": -4.479352934231655,
+       "buy_and_hold": 0.8083149749082863,
+       "oracle": -0.0866797047414002
+      },
+      "turnover": {
+       "mean_reversion_1step": 391556864.93229294,
+       "mean_reversion_1day": 197945763.89314303,
+       "mean_reversion_5day_daily": 32917831.707888953,
+       "momentum_1step": 335619757.0356093,
+       "momentum_1day": 184657430.39819425,
+       "momentum_5day_daily": 32352211.10539198,
+       "buy_and_hold": 1001407.8576190255,
+       "oracle": 3328216.6341684284
+      }
+     },
+     {
+      "seed": 92006,
+      "universe_seed": 93006,
+      "scenario": null,
+      "returns": {
+       "mean_reversion_1step": -36.96653702892564,
+       "mean_reversion_1day": -19.3288595269192,
+       "mean_reversion_5day_daily": -5.979403792266746,
+       "momentum_1step": -47.77925118058109,
+       "momentum_1day": -23.541403918635275,
+       "momentum_5day_daily": -1.8413913804157522,
+       "buy_and_hold": 0.242669990689517,
+       "oracle": 0.5130006731626345
+      },
+      "turnover": {
+       "mean_reversion_1step": 407491396.6958063,
+       "mean_reversion_1day": 199242112.75501877,
+       "mean_reversion_5day_daily": 35916975.54111164,
+       "momentum_1step": 363860379.97666067,
+       "momentum_1day": 188403588.05760148,
+       "momentum_5day_daily": 36676202.160214886,
+       "buy_and_hold": 1000993.0031845304,
+       "oracle": 4908641.981232665
+      }
+     },
+     {
+      "seed": 92007,
+      "universe_seed": 93007,
+      "scenario": null,
+      "returns": {
+       "mean_reversion_1step": -29.81241737951357,
+       "mean_reversion_1day": -18.61167399097816,
+       "mean_reversion_5day_daily": -6.63996839261438,
+       "momentum_1step": -41.3379615478371,
+       "momentum_1day": -13.429205653882212,
+       "momentum_5day_daily": 1.3750813943323912,
+       "buy_and_hold": 3.740882104379253,
+       "oracle": 3.154313862964022
+      },
+      "turnover": {
+       "mean_reversion_1step": 461062927.0609229,
+       "mean_reversion_1day": 203702812.4495217,
+       "mean_reversion_5day_daily": 35012197.3165295,
+       "momentum_1step": 407468364.22972536,
+       "momentum_1day": 203692381.84176362,
+       "momentum_5day_daily": 37061078.85689318,
+       "buy_and_hold": 1000633.5809026614,
+       "oracle": 3720005.939231582
+      }
+     },
+     {
+      "seed": 92008,
+      "universe_seed": 93008,
+      "scenario": null,
+      "returns": {
+       "mean_reversion_1step": -23.5093202972178,
+       "mean_reversion_1day": -11.192010600891768,
+       "mean_reversion_5day_daily": -6.855489083616086,
+       "momentum_1step": -40.60467096030193,
+       "momentum_1day": -20.03214564550596,
+       "momentum_5day_daily": 1.969279495722335,
+       "buy_and_hold": 3.785748622953531,
+       "oracle": 17.32404042776581
+      },
+      "turnover": {
+       "mean_reversion_1step": 448184136.48769873,
+       "mean_reversion_1day": 204112224.2333822,
+       "mean_reversion_5day_daily": 31215206.16767235,
+       "momentum_1step": 387512564.8763212,
+       "momentum_1day": 189427038.4783262,
+       "momentum_5day_daily": 31873541.050821636,
+       "buy_and_hold": 1000638.4963639624,
+       "oracle": 16041334.061897792
+      }
+     },
+     {
+      "seed": 92009,
+      "universe_seed": 93009,
+      "scenario": "geopolitical_conflict",
+      "returns": {
+       "mean_reversion_1step": -23.23531981260141,
+       "mean_reversion_1day": -10.83245419764251,
+       "mean_reversion_5day_daily": -3.3031916788964764,
+       "momentum_1step": -32.940076289999915,
+       "momentum_1day": -14.631945834280947,
+       "momentum_5day_daily": -0.34480799209617546,
+       "buy_and_hold": -1.4687934633286552,
+       "oracle": -1.75839504241962
+      },
+      "turnover": {
+       "mean_reversion_1step": 462946761.4154855,
+       "mean_reversion_1day": 209965486.69713968,
+       "mean_reversion_5day_daily": 34150245.24261158,
+       "momentum_1step": 428557771.5910981,
+       "momentum_1day": 199724342.09338886,
+       "momentum_5day_daily": 34420887.106931545,
+       "buy_and_hold": 1000594.407940424,
+       "oracle": 3091942.016349824
+      }
+     },
+     {
+      "seed": 92010,
+      "universe_seed": 93010,
+      "scenario": "geopolitical_conflict",
+      "returns": {
+       "mean_reversion_1step": -38.77467756719673,
+       "mean_reversion_1day": -22.938716178445194,
+       "mean_reversion_5day_daily": -4.105003716430452,
+       "momentum_1step": -52.271957524122136,
+       "momentum_1day": -22.41333282333552,
+       "momentum_5day_daily": -4.188907099592022,
+       "buy_and_hold": -9.636646289639849,
+       "oracle": -10.188312048015744
+      },
+      "turnover": {
+       "mean_reversion_1step": 380181155.7680922,
+       "mean_reversion_1day": 188545951.4990468,
+       "mean_reversion_5day_daily": 34217681.78431288,
+       "momentum_1step": 350995911.48831517,
+       "momentum_1day": 174028698.06627768,
+       "momentum_5day_daily": 34117574.54408274,
+       "buy_and_hold": 968252.3462421889,
+       "oracle": 3253497.504421257
+      }
+     },
+     {
+      "seed": 92011,
+      "universe_seed": 93011,
+      "scenario": "liquidity_crisis",
+      "returns": {
+       "mean_reversion_1step": -40.16162819252986,
+       "mean_reversion_1day": -22.09677978348534,
+       "mean_reversion_5day_daily": -0.22270623591289623,
+       "momentum_1step": -49.94331501757932,
+       "momentum_1day": -27.25622768475915,
+       "momentum_5day_daily": -9.162744184673624,
+       "buy_and_hold": -17.890581610872818,
+       "oracle": -16.810353264342385
+      },
+      "turnover": {
+       "mean_reversion_1step": 375502636.8360529,
+       "mean_reversion_1day": 195106716.76642177,
+       "mean_reversion_5day_daily": 36600076.407350145,
+       "momentum_1step": 337774883.67962784,
+       "momentum_1day": 185650101.7264866,
+       "momentum_5day_daily": 35718575.18366715,
+       "buy_and_hold": 981637.8907750067,
+       "oracle": 3367131.8312862604
+      }
+     },
+     {
+      "seed": 92012,
+      "universe_seed": 93012,
+      "scenario": "liquidity_crisis",
+      "returns": {
+       "mean_reversion_1step": -34.38044546391055,
+       "mean_reversion_1day": -21.041223852575477,
+       "mean_reversion_5day_daily": -0.29006261527783933,
+       "momentum_1step": -49.03225044275038,
+       "momentum_1day": -20.15327456890658,
+       "momentum_5day_daily": -6.387219157701998,
+       "buy_and_hold": -4.87258875959724,
+       "oracle": -4.673774543308164
+      },
+      "turnover": {
+       "mean_reversion_1step": 424387898.8295485,
+       "mean_reversion_1day": 201842337.44865063,
+       "mean_reversion_5day_daily": 36212631.01497473,
+       "momentum_1step": 382022030.72951835,
+       "momentum_1day": 192346637.20444977,
+       "momentum_5day_daily": 36240350.48788609,
+       "buy_and_hold": 1000919.7904307086,
+       "oracle": 3112005.7649053684
+      }
+     },
+     {
+      "seed": 92013,
+      "universe_seed": 93013,
+      "scenario": "oil_price_spike",
+      "returns": {
+       "mean_reversion_1step": -37.53033716720474,
+       "mean_reversion_1day": -16.570766007989864,
+       "mean_reversion_5day_daily": -3.8084798213864444,
+       "momentum_1step": -52.16363620756639,
+       "momentum_1day": -27.31220142536195,
+       "momentum_5day_daily": -2.9847849196885248,
+       "buy_and_hold": -17.920664773508673,
+       "oracle": -15.848624867410074
+      },
+      "turnover": {
+       "mean_reversion_1step": 411648017.0932093,
+       "mean_reversion_1day": 201417918.10773394,
+       "mean_reversion_5day_daily": 34195774.23529911,
+       "momentum_1step": 346581920.72044027,
+       "momentum_1day": 182377785.23223984,
+       "momentum_5day_daily": 33128817.306514855,
+       "buy_and_hold": 990926.3556824256,
+       "oracle": 3515470.7004958605
+      }
+     },
+     {
+      "seed": 92014,
+      "universe_seed": 93014,
+      "scenario": "oil_price_spike",
+      "returns": {
+       "mean_reversion_1step": -30.553735280038858,
+       "mean_reversion_1day": -17.634682028961972,
+       "mean_reversion_5day_daily": -1.508716288647987,
+       "momentum_1step": -24.51529432332873,
+       "momentum_1day": -11.01398443699259,
+       "momentum_5day_daily": -3.359369967283087,
+       "buy_and_hold": 2.912675344966317,
+       "oracle": 2.711539286717458
+      },
+      "turnover": {
+       "mean_reversion_1step": 417405016.43625367,
+       "mean_reversion_1day": 186837783.5694931,
+       "mean_reversion_5day_daily": 35242454.763871804,
+       "momentum_1step": 408413533.83738065,
+       "momentum_1day": 181249269.7925546,
+       "momentum_5day_daily": 33058955.507428035,
+       "buy_and_hold": 1000659.064545277,
+       "oracle": 4939567.541591685
+      }
+     },
+     {
+      "seed": 92015,
+      "universe_seed": 93015,
+      "scenario": "policy_regime_shift",
+      "returns": {
+       "mean_reversion_1step": -39.87126556828976,
+       "mean_reversion_1day": -19.634560903873936,
+       "mean_reversion_5day_daily": -3.8773668222417705,
+       "momentum_1step": -53.15363194339936,
+       "momentum_1day": -24.582910791906343,
+       "momentum_5day_daily": -2.7046354098698244,
+       "buy_and_hold": 0.5041830442229984,
+       "oracle": 1.0743365100359195
+      },
+      "turnover": {
+       "mean_reversion_1step": 431724191.28042406,
+       "mean_reversion_1day": 205969130.3305314,
+       "mean_reversion_5day_daily": 34547069.606530815,
+       "momentum_1step": 386153054.2937193,
+       "momentum_1day": 200596435.57677615,
+       "momentum_5day_daily": 35308682.88666651,
+       "buy_and_hold": 1000998.252089659,
+       "oracle": 3380132.107054537
+      }
+     },
+     {
+      "seed": 92016,
+      "universe_seed": 93016,
+      "scenario": "policy_regime_shift",
+      "returns": {
+       "mean_reversion_1step": -26.323961812415277,
+       "mean_reversion_1day": -24.24773332194524,
+       "mean_reversion_5day_daily": -3.8124686878939626,
+       "momentum_1step": -77.36539795696717,
+       "momentum_1day": -39.22683518310382,
+       "momentum_5day_daily": -7.155157599672767,
+       "buy_and_hold": 27.84966566705792,
+       "oracle": 8.820886697812425
+      },
+      "turnover": {
+       "mean_reversion_1step": 449678009.55976826,
+       "mean_reversion_1day": 189840812.32027555,
+       "mean_reversion_5day_daily": 33490342.970464393,
+       "momentum_1step": 228928340.16099733,
+       "momentum_1day": 168175177.1039497,
+       "momentum_5day_daily": 31502194.281601038,
+       "buy_and_hold": 1001437.7012727074,
+       "oracle": 16334869.528477456
+      }
+     },
+     {
+      "seed": 92017,
+      "universe_seed": 93017,
+      "scenario": "rate_shock",
+      "returns": {
+       "mean_reversion_1step": -16.884555804097815,
+       "mean_reversion_1day": -9.955218254809221,
+       "mean_reversion_5day_daily": 0.057656121613516007,
+       "momentum_1step": -28.183882428764317,
+       "momentum_1day": -12.429390468483708,
+       "momentum_5day_daily": -3.0316335786616664,
+       "buy_and_hold": 2.484846850436623,
+       "oracle": 1.48205825786544
+      },
+      "turnover": {
+       "mean_reversion_1step": 441868317.34528977,
+       "mean_reversion_1day": 197338632.58161837,
+       "mean_reversion_5day_daily": 35138287.71740607,
+       "momentum_1step": 406418046.37884545,
+       "momentum_1day": 190420905.21402735,
+       "momentum_5day_daily": 34010860.71255187,
+       "buy_and_hold": 994878.3435292067,
+       "oracle": 3602522.2749596587
+      }
+     },
+     {
+      "seed": 92018,
+      "universe_seed": 93018,
+      "scenario": "rate_shock",
+      "returns": {
+       "mean_reversion_1step": -32.747369721101315,
+       "mean_reversion_1day": -12.816192386046598,
+       "mean_reversion_5day_daily": -6.867506218785385,
+       "momentum_1step": -40.01417982402118,
+       "momentum_1day": -22.175693734145177,
+       "momentum_5day_daily": 0.6796149748286465,
+       "buy_and_hold": -2.3116313454125423,
+       "oracle": -1.7636891755019548
+      },
+      "turnover": {
+       "mean_reversion_1step": 413489589.16693735,
+       "mean_reversion_1day": 199667534.88990012,
+       "mean_reversion_5day_daily": 34437740.595944226,
+       "momentum_1step": 385007232.8246272,
+       "momentum_1day": 184406954.30438507,
+       "momentum_5day_daily": 35518352.873886354,
+       "buy_and_hold": 994961.3317052935,
+       "oracle": 3493983.292632796
+      }
+     },
+     {
+      "seed": 92019,
+      "universe_seed": 93019,
+      "scenario": "recession",
+      "returns": {
+       "mean_reversion_1step": 26.795307587184737,
+       "mean_reversion_1day": 8.797335940844798,
+       "mean_reversion_5day_daily": -4.143991237459902,
+       "momentum_1step": -89.4442361466179,
+       "momentum_1day": -59.65486486479745,
+       "momentum_5day_daily": -7.757766777332336,
+       "buy_and_hold": -29.51410947411008,
+       "oracle": -19.146355064211342
+      },
+      "turnover": {
+       "mean_reversion_1step": 540796106.186216,
+       "mean_reversion_1day": 238822711.39999172,
+       "mean_reversion_5day_daily": 34805079.71981129,
+       "momentum_1step": 245556114.34439668,
+       "momentum_1day": 169075552.9267787,
+       "momentum_5day_daily": 34642039.06047233,
+       "buy_and_hold": 980288.8370642759,
+       "oracle": 6102899.295344629
+      }
+     },
+     {
+      "seed": 92020,
+      "universe_seed": 93020,
+      "scenario": "recession",
+      "returns": {
+       "mean_reversion_1step": -41.52159843567633,
+       "mean_reversion_1day": -20.84398659655979,
+       "mean_reversion_5day_daily": -6.370252041363611,
+       "momentum_1step": -51.748732134959155,
+       "momentum_1day": -24.38542688809951,
+       "momentum_5day_daily": -1.5852500972902868,
+       "buy_and_hold": -12.572840251736356,
+       "oracle": -9.61878070230952
+      },
+      "turnover": {
+       "mean_reversion_1step": 408346083.42729074,
+       "mean_reversion_1day": 193862671.4701559,
+       "mean_reversion_5day_daily": 34197440.01987743,
+       "momentum_1step": 377347098.5754513,
+       "momentum_1day": 186342995.83843592,
+       "momentum_5day_daily": 34683257.610154614,
+       "buy_and_hold": 1000998.5824082601,
+       "oracle": 5150536.173704724
+      }
+     }
+    ]
+   }
+  },
+  "ptv22c": {
+   "base": "pt-v21",
+   "dials": {
+    "lossmaker_rate_sensitivity": 11.0
+   },
+   "fingerprint": "custom-1b953028",
+   "c4b": {
+    "suite": "tf-suite-2026.1",
+    "median_ceiling": 5.0,
+    "wins_ceiling": 14,
+    "specs": {
+     "mean_reversion_1step": {
+      "median_excess": -30.139412832646695,
+      "wins": 1,
+      "markets": 20,
+      "median_return": -31.986207650607824,
+      "beats_oracle": 1,
+      "median_turnover": 413.0343351132735,
+      "graded": true,
+      "pass": true
+     },
+     "mean_reversion_1day": {
+      "median_excess": -15.831033864474255,
+      "wins": 2,
+      "markets": 20,
+      "median_return": -17.75257520927579,
+      "beats_oracle": 2,
+      "median_turnover": 198.23462180221605,
+      "graded": true,
+      "pass": true
+     },
+     "mean_reversion_5day_daily": {
+      "median_excess": -3.665593979276455,
+      "wins": 7,
+      "markets": 20,
+      "median_return": -3.3193640281108676,
+      "beats_oracle": 7,
+      "median_turnover": 34.76363722625756,
+      "graded": true,
+      "pass": true
+     },
+     "momentum_1step": {
+      "median_excess": -42.19352677692799,
+      "wins": 0,
+      "markets": 20,
+      "median_return": -47.81277317461872,
+      "beats_oracle": 0,
+      "median_turnover": 377.7255922170471,
+      "graded": true,
+      "pass": true
+     },
+     "momentum_1day": {
+      "median_excess": -17.72253945131959,
+      "wins": 0,
+      "markets": 20,
+      "median_return": -21.28354350900069,
+      "beats_oracle": 0,
+      "median_turnover": 184.98551035723955,
+      "graded": true,
+      "pass": true
+     },
+     "momentum_5day_daily": {
+      "median_excess": -1.285133637769491,
+      "wins": 8,
+      "markets": 20,
+      "median_return": -3.9817518088934243,
+      "beats_oracle": 9,
+      "median_turnover": 34.57480391136082,
+      "graded": true,
+      "pass": true
+     },
+     "oracle": {
+      "median_excess": 0.14465356181629563,
+      "wins": 11,
+      "markets": 20,
+      "median_return": 0.6221367920346791,
+      "beats_oracle": 0,
+      "median_turnover": 3.5600653956139894,
+      "graded": false,
+      "pass": true
+     }
+    },
+    "failing": [],
+    "worst": "momentum_5day_daily",
+    "pass": true,
+    "buy_and_hold_median_return": 0.3734265174562577,
+    "cells": [
+     {
+      "seed": 92001,
+      "universe_seed": 93001,
+      "scenario": null,
+      "returns": {
+       "mean_reversion_1step": -28.137893348553522,
+       "mean_reversion_1day": -17.126575921173696,
+       "mean_reversion_5day_daily": -0.7233357055532978,
+       "momentum_1step": -35.35097424386001,
+       "momentum_1day": -13.70832773424849,
+       "momentum_5day_daily": -4.664997974145133,
+       "buy_and_hold": 4.566663410129223,
+       "oracle": 3.8208340358246584
+      },
+      "turnover": {
+       "mean_reversion_1step": 388148498.08658636,
+       "mean_reversion_1day": 183019833.89772263,
+       "mean_reversion_5day_daily": 34130348.72625421,
+       "momentum_1step": 377063448.36185855,
+       "momentum_1day": 183076902.3009724,
+       "momentum_5day_daily": 33744691.63823635,
+       "buy_and_hold": 965313.6641340728,
+       "oracle": 3981818.226091398
+      }
+     },
+     {
+      "seed": 92002,
+      "universe_seed": 93002,
+      "scenario": null,
+      "returns": {
+       "mean_reversion_1step": -28.181807766440976,
+       "mean_reversion_1day": -13.39826434626343,
+       "mean_reversion_5day_daily": -3.1168787108177556,
+       "momentum_1step": -38.3058632129155,
+       "momentum_1day": -16.600262490141844,
+       "momentum_5day_daily": -1.9085313640311359,
+       "buy_and_hold": 2.8405532112641145,
+       "oracle": 3.220919749960163
+      },
+      "turnover": {
+       "mean_reversion_1step": 412579880.8307003,
+       "mean_reversion_1day": 190153141.12240246,
+       "mean_reversion_5day_daily": 32790032.14664156,
+       "momentum_1step": 383261019.58698016,
+       "momentum_1day": 182917492.47155082,
+       "momentum_5day_daily": 32933246.432047945,
+       "buy_and_hold": 1000941.3076503477,
+       "oracle": 2787082.946851766
+      }
+     },
+     {
+      "seed": 92003,
+      "universe_seed": 93003,
+      "scenario": null,
+      "returns": {
+       "mean_reversion_1step": -34.99720511021772,
+       "mean_reversion_1day": -13.465476043684408,
+       "mean_reversion_5day_daily": -2.7868119791082107,
+       "momentum_1step": -47.84629516865635,
+       "momentum_1day": -29.24641894507906,
+       "momentum_5day_daily": -4.161606993730786,
+       "buy_and_hold": 12.739990785035607,
+       "oracle": 11.838414473724319
+      },
+      "turnover": {
+       "mean_reversion_1step": 408974773.2200907,
+       "mean_reversion_1day": 206480535.81345713,
+       "mean_reversion_5day_daily": 33811641.03109336,
+       "momentum_1step": 362543450.3762487,
+       "momentum_1day": 179147000.86785606,
+       "momentum_5day_daily": 32960491.942614753,
+       "buy_and_hold": 1001367.935509364,
+       "oracle": 3225539.490517412
+      }
+     },
+     {
+      "seed": 92004,
+      "universe_seed": 93004,
+      "scenario": null,
+      "returns": {
+       "mean_reversion_1step": -29.4617568775204,
+       "mean_reversion_1day": -18.378574497377883,
+       "mean_reversion_5day_daily": -10.757107712857122,
+       "momentum_1step": -43.91541370887715,
+       "momentum_1day": -18.40352368438323,
+       "momentum_5day_daily": 5.294413945856667,
+       "buy_and_hold": 5.766684273528936,
+       "oracle": 4.695355393578322
+      },
+      "turnover": {
+       "mean_reversion_1step": 422010901.6358096,
+       "mean_reversion_1day": 195829956.3148876,
+       "mean_reversion_5day_daily": 32005416.277207036,
+       "momentum_1step": 378387736.0722356,
+       "momentum_1day": 193846687.41098905,
+       "momentum_5day_daily": 34852853.12687264,
+       "buy_and_hold": 999146.4469535721,
+       "oracle": 4355148.869519405
+      }
+     },
+     {
+      "seed": 92005,
+      "universe_seed": 93005,
+      "scenario": null,
+      "returns": {
+       "mean_reversion_1step": -42.93302672099076,
+       "mean_reversion_1day": -23.411637054306176,
+       "mean_reversion_5day_daily": -3.3371034466865708,
+       "momentum_1step": -59.10065868153248,
+       "momentum_1day": -30.676918503794028,
+       "momentum_5day_daily": -4.981470689498726,
+       "buy_and_hold": 2.1036470342865212,
+       "oracle": 0.7312729109067236
+      },
+      "turnover": {
+       "mean_reversion_1step": 397671918.8183556,
+       "mean_reversion_1day": 200376834.37915868,
+       "mean_reversion_5day_daily": 34404477.59254745,
+       "momentum_1step": 337460877.5076331,
+       "momentum_1day": 184934090.84818646,
+       "momentum_5day_daily": 33454644.074401617,
+       "buy_and_hold": 1001411.9765475879,
+       "oracle": 3341136.9794278606
+      }
+     },
+     {
+      "seed": 92006,
+      "universe_seed": 93006,
+      "scenario": null,
+      "returns": {
+       "mean_reversion_1step": -36.96653702892564,
+       "mean_reversion_1day": -19.3288595269192,
+       "mean_reversion_5day_daily": -5.979403792266746,
+       "momentum_1step": -47.77925118058109,
+       "momentum_1day": -23.541403918635275,
+       "momentum_5day_daily": -1.8413913804157522,
+       "buy_and_hold": 0.242669990689517,
+       "oracle": 0.5130006731626345
+      },
+      "turnover": {
+       "mean_reversion_1step": 407491396.6958063,
+       "mean_reversion_1day": 199242112.75501877,
+       "mean_reversion_5day_daily": 35916975.54111164,
+       "momentum_1step": 363860379.97666067,
+       "momentum_1day": 188403588.05760148,
+       "momentum_5day_daily": 36676202.160214886,
+       "buy_and_hold": 1000993.0031845304,
+       "oracle": 4908641.981232665
+      }
+     },
+     {
+      "seed": 92007,
+      "universe_seed": 93007,
+      "scenario": null,
+      "returns": {
+       "mean_reversion_1step": -29.81241737951357,
+       "mean_reversion_1day": -18.61167399097816,
+       "mean_reversion_5day_daily": -6.63996839261438,
+       "momentum_1step": -41.3379615478371,
+       "momentum_1day": -13.429205653882212,
+       "momentum_5day_daily": 1.3750813943323912,
+       "buy_and_hold": 3.740882104379253,
+       "oracle": 3.154313862964022
+      },
+      "turnover": {
+       "mean_reversion_1step": 461062927.0609229,
+       "mean_reversion_1day": 203702812.4495217,
+       "mean_reversion_5day_daily": 35012197.3165295,
+       "momentum_1step": 407468364.22972536,
+       "momentum_1day": 203692381.84176362,
+       "momentum_5day_daily": 37061078.85689318,
+       "buy_and_hold": 1000633.5809026614,
+       "oracle": 3720005.939231582
+      }
+     },
+     {
+      "seed": 92008,
+      "universe_seed": 93008,
+      "scenario": null,
+      "returns": {
+       "mean_reversion_1step": -24.326993927170847,
+       "mean_reversion_1day": -10.493779411003517,
+       "mean_reversion_5day_daily": -9.04920592636735,
+       "momentum_1step": -41.338242340045426,
+       "momentum_1day": -21.0493347384891,
+       "momentum_5day_daily": 4.443264855983737,
+       "buy_and_hold": 4.92947076041745,
+       "oracle": 18.61445558095046
+      },
+      "turnover": {
+       "mean_reversion_1step": 451041883.10075057,
+       "mean_reversion_1day": 204769737.3951394,
+       "mean_reversion_5day_daily": 30875574.080849044,
+       "momentum_1step": 384054540.0744982,
+       "momentum_1day": 186395304.25454015,
+       "momentum_5day_daily": 31599986.14406631,
+       "buy_and_hold": 1000638.8960457736,
+       "oracle": 16358321.762758385
+      }
+     },
+     {
+      "seed": 92009,
+      "universe_seed": 93009,
+      "scenario": "geopolitical_conflict",
+      "returns": {
+       "mean_reversion_1step": -21.296208899761016,
+       "mean_reversion_1day": -8.610185689047386,
+       "mean_reversion_5day_daily": -3.301624609535164,
+       "momentum_1step": -34.94192747842991,
+       "momentum_1day": -16.87004808153417,
+       "momentum_5day_daily": -0.4942180119824363,
+       "buy_and_hold": -2.7260525967888998,
+       "oracle": -2.991949923664471
+      },
+      "turnover": {
+       "mean_reversion_1step": 464934246.9247209,
+       "mean_reversion_1day": 208056954.5963523,
+       "mean_reversion_5day_daily": 35588111.76783704,
+       "momentum_1step": 426550455.19664705,
+       "momentum_1day": 197219653.1458871,
+       "momentum_5day_daily": 35937225.60954091,
+       "buy_and_hold": 1000594.407940424,
+       "oracle": 3093850.3441296145
+      }
+     },
+     {
+      "seed": 92010,
+      "universe_seed": 93010,
+      "scenario": "geopolitical_conflict",
+      "returns": {
+       "mean_reversion_1step": -40.289812697374735,
+       "mean_reversion_1day": -23.26718849499703,
+       "mean_reversion_5day_daily": -5.424875599642935,
+       "momentum_1step": -50.004373148799075,
+       "momentum_1day": -21.058563628987965,
+       "momentum_5day_daily": -3.8018966240560634,
+       "buy_and_hold": -12.23598045263266,
+       "oracle": -12.217004011473186
+      },
+      "turnover": {
+       "mean_reversion_1step": 378954035.857401,
+       "mean_reversion_1day": 194459633.63586235,
+       "mean_reversion_5day_daily": 34980204.845984295,
+       "momentum_1step": 351694771.9256318,
+       "momentum_1day": 174413129.66498086,
+       "momentum_5day_daily": 34369594.75301437,
+       "buy_and_hold": 968251.7157737343,
+       "oracle": 3257123.90059002
+      }
+     },
+     {
+      "seed": 92011,
+      "universe_seed": 93011,
+      "scenario": "liquidity_crisis",
+      "returns": {
+       "mean_reversion_1step": -40.16786275204118,
+       "mean_reversion_1day": -22.286394285464006,
+       "mean_reversion_5day_daily": 2.439288734877901,
+       "momentum_1step": -49.9034397008334,
+       "momentum_1day": -27.922933653734017,
+       "momentum_5day_daily": -11.477881943160995,
+       "buy_and_hold": -18.39059330036527,
+       "oracle": -17.383195544684945
+      },
+      "turnover": {
+       "mean_reversion_1step": 375501675.4917924,
+       "mean_reversion_1day": 194814074.5658716,
+       "mean_reversion_5day_daily": 38135382.58587912,
+       "momentum_1step": 338942167.27791035,
+       "momentum_1day": 185036929.86629263,
+       "momentum_5day_daily": 36423169.395525336,
+       "buy_and_hold": 981637.8907750067,
+       "oracle": 3371320.930705335
+      }
+     },
+     {
+      "seed": 92012,
+      "universe_seed": 93012,
+      "scenario": "liquidity_crisis",
+      "returns": {
+       "mean_reversion_1step": -35.10034052379765,
+       "mean_reversion_1day": -18.93198707994198,
+       "mean_reversion_5day_daily": 1.734543995899777,
+       "momentum_1step": -49.512594613758395,
+       "momentum_1day": -21.508523389013416,
+       "momentum_5day_daily": -8.736628145484591,
+       "buy_and_hold": -6.271957484082027,
+       "oracle": -5.71905408080956
+      },
+      "turnover": {
+       "mean_reversion_1step": 421206057.02330655,
+       "mean_reversion_1day": 197354966.61938086,
+       "mean_reversion_5day_daily": 35587131.2376361,
+       "momentum_1step": 383064982.9114017,
+       "momentum_1day": 188617900.92516187,
+       "momentum_5day_daily": 36365460.982856125,
+       "buy_and_hold": 1000919.7904307086,
+       "oracle": 3118271.13475266
+      }
+     },
+     {
+      "seed": 92013,
+      "universe_seed": 93013,
+      "scenario": "oil_price_spike",
+      "returns": {
+       "mean_reversion_1step": -37.52026380092406,
+       "mean_reversion_1day": -15.906774344912847,
+       "mean_reversion_5day_daily": -1.075057721382007,
+       "momentum_1step": -52.050096690817014,
+       "momentum_1day": -27.434497378369223,
+       "momentum_5day_daily": -6.299031402976474,
+       "buy_and_hold": -18.0499250649943,
+       "oracle": -15.950255559431364
+      },
+      "turnover": {
+       "mean_reversion_1step": 413488789.3958467,
+       "mean_reversion_1day": 204907423.62702775,
+       "mean_reversion_5day_daily": 36956177.74423414,
+       "momentum_1step": 348698327.5151967,
+       "momentum_1day": 182966717.6365029,
+       "momentum_5day_daily": 34992929.886177495,
+       "buy_and_hold": 990925.2835922638,
+       "oracle": 3520511.7407339932
+      }
+     },
+     {
+      "seed": 92014,
+      "universe_seed": 93014,
+      "scenario": "oil_price_spike",
+      "returns": {
+       "mean_reversion_1step": -30.986746702835976,
+       "mean_reversion_1day": -17.097326529671694,
+       "mean_reversion_5day_daily": -0.994319241395453,
+       "momentum_1step": -24.04866604209816,
+       "momentum_1day": -10.756552452662564,
+       "momentum_5day_daily": -4.263257081479381,
+       "buy_and_hold": 1.9553188506926875,
+       "oracle": 1.885154185707867
+      },
+      "turnover": {
+       "mean_reversion_1step": 412522722.0644413,
+       "mean_reversion_1day": 185535945.08532748,
+       "mean_reversion_5day_daily": 35224941.685519606,
+       "momentum_1step": 408946935.0678354,
+       "momentum_1day": 180081012.82041416,
+       "momentum_5day_daily": 32599250.204611443,
+       "buy_and_hold": 1000659.064545277,
+       "oracle": 4945803.19976324
+      }
+     },
+     {
+      "seed": 92015,
+      "universe_seed": 93015,
+      "scenario": "policy_regime_shift",
+      "returns": {
+       "mean_reversion_1step": -39.87126556828976,
+       "mean_reversion_1day": -19.634560903873936,
+       "mean_reversion_5day_daily": -3.8773668222417705,
+       "momentum_1step": -53.15363194339936,
+       "momentum_1day": -24.582910791906343,
+       "momentum_5day_daily": -2.7046354098698244,
+       "buy_and_hold": 0.5041830442229984,
+       "oracle": 1.0743365100359195
+      },
+      "turnover": {
+       "mean_reversion_1step": 431724191.28042406,
+       "mean_reversion_1day": 205969130.3305314,
+       "mean_reversion_5day_daily": 34547069.606530815,
+       "momentum_1step": 386153054.2937193,
+       "momentum_1day": 200596435.57677615,
+       "momentum_5day_daily": 35308682.88666651,
+       "buy_and_hold": 1000998.252089659,
+       "oracle": 3380132.107054537
+      }
+     },
+     {
+      "seed": 92016,
+      "universe_seed": 93016,
+      "scenario": "policy_regime_shift",
+      "returns": {
+       "mean_reversion_1step": -26.323961812415277,
+       "mean_reversion_1day": -24.24773332194524,
+       "mean_reversion_5day_daily": -3.8124686878939626,
+       "momentum_1step": -77.36539795696717,
+       "momentum_1day": -39.22683518310382,
+       "momentum_5day_daily": -7.155157599672767,
+       "buy_and_hold": 27.84966566705792,
+       "oracle": 8.820886697812425
+      },
+      "turnover": {
+       "mean_reversion_1step": 449678009.55976826,
+       "mean_reversion_1day": 189840812.32027555,
+       "mean_reversion_5day_daily": 33490342.970464393,
+       "momentum_1step": 228928340.16099733,
+       "momentum_1day": 168175177.1039497,
+       "momentum_5day_daily": 31502194.281601038,
+       "buy_and_hold": 1001437.7012727074,
+       "oracle": 16334869.528477456
+      }
+     },
+     {
+      "seed": 92017,
+      "universe_seed": 93017,
+      "scenario": "rate_shock",
+      "returns": {
+       "mean_reversion_1step": -23.88631904394517,
+       "mean_reversion_1day": -6.2824949678723705,
+       "mean_reversion_5day_daily": 0.9865673219131772,
+       "momentum_1step": -20.581891180214903,
+       "momentum_1day": -15.768684061838862,
+       "momentum_5day_daily": -4.268035192036023,
+       "buy_and_hold": -5.113125129372545,
+       "oracle": -5.154196039695607
+      },
+      "turnover": {
+       "mean_reversion_1step": 433461156.0611366,
+       "mean_reversion_1day": 197196713.42259982,
+       "mean_reversion_5day_daily": 34522456.9905793,
+       "momentum_1step": 415266224.94042426,
+       "momentum_1day": 188480580.13474235,
+       "momentum_5day_daily": 33595828.87135467,
+       "buy_and_hold": 994878.3435292067,
+       "oracle": 3599619.0504939854
+      }
+     },
+     {
+      "seed": 92018,
+      "universe_seed": 93018,
+      "scenario": "rate_shock",
+      "returns": {
+       "mean_reversion_1step": -32.98566859837967,
+       "mean_reversion_1day": -14.751484083411121,
+       "mean_reversion_5day_daily": -4.455949474434857,
+       "momentum_1step": -40.73640928458093,
+       "momentum_1day": -20.178124764119346,
+       "momentum_5day_daily": -2.3448022395407895,
+       "buy_and_hold": -4.180400895503757,
+       "oracle": -3.467027692822041
+      },
+      "turnover": {
+       "mean_reversion_1step": 412377426.3635395,
+       "mean_reversion_1day": 195587268.45591682,
+       "mean_reversion_5day_daily": 35301279.33071243,
+       "momentum_1step": 382976718.08568704,
+       "momentum_1day": 181589214.4167206,
+       "momentum_5day_daily": 36275691.482785255,
+       "buy_and_hold": 994960.0205595308,
+       "oracle": 3498841.1443877053
+      }
+     },
+     {
+      "seed": 92019,
+      "universe_seed": 93019,
+      "scenario": "recession",
+      "returns": {
+       "mean_reversion_1step": 27.03198164288148,
+       "mean_reversion_1day": 7.0362961792932595,
+       "mean_reversion_5day_daily": -2.6582026759140076,
+       "momentum_1step": -88.97512071818545,
+       "momentum_1day": -59.850369082527585,
+       "momentum_5day_daily": -9.205037829477561,
+       "buy_and_hold": -29.75992246935769,
+       "oracle": -19.339158144786186
+      },
+      "turnover": {
+       "mean_reversion_1step": 556269809.3879746,
+       "mean_reversion_1day": 232622955.6589609,
+       "mean_reversion_5day_daily": 35712610.26826747,
+       "momentum_1step": 245836389.0982981,
+       "momentum_1day": 165080151.71161357,
+       "momentum_5day_daily": 34780013.06970725,
+       "buy_and_hold": 980288.8370642759,
+       "oracle": 6113289.433724121
+      }
+     },
+     {
+      "seed": 92020,
+      "universe_seed": 93020,
+      "scenario": "recession",
+      "returns": {
+       "mean_reversion_1step": -40.39963834649702,
+       "mean_reversion_1day": -19.42647384415002,
+       "mean_reversion_5day_daily": -5.912892374186125,
+       "momentum_1step": -54.33423596848825,
+       "momentum_1day": -25.32817360303244,
+       "momentum_5day_daily": -1.2752900542078074,
+       "buy_and_hold": -15.736544086322013,
+       "oracle": -12.96726184868318
+      },
+      "turnover": {
+       "mean_reversion_1step": 412063436.2481669,
+       "mean_reversion_1day": 199114276.9850512,
+       "mean_reversion_5day_daily": 33160281.77327162,
+       "momentum_1step": 376660667.9120946,
+       "momentum_1day": 187100293.38681266,
+       "momentum_5day_daily": 33236878.61171088,
+       "buy_and_hold": 1000998.5824082601,
+       "oracle": 5077561.188143567
+      }
+     }
+    ]
+   }
+  }
+ }
+}

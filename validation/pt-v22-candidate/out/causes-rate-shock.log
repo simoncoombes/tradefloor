@@ -1,0 +1,12 @@
+1d/anchored/loss             n=   67  market|repricing 0.090 -> 0.149   as one 0.119 -> 0.134   company 0.896 -> 0.851
+1d/anchored/profitable       n=  533  market|repricing 0.951 -> 1.000   as one 0.947 -> 1.000   company 0.049 -> 0.000
+1d/tiled/loss                n= 4020  market|repricing 0.173 -> 0.169   as one 0.172 -> 0.169   company 0.162 -> 0.159
+1d/tiled/profitable          n=31980  market|repricing 0.187 -> 0.188   as one 0.179 -> 0.180   company 0.157 -> 0.156
+5d/anchored/loss             n=   67  market|repricing 0.194 -> 0.149   as one 0.179 -> 0.149   company 0.731 -> 0.851
+5d/anchored/profitable       n=  533  market|repricing 0.934 -> 0.987   as one 0.932 -> 0.987   company 0.039 -> 0.000
+5d/tiled/loss                n=  804  market|repricing 0.200 -> 0.195   as one 0.208 -> 0.204   company 0.218 -> 0.228
+5d/tiled/profitable          n= 6396  market|repricing 0.249 -> 0.254   as one 0.247 -> 0.252   company 0.164 -> 0.159
+20d/anchored/loss            n=   67  market|repricing 0.090 -> 0.149   as one 0.090 -> 0.149   company 0.731 -> 0.836
+20d/anchored/profitable      n=  533  market|repricing 0.683 -> 0.844   as one 0.679 -> 0.844   company 0.116 -> 0.015
+20d/tiled/loss               n=  201  market|repricing 0.159 -> 0.189   as one 0.154 -> 0.184   company 0.418 -> 0.453
+20d/tiled/profitable         n= 1599  market|repricing 0.361 -> 0.419   as one 0.361 -> 0.421   company 0.175 -> 0.143

@@ -1,0 +1,1002 @@
+{
+ "kind": "longrun.criteria",
+ "inputs": {
+  "longrun": "/Users/simoncoombes/Dev/tf-lossmaker-grade/g1/out/longrun-report.json",
+  "certgrade": "/Users/simoncoombes/Dev/tf-lossmaker-grade/g1/out/certgrade-g1.json",
+  "edge": {
+   "pt-v21": "/Users/simoncoombes/Dev/tf-lossmaker-grade/g1/out/edge.json",
+   "ptv22c": "/Users/simoncoombes/Dev/tf-lossmaker-grade/g1/out/edge.json"
+  }
+ },
+ "honest_return": 6.25,
+ "arms": {
+  "pt-v21": {
+   "A1": {
+    "pass": true,
+    "usage": 0.7613035312533893,
+    "detail": [
+     {
+      "episode": "2008",
+      "model": 94.0419169919852,
+      "real": 84.25604564887935,
+      "pass": true,
+      "usage": 0.38714813747160537,
+      "note": "+12%"
+     },
+     {
+      "episode": "2020",
+      "model": 72.91780367741829,
+      "real": 94.50098338473276,
+      "pass": true,
+      "usage": 0.7613035312533893,
+      "note": "-23%"
+     }
+    ],
+    "edge_note": "2020 at -23%",
+    "real_text": "84 / 95",
+    "model_text": "94 / 73"
+   },
+   "A2": {
+    "pass": true,
+    "usage": 0.37547164016934587,
+    "detail": [
+     {
+      "episode": "2008",
+      "model": 0.5038012335566397,
+      "real": 0.5677538774277282,
+      "pass": true,
+      "usage": 0.37547164016934587,
+      "note": "-11%"
+     },
+     {
+      "episode": "2020",
+      "model": 0.32434569518662115,
+      "real": 0.3392496000265327,
+      "pass": true,
+      "usage": 0.1464399156132231,
+      "note": "-4%"
+     }
+    ],
+    "edge_note": "2008 at -11%",
+    "real_text": "0.57 / 0.34",
+    "model_text": "0.50 / 0.32"
+   },
+   "A3": {
+    "pass": true,
+    "usage": 0.471764735700931,
+    "detail": [
+     {
+      "episode": "2008",
+      "model": 0.8189403566727373,
+      "real": 0.7481756463175977,
+      "pass": true,
+      "usage": 0.471764735700931,
+      "note": "+0.07"
+     },
+     {
+      "episode": "2020",
+      "model": 0.8111165814226503,
+      "real": 0.8722461043400027,
+      "pass": true,
+      "usage": 0.4075301527823494,
+      "note": "-0.06"
+     }
+    ],
+    "edge_note": "2008 at +0.07",
+    "real_text": "0.75 / 0.87",
+    "model_text": "0.82 / 0.81"
+   },
+   "B1": {
+    "pass": true,
+    "usage": 0.6687793346217277,
+    "model": 0.05138447971781305,
+    "real": 0.08168731168396384,
+    "ratio": 0.6290386922832277,
+    "key": "vix_share_above_30",
+    "edge_note": "0.63x",
+    "real_text": "8.2%",
+    "model_text": "5.1%"
+   },
+   "B2": {
+    "pass": true,
+    "usage": 0.3230380418137179,
+    "model": 17.547470153496306,
+    "real": 21.951219512195124,
+    "ratio": 0.7993847514370539,
+    "key": "spell30_mean_len",
+    "edge_note": "0.80x",
+    "real_text": "22",
+    "model_text": "18"
+   },
+   "B3": {
+    "pass": true,
+    "usage": 0.5241933299865553,
+    "model": 1.6169874975193488,
+    "real": 1.1243686969905886,
+    "ratio": 1.4381292380757942,
+    "key": "dd20_per_decade",
+    "edge_note": "1.44x",
+    "real_text": "1.12",
+    "model_text": "1.62"
+   },
+   "B4": {
+    "pass": true,
+    "usage": 0.2935142974651468,
+    "model": 4.478666402063901,
+    "real": 3.654198265219413,
+    "ratio": 1.2256221685319484,
+    "key": "dd10_per_decade",
+    "edge_note": "1.23x",
+    "real_text": "3.65",
+    "model_text": "4.48"
+   },
+   "B5": {
+    "pass": true,
+    "usage": 0.014312688661900693,
+    "model": 6.245683667394324,
+    "real": 6.184027833448238,
+    "ratio": 1.0099701740688491,
+    "key": "days_below_-5_per_decade",
+    "edge_note": "1.01x",
+    "real_text": "6.2",
+    "model_text": "6.2"
+   },
+   "B6": {
+    "pass": true,
+    "usage": 0.08578353828380507,
+    "model": 0.34617504409171074,
+    "real": 0.32619127329539116,
+    "ratio": 1.0612639651405473,
+    "key": "lvl_0",
+    "edge_note": "1.06x",
+    "real_text": "32.6%",
+    "model_text": "34.6%"
+   },
+   "B7": {
+    "pass": true,
+    "usage": 0.014625399347139578,
+    "model": 18.060108726826797,
+    "real": 18.113090964580408,
+    "ratio": 0.9970749201305721,
+    "key": "ann_vol_pct",
+    "edge_note": "-0%",
+    "real_text": "18.1",
+    "model_text": "18.1"
+   },
+   "B8": {
+    "pass": true,
+    "usage": 0.2557483327981114,
+    "model": 6.761496665596223,
+    "real": 6.25,
+    "diff": 0.5114966655962228,
+    "key": "ann_return_pct",
+    "edge_note": "+0.5 points",
+    "real_text": "6.25",
+    "model_text": "6.8",
+    "tape_point": 8.399538460776924
+   },
+   "C1": {
+    "pass": true,
+    "usage": 0.6175506337914203,
+    "ratio": 1.2845330081238822,
+    "years": [
+     1,
+     21
+    ],
+    "edge_note": "1.28x",
+    "real_text": "1.0x",
+    "model_text": "1.28x"
+   },
+   "C2": {
+    "pass": true,
+    "usage": 0.0,
+    "hits": 0,
+    "histories": 90,
+    "edge_note": "0 of 90",
+    "real_text": "0",
+    "model_text": "0 of 90"
+   },
+   "C3": {
+    "pass": true,
+    "usage": 0.9259077377859647,
+    "edge_bp": 18.518154755719294,
+    "se_bp": 1.2168850313190411,
+    "events": 6035,
+    "edge_note": "+18.5 bp",
+    "real_text": "~0",
+    "model_text": "+19bp"
+   },
+   "C4a": {
+    "pass": true,
+    "usage": 0.4305290026584363,
+    "acf1": -0.021526450132921815,
+    "acf1_se": 0.004572538588635333,
+    "roll_to_quoted": 1.3098432623857048,
+    "roll_bps": 13.761530939134653,
+    "quoted_bps": 10.433289887509382,
+    "edge_note": "-0.022, Roll 1.3x",
+    "real_text": "~0 (Roll)",
+    "model_text": "-0.022 / 1.3x"
+   },
+   "C4b": {
+    "pass": true,
+    "usage": 0.5,
+    "worst": "momentum_5day_daily",
+    "failing": [],
+    "specs": {
+     "mean_reversion_1step": {
+      "median_excess": -30.72904967669693,
+      "wins": 1,
+      "beats_oracle": 1
+     },
+     "mean_reversion_1day": {
+      "median_excess": -16.20372632525289,
+      "wins": 2,
+      "beats_oracle": 1
+     },
+     "mean_reversion_5day_daily": {
+      "median_excess": -4.488633253493573,
+      "wins": 6,
+      "beats_oracle": 6
+     },
+     "momentum_1step": {
+      "median_excess": -43.39748645881771,
+      "wins": 0,
+      "beats_oracle": 0
+     },
+     "momentum_1day": {
+      "median_excess": -18.305451729833713,
+      "wins": 0,
+      "beats_oracle": 0
+     },
+     "momentum_5day_daily": {
+      "median_excess": -1.9502652491682326,
+      "wins": 7,
+      "beats_oracle": 7
+     }
+    },
+    "edge_note": "momentum_5day_daily -2.0 pts, 7 of 20",
+    "real_text": "~0",
+    "model_text": "-2.0 pts, 7/20"
+   },
+   "B9": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "C5": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "C6": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "C7": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "C8": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "C9": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "R1": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "R2": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "R3": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "R4": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "E1": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "D2": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "F1": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "L1": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "R5": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "R6": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "C10": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "R7a": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "R7b": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "S1a": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "S1b": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "S2": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "V1": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "D1": {
+    "pass": true,
+    "usage": 0.0,
+    "cells_missing": [],
+    "misses": {},
+    "level_out": [],
+    "unresolved": {},
+    "crisis_dispersion": {
+     "panel_252": {
+      "own_seeds": 30,
+      "own_readings": 5,
+      "blocks_used": 1,
+      "extension_seeds": [
+       1001,
+       1030
+      ],
+      "extension_readings": 5,
+      "total": 10,
+      "median": 1.223418869942972,
+      "band": [
+       0.79,
+       1.74
+      ],
+      "extended": true,
+      "status": "pass",
+      "note": null
+     },
+     "panel_504": {
+      "own_seeds": 30,
+      "own_readings": 7,
+      "blocks_used": 1,
+      "extension_seeds": [
+       1001,
+       1030
+      ],
+      "extension_readings": 12,
+      "total": 19,
+      "median": 1.2353549361069136,
+      "band": [
+       1.03,
+       1.66
+      ],
+      "extended": true,
+      "status": "pass",
+      "note": null
+     },
+     "heldout_seeds": {
+      "own_seeds": 30,
+      "own_readings": 5,
+      "blocks_used": 1,
+      "extension_seeds": [
+       1001,
+       1030
+      ],
+      "extension_readings": 5,
+      "total": 10,
+      "median": 1.223418869942972,
+      "band": [
+       0.79,
+       1.74
+      ],
+      "extended": true,
+      "status": "pass",
+      "note": null
+     },
+     "heldout_universe": {
+      "own_seeds": 30,
+      "own_readings": 4,
+      "blocks_used": 2,
+      "extension_seeds": [
+       1001,
+       1060
+      ],
+      "extension_readings": 10,
+      "total": 14,
+      "median": 1.2502127553838127,
+      "band": [
+       0.79,
+       1.74
+      ],
+      "extended": true,
+      "status": "pass",
+      "note": null
+     }
+    },
+    "in_band": {
+     "panel_252": 15,
+     "panel_504": 15,
+     "heldout_seeds": 15,
+     "heldout_universe": 15
+    },
+    "unreadable": {},
+    "level_rows": 4,
+    "real_text": "--",
+    "model_text": "in"
+   }
+  },
+  "ptv22c": {
+   "A1": {
+    "pass": true,
+    "usage": 0.7573314750229084,
+    "detail": [
+     {
+      "episode": "2008",
+      "model": 94.12204809369976,
+      "real": 84.25604564887935,
+      "pass": true,
+      "usage": 0.39031827998571006,
+      "note": "+12%"
+     },
+     {
+      "episode": "2020",
+      "model": 73.03041264337025,
+      "real": 94.50098338473276,
+      "pass": true,
+      "usage": 0.7573314750229084,
+      "note": "-23%"
+     }
+    ],
+    "edge_note": "2020 at -23%",
+    "real_text": "84 / 95",
+    "model_text": "94 / 73"
+   },
+   "A2": {
+    "pass": true,
+    "usage": 0.3732978974890452,
+    "detail": [
+     {
+      "episode": "2008",
+      "model": 0.504171478807221,
+      "real": 0.5677538774277282,
+      "pass": true,
+      "usage": 0.3732978974890452,
+      "note": "-11%"
+     },
+     {
+      "episode": "2020",
+      "model": 0.3248507228435386,
+      "real": 0.3392496000265327,
+      "pass": true,
+      "usage": 0.14147771220037741,
+      "note": "-4%"
+     }
+    ],
+    "edge_note": "2008 at -11%",
+    "real_text": "0.57 / 0.34",
+    "model_text": "0.50 / 0.32"
+   },
+   "A3": {
+    "pass": true,
+    "usage": 0.49012572780157065,
+    "detail": [
+     {
+      "episode": "2008",
+      "model": 0.8216945054878333,
+      "real": 0.7481756463175977,
+      "pass": true,
+      "usage": 0.49012572780157065,
+      "note": "+0.07"
+     },
+     {
+      "episode": "2020",
+      "model": 0.811621150542603,
+      "real": 0.8722461043400027,
+      "pass": true,
+      "usage": 0.4041663586493316,
+      "note": "-0.06"
+     }
+    ],
+    "edge_note": "2008 at +0.07",
+    "real_text": "0.75 / 0.87",
+    "model_text": "0.82 / 0.81"
+   },
+   "B1": {
+    "pass": true,
+    "usage": 0.657987823034235,
+    "model": 0.05177028218694885,
+    "real": 0.08168731168396384,
+    "ratio": 0.6337616102148206,
+    "key": "vix_share_above_30",
+    "edge_note": "0.63x",
+    "real_text": "8.2%",
+    "model_text": "5.2%"
+   },
+   "B2": {
+    "pass": true,
+    "usage": 0.3169970716645195,
+    "model": 17.621100397050483,
+    "real": 21.951219512195124,
+    "ratio": 0.8027390180878553,
+    "key": "spell30_mean_len",
+    "edge_note": "0.80x",
+    "real_text": "22",
+    "model_text": "18"
+   },
+   "B3": {
+    "pass": true,
+    "usage": 0.5291425459582887,
+    "model": 1.6225441555864255,
+    "real": 1.1243686969905886,
+    "ratio": 1.4430712629489069,
+    "key": "dd20_per_decade",
+    "edge_note": "1.44x",
+    "real_text": "1.12",
+    "model_text": "1.62"
+   },
+   "B4": {
+    "pass": true,
+    "usage": 0.27912320515952516,
+    "model": 4.434213137527286,
+    "real": 3.654198265219413,
+    "ratio": 1.2134571842289017,
+    "key": "dd10_per_decade",
+    "edge_note": "1.21x",
+    "real_text": "3.65",
+    "model_text": "4.43"
+   },
+   "B5": {
+    "pass": true,
+    "usage": 0.03723330380381709,
+    "model": 6.345703512601705,
+    "real": 6.184027833448238,
+    "ratio": 1.0261440736535814,
+    "key": "days_below_-5_per_decade",
+    "edge_note": "1.03x",
+    "real_text": "6.2",
+    "model_text": "6.3"
+   },
+   "B6": {
+    "pass": true,
+    "usage": 0.08788598370862236,
+    "model": 0.3466798941798942,
+    "real": 0.32619127329539116,
+    "ratio": 1.0628116769572467,
+    "key": "lvl_0",
+    "edge_note": "1.06x",
+    "real_text": "32.6%",
+    "model_text": "34.7%"
+   },
+   "B7": {
+    "pass": true,
+    "usage": 0.0024093837003069662,
+    "model": 18.121819241806854,
+    "real": 18.113090964580408,
+    "ratio": 1.0004818767400614,
+    "key": "ann_vol_pct",
+    "edge_note": "+0%",
+    "real_text": "18.1",
+    "model_text": "18.1"
+   },
+   "B8": {
+    "pass": true,
+    "usage": 0.21762047194224277,
+    "model": 6.6852409438844855,
+    "real": 6.25,
+    "diff": 0.43524094388448553,
+    "key": "ann_return_pct",
+    "edge_note": "+0.4 points",
+    "real_text": "6.25",
+    "model_text": "6.7",
+    "tape_point": 8.399538460776924
+   },
+   "C1": {
+    "pass": true,
+    "usage": 0.6523302914927068,
+    "ratio": 1.3027757391486685,
+    "years": [
+     1,
+     21
+    ],
+    "edge_note": "1.30x",
+    "real_text": "1.0x",
+    "model_text": "1.30x"
+   },
+   "C2": {
+    "pass": true,
+    "usage": 0.0,
+    "hits": 0,
+    "histories": 90,
+    "edge_note": "0 of 90",
+    "real_text": "0",
+    "model_text": "0 of 90"
+   },
+   "C3": {
+    "pass": true,
+    "usage": 0.9258248452062243,
+    "edge_bp": 18.516496904124487,
+    "se_bp": 1.2160428030063892,
+    "events": 6035,
+    "edge_note": "+18.5 bp",
+    "real_text": "~0",
+    "model_text": "+19bp"
+   },
+   "C4a": {
+    "pass": true,
+    "usage": 0.3995686293533345,
+    "acf1": -0.019978431467666726,
+    "acf1_se": 0.004283519932986364,
+    "roll_to_quoted": 1.3634823902248119,
+    "roll_bps": 14.321792717811933,
+    "quoted_bps": 10.43255600845692,
+    "edge_note": "-0.020, Roll 1.4x",
+    "real_text": "~0 (Roll)",
+    "model_text": "-0.020 / 1.4x"
+   },
+   "C4b": {
+    "pass": true,
+    "usage": 0.5714285714285714,
+    "worst": "momentum_5day_daily",
+    "failing": [],
+    "specs": {
+     "mean_reversion_1step": {
+      "median_excess": -30.139412832646695,
+      "wins": 1,
+      "beats_oracle": 1
+     },
+     "mean_reversion_1day": {
+      "median_excess": -15.831033864474255,
+      "wins": 2,
+      "beats_oracle": 2
+     },
+     "mean_reversion_5day_daily": {
+      "median_excess": -3.665593979276455,
+      "wins": 7,
+      "beats_oracle": 7
+     },
+     "momentum_1step": {
+      "median_excess": -42.19352677692799,
+      "wins": 0,
+      "beats_oracle": 0
+     },
+     "momentum_1day": {
+      "median_excess": -17.72253945131959,
+      "wins": 0,
+      "beats_oracle": 0
+     },
+     "momentum_5day_daily": {
+      "median_excess": -1.285133637769491,
+      "wins": 8,
+      "beats_oracle": 9
+     }
+    },
+    "edge_note": "momentum_5day_daily -1.3 pts, 8 of 20",
+    "real_text": "~0",
+    "model_text": "-1.3 pts, 8/20"
+   },
+   "B9": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "C5": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "C6": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "C7": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "C8": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "C9": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "R1": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "R2": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "R3": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "R4": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "E1": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "D2": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "F1": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "L1": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "R5": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "R6": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "C10": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "R7a": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "R7b": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "S1a": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "S1b": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "S2": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "V1": {
+    "pass": null,
+    "usage": null,
+    "real_text": "-",
+    "model_text": "not measured"
+   },
+   "D1": {
+    "pass": true,
+    "usage": 0.0,
+    "cells_missing": [],
+    "misses": {},
+    "level_out": [],
+    "unresolved": {},
+    "crisis_dispersion": {
+     "panel_252": {
+      "own_seeds": 30,
+      "own_readings": 5,
+      "blocks_used": 1,
+      "extension_seeds": [
+       1001,
+       1030
+      ],
+      "extension_readings": 5,
+      "total": 10,
+      "median": 1.225731907336515,
+      "band": [
+       0.79,
+       1.74
+      ],
+      "extended": true,
+      "status": "pass",
+      "note": null
+     },
+     "panel_504": {
+      "own_seeds": 30,
+      "own_readings": 7,
+      "blocks_used": 1,
+      "extension_seeds": [
+       1001,
+       1030
+      ],
+      "extension_readings": 12,
+      "total": 19,
+      "median": 1.23360204023219,
+      "band": [
+       1.03,
+       1.66
+      ],
+      "extended": true,
+      "status": "pass",
+      "note": null
+     },
+     "heldout_seeds": {
+      "own_seeds": 30,
+      "own_readings": 5,
+      "blocks_used": 1,
+      "extension_seeds": [
+       1001,
+       1030
+      ],
+      "extension_readings": 5,
+      "total": 10,
+      "median": 1.2253322667574036,
+      "band": [
+       0.79,
+       1.74
+      ],
+      "extended": true,
+      "status": "pass",
+      "note": null
+     },
+     "heldout_universe": {
+      "own_seeds": 30,
+      "own_readings": 4,
+      "blocks_used": 2,
+      "extension_seeds": [
+       1001,
+       1060
+      ],
+      "extension_readings": 10,
+      "total": 14,
+      "median": 1.2500850610121372,
+      "band": [
+       0.79,
+       1.74
+      ],
+      "extended": true,
+      "status": "pass",
+      "note": null
+     }
+    },
+    "in_band": {
+     "panel_252": 15,
+     "panel_504": 15,
+     "heldout_seeds": 15,
+     "heldout_universe": 15
+    },
+    "unreadable": {},
+    "level_rows": 4,
+    "real_text": "--",
+    "model_text": "in"
+   }
+  }
+ },
+ "verdicts": {
+  "pt-v21": {
+   "fails": [],
+   "unknown": [],
+   "passes_all": true,
+   "nearest_edge": [
+    "C3"
+   ],
+   "text": "passes 17 of 17; nearest the edge: C3 (+18.5 bp, 93% of tolerance)"
+  },
+  "ptv22c": {
+   "fails": [],
+   "unknown": [],
+   "passes_all": true,
+   "nearest_edge": [
+    "C3"
+   ],
+   "text": "passes 17 of 17; nearest the edge: C3 (+18.5 bp, 93% of tolerance)"
+  }
+ }
+}

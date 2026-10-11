@@ -141,3 +141,71 @@ measures it.
 
 The grade of the candidate (pt-v21 with the dial at the chosen value) is
 separate, on seeds no calibration read, and is appended below.
+
+## Results (appended 2026-10-11, after the runs)
+
+**Calibration.** `results/lossmaker-duration-2026-10-11/calibration.log`,
+seeds 9001-9020 on `Universe.random(200, seed=2022)` (22 loss-makers): the
+excess over profitable growth reads +2.39 per 100 bp with the dial off and
+-8.49, -9.68, -10.88 and -12.09 at 9, 10, 11 and 12 (se 0.70). **The
+candidate takes 11.** Off, the model has 2022's loss-makers beating
+profitable growth, the wrong sign.
+
+**Held out** (`validation/pt-v22-candidate/out/heldout-roster*.log`), seeds
+9101-9130 at 11: -9.76 (se 0.62) on the same roster and -11.14 (se 0.74)
+on `Universe.random(200, seed=4022)` (17 loss-makers), against -10.9; off,
++3.51 and +2.34.
+
+**How many loss-makers a roster holds.** `Universe.random(20, seed=s)` for
+s = 1 to 200 holds 2.28 on average (11.4%), and 18 of the 200 rosters hold
+none; `Universe.random(40)` holds 11.4% too. The Nasdaq-100 roster
+tradefloor-serve ships (its 2026-09-24 snapshot, read only) holds 5 of its
+77 (CRWD, INTC, LITE, RKLB, TTWO). So the term is graded per company, as
+above, and the index-level rows can barely see it.
+
+**The grade** (`validation/pt-v22-candidate/`): no row fails and none
+moves by more than its noise. One-year table and two-year panel 15 of 15 on
+every cell for both arms; the long-run criteria 17 of 17 for both (B4 4.48 to
+4.43 corrections a decade, B5 6.2 to 6.3, B8 6.8 to 6.7, C1 1.28x to 1.30x);
+the crisis lever 5.03x to 4.99x (tape 6.16x).
+
+**R6 and the scenarios.** R6 reads -7.364% per 100 bp on both arms (paired
+difference +0.0001; the market P/E reads profitable names only) and R5 0.230
+to 0.232. On `rate_shock`, roster 111, 30 exam seeds, the paired index
+change at 21 days moves from -7.61% to -7.86% and at 120 days from -7.96% to
+-8.22% (paired -0.25 points, se 0.01); the median name from -7.20% to
+-8.04% at 21 days and -7.19% to -8.68% at 120. `curve_shock` reads the same
+to the bit on this roster: it holds the corporate yield and the policy rate
+as `rate_shock` does, and its Treasury impulses reach only the bond indices,
+which the roster does not hold. So the term does not close the scenario-size
+gap; it adds about 3% to the index's response.
+
+**Which cause tops a window** (`tools/calibration/lossmaker_causes.py`,
+`rate_shock`, seeds 270301-270330 on `Universe.random(20, seed=s)`, 67
+loss-makers and 533 profitable names, causes netted as tradefloor-serve's
+`netted_causes` nets them). Share of windows starting on the shock's day
+topped by `fair_value_market` or `repricing`, off then on:
+
+| Window | loss-makers | profitable |
+|---|---|---|
+| 1 day | 0.09 to 0.15 | 0.95 to 1.00 |
+| 5 days | 0.19 to 0.15 | 0.93 to 0.99 |
+| 20 days | 0.09 to 0.15 | 0.68 to 0.84 |
+
+For loss-makers `fair_value_company` tops 0.73 to 0.90 of those windows with
+the dial off and 0.84 to 0.85 with it on. Over every window tiled across
+days 50-109 nothing moves by more than 0.06.
+
+**Where the term is booked.** In the engine it is in fair value, beside the
+profitable rate term: `tests/test_lossmaker_rate.py` shows a 200 bp shock
+moving no name's own level `v` and no `fair_value_shift`. But the engine has
+no `fair_value_market`. tradefloor-serve derives it as the cap-weighted mean
+of the day's change in fair value per share, and calls the rest
+`fair_value_company`. A loss-maker's rate term is larger than that mean and
+loss-makers carry about 1% of the roster's value, so serve's split books
+most of the term to `fair_value_company`, as the table shows. Booking it to
+`fair_value_market` needs serve to attribute the macro valuation terms per
+name (the rate term, the earnings cycle, the VIX discount), which the engine
+would have to expose; it exposes `fundamental_value` per tick, `explain`'s
+`fair_value`, `fair_value_shift` and the snapshot's `fair_value_offset` and
+`tick_fundamental`, and no split of fair value by cause.

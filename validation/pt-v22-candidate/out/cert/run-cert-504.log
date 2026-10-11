@@ -1,0 +1,4 @@
+BUILD {"so": "/Users/simoncoombes/Dev/tf-lossmaker/python/tradefloor/_core.pyi", "so_mtime": "2026-10-11 08:25:50", "rust_commit": "2026-10-11 08:27:35 f020c62", "rust_dirty": "", "branch": "feat/lossmaker-duration", "python": "3.13.15", "engine_file": "/Users/simoncoombes/Dev/tf-lossmaker/python/tradefloor/__init__.py"}
+BASE pt-v21
+pt-v21  vol 20.64 sector 0.1158 dn3 5.902 ar1 0.9527 lever nanx  (310s, 310s total)
+ptv22c  vol 20.79 sector 0.1117 dn3 5.894 ar1 0.9528 lever nanx  (191s, 501s total)

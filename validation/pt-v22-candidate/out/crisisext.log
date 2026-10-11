@@ -1,0 +1,28 @@
+crisis extension: 8 cells, need 10 readings, blocks of 30 from 1001, last 1270, 6 workers, engine a1a9758e638a685970b734104ea5e86e03acd512
+  panel_252         pt-v21: 5 readings from 30 own seeds, extending
+  panel_252         ptv22c: 5 readings from 30 own seeds, extending
+  panel_504         pt-v21: 7 readings from 30 own seeds, extending
+  panel_504         ptv22c: 7 readings from 30 own seeds, extending
+  heldout_seeds     pt-v21: 5 readings from 30 own seeds, extending
+  heldout_seeds     ptv22c: 5 readings from 30 own seeds, extending
+  heldout_universe  pt-v21: 4 readings from 30 own seeds, extending
+  heldout_universe  ptv22c: 4 readings from 30 own seeds, extending
+  panel_252         pt-v21: block 1001-1030 read 5, count 10
+  panel_252         ptv22c: block 1001-1030 read 5, count 10
+  panel_504         pt-v21: block 1001-1030 read 12, count 19
+  panel_504         ptv22c: block 1001-1030 read 12, count 19
+  heldout_seeds     pt-v21: block 1001-1030 read 5, count 10
+  heldout_seeds     ptv22c: block 1001-1030 read 5, count 10
+  heldout_universe  pt-v21: block 1001-1030 read 4, count 8
+  heldout_universe  ptv22c: block 1001-1030 read 4, count 8
+  heldout_universe  pt-v21: block 1031-1060 read 6, count 14
+  heldout_universe  ptv22c: block 1031-1060 read 6, count 14
+  panel_252         pt-v21       own  5  blocks  1  total  10  reached
+  panel_252         ptv22c       own  5  blocks  1  total  10  reached
+  panel_504         pt-v21       own  7  blocks  1  total  19  reached
+  panel_504         ptv22c       own  7  blocks  1  total  19  reached
+  heldout_seeds     pt-v21       own  5  blocks  1  total  10  reached
+  heldout_seeds     ptv22c       own  5  blocks  1  total  10  reached
+  heldout_universe  pt-v21       own  4  blocks  2  total  14  reached
+  heldout_universe  ptv22c       own  4  blocks  2  total  14  reached
+crisis extension done in 622s
