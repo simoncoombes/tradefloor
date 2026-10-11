@@ -568,6 +568,14 @@ OUT_OF_SCOPE = {
         "stood (a branch on `== 0.0` in the month-start step); the trend and "
         "its key are neither stepped, snapshotted nor hashed; at 0.0 it is "
         "also left out of the model's digest",
+    "cycle_inflation_hazard":
+        "inert at 0.0: an expansion adds the legacy 0.1 a month with "
+        "inflation above 4 (a branch on `== 0.0` in the cycle's ladder); at "
+        "0.0 it is also left out of the model's digest",
+    "cycle_rate_hazard":
+        "inert at 0.0: an expansion adds the legacy 0.1 a month with the "
+        "funds rate above 5 (a branch on `== 0.0` in the cycle's ladder); at "
+        "0.0 it is also left out of the model's digest",
     "core_trend_persistence":
         "inert at 0.0 and read only with `core_trend_sd` set; at 0.0 it is "
         "also left out of the model's digest",

@@ -995,6 +995,12 @@ PERTURBATIONS = [
     ("core_trend_sd", 0.17, True),
     # The persistence alone is read by nothing (the sd is 0).
     ("core_trend_persistence", 0.993, False),
+    # The expansion's inflation and rate hazards. INERT on the probe
+    # (measured 2026-10-11): the dials only replace the legacy 0.1 where an
+    # expansion has inflation above 4 or the funds rate above 5, and the
+    # probe's path never does.
+    ("cycle_inflation_hazard", 0.0219, False),
+    ("cycle_rate_hazard", 0.0013, False),
     # The 2-year's carry through a meeting. INERT on the probe's market: the
     # burn-in's meetings move the 2-year (pt-v20's own 2-year noise leaves it
     # a gap to keep: 0.15% against 0.23% after the third close, measured

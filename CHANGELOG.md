@@ -125,6 +125,11 @@ same with them on as off.
   `usd_crisis_vix_threshold` (0.0 the standing 0.05), read by the dollar's
   step and by the forecast's expected bid. FRED DTWEXM against CBOE's VIX
   measures 0.001.
+- `cycle_inflation_hazard` and `cycle_rate_hazard` are new dials, 0.0 on
+  every preset and left out of the digest there: the monthly peak hazard an
+  expansion adds with inflation above 4 and with the funds rate above 5
+  (0.0 the legacy 0.1 each). NBER peaks 1962-2025 on the two conditions and
+  the ladder's inversion term measure +0.022 and +0.001.
 - `core_trend_sd` and `core_trend_persistence` are new dials, 0.0 on every
   preset and left out of the digest there: off zero headline inflation's
   month-start step reverts to 2.0 plus a slow AR(1) trend (monthly

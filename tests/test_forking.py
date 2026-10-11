@@ -1146,6 +1146,9 @@ def _nothing_dormant():
                    # Core inflation's trend (CPILFESL fit), on its own keyed draws.
                    core_trend_sd=0.17,
                    core_trend_persistence=0.993,
+                   # The expansion's inflation and rate hazards (NBER fit).
+                   cycle_inflation_hazard=0.0219,
+                   cycle_rate_hazard=0.0013,
                    # The 2-year's carry through a meeting (a share).
                    treasury_2y_meeting_carry=1.0,
                    # The priced meeting's half-life (policy_anticipation is

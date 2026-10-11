@@ -1205,6 +1205,23 @@ pub struct ModelParams {
     /// 0.0, on every shipped preset, is read by nothing, and a value of 0.0
     /// is left out of the model's digest. In [0, 1].
     pub core_trend_persistence: f64,
+    /// The monthly peak hazard an expansion adds with inflation above 4.
+    /// 0.0, on every shipped preset, is the legacy 0.1 (the JS ladder), and
+    /// a value of 0.0 is left out of the model's digest.
+    ///
+    /// Anchored on NBER peaks (FRED USREC) in expansion months 1962-2025, a
+    /// linear probability model on 1{headline CPI > 4}, 1{funds rate > 5}
+    /// and the ladder's own inversion term: +0.0219 a month (block-bootstrap
+    /// se 0.0133, 8 peaks); 1976-2025 on the 2-year spread +0.0159 (0.0337).
+    /// The legacy 0.1 rarely fired while inflation sat near 2; with
+    /// `core_trend_sd` it does (design PR #9, r22o5czN-B/inflation addendum
+    /// A). In [0, 0.5].
+    pub cycle_inflation_hazard: f64,
+    /// The monthly peak hazard an expansion adds with the funds rate above
+    /// 5. 0.0, on every shipped preset, is the legacy 0.1, and a value of
+    /// 0.0 is left out of the model's digest. The same fit: +0.0013 a month
+    /// (se 0.0087); 1976-2025 -0.0009 (0.0107). In [0, 0.5].
+    pub cycle_rate_hazard: f64,
     /// The share of the 2-year's standing gap to the meeting's formula that a
     /// central-bank meeting keeps. 0.0, on every shipped preset, is the
     /// meeting as it stood, and a value of 0.0 is left out of the model's
@@ -8142,6 +8159,8 @@ impl ModelParams {
             fed_neutral_real_rate: 0.0,
             core_trend_sd: 0.0,
             core_trend_persistence: 0.0,
+            cycle_inflation_hazard: 0.0,
+            cycle_rate_hazard: 0.0,
             treasury_2y_meeting_carry: 0.0,
             policy_anticipation_half_life: 0.0,
             treasury_path_anticipated: 0.0,
@@ -10780,6 +10799,8 @@ impl ModelParams {
             "fed_neutral_real_rate" => self.fed_neutral_real_rate,
             "core_trend_sd" => self.core_trend_sd,
             "core_trend_persistence" => self.core_trend_persistence,
+            "cycle_inflation_hazard" => self.cycle_inflation_hazard,
+            "cycle_rate_hazard" => self.cycle_rate_hazard,
             "treasury_2y_meeting_carry" => self.treasury_2y_meeting_carry,
             "policy_anticipation_half_life" => self.policy_anticipation_half_life,
             "treasury_path_anticipated" => self.treasury_path_anticipated,
@@ -11183,6 +11204,8 @@ impl ModelParams {
             "fed_neutral_real_rate" => out.fed_neutral_real_rate = value,
             "core_trend_sd" => out.core_trend_sd = value,
             "core_trend_persistence" => out.core_trend_persistence = value,
+            "cycle_inflation_hazard" => out.cycle_inflation_hazard = value,
+            "cycle_rate_hazard" => out.cycle_rate_hazard = value,
             "treasury_2y_meeting_carry" => out.treasury_2y_meeting_carry = value,
             "policy_anticipation_half_life" => out.policy_anticipation_half_life = value,
             "treasury_path_anticipated" => out.treasury_path_anticipated = value,
@@ -12673,6 +12696,18 @@ impl ModelParams {
                  coefficient, in [0, 1].",
                 self.core_trend_persistence));
         }
+        if !(0.0..=0.5).contains(&self.cycle_inflation_hazard) {
+            return Err(format!(
+                "cycle_inflation_hazard is {}. It is the monthly peak hazard an expansion adds with \
+                 inflation above 4, in [0, 0.5]; 0 is the legacy 0.1.",
+                self.cycle_inflation_hazard));
+        }
+        if !(0.0..=0.5).contains(&self.cycle_rate_hazard) {
+            return Err(format!(
+                "cycle_rate_hazard is {}. It is the monthly peak hazard an expansion adds with the \
+                 funds rate above 5, in [0, 0.5]; 0 is the legacy 0.1.",
+                self.cycle_rate_hazard));
+        }
         if !(self.oil_forecast_clamp == 0.0 || self.oil_forecast_clamp == 1.0) {
             return Err(format!(
                 "oil_forecast_clamp is {}. It is a switch: 0 (the forecast publishes the \
@@ -13380,6 +13415,8 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "fed_neutral_real_rate",
     "core_trend_sd",
     "core_trend_persistence",
+    "cycle_inflation_hazard",
+    "cycle_rate_hazard",
     "treasury_2y_meeting_carry",
     "policy_anticipation_half_life",
     "treasury_path_anticipated",
@@ -13602,6 +13639,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "fed_neutral_real_rate",
         "core_trend_sd",
         "core_trend_persistence",
+        "cycle_inflation_hazard",
+        "cycle_rate_hazard",
         "treasury_2y_meeting_carry",
         "policy_anticipation_half_life",
         "treasury_path_anticipated",

@@ -697,6 +697,10 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # Core inflation's trend: off to twice the CPILFESL fit's sd; persistence
     # off to 0.998.
     "core_trend_sd": (0.0, 0.34),
+    # The expansion's inflation and rate hazards: off (the legacy 0.1) to
+    # the legacy value itself.
+    "cycle_inflation_hazard": (0.0, 0.1),
+    "cycle_rate_hazard": (0.0, 0.1),
     "core_trend_persistence": (0.0, 0.998),
     # The 2-year's carry through a meeting: a share, so its own bounds.
     "treasury_2y_meeting_carry": (0.0, 1.0),

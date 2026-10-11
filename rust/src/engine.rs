@@ -4034,6 +4034,8 @@ impl Engine {
             } else {
                 0.0
             },
+            inflation_hazard: self.params.cycle_inflation_hazard,
+            rate_hazard: self.params.cycle_rate_hazard,
         }
     }
 
