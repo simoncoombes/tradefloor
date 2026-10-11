@@ -364,6 +364,11 @@ pub struct DailyInputs<'a> {
     /// headline (`EconomyState::oil_inflation_level`): true while
     /// `fed_core_inflation` or `treasury_core_inflation` is set.
     pub oil_inflation_tracked: bool,
+    /// Core inflation's slow trend (`ModelParams::core_trend_sd`), points
+    /// over the 2.0 target: the month-start step closes headline's gap to
+    /// `2.0 + core_trend` instead of 2.0. 0.0, with the dial off, is the
+    /// target that stood.
+    pub core_trend: f64,
     /// The oil price's bounds, dollars; 0.0 is the standing 35 and 150. See
     /// `ModelParams::oil_price_floor`.
     pub oil_price_floor: f64,
@@ -563,6 +568,7 @@ impl<'a> Default for DailyInputs<'a> {
             usd_noise_sd: 0.0,
             usd_safe_haven_gain: 0.0,
             oil_inflation_tracked: false,
+            core_trend: 0.0,
             oil_price_floor: 0.0,
             oil_price_ceiling: 0.0,
             oil_inflation_passthrough: 0.0,
@@ -2007,7 +2013,14 @@ pub fn update_economy_daily(
         );
 
         // ── Inflation ─────────────────────────────────────────────────────
-        let inflation_target = INFLATION_TARGET;
+        // CORE INFLATION'S TREND (`core_trend_sd`): headline closes its gap
+        // to the target plus the slow trend, the level a tape-fitted AR(1)
+        // carries core's persistence at. A branch: at 0.0 the target stood.
+        let inflation_target = if inputs.core_trend != 0.0 {
+            INFLATION_TARGET + inputs.core_trend
+        } else {
+            INFLATION_TARGET
+        };
         let inflation_mean_rev_coeff = inputs.inflation_reversion;
 
         // Positive real rates are contractionary.

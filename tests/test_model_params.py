@@ -991,6 +991,10 @@ PERTURBATIONS = [
     ("treasury_zlb_haven_gain", 0.05, True),
     # The Taylor rule's neutral real rate: the probe's meetings read the rule.
     ("fed_neutral_real_rate", 2.0, True),
+    # Core inflation's trend: its opening draw moves the month-start step.
+    ("core_trend_sd", 0.17, True),
+    # The persistence alone is read by nothing (the sd is 0).
+    ("core_trend_persistence", 0.993, False),
     # Oil's bounds from WTI in real terms. INERT on the probe: its burn-in's
     # oil stays inside 35 to 150, so moving the bounds outward moves nothing.
     ("oil_price_floor", 16.4, False),
@@ -1927,6 +1931,11 @@ ECONOMY_STREAM_MOVERS = frozenset({
     # burn-in lives through, and with them which state-dependent macro
     # sites fire there, as `cycle_stationary_opening` does.
     "cycle_equity_hazard_opening",
+    # Core inflation's trend: its draws are on its own key (stream positions
+    # identical at a negligible sd, tests/test_core_trend_process.py), but
+    # its opening moves headline through the burn-in, and with it which
+    # state-dependent macro sites fire, as the cycle openings above do.
+    "core_trend_sd",
     # The return-driven arrival rate takes the same arrival draw as
     # `vix_jump_intensity` on every session it is non-zero, for the same
     # reason: the draw IS the mechanism.
@@ -2095,6 +2104,7 @@ COMPANIONS: dict[str, dict[str, float]] = {
     # symmetric pass-through does either side of 81 (the shipped branch pays
     # nothing between 50 and 80).
     "fed_core_inflation": {"oil_inflation_passthrough": 1.0},
+    "core_trend_sd": {"core_trend_persistence": 0.993},
     "treasury_core_inflation": {"oil_inflation_passthrough": 1.0},
     # The unmet put needs the put and the priced path it decays like.
     "treasury_zlb_path": {"fed_put_gain": 3.0, "fed_put_half_life": 126.0, "treasury_put_pricing": 1.0,

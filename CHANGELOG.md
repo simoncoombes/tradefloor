@@ -125,6 +125,13 @@ same with them on as off.
   `usd_crisis_vix_threshold` (0.0 the standing 0.05), read by the dollar's
   step and by the forecast's expected bid. FRED DTWEXM against CBOE's VIX
   measures 0.001.
+- `core_trend_sd` and `core_trend_persistence` are new dials, 0.0 on every
+  preset and left out of the digest there: off zero headline inflation's
+  month-start step reverts to 2.0 plus a slow AR(1) trend (monthly
+  persistence and innovation sd, stepped at the month start on its own keyed
+  draws so no stream moves, opened from its stationary distribution), so
+  core carries the tape's persistent regimes. Fitted to FRED CPILFESL
+  year-on-year 1990-2025 about 2.0: 0.993 and 0.170.
 - `fed_neutral_real_rate` is a new dial, 0.0 on every preset and left out of
   the digest there: points added to the neutral rate of the central bank's
   Taylor rule, whose neutral at target is a nominal 2.0 (a real rate of 0).

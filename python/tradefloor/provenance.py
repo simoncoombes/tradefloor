@@ -563,6 +563,14 @@ OUT_OF_SCOPE = {
         "stood (a branch on `== 0.0` in `close_yields` and the meeting's "
         "target), and `zlb_unmet` is neither written, snapshotted nor hashed; "
         "at 0.0 it is also left out of the model's digest",
+    "core_trend_sd":
+        "inert at 0.0: headline inflation reverts to the 2.0 target as it "
+        "stood (a branch on `== 0.0` in the month-start step); the trend and "
+        "its key are neither stepped, snapshotted nor hashed; at 0.0 it is "
+        "also left out of the model's digest",
+    "core_trend_persistence":
+        "inert at 0.0 and read only with `core_trend_sd` set; at 0.0 it is "
+        "also left out of the model's digest",
     "fed_neutral_real_rate":
         "inert at 0.0: the Taylor rule's neutral is the one that stood (a "
         "branch on `== 0.0` in the meeting); at 0.0 it is also left out of "

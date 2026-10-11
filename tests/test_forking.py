@@ -1143,6 +1143,9 @@ def _nothing_dormant():
                    treasury_zlb_haven_gain=0.05,
                    # The Taylor rule's neutral real rate (HLW, 1990-2025).
                    fed_neutral_real_rate=2.0,
+                   # Core inflation's trend (CPILFESL fit), on its own keyed draws.
+                   core_trend_sd=0.17,
+                   core_trend_persistence=0.993,
                    oil_price_floor=16.4,
                    oil_price_ceiling=279.0,
                    # The contracts' margin (pt-v22 phase 1).
@@ -1435,6 +1438,13 @@ UNREACHED_SNAPSHOT_FIELDS = {
         "tests/test_postcut.py::test_the_hashes_agree_and_a_restore_"
         "reproduces_the_run cuts, carries a non-zero path across a restore "
         "and asserts the state hash reads it.",
+    "core_trend":
+        "core inflation's trend (`core_trend_sd`): its level and its key. A "
+        "fresh engine on the same seed opens at the same trend (the opening "
+        "is a draw on the same key), and the trend moves only on a month's "
+        "first step, so until the split's parent has passed one the blank "
+        "value is the parent's own. tests/test_core_trend_process.py holds "
+        "the process to its own draws and its state in the hash.",
     "earnings_key":
         "the earnings calendar's key. It is derived from the seed the engine "
         "was built with, and this guard restores into an engine built from "
