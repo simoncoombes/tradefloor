@@ -125,6 +125,17 @@ same with them on as off.
   `usd_crisis_vix_threshold` (0.0 the standing 0.05), read by the dollar's
   step and by the forecast's expected bid. FRED DTWEXM against CBOE's VIX
   measures 0.001.
+- `fed_eve_decision` is a new switch, 0.0 on every preset and left out of the
+  digest there: at 1 a scheduled meeting delivers the decision the Fed's own
+  reading implied at the eve's close (the decision the market priced), after
+  the ladder's and the put's draws; emergency meetings are untouched. The
+  model's scheduled-decision surprise falls from 9-12 bp to about 5 (tape
+  4.8, Bauer and Swanson 2022).
+- `treasury_path_owed_excluded` is a new switch, 0.0 on every preset and
+  left out of the digest there: under `treasury_path_anticipated` the
+  meeting's path step leaves out the put's owed step, which in the legacy
+  `dff + owed` offsets the put's extra cut and under the anticipated path
+  priced the give-back on the day of the cut.
 - `cycle_inflation_hazard` and `cycle_rate_hazard` are new dials, 0.0 on
   every preset and left out of the digest there: the monthly peak hazard an
   expansion adds with inflation above 4 and with the funds rate above 5

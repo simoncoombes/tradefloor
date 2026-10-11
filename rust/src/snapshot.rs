@@ -1666,6 +1666,10 @@ impl Engine {
         if let Some(words) = self.core_trend_words() {
             out.put("core_trend", V::from_f64s(&words));
         }
+        // The eve's decision (`fed_eve_decision`).
+        if let Some(words) = self.eve_decision_words() {
+            out.put("eve_decision", V::from_f64s(&words));
+        }
         // The spread a `corporate_spread` pin holds tonight, only while its
         // mark stands.
         if let Some(spread) = self.pinned_corporate_spread() {
@@ -2043,6 +2047,7 @@ impl Engine {
             Gated::dial("margin", "margin_scan_coverage", p.margin_scan_coverage),
             Gated::dial("oil_target_drift", "oil_target_drift_sd", p.oil_target_drift_sd),
             Gated::dial("core_trend", "core_trend_sd", p.core_trend_sd),
+            Gated::dial("eve_decision", "fed_eve_decision", p.fed_eve_decision),
             Gated::when(
                 "buyback_log_shares",
                 self.carries_buyback_log_shares(),
@@ -2783,6 +2788,14 @@ impl Engine {
                 None => None,
             };
             inner.set_core_trend_state(words.as_deref()).map_err(core)?;
+        }
+        // The eve's decision (`fed_eve_decision`).
+        {
+            let words = match snapshot.get("eve_decision") {
+                Some(_) => Some(read_buffer(snapshot, "", "eve_decision")?),
+                None => None,
+            };
+            inner.set_eve_decision_state(words.as_deref()).map_err(core)?;
         }
         inner.set_nominal_output_base(read_finite(snapshot, "", "nominal_output_base")?);
         let variance = read_numbers(snapshot, "", "market_variance")?;

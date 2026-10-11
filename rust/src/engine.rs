@@ -1300,6 +1300,11 @@ pub struct Engine {
     /// reverts to (`core_trend_sd`): 0.0 with the dial off, which it never
     /// leaves.
     core_trend: f64,
+    /// The decision the Fed's own reading implied at the last close
+    /// (`fed_eve_decision`), which the next scheduled meeting delivers;
+    /// `None` before the first close with the switch on, and always with it
+    /// off.
+    eve_decision: Option<f64>,
 
     /// The background traders sharing the agent-facing book, when the
     /// engine was built with them (`crate::population`). `None` on every
@@ -2373,6 +2378,7 @@ impl Engine {
             oil_target_drift: 0.0,
             core_trend_key: crate::rng::core_trend_key(seed),
             core_trend: 0.0,
+            eve_decision: None,
             population: None,
         };
         // CORE INFLATION'S TREND OPENING (`core_trend_sd`): a draw from the
@@ -9279,6 +9285,10 @@ impl Engine {
             };
         }
         let policy = self.policy_options(holds(PIN_POLICY));
+        // THE EVE'S DECISION (`fed_eve_decision`): only a meeting the calendar
+        // called delivers it, so this is decided before the put's emergency
+        // below can bring the next meeting forward to tonight.
+        let scheduled_tonight = request.timestamp >= self.central_bank.next_meeting_date;
         // THE INTERMEETING MEETING (`fed_put_emergency_vix`): a VIX close at
         // or above the dial, with inflation under the put's ceiling and room
         // to cut, brings the next meeting forward to tonight, at least 21
@@ -9304,8 +9314,13 @@ impl Engine {
         let meeting =
             {
                 rng.site(Site::CentralBank, 0);
+                let meeting_policy = if self.params.fed_eve_decision != 0.0 && scheduled_tonight {
+                    crate::economy::PolicyOptions { eve_change: self.eve_decision, ..policy }
+                } else {
+                    policy
+                };
                 update_central_bank_with(
-                    &self.central_bank, &self.economy, request.timestamp, rng, &policy)
+                    &self.central_bank, &self.economy, request.timestamp, rng, &meeting_policy)
             };
         let meeting_held = meeting.decision.is_some();
         if meeting_held && self.params.fed_stress_cut != 0.0 {
@@ -9319,10 +9334,13 @@ impl Engine {
             } else {
                 0.0
             };
+            // THE OWED STEP LEFT OUT (`treasury_path_owed_excluded`), as the
+            // meeting's `path_after` leaves it out.
             self.policy_path += match self.anticipated_path_carry() {
-                Some(carry) => carry,
-                None => meeting.economy.federal_funds_rate - self.economy.federal_funds_rate,
-            } + owed;
+                Some(carry) if self.params.treasury_path_owed_excluded != 0.0 => carry,
+                Some(carry) => carry + owed,
+                None => meeting.economy.federal_funds_rate - self.economy.federal_funds_rate + owed,
+            };
         }
         let decision = meeting.decision;
         let announcement_variant = meeting.announcement_variant;
@@ -9371,6 +9389,12 @@ impl Engine {
         // setting.
         if self.params.policy_anticipation != 0.0 {
             self.reprice_anticipated_meeting(request, &policy, meeting_held, pins_today);
+        }
+        // THE EVE'S DECISION (`fed_eve_decision`): what the Fed's own reading
+        // implies tonight, for the next scheduled meeting to deliver. A silent
+        // shadow: no draw. Nothing runs with the switch off.
+        if self.params.fed_eve_decision != 0.0 {
+            self.eve_decision = Some(self.own_shadow_change(request, &policy));
         }
         self.macro_pins_today = 0;
         self.pinned_vix_jump = 0.0;
@@ -9446,6 +9470,8 @@ impl Engine {
             neutral_real_rate: self.params.fed_neutral_real_rate,
             two_year_carry: self.params.treasury_2y_meeting_carry,
             path_carry: self.anticipated_path_carry(),
+            eve_change: None,
+            path_owed_excluded: self.params.treasury_path_owed_excluded != 0.0,
         }
     }
 
@@ -10039,6 +10065,63 @@ impl Engine {
             }
             (None, true) => Err("this model sets core_trend_sd and the snapshot carries no core_trend".to_string()),
             (Some(_), false) => Err("this snapshot carries core_trend and this model's core_trend_sd is 0".to_string()),
+        }
+    }
+
+    /// The decision the Fed's own reading implies tonight: a silent shadow
+    /// meeting on the economy the meeting reads (`fed_eve_decision`; the
+    /// same shadow as `policy_anticipation_guidance`'s "own"), percentage
+    /// points.
+    fn own_shadow_change(&self, request: &DayAdvanceRequest, options: &crate::economy::PolicyOptions) -> f64 {
+        struct Silent;
+        impl Rng for Silent {
+            fn next_f64(&mut self) -> f64 {
+                0.5
+            }
+            fn next_normal(&mut self) -> f64 {
+                0.0
+            }
+        }
+        let mut cb = self.central_bank;
+        cb.next_meeting_date = request.timestamp;
+        let options = crate::economy::PolicyOptions {
+            stress_level: self.stress_vix_max,
+            stress_hold: self.stress_hold_now(),
+            path_before: self.priced_policy_path(),
+            eve_change: None,
+            ..*options
+        };
+        let own = update_central_bank_with(&cb, &self.economy, request.timestamp, &mut Silent, &options);
+        own.economy.federal_funds_rate - self.economy.federal_funds_rate
+    }
+
+    /// The eve's decision for a snapshot and the state hash, `[present,
+    /// change]`, or `None` with `fed_eve_decision` at 0.0.
+    pub fn eve_decision_words(&self) -> Option<[f64; 2]> {
+        if self.params.fed_eve_decision == 0.0 {
+            return None;
+        }
+        Some(match self.eve_decision {
+            Some(c) => [1.0, c],
+            None => [0.0, 0.0],
+        })
+    }
+
+    /// Put the eve's decision back from [`Engine::eve_decision_words`].
+    pub fn set_eve_decision_state(&mut self, words: Option<&[f64]>) -> Result<(), String> {
+        match (words, self.params.fed_eve_decision != 0.0) {
+            (None, false) => Ok(()),
+            (Some(w), true) => {
+                if w.len() != 2 || !(w[0] == 0.0 || w[0] == 1.0) || !w[1].is_finite() {
+                    return Err(format!(
+                        "this snapshot's eve_decision is {w:?}: it is a presence flag and the eve's \
+                         decision"));
+                }
+                self.eve_decision = if w[0] == 1.0 { Some(w[1]) } else { None };
+                Ok(())
+            }
+            (None, true) => Err("this model sets fed_eve_decision and the snapshot carries no eve_decision".to_string()),
+            (Some(_), false) => Err("this snapshot carries eve_decision and this model's fed_eve_decision is 0".to_string()),
         }
     }
 
@@ -11056,6 +11139,7 @@ impl Engine {
             stress_level: self.stress_vix_max,
             stress_hold: self.stress_hold_now(),
             path_before: self.priced_policy_path(),
+            eve_change: None,
             ..*options
         };
         let shadow = update_central_bank_with(&cb, &economy, request.timestamp, &mut Silent, &options);
@@ -12939,6 +13023,14 @@ impl Engine {
         // its own tag (57: 56 is the r* process's on ptv22/rstar-process).
         if let Some(words) = self.core_trend_words() {
             hash_f64(&mut buf, 57.0);
+            for value in words {
+                hash_f64(&mut buf, value);
+            }
+        }
+        // The eve's decision, only while `fed_eve_decision` is set, behind its
+        // own tag.
+        if let Some(words) = self.eve_decision_words() {
+            hash_f64(&mut buf, 58.0);
             for value in words {
                 hash_f64(&mut buf, value);
             }

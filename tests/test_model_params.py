@@ -1001,6 +1001,12 @@ PERTURBATIONS = [
     # probe's path never does.
     ("cycle_inflation_hazard", 0.0219, False),
     ("cycle_rate_hazard", 0.0013, False),
+    # The eve's decision: the probe's meetings deliver the eve's silent
+    # shadow instead of re-reading the day, which moves its rate path.
+    ("fed_eve_decision", 1.0, True),
+    # The owed step left out. INERT on the probe: read only with
+    # treasury_path_anticipated, which pt-v20 leaves off.
+    ("treasury_path_owed_excluded", 1.0, False),
     # The 2-year's carry through a meeting. INERT on the probe's market: the
     # burn-in's meetings move the 2-year (pt-v20's own 2-year noise leaves it
     # a gap to keep: 0.15% against 0.23% after the third close, measured

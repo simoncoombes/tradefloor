@@ -232,6 +232,17 @@ pub struct PolicyOptions {
     /// meeting by `c`, the further move the anticipation priced, instead of
     /// the rate's change. `None`, on every preset, is the step that stood.
     pub path_carry: Option<f64>,
+    /// `fed_eve_decision`: `Some(c)` makes a scheduled meeting's rate change
+    /// `c`, the decision the Fed's own reading implied at the eve's close,
+    /// after the ladder, the stress hold and the put and before the
+    /// announcement's draw, so every draw is taken where it stood. Not read
+    /// at an emergency meeting. `None`, on every preset, is the meeting that
+    /// stood.
+    pub eve_change: Option<f64>,
+    /// `treasury_path_owed_excluded`: with `path_carry` set, the meeting's
+    /// path step leaves out the put's owed step. false, on every preset, is
+    /// the step that stood.
+    pub path_owed_excluded: bool,
 }
 
 /// [`PolicyOptions::shipped`].
@@ -271,6 +282,8 @@ impl PolicyOptions {
             neutral_real_rate: 0.0,
             two_year_carry: 0.0,
             path_carry: None,
+            eve_change: None,
+            path_owed_excluded: false,
         }
     }
 }
@@ -631,6 +644,24 @@ pub fn update_central_bank_with(
         }
     }
 
+    // THE EVE'S DECISION (`fed_eve_decision`): a scheduled meeting delivers
+    // what the Fed's own reading implied at the eve's close, the decision the
+    // market priced; scheduled decisions are signalled and the blackout ends
+    // new input. The ladder's and the put's draws above are taken as they
+    // stood. A branch: `None` is the meeting that stood.
+    if let Some(c) = options.eve_change {
+        if !is_emergency_meeting {
+            rate_change = c;
+            decision = if c > 0.0 {
+                Decision::Hike
+            } else if c < 0.0 {
+                Decision::Cut
+            } else {
+                Decision::Hold
+            };
+        }
+    }
+
     // DRAW SITE — always. The announcement text is not built here, but the
     // draw that chooses it is taken at exactly this point.
     let announcement_variant = (rng.next_f64() * ANNOUNCEMENT_VARIANTS).floor() as usize;
@@ -691,14 +722,19 @@ pub fn update_central_bank_with(
     let owed_moved = if put_on { new_economy.fed_put_owed - economy.fed_put_owed } else { 0.0 };
     let path_after = if path_on {
         options.path_before
-            + options.path_gain * (match options.path_carry {
+            + options.path_gain * match options.path_carry {
                 // THE ANTICIPATED PATH (`treasury_path_anticipated`): the
                 // forecast moves by what the anticipation priced beyond the
                 // next decision, not by the decision, so a surprise reaches
                 // the curve once, through the rate.
-                Some(carry) => carry,
-                None => new_economy.federal_funds_rate - current_rate,
-            } + owed_moved)
+                // THE OWED STEP LEFT OUT (`treasury_path_owed_excluded`): the
+                // owed step offsets the put's extra cut in `Δff + owed`; with
+                // `Δff` replaced it would price the give-back on the day of
+                // the cut. A branch: off, the step is as it stood.
+                Some(carry) if options.path_owed_excluded => carry,
+                Some(carry) => carry + owed_moved,
+                None => new_economy.federal_funds_rate - current_rate + owed_moved,
+            }
     } else {
         0.0
     };

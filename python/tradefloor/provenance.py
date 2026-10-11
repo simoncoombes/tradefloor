@@ -568,6 +568,15 @@ OUT_OF_SCOPE = {
         "stood (a branch on `== 0.0` in the month-start step); the trend and "
         "its key are neither stepped, snapshotted nor hashed; at 0.0 it is "
         "also left out of the model's digest",
+    "fed_eve_decision":
+        "inert at 0.0: a scheduled meeting re-reads the day's economy as it "
+        "stood (a branch in the meeting); the stored decision is neither "
+        "computed, snapshotted nor hashed; at 0.0 it is also left out of the "
+        "model's digest",
+    "treasury_path_owed_excluded":
+        "inert at 0.0 and read only with `treasury_path_anticipated` on: the "
+        "anticipated path's meeting step carries the put's owed step as it "
+        "stood; at 0.0 it is also left out of the model's digest",
     "cycle_inflation_hazard":
         "inert at 0.0: an expansion adds the legacy 0.1 a month with "
         "inflation above 4 (a branch on `== 0.0` in the cycle's ladder); at "

@@ -1149,6 +1149,10 @@ def _nothing_dormant():
                    # The expansion's inflation and rate hazards (NBER fit).
                    cycle_inflation_hazard=0.0219,
                    cycle_rate_hazard=0.0013,
+                   # The eve's decision and the anticipated path without the
+                   # owed step (both switches).
+                   fed_eve_decision=1.0,
+                   treasury_path_owed_excluded=1.0,
                    # The 2-year's carry through a meeting (a share).
                    treasury_2y_meeting_carry=1.0,
                    # The priced meeting's half-life (policy_anticipation is
@@ -1457,6 +1461,13 @@ UNREACHED_SNAPSHOT_FIELDS = {
         "first step, so until the split's parent has passed one the blank "
         "value is the parent's own. tests/test_core_trend_process.py holds "
         "the process to its own draws and its state in the hash.",
+    "eve_decision":
+        "the decision the Fed's own reading implied at the last close "
+        "(`fed_eve_decision`), which the next scheduled meeting delivers. "
+        "`CRISIS` starts the policy rate at 0.05 in a contraction, where the "
+        "ladder has no cut left and no reason to hike, so the eve's decision "
+        "and the day's agree and a restore that loses it (and re-reads the "
+        "day) reaches the same decision.",
     "earnings_key":
         "the earnings calendar's key. It is derived from the seed the engine "
         "was built with, and this guard restores into an engine built from "

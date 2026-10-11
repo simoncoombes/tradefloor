@@ -1222,6 +1222,40 @@ pub struct ModelParams {
     /// 0.0 is left out of the model's digest. The same fit: +0.0013 a month
     /// (se 0.0087); 1976-2025 -0.0009 (0.0107). In [0, 0.5].
     pub cycle_rate_hazard: f64,
+    /// A switch: 1.0 makes a scheduled central-bank meeting deliver the
+    /// decision the Fed's own reading implied at the eve's close, the
+    /// decision the market priced (`policy_anticipation_guidance`'s "own"
+    /// shadow). 0.0, on every shipped preset, is the meeting as it stood,
+    /// re-reading the day's economy, and a value of 0.0 is left out of the
+    /// model's digest.
+    ///
+    /// The eve's shadow equals the delivered decision at 80-87% of meetings;
+    /// the rest are reversals on stressed days that make a surprise sd of
+    /// 9-12 bp (design PR #9, r22o5czN-B/inflation addendum G), against
+    /// 4.8 bp for scheduled FOMC decisions off the zero bound, 1994-2019
+    /// (Bauer and Swanson 2022): scheduled decisions are signalled and the
+    /// blackout ends new input, and the response to a crash comes through
+    /// intermeeting action, which the emergency meeting and the put's
+    /// emergency still give. Applied after the ladder, the stress hold and
+    /// the put, before the announcement's draw, so every draw is taken where
+    /// it stood. The stored decision is snapshotted and hashed only with
+    /// this set. 0 or 1.
+    pub fed_eve_decision: f64,
+    /// A switch: with `treasury_path_anticipated` on, 1.0 leaves the Fed
+    /// put's owed step out of the meeting's path step, so the path moves by
+    /// the anticipation's further move alone. 0.0, on every shipped preset,
+    /// is the step that stood (`(a - 1) E + owed`), and a value of 0.0 is
+    /// left out of the model's digest.
+    ///
+    /// In the legacy step `dff + owed` the owed step offsets the put's extra
+    /// cut, so the path moves by the ladder's change; the anticipated path
+    /// replaced `dff` and kept `owed`, so every put cut raised the path by
+    /// the whole amount owed: on 12 histories the 2-year rose 35 to 48 bp on
+    /// the day of a put cut of 33 to 46 bp (design PR #9, r22o5czN-B/
+    /// inflation addendum H), against the tape's cut-day mean of -1.2 bp
+    /// (DGS2 on scheduled cuts off the zero bound, 1994-2025). Read only
+    /// with `treasury_path_anticipated` on. 0 or 1.
+    pub treasury_path_owed_excluded: f64,
     /// The share of the 2-year's standing gap to the meeting's formula that a
     /// central-bank meeting keeps. 0.0, on every shipped preset, is the
     /// meeting as it stood, and a value of 0.0 is left out of the model's
@@ -8161,6 +8195,8 @@ impl ModelParams {
             core_trend_persistence: 0.0,
             cycle_inflation_hazard: 0.0,
             cycle_rate_hazard: 0.0,
+            fed_eve_decision: 0.0,
+            treasury_path_owed_excluded: 0.0,
             treasury_2y_meeting_carry: 0.0,
             policy_anticipation_half_life: 0.0,
             treasury_path_anticipated: 0.0,
@@ -10801,6 +10837,8 @@ impl ModelParams {
             "core_trend_persistence" => self.core_trend_persistence,
             "cycle_inflation_hazard" => self.cycle_inflation_hazard,
             "cycle_rate_hazard" => self.cycle_rate_hazard,
+            "fed_eve_decision" => self.fed_eve_decision,
+            "treasury_path_owed_excluded" => self.treasury_path_owed_excluded,
             "treasury_2y_meeting_carry" => self.treasury_2y_meeting_carry,
             "policy_anticipation_half_life" => self.policy_anticipation_half_life,
             "treasury_path_anticipated" => self.treasury_path_anticipated,
@@ -11206,6 +11244,8 @@ impl ModelParams {
             "core_trend_persistence" => out.core_trend_persistence = value,
             "cycle_inflation_hazard" => out.cycle_inflation_hazard = value,
             "cycle_rate_hazard" => out.cycle_rate_hazard = value,
+            "fed_eve_decision" => out.fed_eve_decision = value,
+            "treasury_path_owed_excluded" => out.treasury_path_owed_excluded = value,
             "treasury_2y_meeting_carry" => out.treasury_2y_meeting_carry = value,
             "policy_anticipation_half_life" => out.policy_anticipation_half_life = value,
             "treasury_path_anticipated" => out.treasury_path_anticipated = value,
@@ -12708,6 +12748,18 @@ impl ModelParams {
                  funds rate above 5, in [0, 0.5]; 0 is the legacy 0.1.",
                 self.cycle_rate_hazard));
         }
+        if !(self.fed_eve_decision == 0.0 || self.fed_eve_decision == 1.0) {
+            return Err(format!(
+                "fed_eve_decision is {}. It is a switch: 0 (the meeting re-reads the day) or 1 \
+                 (a scheduled meeting delivers the eve's decision).",
+                self.fed_eve_decision));
+        }
+        if !(self.treasury_path_owed_excluded == 0.0 || self.treasury_path_owed_excluded == 1.0) {
+            return Err(format!(
+                "treasury_path_owed_excluded is {}. It is a switch: 0 (the anticipated path's step \
+                 carries the put's owed step) or 1 (it leaves it out).",
+                self.treasury_path_owed_excluded));
+        }
         if !(self.oil_forecast_clamp == 0.0 || self.oil_forecast_clamp == 1.0) {
             return Err(format!(
                 "oil_forecast_clamp is {}. It is a switch: 0 (the forecast publishes the \
@@ -13417,6 +13469,8 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "core_trend_persistence",
     "cycle_inflation_hazard",
     "cycle_rate_hazard",
+    "fed_eve_decision",
+    "treasury_path_owed_excluded",
     "treasury_2y_meeting_carry",
     "policy_anticipation_half_life",
     "treasury_path_anticipated",
@@ -13641,6 +13695,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "core_trend_persistence",
         "cycle_inflation_hazard",
         "cycle_rate_hazard",
+        "fed_eve_decision",
+        "treasury_path_owed_excluded",
         "treasury_2y_meeting_carry",
         "policy_anticipation_half_life",
         "treasury_path_anticipated",
