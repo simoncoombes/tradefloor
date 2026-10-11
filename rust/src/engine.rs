@@ -1848,7 +1848,7 @@ impl Engine {
         let p = &self.params;
         if p.fed_put_gain == 0.0
             || p.treasury_put_pricing == 0.0
-            || self.economy.inflation_rate >= crate::economy::central_bank::FED_PUT_INFLATION_CEILING
+            || self.policy_inflation() >= crate::economy::central_bank::FED_PUT_INFLATION_CEILING
         {
             return 0.0;
         }
@@ -9265,7 +9265,7 @@ impl Engine {
         if self.params.fed_put_gain != 0.0
             && self.params.fed_put_emergency_vix != 0.0
             && self.economy.vix >= self.params.fed_put_emergency_vix
-            && self.economy.inflation_rate < crate::economy::central_bank::FED_PUT_INFLATION_CEILING
+            && self.policy_inflation() < crate::economy::central_bank::FED_PUT_INFLATION_CEILING
             && self.economy.federal_funds_rate > 0.0
             && request.timestamp - self.central_bank.last_meeting_date >= FED_PUT_EMERGENCY_GAP_MINUTES
             && request.timestamp < self.central_bank.next_meeting_date
@@ -9393,7 +9393,45 @@ impl Engine {
             rate_damping: self.params.treasury_policy_damping,
             spread_vix_cut: self.params.corporate_spread_vix_cut,
             spread_equity_gain: self.params.corporate_spread_equity_gain,
+            // Core in headline's place for the bank and the curve
+            // (`fed_core_inflation`, `treasury_core_inflation`); `None` with
+            // the switches off.
+            policy_inflation: if self.params.fed_core_inflation != 0.0 {
+                Some(self.core_inflation())
+            } else {
+                None
+            },
+            curve_inflation: if self.params.treasury_core_inflation != 0.0 {
+                Some(self.core_inflation())
+            } else {
+                None
+            },
         }
+    }
+
+    /// Core inflation: headline less the oil pass-through's accumulated part
+    /// (`EconomyState::oil_inflation_level`, 0.0 unless
+    /// `fed_core_inflation` or `treasury_core_inflation` is set).
+    fn core_inflation(&self) -> f64 {
+        self.economy.inflation_rate - self.economy.oil_inflation_level
+    }
+
+    /// The inflation the central bank reads: core under
+    /// `fed_core_inflation`, headline otherwise.
+    fn policy_inflation(&self) -> f64 {
+        if self.params.fed_core_inflation != 0.0 {
+            self.core_inflation()
+        } else {
+            self.economy.inflation_rate
+        }
+    }
+
+    /// Whether this engine's model keeps the oil pass-through's part of
+    /// headline (`EconomyState::oil_inflation_level`), which is when the
+    /// snapshot and the state hash carry it: `fed_core_inflation` or
+    /// `treasury_core_inflation` set. Off on every preset.
+    pub fn carries_oil_inflation_level(&self) -> bool {
+        self.params.fed_core_inflation != 0.0 || self.params.treasury_core_inflation != 0.0
     }
 
     /// The daily step's inputs, as the close builds them, with the session's
@@ -9539,6 +9577,7 @@ impl Engine {
             usd_mean_reversion: self.params.usd_mean_reversion,
             usd_noise_sd: self.params.usd_noise_sd,
             usd_safe_haven_gain: self.params.usd_safe_haven_gain,
+            oil_inflation_tracked: self.carries_oil_inflation_level(),
             oil_price_floor: self.params.oil_price_floor,
             oil_price_ceiling: self.params.oil_price_ceiling,
             oil_inflation_passthrough: self.params.oil_inflation_passthrough,
@@ -9586,6 +9625,7 @@ impl Engine {
                 priced_anticipation: self.priced_anticipation(),
                 rate_damping: self.params.treasury_policy_damping,
                 haven_gain: self.params.treasury_haven_gain,
+                core_inflation: self.params.treasury_core_inflation,
                 // Credit's VIX slope and leverage term
                 // (`corporate_spread_vix_cut`, `corporate_spread_equity_gain`),
                 // 0.0 unless set; the projection reads them as the close does.
@@ -12822,6 +12862,11 @@ impl Engine {
         // The dollar's safe-haven bid, only while `usd_mean_reversion` is set.
         if self.params.usd_mean_reversion != 0.0 {
             hash_f64(&mut buf, e.usd_haven_level);
+        }
+        // The oil pass-through's part of headline, only while
+        // `fed_core_inflation` or `treasury_core_inflation` is set.
+        if self.carries_oil_inflation_level() {
+            hash_f64(&mut buf, e.oil_inflation_level);
         }
         // The published GDP growth figure's state, only while
         // `gdp_publication_lag` is set, so every other engine's hash is the

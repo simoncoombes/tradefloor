@@ -125,6 +125,15 @@ same with them on as off.
   `usd_crisis_vix_threshold` (0.0 the standing 0.05), read by the dollar's
   step and by the forecast's expected bid. FRED DTWEXM against CBOE's VIX
   measures 0.001.
+- `fed_core_inflation` and `treasury_core_inflation` are new switches, 0.0
+  on every preset and left out of the digest there: the central bank, and the
+  Treasury curve (the 10-year's term premium, the haven's gate, the flight to
+  quality's sign), read core inflation in place of headline. Core is headline
+  less the oil pass-through's accumulated part, which the economy carries as
+  `oil_inflation_level` only with either switch on. FRED CPILFESL against
+  CPIAUCSL, 1990 to 2025: the funds rate loads on core and not on the gap,
+  and in index falls with headline at 3 or more and core under 3 the Fed cut
+  and the 10-year rallied as below 3.
 - `oil_price_floor` and `oil_price_ceiling` are new dials, 0.0 on every
   preset and left out of the digest there: oil's bounds, the standing 35
   and 150 at 0.0, read by the step and by the forecast's clamp.

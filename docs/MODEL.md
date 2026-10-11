@@ -1571,7 +1571,14 @@ drift per VIX point above the threshold (0.0 the standing 0.05, never
 measured): FRED's trade-weighted dollar gains 0.0010 per cent a session per
 point (DTWEXM against CBOE's VIX, 1990 to 2019, se 0.0012) and gives it back
 within 21 sessions, so at 0.001 a crisis barely moves the dollar and the oil
-curve does not price the bid's unwinding as a slope. `oil_price_floor` and `oil_price_ceiling`
+curve does not price the bid's unwinding as a slope. Oil reaches the rest of the
+economy through headline inflation. Under `fed_core_inflation` the central
+bank reads core, headline less the pass-through's accumulated part
+(`oil_inflation_level`, the monthly term decaying at headline's own
+reversion), and under `treasury_core_inflation` so do the 10-year's term
+premium, the haven's gate and the flight to quality's sign: on the tape the
+Fed looked through energy, and an oil-driven headline of 3 to 4 neither
+stopped its cuts nor the 10-year's rally in a fall. `oil_price_floor` and `oil_price_ceiling`
 set oil's bounds (0.0 the standing 35 and 150): WTI deflated by CPIAUCSL ran
 0.203 to 3.44 times its median over 1987 to 2024, which at the model's
 centre of 81 is 16.4 and 279.
@@ -1591,6 +1598,8 @@ centre of 81 is 16.4 and 279.
 | `usd_mean_reversion` | 0 (0.02); up to 1 | same | not set | FRED DTWEXM, 1987 to 2019: AR(1) half-life of the log level 729 sessions (0.00095); 540 to 580 against the trailing five-year mean |
 | `usd_noise_sd` | 0 (0.3); up to 5 | same | not set | FRED DTWEXM: daily log change sd 0.0043, 0.43 points at 100 |
 | `usd_safe_haven_gain` | 0 (0.05); up to 1 | same | not set | FRED DTWEXM on CBOE VIX, 1990 to 2019: drift 0.0010 per cent a session per VIX point above 25.5 (se 0.0012), unwound within 21 sessions; DTWEXBGS 2006 on: 0.003 |
+| `fed_core_inflation` | 0 (the bank reads headline); 1 (core: headline less `oil_inflation_level`) | same | not set | FRED 1990 to 2025: ff loads on CPILFESL 0.74 (NW se 0.38), on headline less core -0.16 (0.33); in 63-session 10% index falls with headline at 3 or more and core under 3 the funds rate fell 0.85, with core at 3 or more it rose 0.36 |
+| `treasury_core_inflation` | 0 (the curve reads headline); 1 (core) | same | not set | FRED DGS10, CPI and the S&P 500, 1990 to 2025: corr(index, 10-year change) +0.28 with headline 3 to 4 and core under 3 (+0.22 both under 3), -0.35 with core 3 to 4; the 10-year's level loads on neither core nor the gap given the funds rate |
 | `oil_price_floor`, `oil_price_ceiling` | 0 (35 and 150); the floor in (0, 35], the ceiling in [150, 1000] | same | not set | EIA RCLC1 deflated by FRED CPIAUCSL, 1987 to 2024: 0.203 and 3.44 times the median, at the model's 81 |
 | `oil_inventory_noise_sd` | 0 (0.5); up to 5 | same | not set | EIA WCESTUS1, 1987 to 2024: sd 0.087 of the log deviation from the trailing 260-week mean |
 | `oil_forecast_clamp` | 0 (unclamped); 1 | same | not set | none: the clamps are in the law |

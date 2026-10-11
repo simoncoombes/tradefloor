@@ -871,6 +871,8 @@ PARAM_SPECS: dict[str, dict] = {
     "oil_price_floor": {"kind": "abs", "step_unit": 0.5, "hard_range": (0.0, 35.0)},
     "oil_price_ceiling": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1000.0)},
     "oil_forecast_clamp": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0), "derived": False},
+    "fed_core_inflation": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0), "derived": False},
+    "treasury_core_inflation": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0), "derived": False},
     "fear_greed_published_inputs": {"kind": "abs", "step_unit": 1.0,
                                     "hard_range": (0.0, 1.0), "derived": False},
     # A switch whose identity is the value: 1.0 prices a macro decision the

@@ -1103,6 +1103,43 @@ pub struct ModelParams {
     /// 0.087 (DTWEXM 0.071), and tilted the oil curve on the dollar's
     /// deviation by +0.10 against EIA's +0.014. In [0, 1].
     pub usd_safe_haven_gain: f64,
+    /// A switch: 1.0 has the central bank read core inflation where it read
+    /// headline. 0.0, on every shipped preset, reads headline as it stood,
+    /// and a value of 0.0 is left out of the model's digest.
+    ///
+    /// Core is headline less the oil pass-through's accumulated part
+    /// (`EconomyState::oil_inflation_level`): the monthly term
+    /// `oil_inflation_passthrough` adds to headline, decaying at the
+    /// headline's own `inflation_reversion`. So core keeps the second-round
+    /// effects (wages, the real-rate term), as CPI less food and energy
+    /// does. Read by the meeting (`update_central_bank_with`: the Taylor
+    /// rule, the ladder's cut-offs, the stress cut and hold, the put's
+    /// ceiling, the meeting cadence), the priced put and the intermeeting
+    /// meeting.
+    ///
+    /// FRED, 1990 to 2025: the funds rate's level loads on CPILFESL (0.74,
+    /// Newey-West se 0.38) and not on headline less core (-0.16, se 0.33);
+    /// over six months the gap's loading is -0.10 (0.13). In 63-session
+    /// index falls of 10% with headline at 3 or more and core under 3 (2000,
+    /// 2001, 2007, 2011) the Fed cut 0.85 points; with core at 3 or more
+    /// (1990, 2022) it raised 0.36. With headline read, an oil-driven
+    /// headline of 3 to 4 closed the cut branches in a fall.
+    pub fed_core_inflation: f64,
+    /// A switch: 1.0 has the Treasury curve read core inflation (as
+    /// `fed_core_inflation` defines it) where it read headline: the
+    /// 10-year's term premium, the haven's inflation gate and the flight to
+    /// quality's sign, at the close and at a meeting. 0.0, on every shipped
+    /// preset, reads headline as it stood, and a value of 0.0 is left out
+    /// of the model's digest.
+    ///
+    /// FRED and the S&P 500, 1990 to 2025: the monthly correlation of the
+    /// index's return with the 10-year's change is +0.28 in months with
+    /// headline at 3 to 4 and core under 3, as with both under 3 (+0.22),
+    /// and -0.35 with core at 3 to 4; the 10-year fell 0.65 points in index
+    /// falls with headline at 3 or more and core under 3, and rose 0.39 with
+    /// core at 3 or more; its level loads on neither core nor the gap given
+    /// the funds rate (the gap -0.06, se 0.12).
+    pub treasury_core_inflation: f64,
     /// The oil price's lower and upper bounds, dollars. 0.0, on every shipped
     /// preset, is the standing 35 and 150, and a value of 0.0 is left out of
     /// the model's digest.
@@ -7964,6 +8001,8 @@ impl ModelParams {
             usd_mean_reversion: 0.0,
             usd_noise_sd: 0.0,
             usd_safe_haven_gain: 0.0,
+            fed_core_inflation: 0.0,
+            treasury_core_inflation: 0.0,
             oil_price_floor: 0.0,
             oil_price_ceiling: 0.0,
             oil_target_drift_reversion: 0.0,
@@ -10591,6 +10630,8 @@ impl ModelParams {
             "usd_mean_reversion" => self.usd_mean_reversion,
             "usd_noise_sd" => self.usd_noise_sd,
             "usd_safe_haven_gain" => self.usd_safe_haven_gain,
+            "fed_core_inflation" => self.fed_core_inflation,
+            "treasury_core_inflation" => self.treasury_core_inflation,
             "oil_price_floor" => self.oil_price_floor,
             "oil_price_ceiling" => self.oil_price_ceiling,
             "oil_target_drift_reversion" => self.oil_target_drift_reversion,
@@ -10983,6 +11024,8 @@ impl ModelParams {
             "usd_mean_reversion" => out.usd_mean_reversion = value,
             "usd_noise_sd" => out.usd_noise_sd = value,
             "usd_safe_haven_gain" => out.usd_safe_haven_gain = value,
+            "fed_core_inflation" => out.fed_core_inflation = value,
+            "treasury_core_inflation" => out.treasury_core_inflation = value,
             "oil_price_floor" => out.oil_price_floor = value,
             "oil_price_ceiling" => out.oil_price_ceiling = value,
             "oil_target_drift_reversion" => out.oil_target_drift_reversion = value,
@@ -12391,6 +12434,19 @@ impl ModelParams {
                  usd_crisis_vix_threshold, index points, in [0, 1]; 0 is the standing 0.05.",
                 self.usd_safe_haven_gain));
         }
+        if !(self.fed_core_inflation == 0.0 || self.fed_core_inflation == 1.0) {
+            return Err(format!(
+                "fed_core_inflation is {}. It is a switch: 0 (the central bank reads headline \
+                 inflation) or 1 (core: headline less the oil pass-through's accumulated part).",
+                self.fed_core_inflation));
+        }
+        if !(self.treasury_core_inflation == 0.0 || self.treasury_core_inflation == 1.0) {
+            return Err(format!(
+                "treasury_core_inflation is {}. It is a switch: 0 (the Treasury curve reads \
+                 headline inflation) or 1 (core: headline less the oil pass-through's accumulated \
+                 part).",
+                self.treasury_core_inflation));
+        }
         if !(self.oil_forecast_clamp == 0.0 || self.oil_forecast_clamp == 1.0) {
             return Err(format!(
                 "oil_forecast_clamp is {}. It is a switch: 0 (the forecast publishes the \
@@ -13091,6 +13147,8 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "usd_mean_reversion",
     "usd_noise_sd",
     "usd_safe_haven_gain",
+    "fed_core_inflation",
+    "treasury_core_inflation",
     "oil_price_floor",
     "oil_price_ceiling",
     "oil_inflation_passthrough",
@@ -13302,6 +13360,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "usd_mean_reversion",
         "usd_noise_sd",
         "usd_safe_haven_gain",
+        "fed_core_inflation",
+        "treasury_core_inflation",
         "oil_price_floor",
         "oil_price_ceiling",
         "oil_inflation_passthrough",
