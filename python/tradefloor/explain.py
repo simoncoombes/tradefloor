@@ -70,6 +70,17 @@ before is not on the tape its closing levels are unknown, ``fair_value``
 and ``repricing`` read zero and ``book`` is what the mispricing leaves
 over, which the caveats say.
 
+``random_noise`` lumps three shocks together: the name's loading on the
+market draw (with the crash amplifier and the down-tick recentring), its
+loading on its sector's draw, and its own draw. :attr:`Explanation.noise_legs`
+splits the day's ``random_noise`` into those three, ``market_noise``,
+``sector_noise`` and ``company_noise`` (``Engine.NOISE_LEGS``), read off the
+same ``truth()`` table. They are not contributions in the tree, because they
+sum to ``random_noise`` to rounding and the fifteen would then count the
+noise twice; :meth:`Explanation.check` tests that they do sum to it. The
+three draw sites under ``random_noise``'s mechanism are the draws each leg
+came from.
+
 ``fair_value`` is zero on a day the valuation holds still, which is most
 days of most presets. Earnings and the sector anchor are fixed for a run,
 the QE channel is off, and the discount rate moves only on the days the
@@ -477,6 +488,9 @@ class _Day(NamedTuple):
     #: The book contribution's three readings off ``prints()``, or an
     #: empty map on a build without it.
     depth: dict[str, float]
+    #: ``random_noise`` split into its three legs, in ``Engine.NOISE_LEGS``
+    #: order. Not among ``factors``, which sum to the change in ``s``.
+    noise_legs: dict[str, float]
 
 
 def _count(n: int, noun: str) -> str:
@@ -740,11 +754,17 @@ class Explanation:
         base = self._run(())
         self._base = base
         self.move = base.move
+        #: The day's ``random_noise`` for this name split into its market,
+        #: sector and company legs, keyed by ``Engine.NOISE_LEGS``. They sum
+        #: to the ``random_noise`` contribution to rounding.
+        self.noise_legs = dict(base.noise_legs)
         self.root = self._tree(base)
         self._walk = tuple(_walk(self.root, "", None))
         self._by_path = {path: node for path, node, _ in self._walk}
         self._recorded = _recorded_factors(engine, self._label,
                                            self._index)
+        self._recorded_legs = _recorded_factors(
+            engine, self._label, self._index, names=Engine.NOISE_LEGS)
         #: The close the run itself printed on this day, where its tape
         #: holds one. The eleven columns agreeing says the mispricing path
         #: was rebuilt; the print is settled through the book after that,
@@ -903,6 +923,10 @@ class Explanation:
         factors = {name: math.fsum(table[name][k] for k in rows)
                    for name in Engine.FACTORS}
         mispricing = math.fsum(factors.values())
+        # The noise slot's three legs, apart from `factors` so the sum
+        # above stays the change in `s`.
+        noise_legs = {name: math.fsum(table[name][k] for k in rows)
+                      for name in Engine.NOISE_LEGS}
         # The day's last print, off the fork's own tape. Under
         # `macro_publication_repricing` the close re-marks the price after
         # it, so `close`, the price the engine holds, is not the print.
@@ -959,7 +983,7 @@ class Explanation:
                        anchor=(move - factors["book"]
                                - factors["repricing"]))
         return _Day(move=move, factors=factors, state=state, levels=levels,
-                    depth=depth)
+                    depth=depth, noise_legs=noise_legs)
 
     def replay(self, node: Node) -> float:
         """Run the day again under ``node``'s draws and read it back.
@@ -997,11 +1021,12 @@ class Explanation:
     def check(self) -> list[str]:
         """Replay every node, and report what did not come back.
 
-        It checks four claims and reports a line per miss. The fifteen
-        contributions sum to the move. Every node's replay reproduces the
-        contribution it sits under. And where the run recorded this day,
-        the replay reproduces both the eleven columns the run recorded and
-        the close it printed.
+        It checks five claims and reports a line per miss. The fifteen
+        contributions sum to the move. The three noise legs sum to
+        ``random_noise``. Every node's replay reproduces the contribution it
+        sits under. And where the run recorded this day, the replay
+        reproduces both the columns the run recorded, the noise legs among
+        them, and the close it printed.
         """
         misses: list[str] = []
         total = math.fsum(child.value for child in self.root.children)
@@ -1011,6 +1036,12 @@ class Explanation:
                 f"the {len(self.root.children)} contributions sum to "
                 f"{total!r} against a move of {self.move!r}, a residual of "
                 f"{residual!r}, over a tolerance of {TOLERANCE!r}")
+        legs = math.fsum(self.noise_legs.values())
+        noise = self._base.factors["random_noise"]
+        if abs(legs - noise) > TOLERANCE:
+            misses.append(
+                f"the noise legs sum to {legs!r} against a random_noise of "
+                f"{noise!r}, over a tolerance of {TOLERANCE!r}")
         for path, node, _ in self._walk:
             expected = self._value_of(self._target(path), self._base)
             got = self.replay(node)
@@ -1018,8 +1049,10 @@ class Explanation:
                 misses.append(
                     f"{path} replayed to {got!r} against {expected!r} on "
                     f"the recorded run, a difference of {got - expected!r}")
-        for name, recorded in (self._recorded or {}).items():
-            got = self._base.factors[name]
+        for name, recorded in ((self._recorded or {})
+                               | (self._recorded_legs or {})).items():
+            got = (self._base.noise_legs[name] if name in self.noise_legs
+                   else self._base.factors[name])
             if abs(got - recorded) > TOLERANCE:
                 misses.append(
                     f"{name} replayed to {got!r} against {recorded!r} on "
@@ -1239,10 +1272,12 @@ class Explanation:
     # -- output -----------------------------------------------------------
 
     def to_json(self) -> str:
-        """The explanation as JSON: the tree, the move and the caveats."""
+        """The explanation as JSON: the tree, the move, the caveats and
+        the noise legs."""
         return json.dumps({
             "ticker": self.ticker, "day": self.day, "move": self.move,
             "caveats": list(self.caveats), "root": _node_to_json(self.root),
+            "noise_legs": dict(self.noise_legs),
         }, sort_keys=True, indent=2)
 
     def to_arrow(self) -> Any:
@@ -1334,9 +1369,12 @@ def _logged_draws(engine: Engine, day: int
     return out, traced
 
 
-def _recorded_factors(engine: Engine, day: int,
-                      index: int) -> dict[str, float] | None:
+def _recorded_factors(engine: Engine, day: int, index: int, *,
+                      names: Sequence[str] | None = None
+                      ) -> dict[str, float] | None:
     """The day's ``truth()`` column sums for one name, off the run's tape.
+
+    ``names`` are the columns, ``Engine.FACTORS`` when not given.
 
     ``None`` when the run did not record the day. What :meth:`check`
     compares the replay against, so a replay that rebuilt a different day
@@ -1355,7 +1393,7 @@ def _recorded_factors(engine: Engine, day: int,
     if not rows:
         return None
     return {name: math.fsum(table[name][k] for k in rows)
-            for name in Engine.FACTORS}
+            for name in (Engine.FACTORS if names is None else names)}
 
 
 def _depth(engine: Engine, day: int, index: int,

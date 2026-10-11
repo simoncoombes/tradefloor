@@ -513,6 +513,10 @@ class HiddenState(MarketView):
         return list(_WRAPPED[self].FACTORS)
 
     @property
+    def NOISE_LEGS(self) -> list[str]:
+        return list(_WRAPPED[self].NOISE_LEGS)
+
+    @property
     def model_params(self) -> dict[str, Any]:
         return dict(_WRAPPED[self].model_params)
 

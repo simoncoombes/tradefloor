@@ -38,6 +38,10 @@ FactorName = Literal[
     "company_news", "order_flow_impact", "short_squeeze_effect", "random_noise",
     "circuit_breaker", "jump", "overnight", "fair_value_shift", "dividend",
 ]
+# `random_noise` split into its three legs, in `Engine.NOISE_LEGS` order. Not
+# among the twelve: the three sum to `random_noise`. `Engine.attribution`
+# accepts them too.
+NoiseLegName = Literal["market_noise", "sector_noise", "company_noise"]
 
 class ValidationError(ValueError):
     """Construction input rejected at the boundary."""
@@ -259,6 +263,8 @@ class ModelParams:
 
 class Engine:
     FACTORS: list[str]
+    # `random_noise`'s market, sector and company legs, which sum to it.
+    NOISE_LEGS: list[str]
     # The layout version `state_snapshot` writes as "state_schema".
     STATE_SCHEMA: int
     tickers: list[str]
@@ -354,7 +360,7 @@ class Engine:
     def day_count(self) -> int: ...
     # The twelve sum to the day's change in `mispricing_s`. On pt-v20 most
     # of a price's move is fair value moving, which they do not split up.
-    def attribution(self, factor: FactorName) -> bytes: ...
+    def attribution(self, factor: FactorName | NoiseLegName) -> bytes: ...
     # The day's noise the per-name GJR steps on at the close: `random_noise`,
     # and under a night split the night's noise too, which `attribution`
     # books in `overnight` alone.

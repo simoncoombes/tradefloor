@@ -132,12 +132,12 @@ if TYPE_CHECKING:
     # A type alias declared in the stub. It has no runtime existence in the
     # compiled extension, so importing it unguarded would break the package
     # for everyone who is not a type checker.
-    from ._core import FactorName
+    from ._core import FactorName, NoiseLegName
 
 from ._arith import ordered_sum
 from ._core import Engine, GameRng, ValidationError, check_seed
 from ._core import rate_specs as _rate_specs
-from .harness import DRIVER_NAMES, Observation
+from .harness import DRIVER_NAMES, SPLIT_DRIVER_NAMES, Observation
 from .sandbox import dividend_states_of, economy_of, hidden_state
 
 # The stream the random baseline draws on. Distinct from the market stream, so
@@ -607,10 +607,14 @@ class Oracle:
     privileged = True
 
     def __init__(self, *, top_k: int = 5, gross: float = 1.0,
-                 max_participation: float = 0.02):
+                 max_participation: float = 0.02, noise_legs: bool = False):
         self.top_k = int(top_k)
         self.gross = float(gross)
         self.max_participation = float(max_participation)
+        # Which answer key `explain` names from: the ten drivers, or the
+        # twelve with `random_noise` split into its legs. Pass what the run
+        # passes to `evaluate(noise_legs=...)`. Trading does not read it.
+        self.noise_legs = bool(noise_legs)
         # `explain` is handed a day and no observation, so the engine has to be
         # remembered from the last `act`. Held here rather than threaded
         # through the protocol, which would complicate every agent that does
@@ -784,12 +788,17 @@ class Oracle:
         It is computed here instead of by calling the scorer's own
         ``_dominant_factor``, because two independent implementations
         agreeing is evidence and one function agreeing with itself is not.
+
+        Built with ``noise_legs=True`` it names from the split key, where
+        ``random_noise`` is replaced by its market, sector and company legs,
+        for a run scored with ``evaluate(noise_legs=True)``.
         """
         if self._engine is None:
             return None
-        best: FactorName = DRIVER_NAMES[0]
+        names = SPLIT_DRIVER_NAMES if self.noise_legs else DRIVER_NAMES
+        best: FactorName | NoiseLegName = names[0]  # type: ignore[assignment]
         largest = -1.0
-        for factor in DRIVER_NAMES:
+        for factor in names:
             total = 0.0
             for value in _f64(self._engine.attribution(factor)):
                 total += abs(value)

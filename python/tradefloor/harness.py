@@ -121,6 +121,24 @@ DRIVER_NAMES: tuple[
     Literal["circuit_breaker"], Literal["jump"], Literal["overnight"],
 ] = FACTOR_NAMES[:10]
 
+# `random_noise` split into the three legs of a name's tick shock, as
+# literals for a checker, in ``Engine.NOISE_LEGS`` order: the market leg
+# (the crash-amplified loading on the market draw plus the down-tick
+# recentring), the sector leg and the company's own. They sum to
+# `random_noise` to rounding, so they are never ranked beside it.
+NOISE_LEG_NAMES: tuple[
+    Literal["market_noise"], Literal["sector_noise"], Literal["company_noise"],
+] = ("market_noise", "sector_noise", "company_noise")
+
+# The answers ``explain`` is scored against under ``evaluate(noise_legs=
+# True)``: :data:`DRIVER_NAMES` with `random_noise` replaced, in its place,
+# by its three legs. One column lumped three shocks together, so on pt-v21
+# naming `random_noise` every day scored 0.60 to 1.0; with the legs apart a
+# constant answer is a much weaker baseline (docs/AGENTS.md, "Explanation
+# scores", has the measurement).
+SPLIT_DRIVER_NAMES: tuple[str, ...] = (
+    DRIVER_NAMES[:6] + NOISE_LEG_NAMES + DRIVER_NAMES[7:])
+
 
 def _f64(buf: bytes) -> list[float]:
     return list(struct.unpack("<%dd" % (len(buf) // 8), buf))
@@ -547,6 +565,12 @@ class Scorecard:
     answering ``random_noise`` every day scores 0.95 to 1.0. Only the edge
     says anything about the agent. An accuracy of 0.97 against a baseline
     of 0.98 is an agent that did worse than naming one factor every day.
+
+    ``noise_legs`` is True on a card from ``evaluate(noise_legs=True)``,
+    where ``random_noise`` is not an answer and its three legs are
+    (:data:`SPLIT_DRIVER_NAMES`). Its accuracy, baseline and edge are on
+    that ranking and are not comparable with a card scored on the whole
+    column; its repr says ``noise-legs``.
     """
 
     __slots__ = ("name", "pnl", "return_pct", "trades", "turnover", "impact_bps",
@@ -557,7 +581,7 @@ class Scorecard:
                  "max_drawdown_pct", "ruined", "leverage_refusals",
                  "explanation_baseline", "partial_fills", "history_days",
                  "margin_interest", "exposure_curve", "dividends",
-                 "population_fingerprint")
+                 "population_fingerprint", "noise_legs")
 
     #: Slots :meth:`as_dict` leaves out. ``exposure_curve`` is the input of
     #: two read-only properties and is read off the fills and the prices,
@@ -581,6 +605,7 @@ class Scorecard:
         exposure_curve: list[float] | None = None,
         dividends: float = 0.0,
         population_fingerprint: str = "",
+        noise_legs: bool = False,
     ) -> None:
         self.name = name
         self.pnl = pnl
@@ -654,6 +679,11 @@ class Scorecard:
         #: (``evaluate(population=...)``), or "" for an isolated run, which
         #: is every run that did not pass one.
         self.population_fingerprint = population_fingerprint
+        #: ``explain`` was scored with `random_noise` split into its market,
+        #: sector and company legs (``evaluate(noise_legs=True)``). False on
+        #: every run that did not ask, which is the ranking every earlier
+        #: release scored.
+        self.noise_legs = bool(noise_legs)
         #: Borrowing paid the policy rate. False only for a run that passed
         #: ``margin_interest=False``, whose repr then says "free-borrowing":
         #: a levered score from such a run is not comparable to one that
@@ -737,12 +767,14 @@ class Scorecard:
         # The figures computed from the card (`sharpe` and the rest) are
         # properties and stay out with their input, so a traded known
         # answer hashes what it always did.
-        # `dividends` likewise only when the model paid any, and
-        # `population_fingerprint` only on a populated run.
+        # `dividends` likewise only when the model paid any,
+        # `population_fingerprint` only on a populated run, and `noise_legs`
+        # only on a run scored with the noise legs split.
         return {slot: getattr(self, slot) for slot in self.__slots__
                 if (slot != "history_days" or self.history_days)
                 and (slot != "dividends" or self.dividends)
                 and (slot != "population_fingerprint" or self.population_fingerprint)
+                and (slot != "noise_legs" or self.noise_legs)
                 and slot not in self._NOT_IN_DICT}
 
     def __repr__(self) -> str:
@@ -753,7 +785,9 @@ class Scorecard:
                                          ("hidden-state",
                                           self.uses_hidden_state),
                                          ("free-borrowing",
-                                          not self.margin_interest)) if on)
+                                          not self.margin_interest),
+                                         ("noise-legs", self.noise_legs))
+            if on)
         if self.history_days:
             flags += f", history_days={self.history_days}"
         # Counts, so an agent that failed on every step does not print like
@@ -835,7 +869,7 @@ def session_clock(start: tuple[int, int, int], step_within_day: int,
     return (total // 60) % 24, total % 60, day_of_week
 
 
-def _dominant_factor(engine: Engine) -> str | None:
+def _dominant_factor(engine: Engine, *, noise_legs: bool = False) -> str | None:
     """The factor that moved prices most today, of :data:`DRIVER_NAMES`.
 
     Summed over instruments in absolute value, because a factor that pushed two
@@ -843,9 +877,15 @@ def _dominant_factor(engine: Engine) -> str | None:
     report a busy factor as an idle one. Read after the close, so a jump at
     the close counts for the day it moved. ``fair_value_shift`` is not ranked:
     it moves no price, and ranking it counted every permanent shock twice.
+
+    ``noise_legs=True`` ranks :data:`SPLIT_DRIVER_NAMES` instead, where
+    `random_noise` is replaced by its market, sector and company legs. Each
+    leg is summed in absolute value on its own, so a day on which the market
+    leg and the company leg each moved names a little is no longer one
+    column's win. The default is the ranking every earlier release scored.
     """
     best, best_size = None, 0.0
-    for name in DRIVER_NAMES:
+    for name in (SPLIT_DRIVER_NAMES if noise_legs else DRIVER_NAMES):
         size = ordered_sum(abs(x) for x in _f64(engine.attribution(name)))
         if size > best_size:
             best, best_size = name, size
@@ -872,6 +912,7 @@ def evaluate(
     margin_interest: bool = True,
     reinvest_dividends: bool = True,
     population: Any = None,
+    noise_legs: bool = False,
 ) -> dict[str, Scorecard]:
     """Run every agent against an identical market and score them.
 
@@ -977,6 +1018,17 @@ def evaluate(
     order the book could not fill in full is listed in the card's
     ``partial_fills``.
 
+    ``noise_legs=True`` scores ``explain`` with ``random_noise`` split into
+    its three legs, ``market_noise``, ``sector_noise`` and
+    ``company_noise`` (:data:`SPLIT_DRIVER_NAMES`): the day's answer is the
+    one of those twelve that moved prices most, and ``random_noise`` is
+    never it. The market is the same run; only the answer key changes, and
+    the baseline and edge are computed on it. Off, the default, the score is
+    the one every earlier release computed, to the bit. A card scored this
+    way says ``noise_legs`` and its repr ``noise-legs``.
+    :class:`tradefloor.baselines.Oracle` answers on the same key when built
+    with ``noise_legs=True``.
+
     ``population`` runs the evaluation in populated mode. A
     :class:`tradefloor.Population` of background traders shares each
     agent's market and reacts to what the agent does (see
@@ -1005,6 +1057,7 @@ def evaluate(
     history_days = _checks.history_days(history_days)
     cash_interest = _checks.flag("cash_interest", cash_interest)
     margin_interest = _checks.flag("margin_interest", margin_interest)
+    noise_legs = _checks.flag("noise_legs", noise_legs)
     _checks.number("cash", cash)
     if max_leverage is not None:
         _checks.number("max_leverage", max_leverage)
@@ -1063,6 +1116,7 @@ def evaluate(
             engine=template.fork(1)[0], history=warmed._copy(),
             margin_interest=margin_interest,
             reinvest_dividends=bool(reinvest_dividends),
+            noise_legs=noise_legs,
         )
         _warn_if_every_step_failed(results[name], days * steps_per_day)
     return results
@@ -1240,7 +1294,8 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
                   model=None, cash_interest=False,
                   trusted=False, *, engine=None,
                   history: History | None = None,
-                  margin_interest=True, reinvest_dividends=True) -> Scorecard:
+                  margin_interest=True, reinvest_dividends=True,
+                  noise_legs=False) -> Scorecard:
     if engine is None:
         engine = Engine(seed=seed, universe=universe, macro_state=macro,
                         model=model)
@@ -1427,7 +1482,7 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
         # the attribution before it, so `jump` could never be the answer.
         explain = getattr(agent, "explain", None)
         if callable(explain):
-            actual = _dominant_factor(engine)
+            actual = _dominant_factor(engine, noise_legs=noise_legs)
             try:
                 with guard:
                     claimed = explain(day)
@@ -1506,6 +1561,7 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
         exposure_curve=exposure_curve,
         dividends=portfolio.dividends,
         population_fingerprint=engine.population_fingerprint or "",
+        noise_legs=noise_legs,
     )
 
 
