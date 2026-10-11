@@ -502,6 +502,12 @@ pub struct EconomyState {
     /// and never read or written, while that dial is 0.0, which every preset
     /// carries; snapshotted and hashed only while it is set.
     pub zlb_unmet: f64,
+    /// Sessions since a meeting at which the Fed put cut
+    /// (`ModelParams::fed_put_giveback_wait`): the put gives nothing back
+    /// until it reaches the dial. 0.0, and never read or written, while that
+    /// dial is 0.0, which every preset carries; snapshotted and hashed only
+    /// while it is set.
+    pub fed_put_age: f64,
     /// The log of the oil price's truncation at its bounds on the last step,
     /// ln(clamped / unclamped), 0.0 where no bound bound it. TRANSIENT: set
     /// by every step that runs the long factor (`oil_target_drift_sd`) and
@@ -681,6 +687,7 @@ pub fn create_initial_economy_state(options: &InitialEconomyOptions) -> EconomyS
         usd_haven_level: 0.0,
         oil_inflation_level: 0.0,
         zlb_unmet: 0.0,
+        fed_put_age: 0.0,
         oil_bound_log_ratio: 0.0,
         market_pe: Some(18.0),
 

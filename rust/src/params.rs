@@ -1182,6 +1182,36 @@ pub struct ModelParams {
     /// economy's own real-rate term (inflation's suppression above a real
     /// rate of 0) is not moved. In [-2, 5].
     pub fed_neutral_real_rate: f64,
+    /// Sessions after the Fed put's last cut before it gives anything back.
+    /// 0.0, on every shipped preset, is no wait, and a value of 0.0 is left
+    /// out of the model's digest.
+    ///
+    /// The put gives a quarter point back at a calm meeting once its decaying
+    /// stock (`fed_put_half_life`) sits an eighth under what it owes, so on
+    /// R22O5cz with `fed_neutral_real_rate` 2.0 (270 histories) the first
+    /// rise came a median 4.7 months after an episode's last put cut. The
+    /// FOMC's first hike came 8.5 to 84 months after an easing's last cut at
+    /// a VIX of 30 or more (FRED DFEDTAR, DFEDTARU, VIXCLS, 1990-2025: six
+    /// easings, median 28.5 months, 599 sessions). Off zero the engine
+    /// counts the sessions since a meeting at which the put cut
+    /// (`EconomyState::fed_put_age`, carried, snapshotted and hashed only
+    /// with this set) and the put gives nothing back until the count reaches
+    /// the dial; after that the give-back is the one that stood. Needs
+    /// `fed_put_gain`. In [0, 2520].
+    pub fed_put_giveback_wait: f64,
+    /// The lift-off branch's unemployment gate as a gap to the natural rate,
+    /// points. 0.0, on every shipped preset, is the gate that stood
+    /// (unemployment at or under the bank's 4.0 target plus one point), and
+    /// a value of 0.0 is left out of the model's digest; a gap of exactly
+    /// zero is not offered.
+    ///
+    /// Off zero the gate is unemployment at or under
+    /// `EconomyState::structural_unemployment` (the NAIRU the Phillips curve
+    /// reads) plus the dial. The FOMC lifted off the zero bound with UNRATE
+    /// less CBO's NROU at +0.42 (December 2015) and -0.54 (March 2022), a
+    /// mean of -0.06 (FRED UNRATE, NROU). Read only with `fed_liftoff_rule`
+    /// set. In [-3, 3].
+    pub fed_liftoff_unemployment_gap: f64,
     /// The oil price's lower and upper bounds, dollars. 0.0, on every shipped
     /// preset, is the standing 35 and 150, and a value of 0.0 is left out of
     /// the model's digest.
@@ -8048,6 +8078,8 @@ impl ModelParams {
             treasury_zlb_path: 0.0,
             treasury_zlb_haven_gain: 0.0,
             fed_neutral_real_rate: 0.0,
+            fed_put_giveback_wait: 0.0,
+            fed_liftoff_unemployment_gap: 0.0,
             oil_price_floor: 0.0,
             oil_price_ceiling: 0.0,
             oil_target_drift_reversion: 0.0,
@@ -10680,6 +10712,8 @@ impl ModelParams {
             "treasury_zlb_path" => self.treasury_zlb_path,
             "treasury_zlb_haven_gain" => self.treasury_zlb_haven_gain,
             "fed_neutral_real_rate" => self.fed_neutral_real_rate,
+            "fed_put_giveback_wait" => self.fed_put_giveback_wait,
+            "fed_liftoff_unemployment_gap" => self.fed_liftoff_unemployment_gap,
             "oil_price_floor" => self.oil_price_floor,
             "oil_price_ceiling" => self.oil_price_ceiling,
             "oil_target_drift_reversion" => self.oil_target_drift_reversion,
@@ -11077,6 +11111,8 @@ impl ModelParams {
             "treasury_zlb_path" => out.treasury_zlb_path = value,
             "treasury_zlb_haven_gain" => out.treasury_zlb_haven_gain = value,
             "fed_neutral_real_rate" => out.fed_neutral_real_rate = value,
+            "fed_put_giveback_wait" => out.fed_put_giveback_wait = value,
+            "fed_liftoff_unemployment_gap" => out.fed_liftoff_unemployment_gap = value,
             "oil_price_floor" => out.oil_price_floor = value,
             "oil_price_ceiling" => out.oil_price_ceiling = value,
             "oil_target_drift_reversion" => out.oil_target_drift_reversion = value,
@@ -12525,6 +12561,24 @@ impl ModelParams {
                  rate, in [-2, 5]; 0 is the neutral that stood.",
                 self.fed_neutral_real_rate));
         }
+        if !(0.0..=2520.0).contains(&self.fed_put_giveback_wait) {
+            return Err(format!(
+                "fed_put_giveback_wait is {}. It is the sessions after the Fed put's last cut \
+                 before it gives anything back, in [0, 2520]; 0 is no wait.",
+                self.fed_put_giveback_wait));
+        }
+        if self.fed_put_giveback_wait != 0.0 && self.fed_put_gain == 0.0 {
+            return Err(format!(
+                "fed_put_giveback_wait is {} with fed_put_gain 0. It delays the put's give-back, \
+                 so it needs the put.",
+                self.fed_put_giveback_wait));
+        }
+        if !(-3.0..=3.0).contains(&self.fed_liftoff_unemployment_gap) {
+            return Err(format!(
+                "fed_liftoff_unemployment_gap is {}. It is the lift-off gate's unemployment gap \
+                 to the natural rate, in [-3, 3]; 0 is the gate that stood.",
+                self.fed_liftoff_unemployment_gap));
+        }
         if !(self.oil_forecast_clamp == 0.0 || self.oil_forecast_clamp == 1.0) {
             return Err(format!(
                 "oil_forecast_clamp is {}. It is a switch: 0 (the forecast publishes the \
@@ -13230,6 +13284,8 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "treasury_zlb_path",
     "treasury_zlb_haven_gain",
     "fed_neutral_real_rate",
+    "fed_put_giveback_wait",
+    "fed_liftoff_unemployment_gap",
     "oil_price_floor",
     "oil_price_ceiling",
     "oil_inflation_passthrough",
@@ -13446,6 +13502,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "treasury_zlb_path",
         "treasury_zlb_haven_gain",
         "fed_neutral_real_rate",
+        "fed_put_giveback_wait",
+        "fed_liftoff_unemployment_gap",
         "oil_price_floor",
         "oil_price_ceiling",
         "oil_inflation_passthrough",

@@ -694,6 +694,10 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # The Taylor rule's neutral real rate: off at the bottom, HLW's 1990-2025
     # high (3.9) at the top.
     "fed_neutral_real_rate": (0.0, 4.0),
+    # The put's give-back wait: off to about seven years (2008-2015's 84
+    # months); the lift-off gate's gap: the five lift-offs' range, rounded out.
+    "fed_put_giveback_wait": (0.0, 1800.0),
+    "fed_liftoff_unemployment_gap": (-1.0, 1.2),
     # The share of oil demand supply answers on the daily step. Bounded by
     # meaning again: 0.0 is the hardcoded zero the reference writes, 1.0 is
     # the value that makes the inventory random walk driftless, and past 1.0

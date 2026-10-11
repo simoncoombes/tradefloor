@@ -9027,6 +9027,11 @@ impl Engine {
             }
             self.economy.fed_put_mcap_prev = mcap;
             self.economy.fed_put *= crate::mathx::pow(0.5, 1.0 / self.params.fed_put_half_life);
+            // THE GIVE-BACK'S CLOCK (`fed_put_giveback_wait`): one session
+            // more since the put's last cut. Nothing runs with the dial at 0.0.
+            if self.params.fed_put_giveback_wait != 0.0 {
+                self.economy.fed_put_age = crate::mathx::min(self.economy.fed_put_age + 1.0, 1.0e6);
+            }
         }
 
         // THE DRAWDOWN'S WINDOW (`fed_drawdown_hold`), before tonight's
@@ -9421,6 +9426,8 @@ impl Engine {
             zlb_path: self.priced_zlb_path(),
             zlb_haven_gain: self.params.treasury_zlb_haven_gain,
             neutral_real_rate: self.params.fed_neutral_real_rate,
+            giveback_wait: self.params.fed_put_giveback_wait,
+            liftoff_gap: self.params.fed_liftoff_unemployment_gap,
         }
     }
 
@@ -12916,6 +12923,10 @@ impl Engine {
         // The put's unmet asks, only while `treasury_zlb_path` is set.
         if self.params.treasury_zlb_path != 0.0 {
             hash_f64(&mut buf, e.zlb_unmet);
+        }
+        // The give-back's clock, only while `fed_put_giveback_wait` is set.
+        if self.params.fed_put_giveback_wait != 0.0 {
+            hash_f64(&mut buf, e.fed_put_age);
         }
         // The published GDP growth figure's state, only while
         // `gdp_publication_lag` is set, so every other engine's hash is the

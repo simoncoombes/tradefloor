@@ -563,6 +563,15 @@ OUT_OF_SCOPE = {
         "stood (a branch on `== 0.0` in `close_yields` and the meeting's "
         "target), and `zlb_unmet` is neither written, snapshotted nor hashed; "
         "at 0.0 it is also left out of the model's digest",
+    "fed_put_giveback_wait":
+        "inert at 0.0: the put gives back with no wait as it stood (a branch "
+        "on `== 0.0` in the meeting), and `fed_put_age` is neither written, "
+        "snapshotted nor hashed; at 0.0 it is also left out of the model's "
+        "digest",
+    "fed_liftoff_unemployment_gap":
+        "inert at 0.0: the lift-off gate is the target plus one point as it "
+        "stood (a branch on `== 0.0` in the meeting); at 0.0 it is also left "
+        "out of the model's digest",
     "fed_neutral_real_rate":
         "inert at 0.0: the Taylor rule's neutral is the one that stood (a "
         "branch on `== 0.0` in the meeting); at 0.0 it is also left out of "

@@ -125,6 +125,14 @@ same with them on as off.
   `usd_crisis_vix_threshold` (0.0 the standing 0.05), read by the dollar's
   step and by the forecast's expected bid. FRED DTWEXM against CBOE's VIX
   measures 0.001.
+- `fed_put_giveback_wait` and `fed_liftoff_unemployment_gap` are new dials,
+  0.0 on every preset and left out of the digest there. The Fed put gives
+  nothing back within the first's sessions of its last cut (FOMC: a median
+  28.5 months from an easing's last cut at a VIX of 30 or more to the first
+  hike, 1990-2025), and the lift-off branch's gate reads unemployment against
+  the natural rate plus the second (UNRATE less CBO's NROU at the 2015 and
+  2022 lift-offs: -0.06). The put's clock is carried as `fed_put_age` only
+  with the first on.
 - `fed_neutral_real_rate` is a new dial, 0.0 on every preset and left out of
   the digest there: points added to the neutral rate of the central bank's
   Taylor rule, whose neutral at target is a nominal 2.0 (a real rate of 0).
