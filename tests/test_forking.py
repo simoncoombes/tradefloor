@@ -1146,6 +1146,15 @@ def _nothing_dormant():
                    # Core inflation's trend (CPILFESL fit), on its own keyed draws.
                    core_trend_sd=0.17,
                    core_trend_persistence=0.993,
+                   # The 2-year's carry through a meeting (a share).
+                   treasury_2y_meeting_carry=1.0,
+                   # The priced meeting's half-life (policy_anticipation is
+                   # on above), in sessions.
+                   policy_anticipation_half_life=10.0,
+                   # The anticipated path (a switch; the path is on above).
+                   treasury_path_anticipated=1.0,
+                   # The Fed's guidance (a share; the anticipation is on).
+                   policy_anticipation_guidance=0.5,
                    oil_price_floor=16.4,
                    oil_price_ceiling=279.0,
                    # The contracts' margin (pt-v22 phase 1).

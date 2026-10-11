@@ -575,6 +575,24 @@ OUT_OF_SCOPE = {
         "inert at 0.0: the Taylor rule's neutral is the one that stood (a "
         "branch on `== 0.0` in the meeting); at 0.0 it is also left out of "
         "the model's digest",
+    "policy_anticipation_guidance":
+        "inert at 0.0: the anticipated meeting prices the published shadow "
+        "alone, as it stood (a branch on `== 0.0` in the shadow meeting); at "
+        "0.0 it is also left out of the model's digest",
+    "treasury_path_anticipated":
+        "inert at 0.0: the meeting steps the priced path by the rate's "
+        "change as it stood (a branch on the switch in the meeting and the "
+        "engine's path update); at 0.0 it is also left out of the model's "
+        "digest",
+    "policy_anticipation_half_life":
+        "inert at 0.0: the anticipated meeting's priced change is the shadow "
+        "meeting's every close, as it stood (a branch on `== 0.0` in "
+        "`reprice_anticipated_meeting`); at 0.0 it is also left out of the "
+        "model's digest",
+    "treasury_2y_meeting_carry":
+        "inert at 0.0: the meeting sets the 2-year from the rate as it stood "
+        "(a branch on `== 0.0` in the meeting and in the anticipated "
+        "meeting's books); at 0.0 it is also left out of the model's digest",
     "treasury_zlb_haven_gain":
         "inert at 0.0: `close_yields` and the meeting's 10-year target branch "
         "on `== 0.0` and take the term premium as it stood; at 0.0 it is also "

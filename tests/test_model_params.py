@@ -995,6 +995,20 @@ PERTURBATIONS = [
     ("core_trend_sd", 0.17, True),
     # The persistence alone is read by nothing (the sd is 0).
     ("core_trend_persistence", 0.993, False),
+    # The 2-year's carry through a meeting. INERT on the probe's market: the
+    # burn-in's meetings move the 2-year (pt-v20's own 2-year noise leaves it
+    # a gap to keep: 0.15% against 0.23% after the third close, measured
+    # 2026-10-11), but no column this table reads takes the 2-year.
+    ("treasury_2y_meeting_carry", 1.0, False),
+    # The priced meeting's half-life. INERT on the probe: pt-v20 has
+    # policy_anticipation off, so no change is priced to smooth.
+    ("policy_anticipation_half_life", 10.0, False),
+    # The anticipated path. INERT on the probe: pt-v20 has
+    # treasury_path_pricing off, so there is no path to move.
+    ("treasury_path_anticipated", 1.0, False),
+    # The Fed's guidance. INERT on the probe: pt-v20 has
+    # policy_anticipation off, so no shadow is priced.
+    ("policy_anticipation_guidance", 0.5, False),
     # Oil's bounds from WTI in real terms. INERT on the probe: its burn-in's
     # oil stays inside 35 to 150, so moving the bounds outward moves nothing.
     ("oil_price_floor", 16.4, False),
