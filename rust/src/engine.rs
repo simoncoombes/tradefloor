@@ -1293,6 +1293,12 @@ pub struct Engine {
     /// The log of the oil price's long-term level (`oil_target_drift_sd`):
     /// 0.0 with the dial off, which it never leaves.
     oil_target_drift: f64,
+    /// The key of the neutral real rate's draws (`fed_rstar_sd`), derived
+    /// from the root seed and carried by a snapshot that holds the process.
+    rstar_key: u64,
+    /// The neutral real rate's deviation from `fed_neutral_real_rate`
+    /// (`fed_rstar_sd`): 0.0 with the dial off, which it never leaves.
+    rstar_dev: f64,
 
     /// The background traders sharing the agent-facing book, when the
     /// engine was built with them (`crate::population`). `None` on every
@@ -2364,8 +2370,13 @@ impl Engine {
             },
             oil_drift_key: crate::rng::oil_drift_key(seed),
             oil_target_drift: 0.0,
+            rstar_key: crate::rng::rstar_key(seed),
+            rstar_dev: 0.0,
             population: None,
         };
+        // THE NEUTRAL REAL RATE'S OPENING (`fed_rstar_sd`): a draw from the
+        // process's stationary distribution on its own key. Nothing at 0.0.
+        engine.rstar_dev = engine.rstar_opening();
         engine.vix_anchor = engine.derive_vix_anchor();
         engine.cycle_nowcast_terms = engine.derive_cycle_nowcast_terms();
         // The front two index futures (`futures_index_listed`); nothing with
@@ -9152,6 +9163,11 @@ impl Engine {
         // The oil price's long factor (`oil_target_drift_sd`): tonight's log
         // change on its own key, so no stream moves; nothing at 0.0.
         let oil_drift_next = self.oil_drift_step(request.game_day);
+        // THE NEUTRAL REAL RATE (`fed_rstar_sd`): one session of its process
+        // on its own key, before tonight's meeting reads it; nothing at 0.0.
+        if let Some(next) = self.rstar_step(request.game_day) {
+            self.rstar_dev = next;
+        }
         if let Some(next) = oil_drift_next {
             inputs.oil_target_drift = Some((self.oil_target_drift, next));
         }
@@ -9420,7 +9436,7 @@ impl Engine {
             },
             zlb_path: self.priced_zlb_path(),
             zlb_haven_gain: self.params.treasury_zlb_haven_gain,
-            neutral_real_rate: self.params.fed_neutral_real_rate,
+            neutral_real_rate: self.params.fed_neutral_real_rate + self.rstar_dev,
         }
     }
 
@@ -9946,6 +9962,82 @@ impl Engine {
         }
         Some([self.oil_target_drift, (self.oil_drift_key >> 32) as f64,
               (self.oil_drift_key & 0xFFFF_FFFF) as f64])
+    }
+
+    /// The r* process in sessions (`fed_rstar_sd`, `fed_rstar_persistence`,
+    /// both quarterly over a 63-session quarter): `(phi_d, sigma_d)` with
+    /// `phi_d = phi^(1/63)` and `sigma_d = sigma sqrt((1 - phi_d^2) / (1 -
+    /// phi^2))` (`sigma / sqrt(63)` at `phi` 1), or `None` at 0.0.
+    fn rstar_daily(&self) -> Option<(f64, f64)> {
+        let sigma = self.params.fed_rstar_sd;
+        if sigma == 0.0 {
+            return None;
+        }
+        let phi = self.params.fed_rstar_persistence;
+        let phi_d = crate::mathx::pow(phi, 1.0 / 63.0);
+        let sigma_d = if phi < 1.0 {
+            sigma * ((1.0 - phi_d * phi_d) / (1.0 - phi * phi)).sqrt()
+        } else {
+            sigma / 63f64.sqrt()
+        };
+        Some((phi_d, sigma_d))
+    }
+
+    /// The r* deviation's opening: the stationary sd `sigma / sqrt(1 -
+    /// phi^2)` times the first normal of `GameRng::keyed(key, RSTAR_TAG,
+    /// u64::MAX)`; 0.0 with `fed_rstar_sd` at 0.0 or `phi` at 1.
+    fn rstar_opening(&self) -> f64 {
+        let sigma = self.params.fed_rstar_sd;
+        let phi = self.params.fed_rstar_persistence;
+        if sigma == 0.0 || phi >= 1.0 {
+            return 0.0;
+        }
+        let z = crate::rng::GameRng::keyed(self.rstar_key, crate::rng::RSTAR_TAG as u64, u64::MAX).next_normal();
+        sigma / (1.0 - phi * phi).sqrt() * z
+    }
+
+    /// The r* deviation's next value, or `None` with `fed_rstar_sd` at 0.0:
+    /// `phi_d x + sigma_d z`, `z` the first normal of `GameRng::keyed(key,
+    /// RSTAR_TAG, day)`.
+    fn rstar_step(&self, game_day: i64) -> Option<f64> {
+        let (phi_d, sigma_d) = self.rstar_daily()?;
+        let z = crate::rng::GameRng::keyed(
+            self.rstar_key, crate::rng::RSTAR_TAG as u64, game_day as u64).next_normal();
+        Some(phi_d * self.rstar_dev + sigma_d * z)
+    }
+
+    /// The r* process's state for a snapshot and the state hash, `[deviation,
+    /// key high word, key low word]`, or `None` with `fed_rstar_sd` at 0.0.
+    pub fn rstar_words(&self) -> Option<[f64; 3]> {
+        if self.params.fed_rstar_sd == 0.0 {
+            return None;
+        }
+        Some([self.rstar_dev, (self.rstar_key >> 32) as f64, (self.rstar_key & 0xFFFF_FFFF) as f64])
+    }
+
+    /// The neutral real rate's current deviation (`fed_rstar_sd`); 0.0 off.
+    pub fn rstar_deviation(&self) -> f64 {
+        self.rstar_dev
+    }
+
+    /// Put the r* process back from [`Engine::rstar_words`].
+    pub fn set_rstar_state(&mut self, words: Option<&[f64]>) -> Result<(), String> {
+        match (words, self.params.fed_rstar_sd != 0.0) {
+            (None, false) => Ok(()),
+            (Some(w), true) => {
+                let whole = |v: f64| v.is_finite() && v >= 0.0 && v <= u32::MAX as f64 && v.fract() == 0.0;
+                if w.len() != 3 || !w[0].is_finite() || !whole(w[1]) || !whole(w[2]) {
+                    return Err(format!(
+                        "this snapshot's rstar is {w:?}: it is r*'s deviation and its key's two \
+                         32-bit words"));
+                }
+                self.rstar_dev = w[0];
+                self.rstar_key = ((w[1] as u64) << 32) | (w[2] as u64);
+                Ok(())
+            }
+            (None, true) => Err("this model sets fed_rstar_sd and the snapshot carries no rstar".to_string()),
+            (Some(_), false) => Err("this snapshot carries rstar and this model's fed_rstar_sd is 0".to_string()),
+        }
     }
 
     /// Put the oil long factor back from [`Engine::oil_drift_words`].
@@ -12788,6 +12880,14 @@ impl Engine {
         // its own tag: its log level and its key's two words.
         if let Some(words) = self.oil_drift_words() {
             hash_f64(&mut buf, 55.0);
+            for value in words {
+                hash_f64(&mut buf, value);
+            }
+        }
+        // The neutral real rate's process, only while `fed_rstar_sd` is set,
+        // behind its own tag.
+        if let Some(words) = self.rstar_words() {
+            hash_f64(&mut buf, 56.0);
             for value in words {
                 hash_f64(&mut buf, value);
             }

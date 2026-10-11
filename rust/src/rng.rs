@@ -665,6 +665,18 @@ pub fn oil_drift_key(root_seed: u64) -> u64 {
     splitmix64_mix(root_seed ^ (((OIL_DRIFT_TAG as u64) << 32) | 0xFFFF_FFFF))
 }
 
+/// The tag of the neutral real rate's process (`fed_rstar_sd`), ASCII "RSTR".
+pub const RSTAR_TAG: u32 = 0x5253_5452;
+
+/// The key of a root seed's r* draws: as [`publication_key`] under
+/// [`RSTAR_TAG`]. Each session's normal is the first of
+/// `GameRng::keyed(key, RSTAR_TAG, session)`, and the opening's the first of
+/// `GameRng::keyed(key, RSTAR_TAG, u64::MAX)`, so it takes nothing from any
+/// stream.
+pub fn rstar_key(root_seed: u64) -> u64 {
+    splitmix64_mix(root_seed ^ (((RSTAR_TAG as u64) << 32) | 0xFFFF_FFFF))
+}
+
 pub fn publication_key(root_seed: u64) -> u64 {
     splitmix64_mix(root_seed ^ (((PUBLICATION_TAG as u64) << 32) | 0xFFFF_FFFF))
 }
