@@ -1329,6 +1329,10 @@ PERTURBATIONS = [
     ("vix_stress_premium_knee", 0.5, False),
     # INERT: read only with vix_stress_premium non-zero.
     ("vix_stress_premium_cap", 0.25, False),
+    # INERT: read only with vix_stress_premium non-zero.
+    ("vix_stress_premium_memory", 0.0556, False),
+    # INERT: read only with vix_stress_premium non-zero.
+    ("vix_stress_premium_undo", 1.0, False),
     # INERT on this probe, measured: the put reads the index's fall since
     # the last meeting, and the burn-in's prices do not move, the probe's
     # three sessions hold no meeting, and no burn-in meeting is at a VIX of

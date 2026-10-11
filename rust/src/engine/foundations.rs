@@ -906,9 +906,10 @@ impl Engine {
                     let d = crate::mathx::log(implied / anchor);
                     slow = (1.0 - h) * slow + h * d;
                     if p.vix_stress_premium != 0.0 {
-                        stress = (1.0 - h) * stress + h * d;
+                        let hs = p.vix_stress_memory_rate();
+                        stress = (1.0 - hs) * stress + hs * d;
                         let after = self.forecast_vix_log_variance(step + 1);
-                        stress_sd = (1.0 - h) * stress_sd + h * crate::mathx::sqrt(after);
+                        stress_sd = (1.0 - hs) * stress_sd + hs * crate::mathx::sqrt(after);
                     }
                 }
             }
