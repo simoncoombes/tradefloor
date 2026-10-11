@@ -885,6 +885,10 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # A blend weight, so the range is the whole domain by definition. 1.0 is
     # the monotonic valuation; anything between is a partial floor.
     "fair_value_book_floor": (0.0, 1.0),
+    # The rate term on a loss-maker's book value, value compression per unit
+    # of yield; 2022's equal-weight excess asks for about 11
+    # (tools/calibration/lossmaker_duration.md).
+    "lossmaker_rate_sensitivity": (0.0, 20.0),
     # Where the crisis blend takes from, and whether sector variance follows
     # VIX. Both blend weights, whole domain.
     "crisis_blend_source": (0.0, 1.0),

@@ -668,6 +668,18 @@ pub struct ModelParams {
     /// yield at the median duration. The S&P 500's trailing P/E fell 4.9 to
     /// 5.5 percent per 100 bp of Baa over 2022.
     pub rate_pe_sensitivity: f64,
+    /// The rate term on a loss-maker's book value: a company with no
+    /// earnings is valued at `1.2 * book * max(0.5, 1 - (yield - neutral) *
+    /// lossmaker_rate_sensitivity * duration)`, the profitable multiple's
+    /// rate adjustment with its own sensitivity and the same growth
+    /// duration, neutral rate and floor (`fair_value::compute_fair_value_full`).
+    ///
+    /// 0.0 on every preset: a BRANCH to the book value the reference
+    /// implementation used, with no rate term, so a rate shock moved no
+    /// loss-maker's fair value. In 2022 the US loss-makers fell 10.9 per cent
+    /// per 100 bp of Baa more than profitable growth companies, equal
+    /// weight (Ken French E/P portfolios; tools/calibration/lossmaker_duration.md).
+    pub lossmaker_rate_sensitivity: f64,
     /// Sessions between a turn of the business cycle and its publication.
     /// 0.0, on every preset through pt-v19, publishes the phase the economy
     /// is in; pt-v20 sets 252.0.
@@ -7710,6 +7722,7 @@ impl ModelParams {
             earnings_cycle_sigma: 0.0,
             earnings_anticipation_half_life: 0.0,
             rate_pe_sensitivity: crate::fair_value::RATE_PE_SENSITIVITY,
+            lossmaker_rate_sensitivity: 0.0,
             cycle_publication_lag: 0.0,
             cycle_publication_lag_draw: 0.0,
             gdp_publication_lag: 0.0,
@@ -10322,6 +10335,7 @@ impl ModelParams {
             "earnings_cycle_sigma" => self.earnings_cycle_sigma,
             "earnings_anticipation_half_life" => self.earnings_anticipation_half_life,
             "rate_pe_sensitivity" => self.rate_pe_sensitivity,
+            "lossmaker_rate_sensitivity" => self.lossmaker_rate_sensitivity,
             "cycle_publication_lag" => self.cycle_publication_lag,
             "cycle_publication_lag_draw" => self.cycle_publication_lag_draw,
             "gdp_publication_lag" => self.gdp_publication_lag,
@@ -10699,6 +10713,7 @@ impl ModelParams {
             "earnings_cycle_sigma" => out.earnings_cycle_sigma = value,
             "earnings_anticipation_half_life" => out.earnings_anticipation_half_life = value,
             "rate_pe_sensitivity" => out.rate_pe_sensitivity = value,
+            "lossmaker_rate_sensitivity" => out.lossmaker_rate_sensitivity = value,
             "cycle_publication_lag" => out.cycle_publication_lag = value,
             "cycle_publication_lag_draw" => out.cycle_publication_lag_draw = value,
             "gdp_publication_lag" => out.gdp_publication_lag = value,
@@ -11986,6 +12001,12 @@ impl ModelParams {
                 "rate_pe_sensitivity is {}. It is P/E compression per unit of yield, in [0, 10].",
                 self.rate_pe_sensitivity));
         }
+        if !(self.lossmaker_rate_sensitivity >= 0.0 && self.lossmaker_rate_sensitivity <= 20.0) {
+            return Err(format!(
+                "lossmaker_rate_sensitivity is {}. It is a loss-maker's value compression per unit \
+                 of yield above neutral, in [0, 20].",
+                self.lossmaker_rate_sensitivity));
+        }
         if !(self.cycle_publication_lag >= 0.0 && self.cycle_publication_lag <= 2520.0
             && self.cycle_publication_lag.fract() == 0.0)
         {
@@ -12643,6 +12664,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "impact_memory_refill",
     "impact_memory_slow_half_life",
     "impact_memory_slow_weight",
+    "lossmaker_rate_sensitivity",
     "macro_pins_hold",
     "market_beta_normalise",
     "market_day_tail_df",
@@ -12883,6 +12905,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "earnings_cycle_sigma",
         "earnings_anticipation_half_life",
         "rate_pe_sensitivity",
+        "lossmaker_rate_sensitivity",
         "cycle_publication_lag",
         "cycle_publication_lag_draw",
         "gdp_publication_lag",

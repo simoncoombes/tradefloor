@@ -424,6 +424,7 @@ impl PyFairValue {
     qe_pe_stock_gain = None,
     rate_pe_sensitivity = None,
     fair_value_book_floor = None,
+    lossmaker_rate_sensitivity = None,
     model = None,
 ))]
 #[allow(clippy::too_many_arguments)]
@@ -454,6 +455,7 @@ fn fair_value(
     qe_pe_stock_gain: Option<f64>,
     rate_pe_sensitivity: Option<f64>,
     fair_value_book_floor: Option<f64>,
+    lossmaker_rate_sensitivity: Option<f64>,
     model: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PyFairValue> {
     // Boundary rejections carry the specific type; PyO3's own argument-type
@@ -489,6 +491,7 @@ fn fair_value(
         ("qe_pe_stock_gain", qe_pe_stock_gain),
         ("rate_pe_sensitivity", rate_pe_sensitivity),
         ("fair_value_book_floor", fair_value_book_floor),
+        ("lossmaker_rate_sensitivity", lossmaker_rate_sensitivity),
     ] {
         if let Some(v) = value {
             if !v.is_finite() {
@@ -518,8 +521,9 @@ fn fair_value(
         ("qe_pe_stock_gain", qe_pe_stock_gain),
         ("rate_pe_sensitivity", rate_pe_sensitivity),
         ("fair_value_book_floor", fair_value_book_floor),
+        ("lossmaker_rate_sensitivity", lossmaker_rate_sensitivity),
     ];
-    let (neutral, qe_gain, qe_stock_gain, sensitivity, book_floor) = match model {
+    let (neutral, qe_gain, qe_stock_gain, sensitivity, book_floor, lossmaker) = match model {
         Some(m) => {
             let both: Vec<&str> = explicit
                 .iter()
@@ -538,7 +542,7 @@ fn fair_value(
             }
             let p = crate::python_engine::model_params_from(Some(m))?;
             (p.neutral_discount_rate, p.qe_pe_gain, p.qe_pe_stock_gain,
-             p.rate_pe_sensitivity, p.fair_value_book_floor)
+             p.rate_pe_sensitivity, p.fair_value_book_floor, p.lossmaker_rate_sensitivity)
         }
         // The reference constants, which are also what every preset through
         // pt-v15 ships.
@@ -552,8 +556,16 @@ fn fair_value(
             qe_pe_stock_gain.unwrap_or(0.0),
             rate_pe_sensitivity.unwrap_or(crate::fair_value::RATE_PE_SENSITIVITY),
             fair_value_book_floor.unwrap_or(0.0),
+            // Absent is no rate term on the book path, the reference's.
+            lossmaker_rate_sensitivity.unwrap_or(0.0),
         ),
     };
+    if !(0.0..=20.0).contains(&lossmaker) {
+        return Err(Rejected::new_err(format!(
+            "lossmaker_rate_sensitivity is {lossmaker}. It is a loss-maker's value compression \
+             per unit of yield above neutral, in [0, 20]."
+        )));
+    }
 
     let economy = crate::fair_value::EconomyValuationInputs {
         corporate_bond_yield: corporate_bond_yield.map(crate::units::fraction_to_percent),
@@ -575,8 +587,8 @@ fn fair_value(
     // The function every engine path calls (`market::tick`, the overnight
     // open). At the reference values it is the two-argument
     // `compute_fair_value` to the bit, which `fair_value_parity` pins.
-    let b = crate::fair_value::compute_fair_value_at(
-        &company, &economy, book_floor, qe_gain, qe_stock_gain, neutral, sensitivity,
+    let b = crate::fair_value::compute_fair_value_full(
+        &company, &economy, book_floor, qe_gain, qe_stock_gain, neutral, sensitivity, lossmaker,
     );
     Ok(PyFairValue {
         fair_value: b.fair_value,

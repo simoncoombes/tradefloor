@@ -842,6 +842,7 @@ PARAM_SPECS: dict[str, dict] = {
     "earnings_cycle_sigma": {"kind": "abs", "step_unit": 0.0005, "hard_range": (0.0, 0.05)},
     "earnings_anticipation_half_life": {"kind": "abs", "step_unit": 10.0, "hard_range": (0.0, 5040.0)},
     "rate_pe_sensitivity": {"kind": "rel", "step_unit": 0.05, "hard_range": (0.0, 10.0)},
+    "lossmaker_rate_sensitivity": {"kind": "abs", "step_unit": 0.5, "hard_range": (0.0, 20.0)},
     "cycle_publication_lag": {"kind": "abs", "step_unit": 21.0, "hard_range": (0.0, 2520.0)},
     "gdp_publication_lag": {"kind": "abs", "step_unit": 21.0, "hard_range": (0.0, 2520.0)},
     "unemployment_adjustment_half_life": {"kind": "abs", "step_unit": 10.0, "hard_range": (0.0, 2520.0)},

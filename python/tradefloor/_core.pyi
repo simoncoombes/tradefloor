@@ -81,6 +81,7 @@ def fair_value(
     qe_pe_stock_gain: float | None = ...,
     rate_pe_sensitivity: float | None = ...,
     fair_value_book_floor: float | None = ...,
+    lossmaker_rate_sensitivity: float | None = ...,
     model: str | ModelParams | None = ...,
 ) -> FairValue: ...
 

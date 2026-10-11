@@ -233,6 +233,28 @@ pub fn compute_target_pe_at(
     }
 }
 
+/// The rate term on the book path: the profitable path's
+/// `max(RATE_ADJUSTMENT_FLOOR, 1 - (discount - neutral) * sensitivity *
+/// duration)`, with the loss-makers' own sensitivity.
+///
+/// Written out beside [`compute_target_pe_at`] rather than shared with it,
+/// so the profitable path's arithmetic stays the statement it has always
+/// been, operation for operation.
+fn book_rate_adjustment(
+    company: &CompanyValuationInputs,
+    economy: &EconomyValuationInputs,
+    neutral_rate: f64,
+    sensitivity: f64,
+) -> f64 {
+    let discount = discount_rate(economy);
+    let revenue_growth = company.revenue_growth.unwrap_or(0.0);
+    let duration_multiplier = 1.0 + mathx::max(0.0, revenue_growth) * GROWTH_DURATION_SCALE;
+    mathx::max(
+        RATE_ADJUSTMENT_FLOOR,
+        1.0 - (discount - neutral_rate) * sensitivity * duration_multiplier,
+    )
+}
+
 /// Fair value per share, with its decomposition.
 ///
 /// Two paths. Profitable companies are valued on earnings times the target
@@ -312,6 +334,33 @@ pub fn compute_fair_value_at(
     neutral_rate: f64,
     rate_pe_sensitivity: f64,
 ) -> FairValueBreakdown {
+    compute_fair_value_full(company, economy, book_floor, qe_gain, qe_stock_gain, neutral_rate,
+                            rate_pe_sensitivity, 0.0)
+}
+
+/// [`compute_fair_value_at`] with a rate term on the book path
+/// (`ModelParams::lossmaker_rate_sensitivity`).
+///
+/// At `lossmaker_rate_sensitivity` 0.0 this is exactly the function above:
+/// a loss-maker is valued at `book * LOSS_MAKING_PRICE_TO_BOOK` and its
+/// breakdown reports a `rate_adjustment` of 1.0. Above zero the book value
+/// is multiplied by
+/// `max(RATE_ADJUSTMENT_FLOOR, 1 - (discount - neutral) * sensitivity * duration)`,
+/// the profitable path's rate term with its own sensitivity: the same
+/// discount rate, neutral rate, growth duration and floor. At the neutral
+/// rate the term is exactly 1.0, so a roster still opens at its own fair
+/// value there. `tools/calibration/lossmaker_duration.md` has the target.
+#[allow(clippy::too_many_arguments)]
+pub fn compute_fair_value_full(
+    company: &CompanyValuationInputs,
+    economy: &EconomyValuationInputs,
+    book_floor: f64,
+    qe_gain: f64,
+    qe_stock_gain: f64,
+    neutral_rate: f64,
+    rate_pe_sensitivity: f64,
+    lossmaker_rate_sensitivity: f64,
+) -> FairValueBreakdown {
     let eps = company.eps.unwrap_or(0.0);
 
     if eps > 0.0 {
@@ -341,6 +390,21 @@ pub fn compute_fair_value_at(
     }
 
     let book_value = company.book_value_per_share.unwrap_or(0.0);
+    // The book path's rate term, a BRANCH at zero so every preset before the
+    // dial values a loss-maker with the arithmetic that stood.
+    if lossmaker_rate_sensitivity != 0.0 {
+        let rate_adjustment = book_rate_adjustment(company, economy, neutral_rate,
+                                                   lossmaker_rate_sensitivity);
+        return FairValueBreakdown {
+            fair_value: mathx::max(FAIR_VALUE_FLOOR,
+                                   book_value * LOSS_MAKING_PRICE_TO_BOOK * rate_adjustment),
+            target_pe: 0.0,
+            sector_anchor_pe: sector_anchor_pe(company.sector_avg_pe),
+            rate_adjustment,
+            qe_adjustment: 1.0,
+            book_value_path: true,
+        };
+    }
     FairValueBreakdown {
         fair_value: mathx::max(FAIR_VALUE_FLOOR, book_value * LOSS_MAKING_PRICE_TO_BOOK),
         target_pe: 0.0,
@@ -508,6 +572,44 @@ mod tests {
             assert_eq!(fv.target_pe, 0.0);
             assert_eq!(fv.fair_value, 12.0, "10 x 1.2");
         }
+    }
+
+    #[test]
+    fn the_book_path_rate_term_is_off_at_zero_and_mirrors_the_profitable_one() {
+        let neutral = 0.0482;
+        for y in [2.5, 4.82, 7.0] {
+            let e = econ(Some(y), 1.0, None);
+            for growth in [None, Some(-0.2), Some(0.0), Some(0.35)] {
+                let c = co(Some(18.0), Some(-1.0), Some(10.0), growth);
+                let off = compute_fair_value_at(&c, &e, 0.0, 1.0, 0.0, neutral, 3.0);
+                let zero = compute_fair_value_full(&c, &e, 0.0, 1.0, 0.0, neutral, 3.0, 0.0);
+                assert_eq!(off.fair_value.to_bits(), zero.fair_value.to_bits());
+                assert_eq!(zero.rate_adjustment, 1.0);
+                let on = compute_fair_value_full(&c, &e, 0.0, 1.0, 0.0, neutral, 3.0, 4.0);
+                // The profitable path's term at the same sensitivity.
+                let p = compute_target_pe_at(&co(Some(18.0), Some(1.0), Some(10.0), growth), &e, 1.0, 0.0,
+                                             neutral, 4.0);
+                assert_eq!(on.rate_adjustment.to_bits(), p.rate_adjustment.to_bits());
+                assert_eq!(on.fair_value, 12.0 * p.rate_adjustment);
+                assert!(on.book_value_path);
+                // A profitable company is untouched by the dial.
+                let pc = co(Some(18.0), Some(2.0), Some(10.0), growth);
+                assert_eq!(
+                    compute_fair_value_full(&pc, &e, 0.0, 1.0, 0.0, neutral, 3.0, 4.0)
+                        .fair_value.to_bits(),
+                    compute_fair_value_at(&pc, &e, 0.0, 1.0, 0.0, neutral, 3.0)
+                        .fair_value.to_bits());
+            }
+        }
+        // Exactly 1.0 at the neutral rate, and floored at RATE_ADJUSTMENT_FLOOR.
+        let at = compute_fair_value_full(&co(Some(18.0), Some(-1.0), Some(10.0), Some(0.3)),
+                                         &econ(Some(4.82), 1.0, None), 0.0, 1.0, 0.0, 0.0482,
+                                         3.0, 11.0);
+        assert_eq!(at.rate_adjustment, 1.0);
+        let high = compute_fair_value_full(&co(Some(18.0), Some(-1.0), Some(10.0), Some(0.3)),
+                                           &econ(Some(20.0), 1.0, None), 0.0, 1.0, 0.0, 0.0482,
+                                           3.0, 11.0);
+        assert_eq!(high.rate_adjustment, RATE_ADJUSTMENT_FLOOR);
     }
 
     #[test]

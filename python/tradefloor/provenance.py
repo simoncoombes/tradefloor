@@ -487,6 +487,14 @@ OUT_OF_SCOPE = {
         "with the switch off, `Engine::contracts` lists no oil future, "
         "`Engine::quote` returns None for one, and nothing is snapshotted or "
         "hashed; at 0.0 it is also left out of the model's digest",
+    # The rate term on a loss-maker's book value (pt-v22 candidate), inert
+    # on every shipped preset.
+    "lossmaker_rate_sensitivity":
+        "inert at 0.0: `compute_fair_value_full` in fair_value.rs branches on "
+        "`!= 0.0` and values a loss-maker at 1.2 times book with no rate term, "
+        "as the reference implementation did; at 0.0 it is also left out of "
+        "the model's digest. The 2022 target and the form are in "
+        "tools/calibration/lossmaker_duration.md",
     # The contracts' margin (pt-v22 phase 1), inert on every shipped preset:
     # it reads the marks and writes only its own state.
     "margin_scan_coverage":

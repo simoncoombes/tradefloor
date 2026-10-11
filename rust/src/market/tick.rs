@@ -1428,9 +1428,10 @@ pub fn simulate_market_tick(
         } else {
             scale_valuation(grown, buyback)
         };
-        let breakdown = crate::fair_value::compute_fair_value_at(
+        let breakdown = crate::fair_value::compute_fair_value_full(
             &valuation, &econ_view, p.fair_value_book_floor,
-            p.qe_pe_gain, p.qe_pe_stock_gain, p.neutral_discount_rate, p.rate_pe_sensitivity);
+            p.qe_pe_gain, p.qe_pe_stock_gain, p.neutral_discount_rate, p.rate_pe_sensitivity,
+            p.lossmaker_rate_sensitivity);
         let fv = with_vix_discount(p, breakdown.fair_value, vix_exposure, companies[idx].stock.beta);
         // The dividend accrued since the last ex-date, in price units. A
         // branch inside: no state, or no accrual, is `fv` bit for bit.
@@ -2095,9 +2096,10 @@ pub fn published_fair_value(
         qe_pe_boost: Some(economy.qe_pe_boost),
         qe_assets_ratio: Some(economy.qe_assets_ratio),
     };
-    let fv = crate::fair_value::compute_fair_value_at(
+    let fv = crate::fair_value::compute_fair_value_full(
         &valuation, &econ_view, p.fair_value_book_floor,
-        p.qe_pe_gain, p.qe_pe_stock_gain, p.neutral_discount_rate, p.rate_pe_sensitivity)
+        p.qe_pe_gain, p.qe_pe_stock_gain, p.neutral_discount_rate, p.rate_pe_sensitivity,
+        p.lossmaker_rate_sensitivity)
     .fair_value;
     let fv = with_vix_discount(p, fv, vix_feedback_exposure(p, economy), company.stock.beta);
     crate::market::dividends::with_accrual(fv, company)
@@ -2139,9 +2141,10 @@ pub fn tick_fair_value(
         qe_pe_boost: Some(economy.qe_pe_boost),
         qe_assets_ratio: Some(economy.qe_assets_ratio),
     };
-    let fv = crate::fair_value::compute_fair_value_at(
+    let fv = crate::fair_value::compute_fair_value_full(
         &valuation, &econ_view, p.fair_value_book_floor,
-        p.qe_pe_gain, p.qe_pe_stock_gain, p.neutral_discount_rate, p.rate_pe_sensitivity)
+        p.qe_pe_gain, p.qe_pe_stock_gain, p.neutral_discount_rate, p.rate_pe_sensitivity,
+        p.lossmaker_rate_sensitivity)
     .fair_value;
     let fv = with_vix_discount(p, fv, vix_feedback_exposure(p, economy), company.stock.beta);
     crate::market::dividends::with_accrual(fv, company)
