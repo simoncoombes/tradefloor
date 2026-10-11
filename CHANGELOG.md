@@ -20,14 +20,9 @@ priced at its carry fair value plus a basis, with its own book, and settled
 on the index of its expiry session's opening prints. Stock prices are the
 same with them on as off.
 
-`random_noise` is now split into its three legs, `market_noise`,
-`sector_noise` and `company_noise`, which sum to it. On pt-v21 the whole
-column moved prices most on about four days in five, so naming it every
-day scored 0.60 to 1.0 on `explanation_accuracy` (median 0.83, seeds 1 to
-10, 20 days, 20 names). `evaluate(noise_legs=True)` scores against the legs
-instead, where the best constant answer scores 0.35 to 0.95 (median 0.475)
-on the same days. The default score, every price and every known-answer
-digest are where they were.
+`random_noise` now splits into market, sector and company legs;
+`evaluate(noise_legs=True)` scores explanations on them, cutting a constant
+answer's median from 0.83 to 0.48 without moving a price.
 
 <!-- release-note-ends -->
 

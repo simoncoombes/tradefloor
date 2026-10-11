@@ -206,6 +206,7 @@ def test_the_schema_is_the_full_labelled_row():
     schema = pa.table(engine.truth()).schema
     assert schema.names == (
         ["day", "tick", "instrument_id"] + LEVELS + COMPONENTS
+        + ["market_noise", "sector_noise", "company_noise"]
     )
 
 

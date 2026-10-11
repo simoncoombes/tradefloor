@@ -101,8 +101,11 @@ SCORECARD_FIELDS = (
 #: pt-v21, so the digest of a run on one is the one it was before the field
 #: existed.
 #: `population_fingerprint` likewise: "" on every isolated run, which is
-#: every run this script makes.
-SCORECARD_NONZERO = ("dividends", "population_fingerprint")
+#: every run this script makes. And `noise_legs`: False on every run that
+#: does not score `explain` with `random_noise` split into its legs, which
+#: is every run this script makes, so its digest did not move when the
+#: field arrived.
+SCORECARD_NONZERO = ("dividends", "population_fingerprint", "noise_legs")
 
 #: The scorecard fields hashed as a count of their lines.
 SCORECARD_COUNTED = ("errors", "partial_fills")

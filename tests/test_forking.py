@@ -1343,6 +1343,14 @@ REQUIRED_SNAPSHOT_KEYS = ("columns", "rng", "tickers", "tick_components")
 #: dials put the scenario in reach of them: `fed_drawdown_mcap_prev`,
 #: `night_market_factor` and `market_vol_cycle_log`.
 UNREACHED_SNAPSHOT_FIELDS = {
+    "noise_legs":
+        "the day's `random_noise` legs under a night split, carried where "
+        "they differ from `noise_parts`. Reporting state: nothing on the "
+        "price path reads them, the tape's per-tick legs come from each "
+        "tick, and the next open resets them, so a continuation reads them "
+        "only through `attribution` with a leg name before that open, which "
+        "this scenario does not compare. tests/test_noise_legs.py holds them "
+        "across a mid-day restore.",
     "vix_anchor":
         "the VIX anchor `vix_level_identity` derives from the roster the "
         "engine was built on. Every copy here is built on the original's "

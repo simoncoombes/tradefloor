@@ -1697,7 +1697,8 @@ _LEDGER_BUFFERS = ("attribution", "tick_components", "tick_fundamental",
 #: their reports, the idiosyncratic variance state, the prehistory's carried
 #: opening, the dividend states and an ex-date's move waiting for its tape
 #: row, the drawdown hold's window and the day's GJR innovation under a
-#: night split. Encoded where
+#: night split, and the day's ``random_noise`` legs where they differ from
+#: ``noise_parts`` (a night split, after an open). Encoded where
 #: present and left out where not. The ``fundamentals`` block's three
 #: buffers and the book's consumed depth are encoded beside them.
 _LEDGER_OPTIONAL_BUFFERS = ("fair_value_offset", "opening_z", "pending_fair_value",
@@ -1707,7 +1708,8 @@ _LEDGER_OPTIONAL_BUFFERS = ("fair_value_offset", "opening_z", "pending_fair_valu
                             "pending_dividend", "fed_drawdown_returns",
                             "innovation_day", "forecast", "futures",
                             "night_bridge", "vix_futures", "rate_futures",
-                            "oil_futures", "margin", "shares_outstanding")
+                            "oil_futures", "margin", "shares_outstanding",
+                            "noise_legs")
 
 #: The ``fundamentals`` block's buffers, one per company each.
 _LEDGER_FUNDAMENTALS = ("eps", "book_value_per_share", "revenue_growth")

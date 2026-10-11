@@ -1713,7 +1713,9 @@ def test_the_kinds_are_the_declared_five():
 def test_the_json_carries_the_whole_tree():
     _, result = one()
     doc = json.loads(result.to_json())
-    assert sorted(doc) == ["caveats", "day", "move", "root", "ticker"]
+    assert sorted(doc) == ["caveats", "day", "move", "noise_legs", "root",
+                           "ticker"]
+    assert doc["noise_legs"] == result.noise_legs
     assert doc["ticker"] == result.ticker
     assert doc["day"] == result.day
     assert doc["move"] == result.move
