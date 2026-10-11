@@ -593,6 +593,8 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          "oil_futures", "oil_futures_book",
          # The contracts' margin, only while `margin_scan_coverage` is set.
          "margin",
+         # Oil's long factor, only while `oil_target_drift_sd` is set.
+         "oil_target_drift",
          # The dividend states, on a model that pays dividends, and an
          # ex-date's move in `s` waiting for its tape row.
          "dividend", "pending_dividend",
@@ -1057,6 +1059,12 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         _u32(buf, len(values))
         for value in values:
             _f64(buf, value)
+    # Oil's long factor, only while `oil_target_drift_sd` is set, behind its
+    # own tag: its log level and its key's two words.
+    if "oil_target_drift" in snapshot:
+        _f64(buf, 55.0)
+        for value in _column(snapshot["oil_target_drift"], 3, "oil_target_drift"):
+            _f64(buf, value)
     # LENGTH-PREFIXED, because these two are empty between the tape row that
     # consumes them and the close that fills them again -- unlike every
     # per-slot array above, which always follows the roster. An empty buffer
@@ -1125,7 +1133,7 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         {"earnings_cycle", "cycle_history", "gdp_publication",
          "unemployment_impulse", "vix_feedback", "qe_assets_ratio",
          "cycle_nowcast", "cycle_publication", "anticipation_drift",
-         "anticipation_raw", "spread_equity_gap"}
+         "anticipation_raw", "spread_equity_gap", "oil_push_level", "usd_haven_level"}
         & set(economy))
     if "fed_put" in economy:
         economy_expected |= {"intermeeting_return", "fed_put", "fed_put_owed",
@@ -1192,6 +1200,13 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # is set: `Engine::state_hash`'s order and rule.
     if "unemployment_impulse" in economy:
         _f64(buf, economy["unemployment_impulse"])
+    # The oil pushes' part of the price, only while `oil_pushes_in_target`
+    # is set: `Engine::state_hash`'s order and rule.
+    if "oil_push_level" in economy:
+        _f64(buf, economy["oil_push_level"])
+    # The dollar's safe-haven bid, only while `usd_mean_reversion` is set.
+    if "usd_haven_level" in economy:
+        _f64(buf, economy["usd_haven_level"])
     # The published GDP growth figure's state, only while
     # `gdp_publication_lag` is set: `Engine::state_hash`'s order and rule,
     # the pending releases LENGTH-PREFIXED, each its day then its figure.
@@ -1700,7 +1715,8 @@ _LEDGER_OPTIONAL_BUFFERS = ("fair_value_offset", "opening_z", "pending_fair_valu
                             "pending_dividend", "fed_drawdown_returns",
                             "innovation_day", "forecast", "futures",
                             "night_bridge", "vix_futures", "rate_futures",
-                            "oil_futures", "margin", "shares_outstanding")
+                            "oil_futures", "margin", "shares_outstanding",
+                            "oil_target_drift")
 
 #: The ``fundamentals`` block's buffers, one per company each.
 _LEDGER_FUNDAMENTALS = ("eps", "book_value_per_share", "revenue_growth")

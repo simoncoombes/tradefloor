@@ -1525,8 +1525,56 @@ With `oil_inventory_level_gain` $G > 0$ inventory's pressure $p(I)$ moves
 the price by $G\,(p(I') - p(I))$ a session in place of $p(I')$, so a
 shortage raises the price at once and the premium unwinds as inventory
 refills: the convenience yield of the theory of storage, low stocks with a
-curve in backwardation. The forecast steps the same law, so its expected
-oil, and the oil futures priced on it, follow each dial.
+curve in backwardation. With `oil_convenience_yield` $k > 0$ the price
+carries a premium on its level, $S = X\,(I/50)^{-k}$ with inventory read at no
+lower than 25 and $X$ the premium-free price reverting to the target: the
+convenience yield of the theory of storage (Working 1949; Brennan 1958),
+which low stocks raise at once and refilling unwinds, so the curve is in backwardation when
+stocks are low and in contango when they are high (Gorton, Hayashi and
+Rouwenhorst 2013, row OF2). It needs `oil_inventory_reversion`, which gives
+inventory the level it refills to. The forecast steps the same law, so its
+expected oil, and the oil futures priced on it, follow each dial; for the
+premium it takes the expectation over inventory's spread, since the
+premium is convex in inventory. With `oil_target_drift_sd` $\sigma > 0$ the
+price also carries a long factor, $S = X\,e^{D} f(I)$, with $D$ a random walk
+on its own key, $D' = (1-r) D - \sigma^2/2 + \sigma z$: the long-term level of
+Schwartz and Smith (Management Science 46(7), 2000), which moves spot and
+every contract alike while $X$ reverts. With no pull ($r = 0$) $e^D$ is a
+martingale and the forecast holds it; `oil_target_drift_reversion` $r$ is a
+weak pull that keeps the walk off the clamps. With `oil_pushes_in_target` at 1
+the price is the sum of a part that reverts at $\lambda$ and a part $P$ that
+collects the daily pushes (the dollar's drag, OPEC, inventory's push, a
+shock's level term) and decays at the shipped 0.03, $P' = 0.97P + $ pushes:
+at $\lambda = 0.03$ the sum is the shipped step, and at a slower $\lambda$
+each push keeps its long-run response (the dollar's $-0.08/0.03 = -2.67$ a
+point) rather than five times it. With `oil_noise_log_sd` $s > 0$ the noise
+is $s$ times the price rather than a dollar amount, the short factor's
+constant log volatility. With `oil_dollar_elasticity` $\varepsilon > 0$ the
+dollar's daily drag is dropped and the reverting part carries
+$(\text{usd}/100)^{-\varepsilon}$ on its level, the target included, so a
+dollar move shifts spot and every contract together, as EIA's contracts 1
+and 4 do against FRED's trade-weighted dollar (elasticities $-0.69$ and
+$-0.66$ on daily changes, 1987 to 2019). `oil_inventory_noise_sd` sets
+inventory's daily noise (0.35 gives EIA's 0.087 sd of the log deviation from
+the trailing five-year mean, with a half-life inside the real 170 to 320
+sessions), and `oil_forecast_clamp` has the forecast publish the oil price's
+expectation truncated at its clamps, 35 and 150, over the spread the short
+factor and the level carriers give it. `usd_mean_reversion` and
+`usd_noise_sd` set the dollar index's law (0.0 the standing 0.02 and 0.3): FRED's
+trade-weighted dollar (DTWEXM, 1987 to 2019) has an AR(1) half-life of 729
+sessions and a daily log change of 0.0043, so the dollar the oil curve carries
+persists as the real one does rather than unwinding within weeks. Under
+`usd_mean_reversion` the dollar's safe-haven bid is a part of its own that
+decays at the shipped 0.02, so a crisis lifts the dollar for months as it did
+and the bid does not accumulate. `usd_safe_haven_gain` sets that bid's daily
+drift per VIX point above the threshold (0.0 the standing 0.05, never
+measured): FRED's trade-weighted dollar gains 0.0010 per cent a session per
+point (DTWEXM against CBOE's VIX, 1990 to 2019, se 0.0012) and gives it back
+within 21 sessions, so at 0.001 a crisis barely moves the dollar and the oil
+curve does not price the bid's unwinding as a slope. `oil_price_floor` and `oil_price_ceiling`
+set oil's bounds (0.0 the standing 35 and 150): WTI deflated by CPIAUCSL ran
+0.203 to 3.44 times its median over 1987 to 2024, which at the model's
+centre of 81 is 16.4 and 279.
 
 | Dial | pt-v20 | pt-v21 | Kind | Source |
 |---|---|---|---|---|
@@ -1538,6 +1586,18 @@ oil, and the oil futures priced on it, follow each dial.
 | `oil_mean_reversion` $\lambda$ | 0 (0.03); up to 1 | same | not set | Bessembinder et al. (1995), about 0.0035 a session; Schwartz (1997) |
 | `oil_noise_sd` $\sigma$ | 0 (2.0); up to 10 | same | not set | set with $\lambda$: the stationary spread before the clamps is $\sigma / \sqrt{2\lambda}$ |
 | `oil_inventory_level_gain` $G$ | 0 (the daily push); up to 2520 | same | not set | Gorton, Hayashi and Rouwenhorst (2013): low inventories, a high spot and backwardation |
+| `oil_target_drift_sd` $\sigma$ | 0 (no long factor); up to 0.1 | same | not set | EIA's contracts 1 and 4: the long factor's daily sd, 0.018 (median of seven five-year windows, 1987 to 2024) |
+| `oil_pushes_in_target` | 0 (the pushes revert with the price); 1 | same | not set | at a reversion of 0.03 it is the shipped step; a stated split, not a fit |
+| `usd_mean_reversion` | 0 (0.02); up to 1 | same | not set | FRED DTWEXM, 1987 to 2019: AR(1) half-life of the log level 729 sessions (0.00095); 540 to 580 against the trailing five-year mean |
+| `usd_noise_sd` | 0 (0.3); up to 5 | same | not set | FRED DTWEXM: daily log change sd 0.0043, 0.43 points at 100 |
+| `usd_safe_haven_gain` | 0 (0.05); up to 1 | same | not set | FRED DTWEXM on CBOE VIX, 1990 to 2019: drift 0.0010 per cent a session per VIX point above 25.5 (se 0.0012), unwound within 21 sessions; DTWEXBGS 2006 on: 0.003 |
+| `oil_price_floor`, `oil_price_ceiling` | 0 (35 and 150); the floor in (0, 35], the ceiling in [150, 1000] | same | not set | EIA RCLC1 deflated by FRED CPIAUCSL, 1987 to 2024: 0.203 and 3.44 times the median, at the model's 81 |
+| `oil_inventory_noise_sd` | 0 (0.5); up to 5 | same | not set | EIA WCESTUS1, 1987 to 2024: sd 0.087 of the log deviation from the trailing 260-week mean |
+| `oil_forecast_clamp` | 0 (unclamped); 1 | same | not set | none: the clamps are in the law |
+| `oil_dollar_elasticity` $\varepsilon$ | 0 (the daily drag); up to 5 | same | not set | EIA RCLC1 and RCLC4 on FRED DTWEXM, 1987 to 2019: 0.69 on daily changes, 1.2 over 21 sessions; DTWEXBGS 2006 on: 2.3 |
+| `oil_noise_log_sd` $s$ | 0 (dollar noise); up to 0.1 | same | not set | EIA's contracts 1 and 4 at a reversion of 0.006: the short factor's daily sd, 0.017 (median of seven windows); Schwartz and Smith (2000) 0.018 |
+| `oil_target_drift_reversion` $r$ | 0 (no pull); up to 1 | same | not set | none: a stated guard against the clamps |
+| `oil_convenience_yield` $k$ | 0 (no premium); up to 10 | same | not set | Working (1949), Brennan (1958); EIA's US crude stocks: the curve's slope on stocks' deviation from their 5-year mean, correlation 0.557 and slope 0.33, 1987 to 2024 |
 
 ### The fear and greed index
 

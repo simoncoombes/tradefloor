@@ -1130,6 +1130,12 @@ def _nothing_dormant():
                    futures_rates_listed=1.0,
                    # The oil futures (pt-v22 phase 1): a switch.
                    futures_oil_listed=1.0,
+                   # The oil storage law's two switches, and oil's bounds
+                   # at WTI's real-terms range (each only widens).
+                   oil_pushes_in_target=1.0,
+                   oil_forecast_clamp=1.0,
+                   oil_price_floor=16.4,
+                   oil_price_ceiling=279.0,
                    # The contracts' margin (pt-v22 phase 1).
                    margin_scan_coverage=0.99,
                    margin_scan_tail=1.3,

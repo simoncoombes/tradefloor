@@ -515,6 +515,60 @@ OUT_OF_SCOPE = {
         "inventory's pressure each session as the shipped step does, and the "
         "forecast's expected push is the standing one; at 0.0 it is also left "
         "out of the model's digest",
+    "oil_pushes_in_target":
+        "inert at 0.0: `update_economy_daily` branches on the switch and steps "
+        "the whole price as it stood; `oil_push_level` is neither read, "
+        "written, snapshotted nor hashed, and at 0.0 it is also left out of "
+        "the model's digest",
+    "oil_noise_log_sd":
+        "inert at 0.0: `update_economy_daily` branches on `== 0.0` and draws "
+        "the dollar noise as it stood, the same draw either way; at 0.0 it is "
+        "also left out of the model's digest",
+    "usd_mean_reversion":
+        "inert at 0.0: `update_economy_daily` branches on `== 0.0` and closes "
+        "the standing 0.02 of the dollar's gap to its target; at 0.0 it is "
+        "also left out of the model's digest",
+    "usd_noise_sd":
+        "inert at 0.0: `update_economy_daily` branches on `== 0.0` and draws "
+        "the standing 0.3 a unit of volatility, the same draw either way; at "
+        "0.0 it is also left out of the model's digest",
+    "usd_safe_haven_gain":
+        "inert at 0.0: `usd_safe_haven_gain` in economy/daily.rs branches on "
+        "`== 0.0` to the standing 0.05, read by the dollar's step and the "
+        "forecast's expected bid; at 0.0 it is also left out of the model's "
+        "digest",
+    "oil_price_floor":
+        "inert at 0.0: `oil_bounds` in economy/daily.rs branches on `== 0.0` "
+        "to the standing 35; at 0.0 it is also left out of the model's digest",
+    "oil_price_ceiling":
+        "inert at 0.0: `oil_bounds` branches on `== 0.0` to the standing 150; "
+        "at 0.0 it is also left out of the model's digest",
+    "oil_inventory_noise_sd":
+        "inert at 0.0: `inventory_noise` in economy/daily.rs branches on "
+        "`== 0.0` to the standing 0.5, the same draw either way, and the "
+        "forecast's inventory variance keeps 0.25; at 0.0 it is also left out "
+        "of the model's digest",
+    "oil_forecast_clamp":
+        "inert at 0.0: the forecast publishes the unclamped expectation it "
+        "steps, as it stood; it reads the forecast only, so no price moves at "
+        "any value, and at 0.0 it is also left out of the model's digest",
+    "oil_dollar_elasticity":
+        "inert at 0.0: `update_economy_daily` branches on `== 0.0` and takes "
+        "the dollar's daily drag as it stood, and rescales nothing after the "
+        "dollar's step; at 0.0 it is also left out of the model's digest",
+    "oil_target_drift_sd":
+        "inert at 0.0: the close takes no draw for it (`Engine::oil_drift_step` "
+        "returns None) and `update_economy_daily` steps the price that stood; "
+        "nothing is snapshotted or hashed, and at 0.0 it is also left out of "
+        "the model's digest",
+    "oil_target_drift_reversion":
+        "unread while `oil_target_drift_sd` is 0.0, as every preset ships it, "
+        "and refused without it; at 0.0 it is also left out of the model's "
+        "digest",
+    "oil_convenience_yield":
+        "inert at 0.0: `update_economy_daily` branches on `== 0.0` and reverts "
+        "oil to the target that stood, and the forecast takes no premium's "
+        "expectation; at 0.0 it is also left out of the model's digest",
     # The VIX's fear memory (pt-v22 phase 1, the VIX law), inert on every
     # shipped preset.
     "vix_fear_uptake":

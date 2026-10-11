@@ -1285,6 +1285,14 @@ pub struct Engine {
     /// and unhashed while the switch is 0.0, which every preset carries;
     /// only its key is set at construction.
     cycle_publication: CyclePublication,
+    /// The key of the oil long factor's draws (`oil_target_drift_sd`),
+    /// derived from the root seed and carried by a snapshot that holds the
+    /// factor, so a restore onto an engine built from another seed draws
+    /// the run's own.
+    oil_drift_key: u64,
+    /// The log of the oil price's long-term level (`oil_target_drift_sd`):
+    /// 0.0 with the dial off, which it never leaves.
+    oil_target_drift: f64,
 
     /// The background traders sharing the agent-facing book, when the
     /// engine was built with them (`crate::population`). `None` on every
@@ -2354,6 +2362,8 @@ impl Engine {
                 key: crate::rng::publication_key(seed),
                 ..CyclePublication::default()
             },
+            oil_drift_key: crate::rng::oil_drift_key(seed),
+            oil_target_drift: 0.0,
             population: None,
         };
         engine.vix_anchor = engine.derive_vix_anchor();
@@ -9134,10 +9144,22 @@ impl Engine {
         if spread_blend {
             inputs.yields.spread_multiplier = Some((spread_before, spread_after_report));
         }
+        // The oil price's long factor (`oil_target_drift_sd`): tonight's log
+        // change on its own key, so no stream moves; nothing at 0.0.
+        let oil_drift_next = self.oil_drift_step(request.game_day);
+        if let Some(next) = oil_drift_next {
+            inputs.oil_target_drift = Some((self.oil_target_drift, next));
+        }
         self.economy = update_economy_daily(&self.economy, &inputs, rng);
         // The host's premium on the target (`set_vix_target_premium`), read
         // by the step above, faded for the next close.
         self.fade_vix_target_premium();
+        if let Some(next) = oil_drift_next {
+            // A bound that truncated tonight's price moved the long-run level
+            // with it (`EconomyState::oil_bound_log_ratio`), so the factor
+            // does not walk past the bounds while the price is pinned.
+            self.oil_target_drift = next + self.economy.oil_bound_log_ratio;
+        }
         if let Some(h) = &held {
             let e = &mut self.economy;
             if pins_today & PIN_VIX != 0 { e.vix = h.vix; }
@@ -9506,6 +9528,19 @@ impl Engine {
             oil_mean_reversion: self.params.oil_mean_reversion,
             oil_noise_sd: self.params.oil_noise_sd,
             oil_inventory_level_gain: self.params.oil_inventory_level_gain,
+            oil_convenience_yield: self.params.oil_convenience_yield,
+            oil_convenience_inventory_var: 0.0,
+            oil_convenience_inventory_var_before: 0.0,
+            oil_target_drift: None,
+            oil_pushes_in_target: self.params.oil_pushes_in_target != 0.0,
+            oil_noise_log_sd: self.params.oil_noise_log_sd,
+            oil_dollar_elasticity: self.params.oil_dollar_elasticity,
+            oil_inventory_noise_sd: self.params.oil_inventory_noise_sd,
+            usd_mean_reversion: self.params.usd_mean_reversion,
+            usd_noise_sd: self.params.usd_noise_sd,
+            usd_safe_haven_gain: self.params.usd_safe_haven_gain,
+            oil_price_floor: self.params.oil_price_floor,
+            oil_price_ceiling: self.params.oil_price_ceiling,
             oil_inflation_passthrough: self.params.oil_inflation_passthrough,
             // The phase and growth as an observer reads them tonight,
             // before the step: the same moment the economy's own are
@@ -9801,6 +9836,53 @@ impl Engine {
     /// of the one this engine derived from the roster it was built on.
     pub fn set_vix_anchor(&mut self, value: f64) {
         self.vix_anchor = value;
+    }
+
+    /// The oil long factor's next log level, or `None` with
+    /// `oil_target_drift_sd` at 0.0: `(1 - r) D - sigma^2 / 2 + sigma z`,
+    /// `z` the first normal of `GameRng::keyed(key, OIL_DRIFT_TAG, day)`.
+    fn oil_drift_step(&self, game_day: i64) -> Option<f64> {
+        let sigma = self.params.oil_target_drift_sd;
+        if sigma == 0.0 {
+            return None;
+        }
+        let z = crate::rng::GameRng::keyed(
+            self.oil_drift_key, crate::rng::OIL_DRIFT_TAG as u64, game_day as u64).next_normal();
+        let pull = 1.0 - self.params.oil_target_drift_reversion;
+        Some(pull * self.oil_target_drift - 0.5 * sigma * sigma + sigma * z)
+    }
+
+    /// The oil long factor's state for a snapshot and the state hash,
+    /// `[log level, key high word, key low word]` (each word exact in an
+    /// f64), or `None` with `oil_target_drift_sd` at 0.0.
+    pub fn oil_drift_words(&self) -> Option<[f64; 3]> {
+        if self.params.oil_target_drift_sd == 0.0 {
+            return None;
+        }
+        Some([self.oil_target_drift, (self.oil_drift_key >> 32) as f64,
+              (self.oil_drift_key & 0xFFFF_FFFF) as f64])
+    }
+
+    /// Put the oil long factor back from [`Engine::oil_drift_words`].
+    pub fn set_oil_drift_state(&mut self, words: Option<&[f64]>) -> Result<(), String> {
+        match (words, self.params.oil_target_drift_sd != 0.0) {
+            (None, false) => Ok(()),
+            (Some(w), true) => {
+                let whole = |v: f64| v.is_finite() && v >= 0.0 && v <= u32::MAX as f64 && v.fract() == 0.0;
+                if w.len() != 3 || !w[0].is_finite() || !whole(w[1]) || !whole(w[2]) {
+                    return Err(format!(
+                        "this snapshot's oil_target_drift is {w:?}: it is the long factor's log \
+                         level and its key's two 32-bit words"));
+                }
+                self.oil_target_drift = w[0];
+                self.oil_drift_key = ((w[1] as u64) << 32) | (w[2] as u64);
+                Ok(())
+            }
+            (None, true) => Err("this model runs oil's long factor (oil_target_drift_sd) and \
+                                 the snapshot carries no oil_target_drift".to_string()),
+            (Some(_), false) => Err("this snapshot carries oil_target_drift and this model's \
+                                      oil_target_drift_sd is 0".to_string()),
+        }
     }
 
     /// Whether this engine's model carries the published VIX's stress
@@ -12611,6 +12693,14 @@ impl Engine {
                 hash_f64(&mut buf, value);
             }
         }
+        // Oil's long factor, only while `oil_target_drift_sd` is set, behind
+        // its own tag: its log level and its key's two words.
+        if let Some(words) = self.oil_drift_words() {
+            hash_f64(&mut buf, 55.0);
+            for value in words {
+                hash_f64(&mut buf, value);
+            }
+        }
         // LENGTH-PREFIXED, because these two are EMPTY between the tape row
         // that consumes them and the close that fills them again, where
         // every per-slot array above always follows the roster. An empty
@@ -12717,6 +12807,15 @@ impl Engine {
         // `unemployment_adjustment_half_life` is set.
         if self.params.unemployment_adjustment_half_life != 0.0 {
             hash_f64(&mut buf, e.unemployment_impulse);
+        }
+        // The oil pushes' part of the price, only while
+        // `oil_pushes_in_target` is set.
+        if self.params.oil_pushes_in_target != 0.0 {
+            hash_f64(&mut buf, e.oil_push_level);
+        }
+        // The dollar's safe-haven bid, only while `usd_mean_reversion` is set.
+        if self.params.usd_mean_reversion != 0.0 {
+            hash_f64(&mut buf, e.usd_haven_level);
         }
         // The published GDP growth figure's state, only while
         // `gdp_publication_lag` is set, so every other engine's hash is the

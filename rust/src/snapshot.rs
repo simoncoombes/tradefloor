@@ -1658,6 +1658,10 @@ impl Engine {
         if let Some(words) = self.margin_words() {
             out.put("margin", V::from_f64s(&words));
         }
+        // Oil's long factor (`oil_target_drift_sd`).
+        if let Some(words) = self.oil_drift_words() {
+            out.put("oil_target_drift", V::from_f64s(&words));
+        }
         // The spread a `corporate_spread` pin holds tonight, only while its
         // mark stands.
         if let Some(spread) = self.pinned_corporate_spread() {
@@ -1779,6 +1783,12 @@ impl Engine {
         }
         if p.unemployment_adjustment_half_life != 0.0 {
             econ.put("unemployment_impulse", V::Float(economy.unemployment_impulse));
+        }
+        if p.oil_pushes_in_target != 0.0 {
+            econ.put("oil_push_level", V::Float(economy.oil_push_level));
+        }
+        if p.usd_mean_reversion != 0.0 {
+            econ.put("usd_haven_level", V::Float(economy.usd_haven_level));
         }
         if p.gdp_publication_lag != 0.0 {
             let g = self.gdp_publication();
@@ -2021,6 +2031,7 @@ impl Engine {
             Gated::dial("oil_futures", "futures_oil_listed", p.futures_oil_listed),
             Gated::held("oil_futures_book", "futures_oil_listed", p.futures_oil_listed),
             Gated::dial("margin", "margin_scan_coverage", p.margin_scan_coverage),
+            Gated::dial("oil_target_drift", "oil_target_drift_sd", p.oil_target_drift_sd),
             Gated::when(
                 "buyback_log_shares",
                 self.carries_buyback_log_shares(),
@@ -2159,6 +2170,8 @@ impl Engine {
                 p.unemployment_adjustment_half_life,
             ),
             Gated::dial("gdp_publication", "gdp_publication_lag", p.gdp_publication_lag),
+            Gated::dial("oil_push_level", "oil_pushes_in_target", p.oil_pushes_in_target),
+            Gated::dial("usd_haven_level", "usd_mean_reversion", p.usd_mean_reversion),
         ];
         if let Some(message) = key_mismatch("this snapshot's economy", economy, &required, &gated, &[]) {
             return Err(refuse(message));
@@ -2734,6 +2747,14 @@ impl Engine {
             };
             inner.set_margin_state(words.as_deref()).map_err(core)?;
         }
+        // Oil's long factor (`oil_target_drift_sd`).
+        {
+            let words = match snapshot.get("oil_target_drift") {
+                Some(_) => Some(read_buffer(snapshot, "", "oil_target_drift")?),
+                None => None,
+            };
+            inner.set_oil_drift_state(words.as_deref()).map_err(core)?;
+        }
         inner.set_nominal_output_base(read_finite(snapshot, "", "nominal_output_base")?);
         let variance = read_numbers(snapshot, "", "market_variance")?;
         if variance.len() != 6 || variance.iter().any(|v| !v.is_finite()) {
@@ -2866,6 +2887,12 @@ impl Engine {
         if params.unemployment_adjustment_half_life != 0.0 {
             inner.economy_mut().unemployment_impulse =
                 read_finite(d, "economy.", "unemployment_impulse")?;
+        }
+        if params.oil_pushes_in_target != 0.0 {
+            inner.economy_mut().oil_push_level = read_finite(d, "economy.", "oil_push_level")?;
+        }
+        if params.usd_mean_reversion != 0.0 {
+            inner.economy_mut().usd_haven_level = read_finite(d, "economy.", "usd_haven_level")?;
         }
         let gdp_publication = if params.gdp_publication_lag != 0.0 {
             let block = read_map(d, "economy.", "gdp_publication")?;

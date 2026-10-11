@@ -741,6 +741,19 @@ impl Engine {
         let mut universe_stress = self.universe_stress;
         let mut down = Some(self.market_vol.prev_day_down());
         let (mut var_oil, mut var_inventory) = (0.0, 0.0);
+        // Oil's long factor (`oil_target_drift_sd`): the mean and variance of
+        // its log level, so the step reads the log of the level's
+        // expectation, `m + v / 2`, which stays where it is with no pull.
+        let (mut drift_mean, mut drift_var) = (self.oil_target_drift, 0.0);
+        // `oil_forecast_clamp`: the level carriers' log variance about the
+        // expected path (the long factor's and the dollar's), and the
+        // dollar's own variance, for the clamped expectation the forecast
+        // publishes. Nothing is read with the switch off.
+        let (mut carry_var, mut usd_var) = (0.0f64, 0.0f64);
+        // Under the long factor a bound's truncation moves the factor, so the
+        // expected truncation at one horizon joins the factor's expected path
+        // at the next (`oil_expected_log_truncation`).
+        let (mut absorb_pending, mut absorb_so_far) = (0.0f64, 0.0f64);
         let policy = self.forecast_policy_path(day, horizon);
         let k_curve = intraday_variance_factor();
         // The spread's shape (`forecast_vix_dispersion_skew`), and the stress
@@ -948,10 +961,37 @@ impl Engine {
             // expected safe-haven drift over the VIX's spread.
             let opec_day = econ.oil_last_opec_day;
             let oil_before = econ.oil_price;
-            let mut next = update_economy_daily(&econ, &inputs, &mut crate::economy::daily::MeanDraws);
             let kappa = p.oil_inventory_reversion;
             let sd_before = crate::mathx::sqrt(var_inventory);
-            var_inventory = (1.0 - kappa) * (1.0 - kappa) * var_inventory + 0.25;
+            // Inventory's noise variance a session: the standing 0.25, or
+            // `oil_inventory_noise_sd` squared. A branch, so the shipped
+            // arithmetic is kept to the bit.
+            let inventory_var = if p.oil_inventory_noise_sd == 0.0 {
+                0.25
+            } else {
+                p.oil_inventory_noise_sd * p.oil_inventory_noise_sd
+            };
+            let var_after = (1.0 - kappa) * (1.0 - kappa) * var_inventory + inventory_var;
+            // The convenience premium (`oil_convenience_yield`) is convex in
+            // inventory, so the step reads its expectation over the
+            // inventory's spread, before the step and after it, rather than
+            // its value on the expected path: the expected price is then the
+            // premium-free path times the premium's expectation.
+            if p.oil_convenience_yield != 0.0 {
+                inputs.oil_convenience_inventory_var_before = var_inventory;
+                inputs.oil_convenience_inventory_var = var_after;
+            }
+            if p.oil_target_drift_sd != 0.0 {
+                let sigma = p.oil_target_drift_sd;
+                let pull = 1.0 - p.oil_target_drift_reversion;
+                let before = drift_mean + 0.5 * drift_var;
+                drift_mean = pull * drift_mean - 0.5 * sigma * sigma + absorb_pending;
+                absorb_pending = 0.0;
+                drift_var = pull * pull * drift_var + sigma * sigma;
+                inputs.oil_target_drift = Some((before, drift_mean + 0.5 * drift_var));
+            }
+            let mut next = update_economy_daily(&econ, &inputs, &mut crate::economy::daily::MeanDraws);
+            var_inventory = var_after;
             let sd_inv = crate::mathx::sqrt(var_inventory);
             let gap = |level: f64, sd: f64| {
                 crate::economy::daily::inventory_pressure_expected(level, sd)
@@ -961,24 +1001,40 @@ impl Engine {
             // its expectation over inventory's spread is what the price
             // expects. Under `oil_inventory_level_gain` the step read the
             // change in the pressure, so the gap is the change in the gaps.
-            next.oil_price += if p.oil_inventory_level_gain == 0.0 {
+            let mut pushed = if p.oil_inventory_level_gain == 0.0 {
                 gap(next.oil_inventory_level, sd_inv)
             } else {
                 p.oil_inventory_level_gain
                     * (gap(next.oil_inventory_level, sd_inv) - gap(econ.oil_inventory_level, sd_before))
             };
+            next.oil_price += pushed;
             if next.oil_last_opec_day != opec_day {
-                next.oil_price += crate::economy::daily::opec_expected_impact(
+                let opec = crate::economy::daily::opec_expected_impact(
                     oil_before, crate::mathx::sqrt(var_oil), p.oil_opec_symmetry);
+                next.oil_price += opec;
+                pushed += opec;
+            }
+            // Under `oil_pushes_in_target` the expected pushes join the part
+            // of the price that decays at 0.03, as the step's own do.
+            if p.oil_pushes_in_target != 0.0 {
+                next.oil_push_level += pushed;
             }
             // Oil's own spread about its expectation, for the OPEC rule's
             // expected decision: the law's reversion and noise.
             // A branch, so the standing law keeps its arithmetic to the bit.
-            var_oil = if p.oil_mean_reversion == 0.0 && p.oil_noise_sd == 0.0 {
+            var_oil = if p.oil_mean_reversion == 0.0 && p.oil_noise_sd == 0.0 && p.oil_noise_log_sd == 0.0 {
                 0.97 * 0.97 * var_oil + 4.0
             } else {
                 let keep = if p.oil_mean_reversion == 0.0 { 0.97 } else { 1.0 - p.oil_mean_reversion };
-                let noise = if p.oil_noise_sd == 0.0 { 2.0 } else { p.oil_noise_sd };
+                // Under `oil_noise_log_sd` the noise is a share of the
+                // price, read at the price the step started from.
+                let noise = if p.oil_noise_log_sd != 0.0 {
+                    p.oil_noise_log_sd * oil_before
+                } else if p.oil_noise_sd == 0.0 {
+                    2.0
+                } else {
+                    p.oil_noise_sd
+                };
                 keep * keep * var_oil + noise * noise
             };
             if spread > 0.0 {
@@ -989,14 +1045,65 @@ impl Engine {
                 } else {
                     lognormal_excess(vix, spread, k)
                 };
-                next.usd_index += crate::economy::daily::USD_SAFE_HAVEN_GAIN * (excess - at_mean);
+                let haven = crate::economy::daily::usd_safe_haven_gain(p.usd_safe_haven_gain) * (excess - at_mean);
+                // Under `oil_dollar_elasticity` the law rescales the oil
+                // price's reverting part by the day's whole dollar move, the
+                // bid included, so the expected bid's excess over the bid at
+                // the expected VIX moves oil by the same ratio.
+                if p.oil_dollar_elasticity != 0.0 && next.usd_index > 0.0 {
+                    let push = if p.oil_pushes_in_target != 0.0 { next.oil_push_level } else { 0.0 };
+                    let ratio = crate::mathx::pow((next.usd_index + haven) / next.usd_index, -p.oil_dollar_elasticity);
+                    next.oil_price = (next.oil_price - push) * ratio + push;
+                }
+                next.usd_index += haven;
+                // Under `usd_mean_reversion` the expected bid joins the part of
+                // the dollar that decays at 0.02, as the step's own does.
+                if p.usd_mean_reversion != 0.0 {
+                    next.usd_haven_level += haven;
+                }
             }
             next.vix = vix_next;
             next.federal_funds_rate = rate;
             econ = next;
 
             out.vix.push(self.forecast_published_vix(&shape, econ.vix, stress, stress_sd, step + 1));
-            out.oil.push(econ.oil_price);
+            // `oil_forecast_clamp`: publish the expectation truncated at the
+            // clamps over the price's spread; the recursion keeps stepping
+            // the unclamped expectation, so the clamp is read once.
+            if p.oil_forecast_clamp != 0.0 {
+                let sigma = p.oil_target_drift_sd;
+                let pull = 1.0 - p.oil_target_drift_reversion;
+                carry_var = pull * pull * carry_var + sigma * sigma;
+                // The dollar's own spread, on its law: the standing 0.02 and
+                // 0.3, or `usd_mean_reversion` and `usd_noise_sd`.
+                let usd_keep = 1.0 - if p.usd_mean_reversion == 0.0 { 0.02 } else { p.usd_mean_reversion };
+                let usd_noise = if p.usd_noise_sd == 0.0 { 0.3 } else { p.usd_noise_sd };
+                usd_var = usd_keep * usd_keep * usd_var + usd_noise * usd_noise;
+                let s = econ.oil_price;
+                let kappa_c = p.oil_convenience_yield;
+                let inventory_log_var = var_inventory / (50.0 * 50.0);
+                let log_var = carry_var
+                    + kappa_c * kappa_c * inventory_log_var
+                    + p.oil_dollar_elasticity * p.oil_dollar_elasticity * usd_var / (100.0 * 100.0);
+                let bounds = crate::economy::daily::oil_bounds(p.oil_price_floor, p.oil_price_ceiling);
+                // The price at this horizon rests on a bound it reaches; under
+                // the long factor that truncation then moves the factor, which
+                // the next step's expected path carries.
+                // Read as lognormal: the price's spread is right-skewed. Its log
+                // variance is the short factor's (in dollars, over the price)
+                // and the carriers'. The marginal's expected truncation at a
+                // horizon is the whole of it to that horizon, so the factor's
+                // path takes its change.
+                let log_total = if s > 0.0 { var_oil / (s * s) + log_var } else { 0.0 };
+                if p.oil_target_drift_sd != 0.0 {
+                    let to_here = crate::economy::daily::oil_lognormal_log_truncation(s, log_total, bounds);
+                    absorb_pending = to_here - absorb_so_far;
+                    absorb_so_far = to_here;
+                }
+                out.oil.push(crate::economy::daily::oil_lognormal_censored(s, log_total, bounds));
+            } else {
+                out.oil.push(econ.oil_price);
+            }
 
             // The belief, one session on.
             let mut pred = [0.0; 5];
