@@ -571,6 +571,19 @@ OUT_OF_SCOPE = {
     "fed_rstar_persistence":
         "inert at 0.0 and read only with `fed_rstar_sd` set; at 0.0 it is "
         "also left out of the model's digest",
+    "fed_put_debt_fade":
+        "inert at 0.0: the put's debt is given back at calm meetings as it "
+        "stood (a branch on `== 0.0` in the daily step and the meeting); at "
+        "0.0 it is also left out of the model's digest",
+    "fed_put_giveback_wait":
+        "inert at 0.0: the put gives back with no wait as it stood (a branch "
+        "on `== 0.0` in the meeting), and `fed_put_age` is neither written, "
+        "snapshotted nor hashed; at 0.0 it is also left out of the model's "
+        "digest",
+    "fed_liftoff_unemployment_gap":
+        "inert at 0.0: the lift-off gate is the target plus one point as it "
+        "stood (a branch on `== 0.0` in the meeting); at 0.0 it is also left "
+        "out of the model's digest",
     "fed_neutral_real_rate":
         "inert at 0.0: the Taylor rule's neutral is the one that stood (a "
         "branch on `== 0.0` in the meeting); at 0.0 it is also left out of "

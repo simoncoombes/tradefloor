@@ -9038,6 +9038,18 @@ impl Engine {
             }
             self.economy.fed_put_mcap_prev = mcap;
             self.economy.fed_put *= crate::mathx::pow(0.5, 1.0 / self.params.fed_put_half_life);
+            // THE GIVE-BACK'S CLOCK (`fed_put_giveback_wait`): one session
+            // more since the put's last cut. Nothing runs with the dial at 0.0.
+            if self.params.fed_put_giveback_wait != 0.0 {
+                self.economy.fed_put_age = crate::mathx::min(self.economy.fed_put_age + 1.0, 1.0e6);
+            }
+            // THE DEBT'S FADE (`fed_put_debt_fade`): a session's share of the
+            // monthly pace leaves the debt the rule reads, never below zero.
+            // Nothing runs with the dial at 0.0.
+            if self.params.fed_put_debt_fade != 0.0 {
+                self.economy.fed_put_owed =
+                    crate::mathx::max(0.0, self.economy.fed_put_owed - self.params.fed_put_debt_fade / 21.0);
+            }
         }
 
         // THE DRAWDOWN'S WINDOW (`fed_drawdown_hold`), before tonight's
@@ -9437,6 +9449,9 @@ impl Engine {
             zlb_path: self.priced_zlb_path(),
             zlb_haven_gain: self.params.treasury_zlb_haven_gain,
             neutral_real_rate: self.params.fed_neutral_real_rate + self.rstar_dev,
+            giveback_wait: self.params.fed_put_giveback_wait,
+            liftoff_gap: self.params.fed_liftoff_unemployment_gap,
+            debt_fade: self.params.fed_put_debt_fade,
         }
     }
 
@@ -13016,6 +13031,10 @@ impl Engine {
         // The put's unmet asks, only while `treasury_zlb_path` is set.
         if self.params.treasury_zlb_path != 0.0 {
             hash_f64(&mut buf, e.zlb_unmet);
+        }
+        // The give-back's clock, only while `fed_put_giveback_wait` is set.
+        if self.params.fed_put_giveback_wait != 0.0 {
+            hash_f64(&mut buf, e.fed_put_age);
         }
         // The published GDP growth figure's state, only while
         // `gdp_publication_lag` is set, so every other engine's hash is the
