@@ -1143,6 +1143,15 @@ def _nothing_dormant():
                    treasury_zlb_haven_gain=0.05,
                    # The Taylor rule's neutral real rate (HLW, 1990-2025).
                    fed_neutral_real_rate=2.0,
+                   # The 2-year's carry through a meeting (a share).
+                   treasury_2y_meeting_carry=1.0,
+                   # The priced meeting's half-life (policy_anticipation is
+                   # on above), in sessions.
+                   policy_anticipation_half_life=10.0,
+                   # The anticipated path (a switch; the path is on above).
+                   treasury_path_anticipated=1.0,
+                   # The Fed's guidance (a share; the anticipation is on).
+                   policy_anticipation_guidance=0.5,
                    oil_price_floor=16.4,
                    oil_price_ceiling=279.0,
                    # The contracts' margin (pt-v22 phase 1).

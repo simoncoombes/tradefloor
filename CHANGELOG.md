@@ -125,6 +125,26 @@ same with them on as off.
   `usd_crisis_vix_threshold` (0.0 the standing 0.05), read by the dollar's
   step and by the forecast's expected bid. FRED DTWEXM against CBOE's VIX
   measures 0.001.
+- `policy_anticipation_guidance` is a new dial, 0.0 on every preset and left
+  out of the digest there: the share of the anticipated meeting's priced
+  change taken from the decision the Fed's own reading implies rather than
+  the published economy's. The tape's policy surprise at scheduled FOMC
+  announcements has an sd of 4.8 bp (Bauer and Swanson 2022).
+- `treasury_path_anticipated` is a new switch, 0.0 on every preset and left
+  out of the digest there: at 1 a meeting moves the priced policy path by
+  the further move the anticipated meeting priced, not by the rate's change,
+  so a rate surprise reaches the curve once.
+- `policy_anticipation_half_life` is a new dial, 0.0 on every preset and left
+  out of the digest there: between meetings the anticipated meeting's priced
+  change moves toward the shadow meeting's at this half-life, in sessions,
+  rather than jumping to it each close. DGS2 off the zero bound: FOMC days
+  carry 0.046 of the variance, the other days' sd is 6.16 bp.
+- `treasury_2y_meeting_carry` is a new dial, 0.0 on every preset and left
+  out of the digest there: the share of the 2-year's standing gap to the
+  meeting's formula (`0.85 (ff + path) + 0.15 x 10y`) that a meeting keeps.
+  At 1.0 the meeting moves the 2-year by 0.85 of the decision's news and
+  0.15 of the 10-year's move instead of resetting it. FOMC days carry 0.046
+  of DGS2's daily variance off the zero bound (1994-2025).
 - `fed_neutral_real_rate` is a new dial, 0.0 on every preset and left out of
   the digest there: points added to the neutral rate of the central bank's
   Taylor rule, whose neutral at target is a nominal 2.0 (a real rate of 0).

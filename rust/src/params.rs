@@ -1182,6 +1182,75 @@ pub struct ModelParams {
     /// economy's own real-rate term (inflation's suppression above a real
     /// rate of 0) is not moved. In [-2, 5].
     pub fed_neutral_real_rate: f64,
+    /// The share of the 2-year's standing gap to the meeting's formula that a
+    /// central-bank meeting keeps. 0.0, on every shipped preset, is the
+    /// meeting as it stood, and a value of 0.0 is left out of the model's
+    /// digest.
+    ///
+    /// The meeting sets the 2-year to `0.85 (ff + path) + 0.15 x 10y` (the JS
+    /// blend). Between meetings, with `treasury_2y_noise` on, the 2-year is
+    /// its own process pulled toward a formula that also prices the
+    /// anticipated decision, the put and the zero bound's path, so the reset
+    /// throws its standing gap away: off the bound on R22O5czN, meeting days
+    /// are 3% of sessions and carry 41% of the 2-year's variance. Off zero
+    /// the meeting's 2-year is `legacy + c (carried - legacy)`, with
+    /// `carried` the 2-year before the meeting moved by 0.85 of the
+    /// decision's news (the rate change, the put share the curve had priced
+    /// and the priced path's move, undamped) and 0.15 of the 10-year's move,
+    /// and the anticipated meeting's books carry what the 2-year keeps. The
+    /// anchor is the scheduled FOMC days' share of DGS2's daily variance off
+    /// the zero bound, 1994-2025: 0.046 (se 0.006) on 0.031 of sessions. In
+    /// [0, 1].
+    pub treasury_2y_meeting_carry: f64,
+    /// The half-life, in sessions, at which the curve's priced change for the
+    /// next meeting (`policy_anticipation`) moves toward the shadow meeting's
+    /// change between meetings. 0.0, on every shipped preset, is off: the
+    /// priced change is the shadow's every close, as it stood, and a value of
+    /// 0.0 is left out of the model's digest.
+    ///
+    /// The shadow meeting is one decision on thresholds, re-taken each close,
+    /// so it switches from close to close; at `policy_anticipation_cut_share`
+    /// 1 each switch moved the 2-year (other-day sd 9.8 bp against DGS2's 6.2
+    /// off the zero bound) and the meeting's eve priced one draw of it. Off
+    /// zero the priced change `P` moves toward `a w S` at `1 - 0.5^(1/H)` a
+    /// close, an average of the shadow's recent decisions; a meeting's close
+    /// sets it as it stood. No new state: `P` is already snapshotted and
+    /// hashed. Anchored on the scheduled FOMC days' share of DGS2's variance
+    /// (0.046) and its other days' sd (6.16 bp), 1994-2025 off the zero bound
+    /// (design PR #9, rates/RULE.md addendum C). In [0, 252].
+    pub policy_anticipation_half_life: f64,
+    /// A switch: 1.0 moves the priced policy path (`treasury_path_pricing`)
+    /// at a meeting by the further move the anticipated meeting priced
+    /// (`policy_anticipation` a: `P (a - 1) / a` of the eve's priced change
+    /// `P`) instead of by the rate's change. 0.0, on every shipped preset,
+    /// is the step that stood, and a value of 0.0 is left out of the model's
+    /// digest.
+    ///
+    /// The step put a rate surprise into the curve twice, through the rate
+    /// and again through the path (sd 20 bp at the step on R22O5czN, the 2-
+    /// year's meeting-day move 0.99 to 1.35 times the surprise). Off zero the
+    /// path moves with the anticipation and a surprise reaches the curve once.
+    /// Checked on the meeting-day 2-year move against DGS2's on scheduled
+    /// FOMC days off the zero bound, 1994-2025 (sd 7.1 bp). 0 or 1.
+    pub treasury_path_anticipated: f64,
+    /// The share of the anticipated meeting's priced change (`policy_
+    /// anticipation`) the market takes from the decision the Fed's own
+    /// reading implies, rather than from the published economy. 0.0, on
+    /// every shipped preset, prices the published shadow alone, as it stood,
+    /// and a value of 0.0 is left out of the model's digest.
+    ///
+    /// The meeting reads the true phase, growth and VIX; the shadow the
+    /// market prices reads the published ones, which differ on 48% of
+    /// meeting eves on R22O5czN, so the decision's surprise against the eve's
+    /// priced change has an sd of about 21 bp. Since 1994 the FOMC announces
+    /// its decisions and assessment, and the tape's surprise is small: the
+    /// current-quarter Eurodollar futures move in the 30-minute window of a
+    /// scheduled announcement, off the zero bound, has an sd of 4.8 bp
+    /// 1994-2019 (5.0 before 2008, 4.2 after; Bauer and Swanson, NBER
+    /// Macroeconomics Annual 2022). Off zero the shadow's change is
+    /// `(1 - q) S(published) + q S(the meeting's own economy)`, both silent
+    /// shadows. In [0, 1].
+    pub policy_anticipation_guidance: f64,
     /// The oil price's lower and upper bounds, dollars. 0.0, on every shipped
     /// preset, is the standing 35 and 150, and a value of 0.0 is left out of
     /// the model's digest.
@@ -8048,6 +8117,10 @@ impl ModelParams {
             treasury_zlb_path: 0.0,
             treasury_zlb_haven_gain: 0.0,
             fed_neutral_real_rate: 0.0,
+            treasury_2y_meeting_carry: 0.0,
+            policy_anticipation_half_life: 0.0,
+            treasury_path_anticipated: 0.0,
+            policy_anticipation_guidance: 0.0,
             oil_price_floor: 0.0,
             oil_price_ceiling: 0.0,
             oil_target_drift_reversion: 0.0,
@@ -10680,6 +10753,10 @@ impl ModelParams {
             "treasury_zlb_path" => self.treasury_zlb_path,
             "treasury_zlb_haven_gain" => self.treasury_zlb_haven_gain,
             "fed_neutral_real_rate" => self.fed_neutral_real_rate,
+            "treasury_2y_meeting_carry" => self.treasury_2y_meeting_carry,
+            "policy_anticipation_half_life" => self.policy_anticipation_half_life,
+            "treasury_path_anticipated" => self.treasury_path_anticipated,
+            "policy_anticipation_guidance" => self.policy_anticipation_guidance,
             "oil_price_floor" => self.oil_price_floor,
             "oil_price_ceiling" => self.oil_price_ceiling,
             "oil_target_drift_reversion" => self.oil_target_drift_reversion,
@@ -11077,6 +11154,10 @@ impl ModelParams {
             "treasury_zlb_path" => out.treasury_zlb_path = value,
             "treasury_zlb_haven_gain" => out.treasury_zlb_haven_gain = value,
             "fed_neutral_real_rate" => out.fed_neutral_real_rate = value,
+            "treasury_2y_meeting_carry" => out.treasury_2y_meeting_carry = value,
+            "policy_anticipation_half_life" => out.policy_anticipation_half_life = value,
+            "treasury_path_anticipated" => out.treasury_path_anticipated = value,
+            "policy_anticipation_guidance" => out.policy_anticipation_guidance = value,
             "oil_price_floor" => out.oil_price_floor = value,
             "oil_price_ceiling" => out.oil_price_ceiling = value,
             "oil_target_drift_reversion" => out.oil_target_drift_reversion = value,
@@ -12519,6 +12600,32 @@ impl ModelParams {
                  20 at the zero bound, in [0, 1].",
                 self.treasury_zlb_haven_gain));
         }
+        if !(0.0..=1.0).contains(&self.policy_anticipation_guidance) {
+            return Err(format!(
+                "policy_anticipation_guidance is {}. It is the share of the priced change the \
+                 market takes from the Fed's own reading, in [0, 1]; 0 prices the published \
+                 shadow alone.",
+                self.policy_anticipation_guidance));
+        }
+        if !(self.treasury_path_anticipated == 0.0 || self.treasury_path_anticipated == 1.0) {
+            return Err(format!(
+                "treasury_path_anticipated is {}. It is a switch: 0 (the meeting steps the priced \
+                 path by the rate's change) or 1 (by the further move the anticipation priced).",
+                self.treasury_path_anticipated));
+        }
+        if !(0.0..=252.0).contains(&self.policy_anticipation_half_life) {
+            return Err(format!(
+                "policy_anticipation_half_life is {}. It is the half-life, in sessions, of the \
+                 priced change for the next meeting between meetings, in [0, 252]; 0 is the \
+                 shadow's change every close, as it stood.",
+                self.policy_anticipation_half_life));
+        }
+        if !(0.0..=1.0).contains(&self.treasury_2y_meeting_carry) {
+            return Err(format!(
+                "treasury_2y_meeting_carry is {}. It is the share of the 2-year's standing gap to \
+                 the meeting's formula a meeting keeps, in [0, 1]; 0 is the reset that stood.",
+                self.treasury_2y_meeting_carry));
+        }
         if !(-2.0..=5.0).contains(&self.fed_neutral_real_rate) {
             return Err(format!(
                 "fed_neutral_real_rate is {}. It is the points added to the Taylor rule's neutral \
@@ -13230,6 +13337,10 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "treasury_zlb_path",
     "treasury_zlb_haven_gain",
     "fed_neutral_real_rate",
+    "treasury_2y_meeting_carry",
+    "policy_anticipation_half_life",
+    "treasury_path_anticipated",
+    "policy_anticipation_guidance",
     "oil_price_floor",
     "oil_price_ceiling",
     "oil_inflation_passthrough",
@@ -13446,6 +13557,10 @@ pub fn settable_names() -> Vec<&'static str> {
         "treasury_zlb_path",
         "treasury_zlb_haven_gain",
         "fed_neutral_real_rate",
+        "treasury_2y_meeting_carry",
+        "policy_anticipation_half_life",
+        "treasury_path_anticipated",
+        "policy_anticipation_guidance",
         "oil_price_floor",
         "oil_price_ceiling",
         "oil_inflation_passthrough",

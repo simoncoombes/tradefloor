@@ -9298,8 +9298,10 @@ impl Engine {
             } else {
                 0.0
             };
-            self.policy_path +=
-                meeting.economy.federal_funds_rate - self.economy.federal_funds_rate + owed;
+            self.policy_path += match self.anticipated_path_carry() {
+                Some(carry) => carry,
+                None => meeting.economy.federal_funds_rate - self.economy.federal_funds_rate,
+            } + owed;
         }
         let decision = meeting.decision;
         let announcement_variant = meeting.announcement_variant;
@@ -9421,6 +9423,8 @@ impl Engine {
             zlb_path: self.priced_zlb_path(),
             zlb_haven_gain: self.params.treasury_zlb_haven_gain,
             neutral_real_rate: self.params.fed_neutral_real_rate,
+            two_year_carry: self.params.treasury_2y_meeting_carry,
+            path_carry: self.anticipated_path_carry(),
         }
     }
 
@@ -10911,6 +10915,22 @@ impl Engine {
         }
     }
 
+    /// THE ANTICIPATED PATH (`treasury_path_anticipated`): what a meeting
+    /// tonight moves the priced path by, the part of the eve's priced change
+    /// beyond the next decision, `P (a - 1) / a`, with `a` the anticipation.
+    /// `None` with the switch off: the meeting steps the path by the rate's
+    /// change, as it stood.
+    fn anticipated_path_carry(&self) -> Option<f64> {
+        if self.params.treasury_path_anticipated == 0.0 {
+            None
+        } else if self.params.policy_anticipation == 0.0 {
+            Some(0.0)
+        } else {
+            let a = self.params.policy_anticipation;
+            Some(self.policy_anticipation_priced * (a - 1.0) / a)
+        }
+    }
+
     /// The next decision the curve prices tonight (`policy_anticipation`),
     /// percentage points, signed. 0.0 with the dial off.
     fn priced_anticipation(&self) -> f64 {
@@ -10949,7 +10969,20 @@ impl Engine {
             ..*options
         };
         let shadow = update_central_bank_with(&cb, &economy, request.timestamp, &mut Silent, &options);
-        shadow.economy.federal_funds_rate - self.economy.federal_funds_rate
+        let published = shadow.economy.federal_funds_rate - self.economy.federal_funds_rate;
+        // THE FED'S GUIDANCE (`policy_anticipation_guidance` q): the market
+        // prices q of the decision the Fed's own reading (the economy the
+        // meeting reads) implies, and 1 - q of the published one's. A second
+        // silent shadow, no draw. A branch: at 0.0 the change is the
+        // published shadow's, as it stood.
+        let q = self.params.policy_anticipation_guidance;
+        if q != 0.0 {
+            let own = update_central_bank_with(&cb, &self.economy, request.timestamp, &mut Silent, &options);
+            let own = own.economy.federal_funds_rate - self.economy.federal_funds_rate;
+            (1.0 - q) * published + q * own
+        } else {
+            published
+        }
     }
 
     /// `policy_anticipation` at the close: `P = a w S`, with `S` the shadow
@@ -10982,10 +11015,30 @@ impl Engine {
         };
         let priced = a * w * change;
         let before = self.policy_anticipation_priced;
+        // THE PRICED PATH'S MEMORY (`policy_anticipation_half_life`): between
+        // meetings the priced change moves toward the shadow's at the dial's
+        // half-life, an average of the closes the market has seen rather than
+        // the last one; a meeting's close sets it. A branch: at 0.0 the priced
+        // change is the shadow's, as it stood.
+        let h = self.params.policy_anticipation_half_life;
+        let priced = if h != 0.0 && !meeting_held {
+            before + (1.0 - crate::mathx::pow(0.5, 1.0 / h)) * (priced - before)
+        } else {
+            priced
+        };
         self.policy_anticipation_priced = priced;
         let f10 = 1.0 - self.params.treasury_policy_damping;
         let f2 = 0.85 + 0.15 * f10;
-        let (held10, held2) = if meeting_held { (0.5 * f10 * before, 0.075 * f10 * before) } else { (f10 * before, f2 * before) };
+        // A meeting that keeps the 2-year's gap (`treasury_2y_meeting_carry`
+        // c) leaves it holding `0.85 c` of the anticipation besides the 10-
+        // year's share. A branch: at 0.0 the held part is as it stood.
+        let carry = self.params.treasury_2y_meeting_carry;
+        let held2_meeting = if carry != 0.0 {
+            0.075 * f10 * before + 0.85 * carry * before
+        } else {
+            0.075 * f10 * before
+        };
+        let (held10, held2) = if meeting_held { (0.5 * f10 * before, held2_meeting) } else { (f10 * before, f2 * before) };
         let (d10, d2) = (f10 * priced - held10, f2 * priced - held2);
         let e = &mut self.economy;
         if pins_today & PIN_T10 == 0 {
