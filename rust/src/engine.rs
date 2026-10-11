@@ -460,6 +460,26 @@ impl<'a> TickRequest<'a> {
     }
 }
 
+/// The inputs of the index variance read-back that do not move with the
+/// factor's variance or the lagged wire (`Engine::index_variance_parts`).
+struct IndexVarianceParts {
+    names: Vec<crate::market::index_var::NameVariance>,
+    sigmas: Vec<f64>,
+    excitations: Vec<f64>,
+    idio_ratios: Vec<f64>,
+    rate_scale: f64,
+    crisis_spike: f64,
+}
+
+/// One roster slot's earnings calendar for a tick
+/// (`Engine::earnings_calendar_now`).
+#[derive(Clone, Copy)]
+struct EarningsCalendarSlot {
+    name: u64,
+    today: Option<i64>,
+    yesterday: Option<i64>,
+}
+
 /// What one tick produced.
 #[non_exhaustive]
 #[derive(Debug, Clone, PartialEq)]
@@ -3711,6 +3731,18 @@ impl Engine {
         prev_day_down: bool,
         garch: Option<&[f64]>,
     ) -> crate::market::index_var::IndexVarianceTerms {
+        let parts = self.index_variance_parts(garch);
+        self.index_variance_terms_from(&parts, factor_variance, prev_day_down)
+    }
+
+    /// Everything [`Self::index_conditional_variance_terms_with`] reads
+    /// that is not the factor's variance or the lagged wire's bit: the
+    /// names, the per-sector sigmas, the excitations, the own-variance
+    /// ratios and the two VIX-driven scalars. A projection of the close
+    /// (`expected_close`) reads the identity at eight factor states on one
+    /// standing state, so it builds these once and hands them to every
+    /// node; each is the same value each node would have built.
+    fn index_variance_parts(&self, garch: Option<&[f64]>) -> IndexVarianceParts {
         let names = self.index_variance_names_with(garch);
         let sector_sigma = crate::market::tick::sector_sigma_at(
             &self.params, &self.economy, self.vix_anchor);
@@ -3733,16 +3765,28 @@ impl Engine {
         };
         let excitations = self.index_variance_excitations();
         let idio_ratios = self.index_variance_idio_ratios();
+        IndexVarianceParts { names, sigmas, excitations, idio_ratios, rate_scale, crisis_spike }
+    }
+
+    /// The identity's terms from `parts` ([`Self::index_variance_parts`])
+    /// at the factor's variance `factor_variance` and the lagged wire's
+    /// `prev_day_down`.
+    fn index_variance_terms_from(
+        &self,
+        parts: &IndexVarianceParts,
+        factor_variance: f64,
+        prev_day_down: bool,
+    ) -> crate::market::index_var::IndexVarianceTerms {
         crate::market::index_var::index_conditional_variance_terms_with_states(
             &self.params,
-            &names,
+            &parts.names,
             self.sector_keys.len(),
             factor_variance,
-            &sigmas,
-            &excitations,
-            &idio_ratios,
-            rate_scale,
-            crisis_spike,
+            &parts.sigmas,
+            &parts.excitations,
+            &parts.idio_ratios,
+            parts.rate_scale,
+            parts.crisis_spike,
             // THE LAGGED TRANSMISSION WIRE, and the timing is the point.
             // `close_day_at` has already rolled `day_factor` into
             // `prev_day_factor`, so this bit is the one TOMORROW's ticks
@@ -4750,13 +4794,16 @@ impl Engine {
         // The reaction session's discovery and the follow-through, this
         // minute's step into fair value, before the tick prices it. Off the
         // calendar nothing runs.
+        // The calendar's answers for this tick, read by both below (each
+        // asked it the same questions on its own before).
+        let calendar = self.earnings_calendar_now();
         if open_now && self.carries_earnings() {
-            self.walk_earnings_sessions(request.time);
+            self.walk_earnings_sessions(request.time, &calendar);
         }
         // Recomputed from the calendar every tick rather than kept, so a
         // fork taken mid-session needs nothing beyond the key. Empty off the
         // calendar.
-        let earnings_volume = self.earnings_volume_column();
+        let earnings_volume = self.earnings_volume_column(&calendar);
 
         // The per-name idiosyncratic variance ratios, one per roster slot,
         // or EMPTY while the state is off, in which case the tick multiplies
@@ -7406,18 +7453,38 @@ impl Engine {
     /// multiple its volume trades at if so (`earnings_volume_multiple`).
     /// EMPTY with the calendar off or no multiple set, which the tick reads
     /// as no multiple.
-    fn earnings_volume_column(&self) -> Vec<f64> {
+    fn earnings_volume_column(&self, calendar: &[EarningsCalendarSlot]) -> Vec<f64> {
         let m = self.params.earnings_volume_multiple;
         if !self.carries_earnings() || m == 0.0 || m == 1.0 {
             return Vec::new();
         }
+        calendar
+            .iter()
+            .map(|slot| match slot.today {
+                Some(_) => m,
+                None => 1.0,
+            })
+            .collect()
+    }
+
+    /// The earnings calendar as a tick reads it, one entry per roster slot:
+    /// the id's hash and the quarter the name reacts to a report of today
+    /// and (under the follow-through) yesterday, each by
+    /// `earnings::reacts_on`. Empty off the calendar.
+    fn earnings_calendar_now(&self) -> Vec<EarningsCalendarSlot> {
+        if !self.carries_earnings() {
+            return Vec::new();
+        }
+        let (key, day) = (self.earnings_key, self.elapsed_days);
+        let follow = self.params.earnings_followthrough_sigma != 0.0;
         self.companies
             .iter()
             .map(|c| {
-                let h = crate::earnings::id_hash(&c.id);
-                match crate::earnings::reacts_on(self.earnings_key, h, self.elapsed_days) {
-                    Some(_) => m,
-                    None => 1.0,
+                let name = crate::earnings::id_hash(&c.id);
+                EarningsCalendarSlot {
+                    name,
+                    today: crate::earnings::reacts_on(key, name, day),
+                    yesterday: if follow { crate::earnings::reacts_on(key, name, day - 1) } else { None },
                 }
             })
             .collect()
@@ -7504,7 +7571,7 @@ impl Engine {
     /// fair-value levels (both already carried with the calendar on) is
     /// state. Called only on an open minute with the calendar on and a part
     /// set.
-    fn walk_earnings_sessions(&mut self, time: GameTime) {
+    fn walk_earnings_sessions(&mut self, time: GameTime, calendar: &[EarningsCalendarSlot]) {
         let p = &self.params;
         let (ss, sf) = (p.earnings_session_sigma, p.earnings_followthrough_sigma);
         if ss == 0.0 && sf == 0.0 {
@@ -7520,23 +7587,22 @@ impl Engine {
             / crate::mathx::sqrt(
                 MINUTES as f64 * crate::market::index_var::intraday_variance_factor());
         let key = self.earnings_key;
-        let day = self.elapsed_days;
         let mut moves: Vec<(usize, f64)> = Vec::new();
-        for (i, c) in self.companies.iter().enumerate() {
+        for ((i, c), slot) in self.companies.iter().enumerate().zip(calendar) {
             if c.is_bankrupt || !c.is_public || c.stock.mispricing_s.is_none() {
                 continue;
             }
-            let name = crate::earnings::id_hash(&c.id);
+            let name = slot.name;
             let mut sd2 = 0.0;
             let mut u = 0.0;
             if ss != 0.0 {
-                if let Some(q) = crate::earnings::reacts_on(key, name, day) {
+                if let Some(q) = slot.today {
                     u += ss * crate::earnings::session_unit(key, name, q, minute);
                     sd2 += ss * ss;
                 }
             }
             if sf != 0.0 {
-                if let Some(q) = crate::earnings::reacts_on(key, name, day - 1) {
+                if let Some(q) = slot.yesterday {
                     u += sf * crate::earnings::followthrough_unit(key, name, q, minute);
                     sd2 += sf * sf;
                 }
@@ -11102,7 +11168,7 @@ impl Engine {
         &self,
         session_pct: f64,
         mv: MarketVarianceState,
-        garch: &[f64],
+        parts: Option<&IndexVarianceParts>,
         yields: bool,
     ) -> [f64; 4] {
         let mut mv = mv;
@@ -11140,11 +11206,9 @@ impl Engine {
             }
         };
         let _ = mv.close_day_scaled(&self.params, denominator, self.economy.vix, level);
-        let index_variance = if self.params.vix_level_identity == 0.0 {
-            0.0
-        } else {
-            let g = if garch.is_empty() { None } else { Some(garch) };
-            self.index_conditional_variance_terms_with(mv.variance(), mv.prev_day_down(), g).total()
+        let index_variance = match parts {
+            None => 0.0,
+            Some(parts) => self.index_variance_terms_from(parts, mv.variance(), mv.prev_day_down()).total(),
         };
         // The anchor's slow memory and the published VIX's stress memory, as
         // `advance_day_with` steps them before the economy's step.
@@ -11232,10 +11296,18 @@ impl Engine {
         } else {
             Vec::new()
         };
+        // The identity's node-invariant inputs, built once for the nodes
+        // below (`Self::index_variance_parts`); `None` off the identity,
+        // where the projection reads no index variance.
+        let parts = if self.params.vix_level_identity == 0.0 {
+            None
+        } else {
+            Some(self.index_variance_parts(if garch.is_empty() { None } else { Some(&garch) }))
+        };
         let sd_factor = crate::mathx::sqrt(crate::mathx::max(0.0, self.market_vol.variance() * remaining));
         if !(sd_factor > 0.0) {
             return self.projected_close(
-                session_pct, self.market_vol.with_day_factor(day_factor), &garch, yields);
+                session_pct, self.market_vol.with_day_factor(day_factor), parts.as_ref(), yields);
         }
         let sd_index = crate::mathx::sqrt(crate::mathx::max(
             0.0, self.index_conditional_variance_terms_now().total() * remaining));
@@ -11244,7 +11316,7 @@ impl Engine {
             let y = self.projected_close(
                 session_pct + 100.0 * z * sd_index,
                 self.market_vol.with_day_factor(day_factor + z * sd_factor),
-                &garch,
+                parts.as_ref(),
                 yields,
             );
             for (o, v) in out.iter_mut().zip(y.iter()) {
@@ -13755,35 +13827,52 @@ impl SessionBuffer {
     }
 
     fn write_tick(&mut self, tick: usize, companies: &[TickCompany], truth: &TickTruth<'_>) {
+        // Column by column over the tick's contiguous cross-section: the same
+        // values into the same slots as an element-wise walk, without a
+        // bounds check and an `Option` per element per column. A truth
+        // column shorter than the roster leaves the rest at its default.
         let base = tick * self.companies;
-        for (i, c) in companies.iter().enumerate() {
-            self.prices[base + i] = c.stock.price;
-            self.volumes[base + i] = c.stock.volume;
-            // NaN for a company that has never ticked — a column cannot carry
-            // `None`, and zero would be a real mispricing.
-            self.mispricing_s[base + i] = c.stock.mispricing_s.unwrap_or(f64::NAN);
-            self.fundamental[base + i] = truth.fundamental.get(i).copied().unwrap_or(f64::NAN);
-            self.anchor[base + i] = truth.anchor.get(i).copied().unwrap_or(f64::NAN);
-            self.shock[base + i] = truth.shock.get(i).copied().unwrap_or(0.0);
-            self.absorbed[base + i] = truth.absorbed.get(i).copied().unwrap_or(0.0);
-            self.clamp[base + i] = truth.clamp.get(i).copied().unwrap_or(0.0);
-            self.repriced[base + i] = truth.repriced.get(i).copied().unwrap_or(0.0);
-            // Guarded on the buffer rather than on the source: a session that
-            // sized these columns and then met an engine with the arm off
-            // would otherwise write NaN into a column it had promised.
-            if !self.unbounded_print.is_empty() {
-                self.unbounded_print[base + i] = truth
-                    .unbounded_print
-                    .get(i)
-                    .copied()
-                    .unwrap_or(c.stock.price);
-                self.liquidity_share[base + i] =
-                    truth.liquidity_share.get(i).copied().unwrap_or(0.0);
+        let n = companies.len();
+        let span = base..base + n;
+        for (d, c) in self.prices[span.clone()].iter_mut().zip(companies) {
+            *d = c.stock.price;
+        }
+        for (d, c) in self.volumes[span.clone()].iter_mut().zip(companies) {
+            *d = c.stock.volume;
+        }
+        // NaN for a company that has never ticked — a column cannot carry
+        // `None`, and zero would be a real mispricing.
+        for (d, c) in self.mispricing_s[span.clone()].iter_mut().zip(companies) {
+            *d = c.stock.mispricing_s.unwrap_or(f64::NAN);
+        }
+        fn fill(dst: &mut [f64], src: &[f64], default: f64) {
+            let m = std::cmp::min(src.len(), dst.len());
+            dst[..m].copy_from_slice(&src[..m]);
+            dst[m..].fill(default);
+        }
+        fill(&mut self.fundamental[span.clone()], truth.fundamental, f64::NAN);
+        fill(&mut self.anchor[span.clone()], truth.anchor, f64::NAN);
+        fill(&mut self.shock[span.clone()], truth.shock, 0.0);
+        fill(&mut self.absorbed[span.clone()], truth.absorbed, 0.0);
+        fill(&mut self.clamp[span.clone()], truth.clamp, 0.0);
+        fill(&mut self.repriced[span.clone()], truth.repriced, 0.0);
+        // Guarded on the buffer rather than on the source: a session that
+        // sized these columns and then met an engine with the arm off
+        // would otherwise write NaN into a column it had promised.
+        if !self.unbounded_print.is_empty() {
+            let dst = &mut self.unbounded_print[span.clone()];
+            for (i, (d, c)) in dst.iter_mut().zip(companies).enumerate() {
+                *d = truth.unbounded_print.get(i).copied().unwrap_or(c.stock.price);
             }
-            let row = truth.components.get(i).copied().unwrap_or([0.0; crate::market::factors::TICK_COMPONENT_COUNT]);
-            for (k, column) in self.components.iter_mut().enumerate() {
-                column[base + i] = row[k];
+            fill(&mut self.liquidity_share[span.clone()], truth.liquidity_share, 0.0);
+        }
+        let rows = &truth.components[..std::cmp::min(truth.components.len(), n)];
+        for (k, column) in self.components.iter_mut().enumerate() {
+            let dst = &mut column[span.clone()];
+            for (d, row) in dst.iter_mut().zip(rows) {
+                *d = row[k];
             }
+            dst[rows.len()..].fill(0.0);
         }
     }
 

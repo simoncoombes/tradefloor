@@ -390,8 +390,23 @@ fn slow_step(
 /// The return memory's per-session carry, `0.5^(1 / half_life)`. Read only
 /// while `market_vol_leverage` is set, where validation holds the half-life
 /// positive.
+///
+/// A pure function of one dial, read twice a close and on every node of a
+/// projection, so the last answer is kept per thread against the dial's
+/// exact bits and a repeat returns it.
 fn leverage_phi(params: &crate::params::ModelParams) -> f64 {
-    mathx::pow(0.5, 1.0 / params.market_vol_leverage_half_life)
+    std::thread_local! {
+        static LAST: std::cell::Cell<Option<(u64, f64)>> = const { std::cell::Cell::new(None) };
+    }
+    let key = params.market_vol_leverage_half_life.to_bits();
+    if let Some((k, phi)) = LAST.with(|m| m.get()) {
+        if k == key {
+            return phi;
+        }
+    }
+    let phi = mathx::pow(0.5, 1.0 / params.market_vol_leverage_half_life);
+    LAST.with(|m| m.set(Some((key, phi))));
+    phi
 }
 
 /// The shared clamp: a variance stays inside its floor and ceiling
@@ -411,7 +426,34 @@ fn clamp_variance(params: &crate::params::ModelParams, v: f64) -> f64 {
 /// Round 100: along the real covid path the square is too convex through
 /// mid-VIX, and the exponent (with the coupling re-fit to preserve the
 /// held-VIX ratio) is the shape the driven window asks for.
+///
+/// A pure function of the ratio and the two exponent dials. A close reads it
+/// twice at one ratio, and a projection of the close once on each of its
+/// nodes at one ratio, so the last answer is kept per thread against the
+/// exact bits of all three and a repeat returns it.
 pub(crate) fn vix_response(params: &crate::params::ModelParams, vix_ratio: f64) -> f64 {
+    std::thread_local! {
+        static LAST: std::cell::Cell<Option<([u64; 3], f64)>> = const { std::cell::Cell::new(None) };
+    }
+    let key = [
+        vix_ratio.to_bits(),
+        params.market_vol_vix_exponent.to_bits(),
+        params.market_vol_vix_exponent_below.to_bits(),
+    ];
+    if let Some((k, value)) = LAST.with(|m| m.get()) {
+        if k == key {
+            return value;
+        }
+    }
+    let value = vix_response_uncached(params, vix_ratio);
+    LAST.with(|m| m.set(Some((key, value))));
+    value
+}
+
+/// [`vix_response`] without the memo, for a caller that asks it at a new
+/// ratio every time (an expectation over the VIX's spread), where a memo
+/// would only cost.
+pub(crate) fn vix_response_uncached(params: &crate::params::ModelParams, vix_ratio: f64) -> f64 {
     // The calm side's own exponent. Guarded, so at 0.0 -- every preset --
     // this branch is never taken and the arithmetic below is unchanged to
     // the bit. See `ModelParams::market_vol_vix_exponent_below`.

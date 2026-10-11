@@ -71,7 +71,28 @@ const GAUSS_HERMITE_40_HALF: [(f64, f64); 20] = [
 /// rule is the skew. Its tails stay normal, so every power of the VIX the
 /// forecast takes an expectation of stays finite; its skewness reaches
 /// about 0.99.
+///
+/// A pure function of the skew dial, and its bisection is sixty rounds over
+/// the forty nodes, so it is computed once per thread for the skew last
+/// asked for (against its exact bits) and a repeat returns a copy of it.
 fn spread_shape(skew: f64) -> Vec<(f64, f64)> {
+    type Memo = Option<(u64, Vec<(f64, f64)>)>;
+    std::thread_local! {
+        static LAST: std::cell::RefCell<Memo> = const { std::cell::RefCell::new(None) };
+    }
+    let key = skew.to_bits();
+    if let Some(shape) = LAST.with(|m| match &*m.borrow() {
+        Some((k, shape)) if *k == key => Some(shape.clone()),
+        _ => None,
+    }) {
+        return shape;
+    }
+    let shape = spread_shape_uncached(skew);
+    LAST.with(|m| *m.borrow_mut() = Some((key, shape.clone())));
+    shape
+}
+
+fn spread_shape_uncached(skew: f64) -> Vec<(f64, f64)> {
     let root_pi = crate::mathx::sqrt(std::f64::consts::PI);
     let mut normal = Vec::with_capacity(40);
     for &(x, w) in GAUSS_HERMITE_40_HALF.iter().rev() {
@@ -136,6 +157,17 @@ fn spread_expect(nodes: &[(f64, f64)], mean: f64, g: impl Fn(f64) -> f64) -> f64
     let mut total = 0.0;
     for &(x, w) in nodes {
         total += w * g(mean * crate::mathx::exp(x));
+    }
+    total
+}
+
+/// [`spread_expect`] with each node's `exp(x)` given in `exps`, for a caller
+/// that takes several expectations over one set of nodes: the same sum,
+/// term for term.
+fn spread_expect_with(nodes: &[(f64, f64)], exps: &[f64], mean: f64, g: impl Fn(f64) -> f64) -> f64 {
+    let mut total = 0.0;
+    for (&(_, w), &e) in nodes.iter().zip(exps) {
+        total += w * g(mean * e);
     }
     total
 }
@@ -1215,15 +1247,21 @@ impl Engine {
         let (mut variance, mut fast, mut slow_part, mut lev) = (0.0, 0.0, 0.0, 0.0);
         let (mut up, mut down) = (0.0, 0.0);
         let mut smoothed_out = -1.0;
+        // Each node's `exp(x)`, read by every regime's expectation below.
+        let exps: Vec<f64> = if spread > 0.0 && c != 0.0 {
+            nodes.iter().map(|&(x, _)| crate::mathx::exp(x)).collect()
+        } else {
+            Vec::new()
+        };
         for &(w, level, scale) in regimes {
             let denominator = self.vix_anchor * scale;
             let level = if spread > 0.0 && c != 0.0 {
                 let at = crate::market::factor_vol::vix_response(p, smoothed / denominator);
-                let response = |x: f64| crate::market::factor_vol::vix_response(p, x / denominator);
+                let response = |x: f64| crate::market::factor_vol::vix_response_uncached(p, x / denominator);
                 let expected = if nodes.is_empty() {
                     lognormal_expect(smoothed, spread, response)
                 } else {
-                    spread_expect(nodes, smoothed, response)
+                    spread_expect_with(nodes, &exps, smoothed, response)
                 };
                 let ratio_fast = (1.0 - c + c * expected) / (1.0 - c + c * at);
                 let ratio_slow = (1.0 - c_slow + c_slow * expected) / (1.0 - c_slow + c_slow * at);
