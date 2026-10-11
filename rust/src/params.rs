@@ -1182,6 +1182,29 @@ pub struct ModelParams {
     /// economy's own real-rate term (inflation's suppression above a real
     /// rate of 0) is not moved. In [-2, 5].
     pub fed_neutral_real_rate: f64,
+    /// The monthly innovation sd of core inflation's slow trend, points.
+    /// 0.0, on every shipped preset, is no trend (headline reverts to the
+    /// 2.0 target), and a value of 0.0 is left out of the model's digest.
+    ///
+    /// Off zero the month-start inflation step closes headline's gap to
+    /// `2.0 + tau` instead of 2.0, where `tau` follows an AR(1) at
+    /// `core_trend_persistence` a month, stepped on the economy's month
+    /// start on its own key (`GameRng::keyed(key, CORE_TREND_TAG, month)`,
+    /// so no stream moves) and opened at a draw from its stationary
+    /// distribution. Every push, the floor, the ceiling and the central
+    /// bank's 2.0 target stand; core is still headline less the oil part.
+    /// `tau` and its key are snapshotted and hashed only with this set.
+    /// Fitted to FRED CPILFESL year-on-year itself, monthly 1990-2025, by
+    /// exact ML about 2.0: phi 0.993, sigma 0.170 a month (a half-life of
+    /// 8.2 years, unconditional sd 1.44 against the series' 1.15; given
+    /// room, ML puts no weight on a fast component). Slower reversion of
+    /// headline itself is not the fit: it would integrate every monthly push
+    /// and the oil part (design PR #9, r22o5czN-B/inflation). In [0, 2].
+    pub core_trend_sd: f64,
+    /// The monthly persistence of core inflation's trend (`core_trend_sd`).
+    /// 0.0, on every shipped preset, is read by nothing, and a value of 0.0
+    /// is left out of the model's digest. In [0, 1].
+    pub core_trend_persistence: f64,
     /// The oil price's lower and upper bounds, dollars. 0.0, on every shipped
     /// preset, is the standing 35 and 150, and a value of 0.0 is left out of
     /// the model's digest.
@@ -8048,6 +8071,8 @@ impl ModelParams {
             treasury_zlb_path: 0.0,
             treasury_zlb_haven_gain: 0.0,
             fed_neutral_real_rate: 0.0,
+            core_trend_sd: 0.0,
+            core_trend_persistence: 0.0,
             oil_price_floor: 0.0,
             oil_price_ceiling: 0.0,
             oil_target_drift_reversion: 0.0,
@@ -10680,6 +10705,8 @@ impl ModelParams {
             "treasury_zlb_path" => self.treasury_zlb_path,
             "treasury_zlb_haven_gain" => self.treasury_zlb_haven_gain,
             "fed_neutral_real_rate" => self.fed_neutral_real_rate,
+            "core_trend_sd" => self.core_trend_sd,
+            "core_trend_persistence" => self.core_trend_persistence,
             "oil_price_floor" => self.oil_price_floor,
             "oil_price_ceiling" => self.oil_price_ceiling,
             "oil_target_drift_reversion" => self.oil_target_drift_reversion,
@@ -11077,6 +11104,8 @@ impl ModelParams {
             "treasury_zlb_path" => out.treasury_zlb_path = value,
             "treasury_zlb_haven_gain" => out.treasury_zlb_haven_gain = value,
             "fed_neutral_real_rate" => out.fed_neutral_real_rate = value,
+            "core_trend_sd" => out.core_trend_sd = value,
+            "core_trend_persistence" => out.core_trend_persistence = value,
             "oil_price_floor" => out.oil_price_floor = value,
             "oil_price_ceiling" => out.oil_price_ceiling = value,
             "oil_target_drift_reversion" => out.oil_target_drift_reversion = value,
@@ -12525,6 +12554,18 @@ impl ModelParams {
                  rate, in [-2, 5]; 0 is the neutral that stood.",
                 self.fed_neutral_real_rate));
         }
+        if !(0.0..=2.0).contains(&self.core_trend_sd) {
+            return Err(format!(
+                "core_trend_sd is {}. It is the monthly innovation sd of core inflation's trend, \
+                 in [0, 2]; 0 is no trend.",
+                self.core_trend_sd));
+        }
+        if !(0.0..=1.0).contains(&self.core_trend_persistence) {
+            return Err(format!(
+                "core_trend_persistence is {}. It is core inflation's trend's monthly AR(1) \
+                 coefficient, in [0, 1].",
+                self.core_trend_persistence));
+        }
         if !(self.oil_forecast_clamp == 0.0 || self.oil_forecast_clamp == 1.0) {
             return Err(format!(
                 "oil_forecast_clamp is {}. It is a switch: 0 (the forecast publishes the \
@@ -13230,6 +13271,8 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "treasury_zlb_path",
     "treasury_zlb_haven_gain",
     "fed_neutral_real_rate",
+    "core_trend_sd",
+    "core_trend_persistence",
     "oil_price_floor",
     "oil_price_ceiling",
     "oil_inflation_passthrough",
@@ -13446,6 +13489,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "treasury_zlb_path",
         "treasury_zlb_haven_gain",
         "fed_neutral_real_rate",
+        "core_trend_sd",
+        "core_trend_persistence",
         "oil_price_floor",
         "oil_price_ceiling",
         "oil_inflation_passthrough",

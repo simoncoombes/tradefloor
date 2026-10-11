@@ -1293,6 +1293,13 @@ pub struct Engine {
     /// The log of the oil price's long-term level (`oil_target_drift_sd`):
     /// 0.0 with the dial off, which it never leaves.
     oil_target_drift: f64,
+    /// The key of core inflation's trend draws (`core_trend_sd`), derived
+    /// from the root seed and carried by a snapshot that holds the process.
+    core_trend_key: u64,
+    /// Core inflation's slow trend, points over the 2.0 target headline
+    /// reverts to (`core_trend_sd`): 0.0 with the dial off, which it never
+    /// leaves.
+    core_trend: f64,
 
     /// The background traders sharing the agent-facing book, when the
     /// engine was built with them (`crate::population`). `None` on every
@@ -2364,8 +2371,13 @@ impl Engine {
             },
             oil_drift_key: crate::rng::oil_drift_key(seed),
             oil_target_drift: 0.0,
+            core_trend_key: crate::rng::core_trend_key(seed),
+            core_trend: 0.0,
             population: None,
         };
+        // CORE INFLATION'S TREND OPENING (`core_trend_sd`): a draw from the
+        // process's stationary distribution on its own key. Nothing at 0.0.
+        engine.core_trend = engine.core_trend_opening();
         engine.vix_anchor = engine.derive_vix_anchor();
         engine.cycle_nowcast_terms = engine.derive_cycle_nowcast_terms();
         // The front two index futures (`futures_index_listed`); nothing with
@@ -9155,6 +9167,13 @@ impl Engine {
         if let Some(next) = oil_drift_next {
             inputs.oil_target_drift = Some((self.oil_target_drift, next));
         }
+        // CORE INFLATION'S TREND (`core_trend_sd`): one month of its process
+        // on its own key at the month's first step, before tonight's
+        // inflation step reverts to it; nothing at 0.0.
+        if let Some(next) = self.core_trend_step(request.game_day) {
+            self.core_trend = next;
+        }
+        inputs.core_trend = self.core_trend;
         self.economy = update_economy_daily(&self.economy, &inputs, rng);
         // The host's premium on the target (`set_vix_target_premium`), read
         // by the step above, faded for the next close.
@@ -9621,6 +9640,7 @@ impl Engine {
             usd_noise_sd: self.params.usd_noise_sd,
             usd_safe_haven_gain: self.params.usd_safe_haven_gain,
             oil_inflation_tracked: self.carries_oil_inflation_level(),
+            core_trend: self.core_trend,
             oil_price_floor: self.params.oil_price_floor,
             oil_price_ceiling: self.params.oil_price_ceiling,
             oil_inflation_passthrough: self.params.oil_inflation_passthrough,
@@ -9946,6 +9966,74 @@ impl Engine {
         }
         Some([self.oil_target_drift, (self.oil_drift_key >> 32) as f64,
               (self.oil_drift_key & 0xFFFF_FFFF) as f64])
+    }
+
+    /// Core inflation's trend opening: the stationary sd `sigma / sqrt(1 -
+    /// phi^2)` times the first normal of `GameRng::keyed(key,
+    /// CORE_TREND_TAG, u64::MAX)`; 0.0 with `core_trend_sd` at 0.0 or `phi`
+    /// at 1.
+    fn core_trend_opening(&self) -> f64 {
+        let sigma = self.params.core_trend_sd;
+        let phi = self.params.core_trend_persistence;
+        if sigma == 0.0 || phi >= 1.0 {
+            return 0.0;
+        }
+        let z = crate::rng::GameRng::keyed(
+            self.core_trend_key, crate::rng::CORE_TREND_TAG as u64, u64::MAX).next_normal();
+        sigma / (1.0 - phi * phi).sqrt() * z
+    }
+
+    /// Core inflation's trend next month, or `None` with `core_trend_sd` at
+    /// 0.0 or off a month's first step (`game_day % days_per_month != 0`, the
+    /// economy's own month start): `phi x + sigma z`, `z` the first normal of
+    /// `GameRng::keyed(key, CORE_TREND_TAG, game_day / days_per_month)`.
+    fn core_trend_step(&self, game_day: i64) -> Option<f64> {
+        let sigma = self.params.core_trend_sd;
+        if sigma == 0.0 {
+            return None;
+        }
+        let month = self.macro_calendar().days_per_month;
+        if game_day % month != 0 {
+            return None;
+        }
+        let z = crate::rng::GameRng::keyed(
+            self.core_trend_key, crate::rng::CORE_TREND_TAG as u64, (game_day / month) as u64).next_normal();
+        Some(self.params.core_trend_persistence * self.core_trend + sigma * z)
+    }
+
+    /// Core inflation's trend for a snapshot and the state hash, `[trend,
+    /// key high word, key low word]`, or `None` with `core_trend_sd` at 0.0.
+    pub fn core_trend_words(&self) -> Option<[f64; 3]> {
+        if self.params.core_trend_sd == 0.0 {
+            return None;
+        }
+        Some([self.core_trend, (self.core_trend_key >> 32) as f64, (self.core_trend_key & 0xFFFF_FFFF) as f64])
+    }
+
+    /// Core inflation's current trend over the target (`core_trend_sd`);
+    /// 0.0 off.
+    pub fn core_trend_level(&self) -> f64 {
+        self.core_trend
+    }
+
+    /// Put core inflation's trend back from [`Engine::core_trend_words`].
+    pub fn set_core_trend_state(&mut self, words: Option<&[f64]>) -> Result<(), String> {
+        match (words, self.params.core_trend_sd != 0.0) {
+            (None, false) => Ok(()),
+            (Some(w), true) => {
+                let whole = |v: f64| v.is_finite() && v >= 0.0 && v <= u32::MAX as f64 && v.fract() == 0.0;
+                if w.len() != 3 || !w[0].is_finite() || !whole(w[1]) || !whole(w[2]) {
+                    return Err(format!(
+                        "this snapshot's core_trend is {w:?}: it is core inflation's trend and its \
+                         key's two 32-bit words"));
+                }
+                self.core_trend = w[0];
+                self.core_trend_key = ((w[1] as u64) << 32) | (w[2] as u64);
+                Ok(())
+            }
+            (None, true) => Err("this model sets core_trend_sd and the snapshot carries no core_trend".to_string()),
+            (Some(_), false) => Err("this snapshot carries core_trend and this model's core_trend_sd is 0".to_string()),
+        }
     }
 
     /// Put the oil long factor back from [`Engine::oil_drift_words`].
@@ -12788,6 +12876,14 @@ impl Engine {
         // its own tag: its log level and its key's two words.
         if let Some(words) = self.oil_drift_words() {
             hash_f64(&mut buf, 55.0);
+            for value in words {
+                hash_f64(&mut buf, value);
+            }
+        }
+        // Core inflation's trend, only while `core_trend_sd` is set, behind
+        // its own tag (57: 56 is the r* process's on ptv22/rstar-process).
+        if let Some(words) = self.core_trend_words() {
+            hash_f64(&mut buf, 57.0);
             for value in words {
                 hash_f64(&mut buf, value);
             }
