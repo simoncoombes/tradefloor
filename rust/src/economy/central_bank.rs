@@ -220,6 +220,10 @@ pub struct PolicyOptions {
     /// `treasury_zlb_haven_gain`: the zero bound's term-premium fall per VIX
     /// point above 20 in the meeting's 10-year target. 0.0 is none.
     pub zlb_haven_gain: f64,
+    /// `fed_neutral_real_rate`: points added to the Taylor rule's neutral
+    /// rate, the real rate it sets at target. 0.0, on every preset, is the
+    /// neutral that stood (a nominal 2.0 at target, a real rate of 0).
+    pub neutral_real_rate: f64,
 }
 
 /// [`PolicyOptions::shipped`].
@@ -256,6 +260,7 @@ impl PolicyOptions {
             curve_inflation: None,
             zlb_path: 0.0,
             zlb_haven_gain: 0.0,
+            neutral_real_rate: 0.0,
         }
     }
 }
@@ -352,6 +357,16 @@ pub fn update_central_bank_with(
     // leaves `hawkish_dovish_score` as state that is maintained and never
     // read. That is a truncation of a Taylor rule, not a variant of one.
     let neutral_rate = 2.0 + 0.5 * (economy.inflation_rate / central_bank.target_inflation - 1.0);
+    // THE NEUTRAL REAL RATE (`fed_neutral_real_rate`). At target the formula
+    // above is a nominal 2.0, Taylor's (1993) r* of 2 without his `+ pi`
+    // term, so the real rate it sets is 0. Off zero the dial is added: the
+    // Holston-Laubach-Williams US r* averaged 2.0 over 1990-2025. A branch:
+    // at 0.0 the neutral is the one that stood.
+    let neutral_rate = if options.neutral_real_rate != 0.0 {
+        neutral_rate + options.neutral_real_rate
+    } else {
+        neutral_rate
+    };
     let inflation_gap_taylor = economy.inflation_rate - central_bank.target_inflation;
     let output_gap_taylor = central_bank.target_unemployment - economy.unemployment_rate;
     let taylor_rate = neutral_rate
@@ -917,6 +932,21 @@ mod tests {
         let off = PolicyOptions { growth_cut: 2.0, ..PolicyOptions::shipped() };
         let c = update_central_bank_with(&bank, &economy, bank.next_meeting_date, &mut GameRng::new(1, 1), &off);
         assert_ne!(c.decision, Some(Decision::Cut));
+    }
+
+    /// `fed_neutral_real_rate`: at 0.0 the calm meeting at a rate of 2.0
+    /// holds, as the rule's neutral stood; at 2.0 the rule sits 2 points
+    /// over the rate and the lift-off branch hikes; the rate at the moved
+    /// neutral (4.0) holds again.
+    #[test]
+    fn the_neutral_real_rate_moves_the_rule_by_itself() {
+        let lift = PolicyOptions { liftoff: 1.0, ..PolicyOptions::shipped() };
+        let moved = PolicyOptions { neutral_real_rate: 2.0, ..lift };
+        let zero = PolicyOptions { neutral_real_rate: 0.0, ..lift };
+        assert_eq!(meeting(2.5, 2.0, 2.0, &lift), Some(Decision::Hold));
+        assert_eq!(meeting(2.5, 2.0, 2.0, &zero), Some(Decision::Hold));
+        assert_eq!(meeting(2.5, 2.0, 2.0, &moved), Some(Decision::Hike));
+        assert_eq!(meeting(2.5, 4.0, 2.0, &moved), Some(Decision::Hold));
     }
 
     /// `fed_growth_cut`: off, the calm meeting holds whatever growth does;

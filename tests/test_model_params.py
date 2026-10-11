@@ -989,6 +989,8 @@ PERTURBATIONS = [
     # Measured 2026-10-11.
     ("treasury_zlb_path", 1.0, True),
     ("treasury_zlb_haven_gain", 0.05, True),
+    # The Taylor rule's neutral real rate: the probe's meetings read the rule.
+    ("fed_neutral_real_rate", 2.0, True),
     # Oil's bounds from WTI in real terms. INERT on the probe: its burn-in's
     # oil stays inside 35 to 150, so moving the bounds outward moves nothing.
     ("oil_price_floor", 16.4, False),
