@@ -30,9 +30,11 @@ pa = pytest.importorskip("pyarrow")
 
 UNIVERSE = tf.Universe.random(6, seed=21)
 
-#: Seeds drawn at random once per run of the module, from the clock, so the
-#: identity is held on seeds nobody picked. Printed on failure by the ids.
-SEEDS = random.SystemRandom().sample(range(2**32), 2)
+#: Seeds drawn at random from the whole 64-bit range, so the identity is held
+#: on seeds nobody picked. From a fixed generator rather than the clock: a
+#: failure has to be re-runnable, and a parallel run collects the module
+#: once per worker and needs every worker to see the same ids.
+SEEDS = [random.Random(20261011 + k).getrandbits(64) for k in range(3)]
 
 LEGS = ("market_noise", "sector_noise", "company_noise")
 
