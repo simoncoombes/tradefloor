@@ -563,6 +563,10 @@ OUT_OF_SCOPE = {
         "stood (a branch on `== 0.0` in `close_yields` and the meeting's "
         "target), and `zlb_unmet` is neither written, snapshotted nor hashed; "
         "at 0.0 it is also left out of the model's digest",
+    "fed_put_debt_fade":
+        "inert at 0.0: the put's debt is given back at calm meetings as it "
+        "stood (a branch on `== 0.0` in the daily step and the meeting); at "
+        "0.0 it is also left out of the model's digest",
     "fed_put_giveback_wait":
         "inert at 0.0: the put gives back with no wait as it stood (a branch "
         "on `== 0.0` in the meeting), and `fed_put_age` is neither written, "

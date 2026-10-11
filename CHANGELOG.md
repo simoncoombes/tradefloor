@@ -125,6 +125,10 @@ same with them on as off.
   `usd_crisis_vix_threshold` (0.0 the standing 0.05), read by the dollar's
   step and by the forecast's expected bid. FRED DTWEXM against CBOE's VIX
   measures 0.001.
+- `fed_put_debt_fade` is a new dial, 0.0 on every preset and left out of the
+  digest there: off zero the Fed put's debt leaves the Taylor rule the ladder
+  reads at that many points a month, and a meeting gives nothing back (the
+  FOMC's pace back after easings with stress cuts: median 17 bp a month).
 - `fed_put_giveback_wait` and `fed_liftoff_unemployment_gap` are new dials,
   0.0 on every preset and left out of the digest there. The Fed put gives
   nothing back within the first's sessions of its last cut (FOMC: a median

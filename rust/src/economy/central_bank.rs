@@ -231,6 +231,10 @@ pub struct PolicyOptions {
     /// unemployment at or under the natural rate plus this. 0.0, on every
     /// preset, is the gate that stood (the target plus one point).
     pub liftoff_gap: f64,
+    /// `fed_put_debt_fade`: off zero the put's debt fades out of the rule
+    /// on the daily step and the put gives nothing back at a meeting. 0.0,
+    /// on every preset, is the give-back that stood.
+    pub debt_fade: f64,
 }
 
 /// [`PolicyOptions::shipped`].
@@ -270,6 +274,7 @@ impl PolicyOptions {
             neutral_real_rate: 0.0,
             giveback_wait: 0.0,
             liftoff_gap: 0.0,
+            debt_fade: 0.0,
         }
     }
 }
@@ -633,6 +638,9 @@ pub fn update_central_bank_with(
         // back within the dial's sessions of the put's last cut. A branch:
         // at 0.0 there is no wait, as it stood.
         && (options.giveback_wait == 0.0 || economy.fed_put_age >= options.giveback_wait)
+        // THE DEBT'S FADE (`fed_put_debt_fade`): off zero the debt leaves the
+        // rule on the daily step, so a meeting gives nothing back. A branch.
+        && options.debt_fade == 0.0
         && !(options.stress_hold
             && economy.inflation_rate
                 < central_bank.target_inflation + options.stress_inflation_gap)
@@ -1008,6 +1016,31 @@ mod tests {
         let cut = run(&economy, &wait);
         assert!(cut.economy.federal_funds_rate < 2.0);
         assert_eq!(cut.economy.fed_put_age, 0.0);
+    }
+
+    /// `fed_put_debt_fade`: a calm meeting owing the put half a point gives
+    /// a quarter back as it stood, and nothing with the fade on.
+    #[test]
+    fn with_the_fade_on_a_meeting_gives_nothing_back() {
+        let bank = create_initial_central_bank_state(0);
+        let mut economy = create_initial_economy_state(&InitialEconomyOptions::default());
+        economy.cycle_phase = CyclePhase::Expansion;
+        economy.gdp_growth = 2.5;
+        economy.federal_funds_rate = 2.0;
+        economy.inflation_rate = 2.0;
+        economy.unemployment_rate = bank.target_unemployment;
+        economy.vix = 20.0;
+        economy.intermeeting_return = 0.0;
+        economy.fed_put_owed = 0.5;
+        economy.fed_put = 0.2;
+        let put = PolicyOptions { put_gain: 3.0, ..PolicyOptions::shipped() };
+        let fade = PolicyOptions { debt_fade: 0.17, ..put };
+        let run = |o: &PolicyOptions| {
+            update_central_bank_with(&bank, &economy, bank.next_meeting_date, &mut GameRng::new(1, 1), o)
+        };
+        assert_eq!(run(&put).economy.federal_funds_rate, 2.25);
+        assert_eq!(run(&fade).economy.federal_funds_rate, 2.0);
+        assert_eq!(run(&fade).economy.fed_put_owed, 0.5);
     }
 
     /// `fed_liftoff_unemployment_gap`: at 0.0 the gate is the target plus

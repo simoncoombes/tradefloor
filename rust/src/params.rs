@@ -1212,6 +1212,23 @@ pub struct ModelParams {
     /// mean of -0.06 (FRED UNRATE, NROU). Read only with `fed_liftoff_rule`
     /// set. In [-3, 3].
     pub fed_liftoff_unemployment_gap: f64,
+    /// The pace, in points a month (21 sessions), at which the Fed put's
+    /// debt (`EconomyState::fed_put_owed`) fades out of the Taylor rule the
+    /// ladder reads. 0.0, on every shipped preset, is the debt as it stood,
+    /// given back a quarter point at a calm meeting, and a value of 0.0 is
+    /// left out of the model's digest.
+    ///
+    /// The ladder reads its rule less the debt, so a debt that waits stacks
+    /// and holds the rate down (design PR #9, zlbtime/liftoff). Off zero the
+    /// debt falls by `fade / 21` each session, never below zero, and a
+    /// meeting gives nothing back: the rate comes back up only through the
+    /// ladder's own branches. The FOMC took the rate back after an easing
+    /// that held cuts at a VIX of 30 or more at 6.1 to 41.9 bp a month,
+    /// from the first hike to the lower of the pre-easing rate and the
+    /// cycle's peak (FRED DFEDTAR, DFEDTARU, VIXCLS, five hiking cycles
+    /// 1994-2022): median 17.0, so 0.17. The debt is already carried with
+    /// the put; no new state. Needs `fed_put_gain`. In [0, 2].
+    pub fed_put_debt_fade: f64,
     /// The oil price's lower and upper bounds, dollars. 0.0, on every shipped
     /// preset, is the standing 35 and 150, and a value of 0.0 is left out of
     /// the model's digest.
@@ -8080,6 +8097,7 @@ impl ModelParams {
             fed_neutral_real_rate: 0.0,
             fed_put_giveback_wait: 0.0,
             fed_liftoff_unemployment_gap: 0.0,
+            fed_put_debt_fade: 0.0,
             oil_price_floor: 0.0,
             oil_price_ceiling: 0.0,
             oil_target_drift_reversion: 0.0,
@@ -10714,6 +10732,7 @@ impl ModelParams {
             "fed_neutral_real_rate" => self.fed_neutral_real_rate,
             "fed_put_giveback_wait" => self.fed_put_giveback_wait,
             "fed_liftoff_unemployment_gap" => self.fed_liftoff_unemployment_gap,
+            "fed_put_debt_fade" => self.fed_put_debt_fade,
             "oil_price_floor" => self.oil_price_floor,
             "oil_price_ceiling" => self.oil_price_ceiling,
             "oil_target_drift_reversion" => self.oil_target_drift_reversion,
@@ -11113,6 +11132,7 @@ impl ModelParams {
             "fed_neutral_real_rate" => out.fed_neutral_real_rate = value,
             "fed_put_giveback_wait" => out.fed_put_giveback_wait = value,
             "fed_liftoff_unemployment_gap" => out.fed_liftoff_unemployment_gap = value,
+            "fed_put_debt_fade" => out.fed_put_debt_fade = value,
             "oil_price_floor" => out.oil_price_floor = value,
             "oil_price_ceiling" => out.oil_price_ceiling = value,
             "oil_target_drift_reversion" => out.oil_target_drift_reversion = value,
@@ -12579,6 +12599,18 @@ impl ModelParams {
                  to the natural rate, in [-3, 3]; 0 is the gate that stood.",
                 self.fed_liftoff_unemployment_gap));
         }
+        if !(0.0..=2.0).contains(&self.fed_put_debt_fade) {
+            return Err(format!(
+                "fed_put_debt_fade is {}. It is the points a month the Fed put's debt fades out \
+                 of the rule, in [0, 2]; 0 is the give-back that stood.",
+                self.fed_put_debt_fade));
+        }
+        if self.fed_put_debt_fade != 0.0 && self.fed_put_gain == 0.0 {
+            return Err(format!(
+                "fed_put_debt_fade is {} with fed_put_gain 0. It fades the put's debt, so it \
+                 needs the put.",
+                self.fed_put_debt_fade));
+        }
         if !(self.oil_forecast_clamp == 0.0 || self.oil_forecast_clamp == 1.0) {
             return Err(format!(
                 "oil_forecast_clamp is {}. It is a switch: 0 (the forecast publishes the \
@@ -13286,6 +13318,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "fed_neutral_real_rate",
     "fed_put_giveback_wait",
     "fed_liftoff_unemployment_gap",
+    "fed_put_debt_fade",
     "oil_price_floor",
     "oil_price_ceiling",
     "oil_inflation_passthrough",
@@ -13504,6 +13537,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "fed_neutral_real_rate",
         "fed_put_giveback_wait",
         "fed_liftoff_unemployment_gap",
+        "fed_put_debt_fade",
         "oil_price_floor",
         "oil_price_ceiling",
         "oil_inflation_passthrough",

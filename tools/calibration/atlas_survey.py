@@ -697,6 +697,8 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # The put's give-back wait: off to about seven years (2008-2015's 84
     # months); the lift-off gate's gap: the five lift-offs' range, rounded out.
     "fed_put_giveback_wait": (0.0, 1800.0),
+    # The debt's fade: off to the fastest real pace back (2022's 0.42), rounded.
+    "fed_put_debt_fade": (0.0, 0.5),
     "fed_liftoff_unemployment_gap": (-1.0, 1.2),
     # The share of oil demand supply answers on the daily step. Bounded by
     # meaning again: 0.0 is the hardcoded zero the reference writes, 1.0 is
