@@ -558,6 +558,15 @@ OUT_OF_SCOPE = {
         "headline inflation as they stood (a branch on `== 0.0`), and "
         "`oil_inflation_level` is neither written, snapshotted nor hashed; at "
         "0.0 it is also left out of the model's digest",
+    "treasury_zlb_path":
+        "inert at 0.0: the curve prices the Fed put up to the rate as it "
+        "stood (a branch on `== 0.0` in `close_yields` and the meeting's "
+        "target), and `zlb_unmet` is neither written, snapshotted nor hashed; "
+        "at 0.0 it is also left out of the model's digest",
+    "treasury_zlb_haven_gain":
+        "inert at 0.0: `close_yields` and the meeting's 10-year target branch "
+        "on `== 0.0` and take the term premium as it stood; at 0.0 it is also "
+        "left out of the model's digest",
     "oil_forecast_clamp":
         "inert at 0.0: the forecast publishes the unclamped expectation it "
         "steps, as it stood; it reads the forecast only, so no price moves at "

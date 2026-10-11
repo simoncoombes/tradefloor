@@ -1140,6 +1140,33 @@ pub struct ModelParams {
     /// core at 3 or more; its level loads on neither core nor the gap given
     /// the funds rate (the gap -0.06, se 0.12).
     pub treasury_core_inflation: f64,
+    /// The share of the Fed put's unmet ask the curve prices at the zero
+    /// bound. 0.0, on every shipped preset, prices the put only up to the
+    /// rate, as it stood, and a value of 0.0 is left out of the model's
+    /// digest.
+    ///
+    /// The put asks for `fed_put_gain * max(0, -I - fed_put_threshold)` and
+    /// the curve prices it no further than the policy rate, so at the zero
+    /// bound a fall moves no expected easing at all. Off zero the 10-year's
+    /// anchor (and the 2-year's formula) is lowered also by
+    /// `k * treasury_put_pricing * (x + U)`: `x` the part of tonight's ask the
+    /// rate cannot deliver, `U` (`EconomyState::zlb_unmet`) each meeting's
+    /// unmet ask, decaying at `treasury_path_half_life`. It passes through
+    /// whole, as the put does. Kim and Wright's decomposition of the
+    /// 10-year (FRED THREEFY10, THREEFYTP10) in the 2008-2015 falls of 10%
+    /// that began at the zero bound: the expected path fell 0.35 (se 0.12)
+    /// with the funds rate unchanged. Needs `fed_put_gain` and
+    /// `treasury_path_pricing`. In [0, 20].
+    pub treasury_zlb_path: f64,
+    /// The term premium's fall per VIX point above 20 with the funds rate at
+    /// or below 0.25, beside `treasury_haven_gain`, at the close and in the
+    /// meeting's 10-year target, under the haven's inflation gate. 0.0, on
+    /// every shipped preset, is none, and a value of 0.0 is left out of the
+    /// model's digest. It stands for the haven bid and the asset purchases
+    /// when the bank cannot cut: Kim and Wright's term premium fell 0.36 (se
+    /// 0.13) in the 2008-2015 falls of 10% that began at the zero bound. In
+    /// [0, 1].
+    pub treasury_zlb_haven_gain: f64,
     /// The oil price's lower and upper bounds, dollars. 0.0, on every shipped
     /// preset, is the standing 35 and 150, and a value of 0.0 is left out of
     /// the model's digest.
@@ -8003,6 +8030,8 @@ impl ModelParams {
             usd_safe_haven_gain: 0.0,
             fed_core_inflation: 0.0,
             treasury_core_inflation: 0.0,
+            treasury_zlb_path: 0.0,
+            treasury_zlb_haven_gain: 0.0,
             oil_price_floor: 0.0,
             oil_price_ceiling: 0.0,
             oil_target_drift_reversion: 0.0,
@@ -10632,6 +10661,8 @@ impl ModelParams {
             "usd_safe_haven_gain" => self.usd_safe_haven_gain,
             "fed_core_inflation" => self.fed_core_inflation,
             "treasury_core_inflation" => self.treasury_core_inflation,
+            "treasury_zlb_path" => self.treasury_zlb_path,
+            "treasury_zlb_haven_gain" => self.treasury_zlb_haven_gain,
             "oil_price_floor" => self.oil_price_floor,
             "oil_price_ceiling" => self.oil_price_ceiling,
             "oil_target_drift_reversion" => self.oil_target_drift_reversion,
@@ -11026,6 +11057,8 @@ impl ModelParams {
             "usd_safe_haven_gain" => out.usd_safe_haven_gain = value,
             "fed_core_inflation" => out.fed_core_inflation = value,
             "treasury_core_inflation" => out.treasury_core_inflation = value,
+            "treasury_zlb_path" => out.treasury_zlb_path = value,
+            "treasury_zlb_haven_gain" => out.treasury_zlb_haven_gain = value,
             "oil_price_floor" => out.oil_price_floor = value,
             "oil_price_ceiling" => out.oil_price_ceiling = value,
             "oil_target_drift_reversion" => out.oil_target_drift_reversion = value,
@@ -12447,6 +12480,27 @@ impl ModelParams {
                  part).",
                 self.treasury_core_inflation));
         }
+        if !(0.0..=20.0).contains(&self.treasury_zlb_path) {
+            return Err(format!(
+                "treasury_zlb_path is {}. It is the share of the Fed put's unmet ask the curve \
+                 prices at the zero bound, in [0, 20]; 0 prices the put up to the rate.",
+                self.treasury_zlb_path));
+        }
+        if self.treasury_zlb_path != 0.0
+            && (self.fed_put_gain == 0.0 || self.treasury_path_pricing == 0.0)
+        {
+            return Err(format!(
+                "treasury_zlb_path is {} with fed_put_gain {} and treasury_path_pricing {}. It \
+                 prices the put's unmet ask and decays it at the priced path's half-life, so it \
+                 needs both.",
+                self.treasury_zlb_path, self.fed_put_gain, self.treasury_path_pricing));
+        }
+        if !(0.0..=1.0).contains(&self.treasury_zlb_haven_gain) {
+            return Err(format!(
+                "treasury_zlb_haven_gain is {}. It is the term premium's fall per VIX point above \
+                 20 at the zero bound, in [0, 1].",
+                self.treasury_zlb_haven_gain));
+        }
         if !(self.oil_forecast_clamp == 0.0 || self.oil_forecast_clamp == 1.0) {
             return Err(format!(
                 "oil_forecast_clamp is {}. It is a switch: 0 (the forecast publishes the \
@@ -13149,6 +13203,8 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "usd_safe_haven_gain",
     "fed_core_inflation",
     "treasury_core_inflation",
+    "treasury_zlb_path",
+    "treasury_zlb_haven_gain",
     "oil_price_floor",
     "oil_price_ceiling",
     "oil_inflation_passthrough",
@@ -13362,6 +13418,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "usd_safe_haven_gain",
         "fed_core_inflation",
         "treasury_core_inflation",
+        "treasury_zlb_path",
+        "treasury_zlb_haven_gain",
         "oil_price_floor",
         "oil_price_ceiling",
         "oil_inflation_passthrough",

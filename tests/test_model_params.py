@@ -983,6 +983,12 @@ PERTURBATIONS = [
     # changes; the 10-year differs from the burn-in's months above 2 by
     # 1e-17 and no price reads that. Measured 2026-10-11.
     ("treasury_core_inflation", 1.0, False),
+    # The zero bound's pieces, LIVE: the probe's funds rate closes at 0.0 and
+    # its VIX at 21.6, so the unmet put (with its companion put and path) and
+    # the zero bound's compression both move the 10-year and the prices.
+    # Measured 2026-10-11.
+    ("treasury_zlb_path", 1.0, True),
+    ("treasury_zlb_haven_gain", 0.05, True),
     # Oil's bounds from WTI in real terms. INERT on the probe: its burn-in's
     # oil stays inside 35 to 150, so moving the bounds outward moves nothing.
     ("oil_price_floor", 16.4, False),
@@ -2088,6 +2094,9 @@ COMPANIONS: dict[str, dict[str, float]] = {
     # nothing between 50 and 80).
     "fed_core_inflation": {"oil_inflation_passthrough": 1.0},
     "treasury_core_inflation": {"oil_inflation_passthrough": 1.0},
+    # The unmet put needs the put and the priced path it decays like.
+    "treasury_zlb_path": {"fed_put_gain": 3.0, "fed_put_half_life": 126.0, "treasury_put_pricing": 1.0,
+                          "treasury_path_pricing": 1.0, "treasury_path_half_life": 63.0},
     # The knee pulls at its half-life, and the pair is refused without it.
     "fair_value_relative_knee": {"fair_value_relative_half_life": 252.0},
     # The valuation is carried from the prehistory, and refused without one.

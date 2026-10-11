@@ -1138,6 +1138,9 @@ def _nothing_dormant():
                    # and both on so the oil part of headline is carried.
                    fed_core_inflation=1.0,
                    treasury_core_inflation=1.0,
+                   # The zero bound's pieces (the put and path are on above).
+                   treasury_zlb_path=0.5,
+                   treasury_zlb_haven_gain=0.05,
                    oil_price_floor=16.4,
                    oil_price_ceiling=279.0,
                    # The contracts' margin (pt-v22 phase 1).

@@ -687,6 +687,10 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # Switches: the bank's and the curve's inflation, headline or core.
     "fed_core_inflation": (0.0, 1.0),
     "treasury_core_inflation": (0.0, 1.0),
+    # The zero bound's pieces: off at the bottom, about twice the solved
+    # values (design PR #9, zlb/SOLVE.md) at the top.
+    "treasury_zlb_path": (0.0, 2.0),
+    "treasury_zlb_haven_gain": (0.0, 0.1),
     # The share of oil demand supply answers on the daily step. Bounded by
     # meaning again: 0.0 is the hardcoded zero the reference writes, 1.0 is
     # the value that makes the inventory random walk driftless, and past 1.0
