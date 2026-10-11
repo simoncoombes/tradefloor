@@ -814,8 +814,13 @@ impl Engine {
             // Its close. The factor on both tracks: the expected update over
             // the day's factor (four nodes) and the believed phase's regimes.
             let regimes = self.forecast_regimes(&belief, &phase_regimes);
-            let (next_mv, next_faces) = self.forecast_factor_close(&mv, &regimes, vix, 0.0, &[]);
-            let (next_mv_e, next_faces_e) = self.forecast_factor_close(&mv_e, &regimes, vix, spread, &nodes);
+            // Under `market_vol_vix_excursion` the close's target reads the VIX
+            // against the session's own read-back, so the forecast's does too
+            // (ptv22/vix-stabiliser, local research patch): each track's index
+            // variance gives its read-back. Off the switch the argument is unread.
+            let rb = |v: f64| crate::market::index_var::vix_from_variance(p.vix_variance_premium, v);
+            let (next_mv, next_faces) = self.forecast_factor_close(&mv, &regimes, vix, 0.0, &[], rb(v_session));
+            let (next_mv_e, next_faces_e) = self.forecast_factor_close(&mv_e, &regimes, vix, spread, &nodes, rb(v_report));
 
             // Each name's GARCH on both tracks: the expected GJR step on the
             // session's noise.
@@ -1196,6 +1201,7 @@ impl Engine {
         vix: f64,
         spread: f64,
         nodes: &[(f64, f64)],
+        readback: f64,
     ) -> (MarketVarianceState, (f64, f64)) {
         let p = &self.params;
         let sd_f = crate::mathx::sqrt(crate::mathx::max(0.0, mv.variance()));
@@ -1216,7 +1222,11 @@ impl Engine {
         let (mut up, mut down) = (0.0, 0.0);
         let mut smoothed_out = -1.0;
         for &(w, level, scale) in regimes {
-            let denominator = self.vix_anchor * scale;
+            let denominator = if p.market_vol_vix_excursion == 0.0 || !(readback > 0.0) {
+                self.vix_anchor * scale
+            } else {
+                readback * scale
+            };
             let level = if spread > 0.0 && c != 0.0 {
                 let at = crate::market::factor_vol::vix_response(p, smoothed / denominator);
                 let response = |x: f64| crate::market::factor_vol::vix_response(p, x / denominator);
