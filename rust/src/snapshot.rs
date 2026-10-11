@@ -1796,6 +1796,9 @@ impl Engine {
         if p.treasury_zlb_path != 0.0 {
             econ.put("zlb_unmet", V::Float(economy.zlb_unmet));
         }
+        if p.fed_put_giveback_wait != 0.0 {
+            econ.put("fed_put_age", V::Float(economy.fed_put_age));
+        }
         if p.gdp_publication_lag != 0.0 {
             let g = self.gdp_publication();
             let mut block = SnapshotMap::new();
@@ -2179,6 +2182,7 @@ impl Engine {
             Gated::dial("oil_push_level", "oil_pushes_in_target", p.oil_pushes_in_target),
             Gated::dial("usd_haven_level", "usd_mean_reversion", p.usd_mean_reversion),
             Gated::dial("zlb_unmet", "treasury_zlb_path", p.treasury_zlb_path),
+            Gated::dial("fed_put_age", "fed_put_giveback_wait", p.fed_put_giveback_wait),
             Gated::when(
                 "oil_inflation_level",
                 self.carries_oil_inflation_level(),
@@ -2909,6 +2913,9 @@ impl Engine {
         }
         if params.treasury_zlb_path != 0.0 {
             inner.economy_mut().zlb_unmet = read_finite(d, "economy.", "zlb_unmet")?;
+        }
+        if params.fed_put_giveback_wait != 0.0 {
+            inner.economy_mut().fed_put_age = read_finite(d, "economy.", "fed_put_age")?;
         }
         if params.fed_core_inflation != 0.0 || params.treasury_core_inflation != 0.0 {
             inner.economy_mut().oil_inflation_level = read_finite(d, "economy.", "oil_inflation_level")?;

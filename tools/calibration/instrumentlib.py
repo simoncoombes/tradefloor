@@ -876,6 +876,9 @@ PARAM_SPECS: dict[str, dict] = {
     "treasury_zlb_path": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 20.0)},
     "treasury_zlb_haven_gain": {"kind": "abs", "step_unit": 0.005, "hard_range": (0.0, 1.0)},
     "fed_neutral_real_rate": {"kind": "abs", "step_unit": 0.1, "hard_range": (-2.0, 5.0)},
+    "fed_put_giveback_wait": {"kind": "abs", "step_unit": 21.0, "hard_range": (0.0, 2520.0)},
+    "fed_put_debt_fade": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 2.0)},
+    "fed_liftoff_unemployment_gap": {"kind": "abs", "step_unit": 0.1, "hard_range": (-3.0, 3.0)},
     "fear_greed_published_inputs": {"kind": "abs", "step_unit": 1.0,
                                     "hard_range": (0.0, 1.0), "derived": False},
     # A switch whose identity is the value: 1.0 prices a macro decision the

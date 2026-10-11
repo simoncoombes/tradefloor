@@ -1143,6 +1143,10 @@ def _nothing_dormant():
                    treasury_zlb_haven_gain=0.05,
                    # The Taylor rule's neutral real rate (HLW, 1990-2025).
                    fed_neutral_real_rate=2.0,
+                   # The put's give-back wait and the lift-off gate's gap.
+                   fed_put_giveback_wait=599.0,
+                   fed_liftoff_unemployment_gap=-0.06,
+                   fed_put_debt_fade=0.17,
                    oil_price_floor=16.4,
                    oil_price_ceiling=279.0,
                    # The contracts' margin (pt-v22 phase 1).

@@ -991,6 +991,15 @@ PERTURBATIONS = [
     ("treasury_zlb_haven_gain", 0.05, True),
     # The Taylor rule's neutral real rate: the probe's meetings read the rule.
     ("fed_neutral_real_rate", 2.0, True),
+    # The put's give-back wait and the lift-off gate's gap. INERT on the
+    # probe: its run holds no give-back and no lift-off meeting for either to
+    # change (the check's long histories move both). Measured 2026-10-11.
+    ("fed_put_giveback_wait", 599.0, False),
+    ("fed_liftoff_unemployment_gap", -0.06, False),
+    # The debt's fade. INERT on the probe: its run carries no put debt for
+    # the fade to take out of the rule (the check's long histories move it).
+    # Measured 2026-10-11.
+    ("fed_put_debt_fade", 0.17, False),
     # Oil's bounds from WTI in real terms. INERT on the probe: its burn-in's
     # oil stays inside 35 to 150, so moving the bounds outward moves nothing.
     ("oil_price_floor", 16.4, False),
@@ -2097,6 +2106,10 @@ COMPANIONS: dict[str, dict[str, float]] = {
     "fed_core_inflation": {"oil_inflation_passthrough": 1.0},
     "treasury_core_inflation": {"oil_inflation_passthrough": 1.0},
     # The unmet put needs the put and the priced path it decays like.
+    # The give-back's wait needs the put; the gate's gap needs lift-off.
+    "fed_put_giveback_wait": {"fed_put_gain": 3.0, "fed_put_half_life": 126.0},
+    "fed_liftoff_unemployment_gap": {"fed_liftoff_rule": 1.0},
+    "fed_put_debt_fade": {"fed_put_gain": 3.0, "fed_put_half_life": 126.0},
     "treasury_zlb_path": {"fed_put_gain": 3.0, "fed_put_half_life": 126.0, "treasury_put_pricing": 1.0,
                           "treasury_path_pricing": 1.0, "treasury_path_half_life": 63.0},
     # The knee pulls at its half-life, and the pair is refused without it.
