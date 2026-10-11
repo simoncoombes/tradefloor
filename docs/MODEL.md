@@ -1677,8 +1677,16 @@ V_{i,t} = \begin{cases}
 \end{cases}
 ```
 
-(`fair_value.rs:213`, `fair_value.rs:299-329`). A loss-making company is
-valued at 1.2 times book, with no rate term.
+(`fair_value.rs:214`, `fair_value.rs:354-420`). A loss-making company is
+valued at 1.2 times book, with no rate term, on every shipped preset. Off
+zero, `lossmaker_rate_sensitivity` $\kappa_L$ gives it one, the profitable
+term with its own sensitivity (`fair_value::compute_fair_value_full`):
+
+```math
+R^{L}_{i,d} = \max\!\Big(0.5,\ 1 - \kappa_L\,D_i\Big(\frac{y^{c}_d}{100} - r^{\ast}\Big)\Big),
+\qquad
+V_{i,t} = \max\big(0.01,\ 1.2\,\hat K_{i,t}\,R^{L}_{i,d}\big) \quad (E_i \le 0)
+```
 
 Two public calls return this number. `tradefloor.fair_value(...,
 model=...)` returns $V$ for the fundamentals and macro it is given, with
@@ -1693,7 +1701,7 @@ manifest's era fingerprint is computed on it.
 
 What follows from this:
 
-- **Rates.** $\partial \ln V / \partial r = -\lambda D_i / R$, with $\lambda$ = `rate_pe_sensitivity`. At the neutral rate, 100 basis points on the corporate yield moves a profitable company's fair value by 3% to 5.4% on pt-v20 ($\lambda$ = 3), depending on its growth, and by 1.5% to 2.7% on pt-v19 ($\lambda$ = 1.5). On the driven 2022 path the market P/E falls 4.26% per 100 bp against the S&P 500's 5.2% (row R6, box ptv20g6). Loss-makers do not move.
+- **Rates.** $\partial \ln V / \partial r = -\lambda D_i / R$, with $\lambda$ = `rate_pe_sensitivity`. At the neutral rate, 100 basis points on the corporate yield moves a profitable company's fair value by 3% to 5.4% on pt-v20 ($\lambda$ = 3), depending on its growth, and by 1.5% to 2.7% on pt-v19 ($\lambda$ = 1.5). On the driven 2022 path the market P/E falls 4.26% per 100 bp on pt-v20 (row R6, box ptv20g6) and 6.97% on pt-v21 (box ptv21c1), against the S&P 500's 5.2%. The market P/E reads profitable companies only. Loss-makers do not move on any shipped preset; under `lossmaker_rate_sensitivity` they move by $\kappa_L D_i / R^{L}$ per unit of yield, and in 2022 US loss-makers fell 10.9% per 100 bp of Baa more than profitable growth companies, equal weight (`tools/calibration/lossmaker_duration.md`).
 - **Earnings growth** comes only from nominal output and buybacks. Revenue growth sets duration and nothing else. pt-v21 pays dividends and no earlier preset does; see **Dividends** below.
 - **Buybacks** add about $\kappa E/P$ a year, about 1.9% at a typical earnings yield. They retire no shares. The yield is read at the current price and applied over every elapsed session, so a company whose price falls toward the 0.01 floor reads a yield in the hundreds. Under `buyback_yield_cap` $\bar b$ the yield in $B$ is $\min(\kappa E_i n_d / P_{i,t-1},\ \bar b)$ (`market/tick.rs:270-277`). pt-v20's $\kappa$ of 0.75 would be 4.2% a year at the median earnings yield, but the index's delivered buyback yield (the cap-weighted log rate of $B$) is 2.0% a year on held-out seeds, and its cap of 0.15 binds only on a company priced under five times earnings.
 - **Dividends** are on in pt-v21 at `dividend_payout_share` 1.2 and off on every earlier preset (0). When the dial is set, a profitable company whose revenue growth is under `dividend_growth_cutoff` pays a payout $\delta_i = \min(1, s\,\pi_{\text{sector}})$ of its earnings, a target yield $y_i = \delta_i E_i / P_{i,0}$. Ex-dates fall every 63 sessions from a phase hashed from the ticker. Each amount is declared 21 sessions ahead as $D \leftarrow \max(0, D + c_q(y_i \bar P_i/4 - D))$, capped at `dividend_yield_ceiling` $\cdot\, y_i P_i / 4$, where $\bar P_i$ is an EMA of the company's closes (half-life 21) and $c_q = 1-(1-c)^{1/4}$ for `dividend_adjustment_speed` $c$. Fair value adds $D\,k/63$ at $k$ sessions since the last ex-date, and at the ex-date open the price drops by $D$ exactly (`market/dividends.rs`, `Engine::apply_dividends`). Under `dividend_buyback_substitution` the buyback share in $B$ is $\max(0, \kappa - \delta_i)$, so $\kappa$ is the total payout.
@@ -1709,6 +1717,7 @@ What follows from this:
 | | rate-term floor | 0.5 | | guard | |
 | | duration scale | 2.0 | | chosen | reference implementation |
 | | loss-maker price to book | 1.2 | | chosen | reference implementation |
+| $\kappa_L$ | `lossmaker_rate_sensitivity` | 0 (off) | 0 (off) | fitted (candidate) | off on every shipped preset; the pt-v22 candidate's value is fitted to the 2022 excess of loss-makers over profitable growth, -10.9% per 100 bp of Baa, equal weight (Ken French E/P portfolios, CRSP; `tools/calibration/lossmaker_duration.md`) |
 | | `market_pe_buybacks` | 1.0 | same | derived | the market P/E divides by the same buyback factor |
 
 The sector anchors $\Pi_k$ are in [The sectors](#the-sectors). They are
