@@ -596,6 +596,9 @@ def test_the_claude_example_says_how_to_get_a_recording_it_cannot_find(
     import os
     import shutil
     import subprocess
+    # The script exits at its pydantic import, before it looks for the
+    # recording, so without the extra there is no message to check.
+    pytest.importorskip("pydantic")
     copy = tmp_path / "08-claude-agent.py"
     shutil.copy(EXAMPLES / "08-claude-agent.py", copy)
     env = {k: v for k, v in os.environ.items()
@@ -640,6 +643,7 @@ def test_the_claude_example_replays_its_committed_recording():
     """
     import os
     import subprocess
+    pytest.importorskip("pydantic")
     _committed_08_recording()
     env = {k: v for k, v in os.environ.items()
            if k not in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN",

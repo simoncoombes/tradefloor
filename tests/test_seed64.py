@@ -330,6 +330,10 @@ def test_a_narrow_commitment_is_the_one_it_was():
 # -- the MCP server ------------------------------------------------------------
 
 def test_the_mcp_tools_take_a_high_seed_and_refuse_a_bad_one():
+    # The extra first, as test_mcp.py does. `tradefloor.mcp` re-raises a
+    # missing `mcp` as a plain ImportError, and from pytest 9 importorskip
+    # skips only on ModuleNotFoundError, so without the extra this failed.
+    pytest.importorskip("mcp")
     mcp = pytest.importorskip("tradefloor.mcp")
     momentum = {"signal": {"kind": "momentum", "lookback_days": 1.0}}
     ok = mcp.evaluate_strategies({"m": momentum}, seed=HIGH, universe_size=4,
