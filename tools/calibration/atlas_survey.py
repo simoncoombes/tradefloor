@@ -558,6 +558,12 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "vix_stress_premium_knee": (0.0, 1.5),
     # The largest log premium of the quote over the state; 0.5 is 1.65x.
     "vix_stress_premium_cap": (0.0, 0.5),
+    # The stress memory's own rate per session; 0.0 is the anchor's rate
+    # (`vix_anchor_memory`). The box is the validator's [0, 1], as the
+    # anchor's own memory's is: 1.0 takes up the whole deviation each session.
+    "vix_stress_premium_memory": (0.0, 1.0),
+    # A switch: the premium as the anchor's pull undone above the knee.
+    "vix_stress_premium_undo": (0.0, 1.0),
     # The VIX's fear memory: the uptake up to half the excursion a session,
     # and the half-life from a week to a year of sessions.
     "vix_fear_uptake": (0.0, 0.5),
