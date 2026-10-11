@@ -2637,6 +2637,24 @@ pub struct ModelParams {
     /// anchor's memory is untouched. Read only with `vix_stress_premium`
     /// non-zero. In [0, 1].
     pub vix_stress_premium_memory: f64,
+    /// The VIX's own innovation as news about the market factor's variance.
+    /// 0.0, which every preset carries, is off: nothing is projected and no
+    /// state moves, and the dial is left out of the model's digest.
+    ///
+    /// Off zero, at each close whose VIX nobody pinned, the engine reads
+    /// `u = ln(VIX / VIX at the same close with its draws at their means)`
+    /// (`economy::daily::project_close_state`): the VIX's own noise and jumps,
+    /// with no return response, fear memory or target in it. It then
+    /// multiplies both variance components and the mixture by
+    /// `exp(2 * value * u)`, within the clamps, and they decay at their own
+    /// persistences. 1.0 is the identity: a VIX innovation of 1% is a 1% move
+    /// in the factor's volatility. That is what the tape's HAR-X response says
+    /// a VIX move the return does not explain is. Its profile, 0.90 / 0.59 /
+    /// 0.46 / 0.27 over weeks 1, 2-4, months 2-3 and 4-6, is the tape's
+    /// variance impulse response (design `ptv22/vix-stabiliser`,
+    /// stabiliser/news/RULE.md). The forecast does not carry the news's
+    /// expectation. In [0, 2].
+    pub market_vol_vix_news: f64,
     /// The stress premium as the anchor's own pull, undone above the knee.
     /// 0.0, which every preset carries, is the shipped form, the capped hinge
     /// `cap * (1 - exp(-g * max(0, m - knee) / cap))`. Off zero (a switch, in
@@ -8056,6 +8074,7 @@ impl ModelParams {
             vix_stress_premium_knee: 0.0,
             vix_stress_premium_cap: 0.0,
             vix_stress_premium_memory: 0.0,
+            market_vol_vix_news: 0.0,
             vix_stress_premium_undo: 0.0,
             vix_fear_uptake: 0.0,
             vix_fear_half_life: 0.0,
@@ -10683,6 +10702,7 @@ impl ModelParams {
             "vix_stress_premium_knee" => self.vix_stress_premium_knee,
             "vix_stress_premium_cap" => self.vix_stress_premium_cap,
             "vix_stress_premium_memory" => self.vix_stress_premium_memory,
+            "market_vol_vix_news" => self.market_vol_vix_news,
             "vix_stress_premium_undo" => self.vix_stress_premium_undo,
             "vix_fear_uptake" => self.vix_fear_uptake,
             "vix_fear_half_life" => self.vix_fear_half_life,
@@ -11075,6 +11095,7 @@ impl ModelParams {
             "vix_stress_premium_knee" => out.vix_stress_premium_knee = value,
             "vix_stress_premium_cap" => out.vix_stress_premium_cap = value,
             "vix_stress_premium_memory" => out.vix_stress_premium_memory = value,
+            "market_vol_vix_news" => out.market_vol_vix_news = value,
             "vix_stress_premium_undo" => out.vix_stress_premium_undo = value,
             "vix_fear_uptake" => out.vix_fear_uptake = value,
             "vix_fear_half_life" => out.vix_fear_half_life = value,
@@ -11956,6 +11977,12 @@ impl ModelParams {
                 "vix_stress_premium_cap is {}. It is the largest log premium of the \
                  published VIX over the state, in [0, 1].",
                 self.vix_stress_premium_cap));
+        }
+        if !(self.market_vol_vix_news >= 0.0 && self.market_vol_vix_news <= 2.0) {
+            return Err(format!(
+                "market_vol_vix_news is {}. It is the loading of the VIX's own \
+                 innovation on the factor's volatility, in [0, 2]; 1 is the identity, 0 is off.",
+                self.market_vol_vix_news));
         }
         if !(self.vix_stress_premium_memory >= 0.0 && self.vix_stress_premium_memory <= 1.0) {
             return Err(format!(
@@ -13071,6 +13098,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "vix_stress_premium_memory",
     "vix_stress_premium_undo",
     "vix_stress_premium_knee",
+    "market_vol_vix_news",
     "vix_fear_uptake",
     "vix_fear_half_life",
     "unemployment_natural_pull",
@@ -13394,6 +13422,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "vix_stress_premium_cap",
         "vix_stress_premium_memory",
         "vix_stress_premium_undo",
+        "market_vol_vix_news",
         "vix_fear_uptake",
         "vix_fear_half_life",
         "fed_put_gain",

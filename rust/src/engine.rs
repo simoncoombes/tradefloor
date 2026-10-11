@@ -9150,7 +9150,23 @@ impl Engine {
         if let Some(next) = oil_drift_next {
             inputs.oil_target_drift = Some((self.oil_target_drift, next));
         }
+        // THE VIX'S OWN INNOVATION AS VARIANCE NEWS (`market_vol_vix_news`):
+        // tonight's VIX with its draws at their means, before the step draws.
+        // Arithmetic on a copy, no draw; nothing at 0.0 or on a pinned VIX.
+        let news_mean_vix = if self.params.market_vol_vix_news != 0.0 && pins_today & PIN_VIX == 0 {
+            Some(crate::economy::daily::project_close_state(&self.economy, &inputs).vix)
+        } else {
+            None
+        };
         self.economy = update_economy_daily(&self.economy, &inputs, rng);
+        if let Some(mean_vix) = news_mean_vix {
+            let vix = self.economy.vix;
+            if vix > 0.0 && mean_vix > 0.0 {
+                let u = crate::mathx::log(vix / mean_vix);
+                let m = crate::mathx::exp(2.0 * self.params.market_vol_vix_news * u);
+                self.market_vol.scale_variance(&self.params, m);
+            }
+        }
         // The host's premium on the target (`set_vix_target_premium`), read
         // by the step above, faded for the next close.
         self.fade_vix_target_premium();

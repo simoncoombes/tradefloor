@@ -198,6 +198,16 @@ same with them on as off.
   switch, and the state hash and `manifest.state_hash` cover them behind tags
   48 and 49 only then. Every known-answer digest is where it was.
 
+### The VIX's own innovation as variance news
+
+- `market_vol_vix_news` is a new dial. It is 0.0 on every preset and left out of the digest there. Off zero, each
+  close whose VIX nobody pinned reads the VIX's own innovation, its log ratio to the same close with the draws at
+  their means. It then multiplies the market factor's variance components by `exp(2 * value * u)`, within their
+  clamps. At 1.0 a 1% VIX innovation is a 1% move in the factor's volatility.
+- `market_vol_vix_excursion`: the forecast's factor close now reads the VIX against each track's own read-back, as
+  the engine's close does. It used the constant anchor whatever the switch said.
+- Every known-answer digest is where it was.
+
 ### The published VIX's stress memory at its own rate
 
 - `vix_stress_premium_memory` is a new dial, 0.0 on every preset and left

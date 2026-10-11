@@ -1333,6 +1333,9 @@ PERTURBATIONS = [
     ("vix_stress_premium_cap", 0.25, False),
     # INERT: read only with vix_stress_premium non-zero.
     ("vix_stress_premium_memory", 0.0556, False),
+    # LIVE on the probe: every free close's VIX innovation scales the factor's
+    # variance, so the next session's draws move.
+    ("market_vol_vix_news", 1.0, True),
     # INERT: read only with vix_stress_premium non-zero.
     ("vix_stress_premium_undo", 1.0, False),
     # INERT on this probe, measured: the put reads the index's fall since
