@@ -563,6 +563,14 @@ OUT_OF_SCOPE = {
         "stood (a branch on `== 0.0` in `close_yields` and the meeting's "
         "target), and `zlb_unmet` is neither written, snapshotted nor hashed; "
         "at 0.0 it is also left out of the model's digest",
+    "fed_rstar_sd":
+        "inert at 0.0: the neutral real rate is `fed_neutral_real_rate`, "
+        "constant, as it stood; the process's deviation and key are neither "
+        "stepped, snapshotted nor hashed; at 0.0 it is also left out of the "
+        "model's digest",
+    "fed_rstar_persistence":
+        "inert at 0.0 and read only with `fed_rstar_sd` set; at 0.0 it is "
+        "also left out of the model's digest",
     "fed_neutral_real_rate":
         "inert at 0.0: the Taylor rule's neutral is the one that stood (a "
         "branch on `== 0.0` in the meeting); at 0.0 it is also left out of "

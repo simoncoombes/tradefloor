@@ -1182,6 +1182,27 @@ pub struct ModelParams {
     /// economy's own real-rate term (inflation's suppression above a real
     /// rate of 0) is not moved. In [-2, 5].
     pub fed_neutral_real_rate: f64,
+    /// The quarterly innovation sd of a slow process for the neutral real
+    /// rate, points. 0.0, on every shipped preset, is no process (the
+    /// neutral real rate is `fed_neutral_real_rate`, constant), and a value
+    /// of 0.0 is left out of the model's digest.
+    ///
+    /// Off zero the Taylor rule's neutral real rate is
+    /// `fed_neutral_real_rate` plus a deviation that follows an AR(1) at
+    /// `fed_rstar_persistence` a quarter (63 sessions), stepped each session
+    /// on its own key (`GameRng::keyed(key, RSTAR_TAG, session)`, so no
+    /// stream moves) and opened at a draw from its stationary distribution.
+    /// The deviation and its key are snapshotted and hashed only with this
+    /// set. Fitted to the Holston-Laubach-Williams US one-sided r* itself,
+    /// 1990Q1-2025Q4, about its mean 1.996: phi 0.9819 (HAC se 0.0125),
+    /// sigma 0.1498 a quarter, a half-life of 9.5 years and an
+    /// unconditional sd of 0.79 against the series' 1.01 (design PR #9,
+    /// zlbtime/rstar). In [0, 2].
+    pub fed_rstar_sd: f64,
+    /// The quarterly persistence of the neutral real rate's process
+    /// (`fed_rstar_sd`). 0.0, on every shipped preset, is read by nothing,
+    /// and a value of 0.0 is left out of the model's digest. In [0, 1].
+    pub fed_rstar_persistence: f64,
     /// The oil price's lower and upper bounds, dollars. 0.0, on every shipped
     /// preset, is the standing 35 and 150, and a value of 0.0 is left out of
     /// the model's digest.
@@ -8048,6 +8069,8 @@ impl ModelParams {
             treasury_zlb_path: 0.0,
             treasury_zlb_haven_gain: 0.0,
             fed_neutral_real_rate: 0.0,
+            fed_rstar_sd: 0.0,
+            fed_rstar_persistence: 0.0,
             oil_price_floor: 0.0,
             oil_price_ceiling: 0.0,
             oil_target_drift_reversion: 0.0,
@@ -10680,6 +10703,8 @@ impl ModelParams {
             "treasury_zlb_path" => self.treasury_zlb_path,
             "treasury_zlb_haven_gain" => self.treasury_zlb_haven_gain,
             "fed_neutral_real_rate" => self.fed_neutral_real_rate,
+            "fed_rstar_sd" => self.fed_rstar_sd,
+            "fed_rstar_persistence" => self.fed_rstar_persistence,
             "oil_price_floor" => self.oil_price_floor,
             "oil_price_ceiling" => self.oil_price_ceiling,
             "oil_target_drift_reversion" => self.oil_target_drift_reversion,
@@ -11077,6 +11102,8 @@ impl ModelParams {
             "treasury_zlb_path" => out.treasury_zlb_path = value,
             "treasury_zlb_haven_gain" => out.treasury_zlb_haven_gain = value,
             "fed_neutral_real_rate" => out.fed_neutral_real_rate = value,
+            "fed_rstar_sd" => out.fed_rstar_sd = value,
+            "fed_rstar_persistence" => out.fed_rstar_persistence = value,
             "oil_price_floor" => out.oil_price_floor = value,
             "oil_price_ceiling" => out.oil_price_ceiling = value,
             "oil_target_drift_reversion" => out.oil_target_drift_reversion = value,
@@ -12525,6 +12552,18 @@ impl ModelParams {
                  rate, in [-2, 5]; 0 is the neutral that stood.",
                 self.fed_neutral_real_rate));
         }
+        if !(0.0..=2.0).contains(&self.fed_rstar_sd) {
+            return Err(format!(
+                "fed_rstar_sd is {}. It is the quarterly innovation sd of the neutral real rate's \
+                 process, in [0, 2]; 0 is no process.",
+                self.fed_rstar_sd));
+        }
+        if !(0.0..=1.0).contains(&self.fed_rstar_persistence) {
+            return Err(format!(
+                "fed_rstar_persistence is {}. It is the neutral real rate's quarterly AR(1) \
+                 coefficient, in [0, 1].",
+                self.fed_rstar_persistence));
+        }
         if !(self.oil_forecast_clamp == 0.0 || self.oil_forecast_clamp == 1.0) {
             return Err(format!(
                 "oil_forecast_clamp is {}. It is a switch: 0 (the forecast publishes the \
@@ -13230,6 +13269,8 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "treasury_zlb_path",
     "treasury_zlb_haven_gain",
     "fed_neutral_real_rate",
+    "fed_rstar_sd",
+    "fed_rstar_persistence",
     "oil_price_floor",
     "oil_price_ceiling",
     "oil_inflation_passthrough",
@@ -13446,6 +13487,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "treasury_zlb_path",
         "treasury_zlb_haven_gain",
         "fed_neutral_real_rate",
+        "fed_rstar_sd",
+        "fed_rstar_persistence",
         "oil_price_floor",
         "oil_price_ceiling",
         "oil_inflation_passthrough",

@@ -991,6 +991,10 @@ PERTURBATIONS = [
     ("treasury_zlb_haven_gain", 0.05, True),
     # The Taylor rule's neutral real rate: the probe's meetings read the rule.
     ("fed_neutral_real_rate", 2.0, True),
+    # The r* process: its opening draw moves the rule from the first meeting.
+    ("fed_rstar_sd", 0.1498, True),
+    # The persistence alone is read by nothing (the sd is 0).
+    ("fed_rstar_persistence", 0.9819, False),
     # Oil's bounds from WTI in real terms. INERT on the probe: its burn-in's
     # oil stays inside 35 to 150, so moving the bounds outward moves nothing.
     ("oil_price_floor", 16.4, False),
@@ -2097,6 +2101,7 @@ COMPANIONS: dict[str, dict[str, float]] = {
     "fed_core_inflation": {"oil_inflation_passthrough": 1.0},
     "treasury_core_inflation": {"oil_inflation_passthrough": 1.0},
     # The unmet put needs the put and the priced path it decays like.
+    "fed_rstar_sd": {"fed_rstar_persistence": 0.9819},
     "treasury_zlb_path": {"fed_put_gain": 3.0, "fed_put_half_life": 126.0, "treasury_put_pricing": 1.0,
                           "treasury_path_pricing": 1.0, "treasury_path_half_life": 63.0},
     # The knee pulls at its half-life, and the pair is refused without it.
