@@ -224,6 +224,10 @@ pub struct PolicyOptions {
     /// rate, the real rate it sets at target. 0.0, on every preset, is the
     /// neutral that stood (a nominal 2.0 at target, a real rate of 0).
     pub neutral_real_rate: f64,
+    /// `treasury_2y_meeting_carry`: the share of the 2-year's standing gap
+    /// to the meeting's formula the meeting keeps. 0.0, on every preset, is
+    /// the reset that stood.
+    pub two_year_carry: f64,
 }
 
 /// [`PolicyOptions::shipped`].
@@ -261,6 +265,7 @@ impl PolicyOptions {
             zlb_path: 0.0,
             zlb_haven_gain: 0.0,
             neutral_real_rate: 0.0,
+            two_year_carry: 0.0,
         }
     }
 }
@@ -686,6 +691,9 @@ pub fn update_central_bank_with(
         0.0
     };
     let surprise = if path_on { surprise + (path_after - options.path_before) } else { surprise };
+    // The 2-year reads the policy rate undamped, so its news is the surprise
+    // as it stands here, before the 10-year's damping below.
+    let news_2y = surprise;
     // THE DAMPED PASS-THROUGH (`treasury_policy_damping`): the 10-year reads
     // the rate the ladder sets (the policy rate plus what the put owes) and
     // the priced path, pulled toward the neutral rate by the dial; the put's
@@ -751,6 +759,21 @@ pub fn update_central_bank_with(
     } else {
         new_economy.federal_funds_rate * 0.85 + new_economy.treasury_yield_10y * 0.15
     };
+    // THE 2-YEAR'S CARRY (`treasury_2y_meeting_carry`). The line above sets
+    // the level from the rate, which throws away the 2-year's standing gap
+    // to that formula: its own noise's excursion, the anticipated decision
+    // and the priced put. Off zero the meeting keeps `c` of the gap: the
+    // 2-year before the meeting moved by 0.85 of the decision's news and
+    // 0.15 of the 10-year's move. A branch: at 0.0 the level is the reset
+    // that stood.
+    if options.two_year_carry != 0.0 {
+        let legacy = new_economy.treasury_yield_2y;
+        let carried = economy.treasury_yield_2y
+            + 0.85 * news_2y
+            + 0.15 * (new_economy.treasury_yield_10y - economy.treasury_yield_10y);
+        new_economy.treasury_yield_2y =
+            clamp(legacy + options.two_year_carry * (carried - legacy), 0.0, 12.0);
+    }
 
     // ── Mortgage rate: three floors and a cap, applied in order ───────────
     // The order matters — each step reads the result of the last.
@@ -932,6 +955,38 @@ mod tests {
         let off = PolicyOptions { growth_cut: 2.0, ..PolicyOptions::shipped() };
         let c = update_central_bank_with(&bank, &economy, bank.next_meeting_date, &mut GameRng::new(1, 1), &off);
         assert_ne!(c.decision, Some(Decision::Cut));
+    }
+
+    /// `treasury_2y_meeting_carry`: at 0.0 the meeting sets the 2-year from
+    /// the rate, its gap to the formula gone; at 1.0 a held meeting keeps the
+    /// gap and moves the 2-year by 0.15 of the 10-year's move alone; at 0.5
+    /// it is halfway. The rate, the 10-year and the decision do not move.
+    #[test]
+    fn the_two_year_carry_keeps_the_gap_a_meeting_did_not_announce() {
+        let bank = create_initial_central_bank_state(0);
+        let mut economy = create_initial_economy_state(&InitialEconomyOptions::default());
+        economy.cycle_phase = CyclePhase::Expansion;
+        economy.gdp_growth = 2.5;
+        economy.federal_funds_rate = 2.0;
+        economy.inflation_rate = 2.0;
+        economy.unemployment_rate = bank.target_unemployment;
+        economy.treasury_yield_2y = 0.85 * 2.0 + 0.15 * economy.treasury_yield_10y + 0.4;
+        let run = |c: f64| {
+            let o = PolicyOptions { two_year_carry: c, ..PolicyOptions::shipped() };
+            let mut rng = GameRng::new(1, 1);
+            update_central_bank_with(&bank, &economy, bank.next_meeting_date, &mut rng, &o)
+        };
+        let (off, on, half) = (run(0.0), run(1.0), run(0.5));
+        assert_eq!(off.decision, Some(Decision::Hold));
+        assert_eq!(on.decision, off.decision);
+        assert_eq!(on.economy.federal_funds_rate.to_bits(), off.economy.federal_funds_rate.to_bits());
+        assert_eq!(on.economy.treasury_yield_10y.to_bits(), off.economy.treasury_yield_10y.to_bits());
+        let legacy = off.economy.federal_funds_rate * 0.85 + off.economy.treasury_yield_10y * 0.15;
+        assert_eq!(off.economy.treasury_yield_2y.to_bits(), legacy.to_bits());
+        let carried = economy.treasury_yield_2y
+            + 0.15 * (on.economy.treasury_yield_10y - economy.treasury_yield_10y);
+        assert!((on.economy.treasury_yield_2y - carried).abs() < 1e-12);
+        assert!((half.economy.treasury_yield_2y - 0.5 * (legacy + carried)).abs() < 1e-12);
     }
 
     /// `fed_neutral_real_rate`: at 0.0 the calm meeting at a rate of 2.0

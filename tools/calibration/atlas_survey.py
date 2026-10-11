@@ -694,6 +694,8 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # The Taylor rule's neutral real rate: off at the bottom, HLW's 1990-2025
     # high (3.9) at the top.
     "fed_neutral_real_rate": (0.0, 4.0),
+    # The 2-year's carry through a meeting: a share, so its own bounds.
+    "treasury_2y_meeting_carry": (0.0, 1.0),
     # The share of oil demand supply answers on the daily step. Bounded by
     # meaning again: 0.0 is the hardcoded zero the reference writes, 1.0 is
     # the value that makes the inventory random walk driftless, and past 1.0

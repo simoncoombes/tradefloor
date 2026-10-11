@@ -125,6 +125,12 @@ same with them on as off.
   `usd_crisis_vix_threshold` (0.0 the standing 0.05), read by the dollar's
   step and by the forecast's expected bid. FRED DTWEXM against CBOE's VIX
   measures 0.001.
+- `treasury_2y_meeting_carry` is a new dial, 0.0 on every preset and left
+  out of the digest there: the share of the 2-year's standing gap to the
+  meeting's formula (`0.85 (ff + path) + 0.15 x 10y`) that a meeting keeps.
+  At 1.0 the meeting moves the 2-year by 0.85 of the decision's news and
+  0.15 of the 10-year's move instead of resetting it. FOMC days carry 0.046
+  of DGS2's daily variance off the zero bound (1994-2025).
 - `fed_neutral_real_rate` is a new dial, 0.0 on every preset and left out of
   the digest there: points added to the neutral rate of the central bank's
   Taylor rule, whose neutral at target is a nominal 2.0 (a real rate of 0).

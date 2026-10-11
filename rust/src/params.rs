@@ -1182,6 +1182,26 @@ pub struct ModelParams {
     /// economy's own real-rate term (inflation's suppression above a real
     /// rate of 0) is not moved. In [-2, 5].
     pub fed_neutral_real_rate: f64,
+    /// The share of the 2-year's standing gap to the meeting's formula that a
+    /// central-bank meeting keeps. 0.0, on every shipped preset, is the
+    /// meeting as it stood, and a value of 0.0 is left out of the model's
+    /// digest.
+    ///
+    /// The meeting sets the 2-year to `0.85 (ff + path) + 0.15 x 10y` (the JS
+    /// blend). Between meetings, with `treasury_2y_noise` on, the 2-year is
+    /// its own process pulled toward a formula that also prices the
+    /// anticipated decision, the put and the zero bound's path, so the reset
+    /// throws its standing gap away: off the bound on R22O5czN, meeting days
+    /// are 3% of sessions and carry 41% of the 2-year's variance. Off zero
+    /// the meeting's 2-year is `legacy + c (carried - legacy)`, with
+    /// `carried` the 2-year before the meeting moved by 0.85 of the
+    /// decision's news (the rate change, the put share the curve had priced
+    /// and the priced path's move, undamped) and 0.15 of the 10-year's move,
+    /// and the anticipated meeting's books carry what the 2-year keeps. The
+    /// anchor is the scheduled FOMC days' share of DGS2's daily variance off
+    /// the zero bound, 1994-2025: 0.046 (se 0.006) on 0.031 of sessions. In
+    /// [0, 1].
+    pub treasury_2y_meeting_carry: f64,
     /// The oil price's lower and upper bounds, dollars. 0.0, on every shipped
     /// preset, is the standing 35 and 150, and a value of 0.0 is left out of
     /// the model's digest.
@@ -8048,6 +8068,7 @@ impl ModelParams {
             treasury_zlb_path: 0.0,
             treasury_zlb_haven_gain: 0.0,
             fed_neutral_real_rate: 0.0,
+            treasury_2y_meeting_carry: 0.0,
             oil_price_floor: 0.0,
             oil_price_ceiling: 0.0,
             oil_target_drift_reversion: 0.0,
@@ -10680,6 +10701,7 @@ impl ModelParams {
             "treasury_zlb_path" => self.treasury_zlb_path,
             "treasury_zlb_haven_gain" => self.treasury_zlb_haven_gain,
             "fed_neutral_real_rate" => self.fed_neutral_real_rate,
+            "treasury_2y_meeting_carry" => self.treasury_2y_meeting_carry,
             "oil_price_floor" => self.oil_price_floor,
             "oil_price_ceiling" => self.oil_price_ceiling,
             "oil_target_drift_reversion" => self.oil_target_drift_reversion,
@@ -11077,6 +11099,7 @@ impl ModelParams {
             "treasury_zlb_path" => out.treasury_zlb_path = value,
             "treasury_zlb_haven_gain" => out.treasury_zlb_haven_gain = value,
             "fed_neutral_real_rate" => out.fed_neutral_real_rate = value,
+            "treasury_2y_meeting_carry" => out.treasury_2y_meeting_carry = value,
             "oil_price_floor" => out.oil_price_floor = value,
             "oil_price_ceiling" => out.oil_price_ceiling = value,
             "oil_target_drift_reversion" => out.oil_target_drift_reversion = value,
@@ -12519,6 +12542,12 @@ impl ModelParams {
                  20 at the zero bound, in [0, 1].",
                 self.treasury_zlb_haven_gain));
         }
+        if !(0.0..=1.0).contains(&self.treasury_2y_meeting_carry) {
+            return Err(format!(
+                "treasury_2y_meeting_carry is {}. It is the share of the 2-year's standing gap to \
+                 the meeting's formula a meeting keeps, in [0, 1]; 0 is the reset that stood.",
+                self.treasury_2y_meeting_carry));
+        }
         if !(-2.0..=5.0).contains(&self.fed_neutral_real_rate) {
             return Err(format!(
                 "fed_neutral_real_rate is {}. It is the points added to the Taylor rule's neutral \
@@ -13230,6 +13259,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "treasury_zlb_path",
     "treasury_zlb_haven_gain",
     "fed_neutral_real_rate",
+    "treasury_2y_meeting_carry",
     "oil_price_floor",
     "oil_price_ceiling",
     "oil_inflation_passthrough",
@@ -13446,6 +13476,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "treasury_zlb_path",
         "treasury_zlb_haven_gain",
         "fed_neutral_real_rate",
+        "treasury_2y_meeting_carry",
         "oil_price_floor",
         "oil_price_ceiling",
         "oil_inflation_passthrough",

@@ -9421,6 +9421,7 @@ impl Engine {
             zlb_path: self.priced_zlb_path(),
             zlb_haven_gain: self.params.treasury_zlb_haven_gain,
             neutral_real_rate: self.params.fed_neutral_real_rate,
+            two_year_carry: self.params.treasury_2y_meeting_carry,
         }
     }
 
@@ -10985,7 +10986,16 @@ impl Engine {
         self.policy_anticipation_priced = priced;
         let f10 = 1.0 - self.params.treasury_policy_damping;
         let f2 = 0.85 + 0.15 * f10;
-        let (held10, held2) = if meeting_held { (0.5 * f10 * before, 0.075 * f10 * before) } else { (f10 * before, f2 * before) };
+        // A meeting that keeps the 2-year's gap (`treasury_2y_meeting_carry`
+        // c) leaves it holding `0.85 c` of the anticipation besides the 10-
+        // year's share. A branch: at 0.0 the held part is as it stood.
+        let carry = self.params.treasury_2y_meeting_carry;
+        let held2_meeting = if carry != 0.0 {
+            0.075 * f10 * before + 0.85 * carry * before
+        } else {
+            0.075 * f10 * before
+        };
+        let (held10, held2) = if meeting_held { (0.5 * f10 * before, held2_meeting) } else { (f10 * before, f2 * before) };
         let (d10, d2) = (f10 * priced - held10, f2 * priced - held2);
         let e = &mut self.economy;
         if pins_today & PIN_T10 == 0 {

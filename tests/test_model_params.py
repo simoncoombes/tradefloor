@@ -991,6 +991,11 @@ PERTURBATIONS = [
     ("treasury_zlb_haven_gain", 0.05, True),
     # The Taylor rule's neutral real rate: the probe's meetings read the rule.
     ("fed_neutral_real_rate", 2.0, True),
+    # The 2-year's carry through a meeting. INERT on the probe's market: the
+    # burn-in's meetings move the 2-year (pt-v20's own 2-year noise leaves it
+    # a gap to keep: 0.15% against 0.23% after the third close, measured
+    # 2026-10-11), but no column this table reads takes the 2-year.
+    ("treasury_2y_meeting_carry", 1.0, False),
     # Oil's bounds from WTI in real terms. INERT on the probe: its burn-in's
     # oil stays inside 35 to 150, so moving the bounds outward moves nothing.
     ("oil_price_floor", 16.4, False),
