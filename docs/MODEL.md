@@ -2384,10 +2384,11 @@ idiosyncratic jumps a year, of standard deviation 7.5%.
 
 Every change in the model price at a fixed published valuation is booked to
 one of ten factors, which `engine.truth()` reports
-(`market/factors.rs:61-64`, `market/tick.rs:1171-1190`). An eleventh column,
+(`market/factors.rs:69-73`, `market/tick.rs:1481-1512`). An eleventh column,
 the fair-value shift, books what left $s$ for the fair-value level. It is
-new in 0.8.5 (`market/factors.rs`, `python_arrow.rs`), and each tick books
-as follows:
+new in 0.8.5 (`market/factors.rs`, `python_arrow.rs`). A twelfth,
+`dividend`, new in 0.10.0, books the change in $s$ at an ex-date open
+(`Engine::go_ex`). Each tick books as follows:
 
 | Slot | Factor | Amount |
 |---|---|---|
@@ -2402,6 +2403,7 @@ as follows:
 | 8 | jump | the jump, at the close, the whole shock |
 | 9 | overnight | the overnight change (zero on pt-v20) |
 | 10 | fair value shift | $-\Delta_{i,t}^{v}$, and $-\Delta_{i}^{v,J}$ at the close: the part that left $s$ for $v$ |
+| 11 | dividend | the change in $s$ at an ex-date open, where the price drops by the dividend and fair value gives up its accrual; on the day's first row, zero on every model without dividends (`dividend_payout_share`) |
 
 Slots 3, 6 and 8 keep the whole shock, because that is what moved the
 price; slot 10 takes the permanent part back out of $s$. So, over any run
@@ -2409,17 +2411,20 @@ of rows, to rounding, except a tick where the $\pm\bar s$ cap binds, which
 no slot records:
 
 ```math
-\sum_{k=0}^{10} c_k = \Delta s,
+\sum_{k=0}^{11} c_k = \Delta s,
 \qquad
-\sum_{k=0}^{9} c_k = \Delta s + \sum \Delta^{v} = \Delta s + \Delta v + \tfrac12 \sum \big(\Delta^{v}\big)^{2}
+\sum_{k \ne 10} c_k = \Delta s + \sum \Delta^{v} = \Delta s + \Delta v + \tfrac12 \sum \big(\Delta^{v}\big)^{2}
 ```
 
-The first ten are the model price's log move at a fixed published
-valuation, plus the Ito term. On pt-v19 slot 10 is always zero and the ten
-sum to $\Delta s$. The close's share is written on the next day's first
-row, beside the jump. `explain` adds two more terms, the change in
-$\ln V$ (which contains $\Delta v$) and the book's $\ln(P/P^{\ast})$, so
-its thirteen terms sum to $\Delta \ln P$.
+The eleven without slot 10 are the model price's log move at a fixed
+published valuation, plus the Ito term. On pt-v19 slots 10 and 11 are
+always zero and the first ten sum to $\Delta s$. The close's share is
+written on the next day's first row, beside the jump. `explain` adds three
+more terms, the change in $\ln V$ (`fair_value`, which contains $\Delta v$),
+the book's $\ln(P/P^{\ast})$ (`book`), and `repricing`, the change in the
+log distance from the day's last print to the price the close left (the
+close's re-mark, zero through pt-v19), so its fifteen terms sum to
+$\Delta \ln P$ (`python/tradefloor/explain.py`, `CONTRIBUTIONS`).
 
 **The noise legs.** Slot 6 lumps three shocks together, and on pt-v21 it
 moves prices most, summed over a 20-name roster, on about four days in
