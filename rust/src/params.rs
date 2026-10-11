@@ -1167,6 +1167,21 @@ pub struct ModelParams {
     /// 0.13) in the 2008-2015 falls of 10% that began at the zero bound. In
     /// [0, 1].
     pub treasury_zlb_haven_gain: f64,
+    /// Points added to the neutral rate of the central bank's Taylor rule.
+    /// 0.0, on every shipped preset, is the neutral that stood, and a value
+    /// of 0.0 is left out of the model's digest.
+    ///
+    /// The rule's neutral is `2.0 + 0.5 (pi / pi* - 1)` (the JS formula):
+    /// at target a nominal 2.0, which is Taylor's (1993) r* of 2 without his
+    /// `+ pi` term, so the real rate it sets at target is 0. Off zero the
+    /// dial is added to it, and the meeting and the shadow meeting read the
+    /// result. The anchor is the Holston-Laubach-Williams US natural rate
+    /// (NY Fed, one-sided), whose mean over 1990Q1-2025Q4 is 2.0; through
+    /// the rule on FRED's core CPI and unemployment, DFF sits 1.69 over the
+    /// rule off the zero bound at 0.0 and 0.31 under it at 2.0. The
+    /// economy's own real-rate term (inflation's suppression above a real
+    /// rate of 0) is not moved. In [-2, 5].
+    pub fed_neutral_real_rate: f64,
     /// The oil price's lower and upper bounds, dollars. 0.0, on every shipped
     /// preset, is the standing 35 and 150, and a value of 0.0 is left out of
     /// the model's digest.
@@ -8032,6 +8047,7 @@ impl ModelParams {
             treasury_core_inflation: 0.0,
             treasury_zlb_path: 0.0,
             treasury_zlb_haven_gain: 0.0,
+            fed_neutral_real_rate: 0.0,
             oil_price_floor: 0.0,
             oil_price_ceiling: 0.0,
             oil_target_drift_reversion: 0.0,
@@ -10663,6 +10679,7 @@ impl ModelParams {
             "treasury_core_inflation" => self.treasury_core_inflation,
             "treasury_zlb_path" => self.treasury_zlb_path,
             "treasury_zlb_haven_gain" => self.treasury_zlb_haven_gain,
+            "fed_neutral_real_rate" => self.fed_neutral_real_rate,
             "oil_price_floor" => self.oil_price_floor,
             "oil_price_ceiling" => self.oil_price_ceiling,
             "oil_target_drift_reversion" => self.oil_target_drift_reversion,
@@ -11059,6 +11076,7 @@ impl ModelParams {
             "treasury_core_inflation" => out.treasury_core_inflation = value,
             "treasury_zlb_path" => out.treasury_zlb_path = value,
             "treasury_zlb_haven_gain" => out.treasury_zlb_haven_gain = value,
+            "fed_neutral_real_rate" => out.fed_neutral_real_rate = value,
             "oil_price_floor" => out.oil_price_floor = value,
             "oil_price_ceiling" => out.oil_price_ceiling = value,
             "oil_target_drift_reversion" => out.oil_target_drift_reversion = value,
@@ -12501,6 +12519,12 @@ impl ModelParams {
                  20 at the zero bound, in [0, 1].",
                 self.treasury_zlb_haven_gain));
         }
+        if !(-2.0..=5.0).contains(&self.fed_neutral_real_rate) {
+            return Err(format!(
+                "fed_neutral_real_rate is {}. It is the points added to the Taylor rule's neutral \
+                 rate, in [-2, 5]; 0 is the neutral that stood.",
+                self.fed_neutral_real_rate));
+        }
         if !(self.oil_forecast_clamp == 0.0 || self.oil_forecast_clamp == 1.0) {
             return Err(format!(
                 "oil_forecast_clamp is {}. It is a switch: 0 (the forecast publishes the \
@@ -13205,6 +13229,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "treasury_core_inflation",
     "treasury_zlb_path",
     "treasury_zlb_haven_gain",
+    "fed_neutral_real_rate",
     "oil_price_floor",
     "oil_price_ceiling",
     "oil_inflation_passthrough",
@@ -13420,6 +13445,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "treasury_core_inflation",
         "treasury_zlb_path",
         "treasury_zlb_haven_gain",
+        "fed_neutral_real_rate",
         "oil_price_floor",
         "oil_price_ceiling",
         "oil_inflation_passthrough",

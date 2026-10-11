@@ -563,6 +563,10 @@ OUT_OF_SCOPE = {
         "stood (a branch on `== 0.0` in `close_yields` and the meeting's "
         "target), and `zlb_unmet` is neither written, snapshotted nor hashed; "
         "at 0.0 it is also left out of the model's digest",
+    "fed_neutral_real_rate":
+        "inert at 0.0: the Taylor rule's neutral is the one that stood (a "
+        "branch on `== 0.0` in the meeting); at 0.0 it is also left out of "
+        "the model's digest",
     "treasury_zlb_haven_gain":
         "inert at 0.0: `close_yields` and the meeting's 10-year target branch "
         "on `== 0.0` and take the term premium as it stood; at 0.0 it is also "

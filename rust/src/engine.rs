@@ -9420,6 +9420,7 @@ impl Engine {
             },
             zlb_path: self.priced_zlb_path(),
             zlb_haven_gain: self.params.treasury_zlb_haven_gain,
+            neutral_real_rate: self.params.fed_neutral_real_rate,
         }
     }
 

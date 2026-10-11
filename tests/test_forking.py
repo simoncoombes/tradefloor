@@ -1141,6 +1141,8 @@ def _nothing_dormant():
                    # The zero bound's pieces (the put and path are on above).
                    treasury_zlb_path=0.5,
                    treasury_zlb_haven_gain=0.05,
+                   # The Taylor rule's neutral real rate (HLW, 1990-2025).
+                   fed_neutral_real_rate=2.0,
                    oil_price_floor=16.4,
                    oil_price_ceiling=279.0,
                    # The contracts' margin (pt-v22 phase 1).
@@ -1433,16 +1435,6 @@ UNREACHED_SNAPSHOT_FIELDS = {
         "tests/test_postcut.py::test_the_hashes_agree_and_a_restore_"
         "reproduces_the_run cuts, carries a non-zero path across a restore "
         "and asserts the state hash reads it.",
-    "fed_stress_vix_max":
-        "the central bank's stress level, the highest VIX published since "
-        "the last meeting (`fed_stress_cut`). `CRISIS` holds the VIX at 45 "
-        "every session, so each close writes 45 whatever the level was, and "
-        "an engine restored without it (0.0) is back at 45 at its first "
-        "close, before any meeting reads it. What it takes to see it is a "
-        "VIX that spikes and falls back before a meeting. tests/"
-        "test_bond_timing.py::test_a_restore_without_the_stress_level_loses_"
-        "the_cut is that scenario: without the key the meeting holds where "
-        "the parent cut.",
     "earnings_key":
         "the earnings calendar's key. It is derived from the seed the engine "
         "was built with, and this guard restores into an engine built from "
