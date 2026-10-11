@@ -2421,6 +2421,38 @@ row, beside the jump. `explain` adds two more terms, the change in
 $\ln V$ (which contains $\Delta v$) and the book's $\ln(P/P^{\ast})$, so
 its thirteen terms sum to $\Delta \ln P$.
 
+**The noise legs.** Slot 6 lumps three shocks together, and on pt-v21 it
+moves prices most, summed over a 20-name roster, on about four days in
+five. Three more columns split it into the legs of $\varepsilon_{i,t}$,
+each at the scale slot 6 carries (`Engine.NOISE_LEGS`, `market/factors.rs:1176-1184`,
+`market/tick.rs:1523-1528`, `Engine::noise_legs` in `engine.rs`):
+
+| Column | Leg | Amount |
+|---|---|---|
+| `market_noise` | market | $u(\tau_t)\,(\Gamma_t M_{i,t} + \upsilon_{i,d})$ |
+| `sector_noise` | sector | $u(\tau_t)\,\xi_i\,\ell_i\,G_{k(i),t}$ |
+| `company_noise` | company | $u(\tau_t)\,\xi_i\,I_{i,t}$ |
+
+The recentring $\upsilon$ is booked to the market leg, because it gives
+back the mean of the market leg's down-tick tilt and is scaled by the
+market factor's conditional sigma. On a closed tick $u$ is the closed
+tick's 0.15. The legs are not slots: the attribution row stays twelve
+wide, `Engine.FACTORS` stays the twelve names, and slot 6 stays the whole
+shock, so per tick, per day and over any run of rows, to rounding,
+
+```math
+c^{\text{market}} + c^{\text{sector}} + c^{\text{company}} = c_6
+```
+
+and none of the identities above changes. Adding the legs to the slots
+would count the noise twice. `truth()` carries them after the twelve, and
+`attribution()` and `explain` read them. They are reporting state: nothing
+on the price path reads them, the state hash does not cover them, and no
+trajectory or digest moved when they were added. Under a night split
+(pt-v21) the night's market, sector and company draws are booked whole in
+`overnight`, slot 9, and are not in the legs; `Engine.noise_split`, the
+split the per-name GJR steps on, carries both.
+
 ## Volatility
 
 Three variance processes set the size of the tick shocks. All three update

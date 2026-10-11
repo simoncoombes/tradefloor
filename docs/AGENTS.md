@@ -123,6 +123,33 @@ scores on the same days, and `explanation_edge`, the accuracy minus the
 baseline, and its repr prints the three together. Only the edge means
 anything. Quote it, or all three, and never the accuracy alone.
 
+`random_noise` wins so often because it lumps three shocks together: each
+name's loading on the market's draw, on its sector's draw, and its own.
+`Engine.NOISE_LEGS` names them, `market_noise`, `sector_noise` and
+`company_noise`; they sum to `random_noise`, and `truth()`,
+`attribution()` and `explain` carry them beside the twelve.
+`evaluate(..., noise_legs=True)` scores `explain` against the ten drivers
+with `random_noise` replaced by its three legs, so the answer names which
+shock moved prices. Its cards say `noise-legs`, and their accuracy,
+baseline and edge are not comparable with a card scored on the whole
+column. The default is the score it always was. On the same ten seeds
+(1 to 10, each on `Universe.random(20, seed=seed)`, 20 days of pt-v21,
+the default schedule), the constant answers score:
+
+| Answer every day | Whole column: min, median, max | Legs split: min, median, max |
+|---|---|---|
+| `random_noise` | 0.60, 0.825, 1.0 | never right |
+| `company_noise` | never right | 0.15, 0.35, 0.95 |
+| `market_noise` | never right | 0.05, 0.225, 0.50 |
+| `sector_noise` | never right | 0.00, 0.00, 0.05 |
+| `overnight` | 0.00, 0.175, 0.35 | 0.00, 0.25, 0.45 |
+| `jump` | 0.00, 0.00, 0.05 | 0.00, 0.00, 0.05 |
+| best constant, per seed (`explanation_baseline`) | 0.60, 0.825, 1.0 | 0.35, 0.475, 0.95 |
+
+So the split key lowers the bar a constant answer sets from a median of
+0.83 to 0.48. It does not remove it: `company_noise` still wins 19 of 20
+days on one seed, and the edge is still the only number to quote.
+
 ## Agent frameworks
 
 The framework makes the decisions and tradefloor runs the market. Each

@@ -20,7 +20,74 @@ priced at its carry fair value plus a basis, with its own book, and settled
 on the index of its expiry session's opening prints. Stock prices are the
 same with them on as off.
 
+`random_noise` is now split into its three legs, `market_noise`,
+`sector_noise` and `company_noise`, which sum to it. On pt-v21 the whole
+column moved prices most on about four days in five, so naming it every
+day scored 0.60 to 1.0 on `explanation_accuracy` (median 0.83, seeds 1 to
+10, 20 days, 20 names). `evaluate(noise_legs=True)` scores against the legs
+instead, where the best constant answer scores 0.35 to 0.95 (median 0.475)
+on the same days. The default score, every price and every known-answer
+digest are where they were.
+
 <!-- release-note-ends -->
+
+### The noise legs
+
+- `Engine.NOISE_LEGS` is `["market_noise", "sector_noise",
+  "company_noise"]`: the market leg (the crash-amplified loading on the
+  market draw plus the down-tick recentring, which is booked here), the
+  sector leg and the company's own. They sum to `random_noise` to rounding,
+  per tick and per day. A list of its own beside `Engine.FACTORS`, which is
+  still the twelve names in the same order: the twelve sum to the change in
+  `mispricing_s`, and callers sum, rank and size buffers by them, so the
+  legs among them would count the noise twice.
+- `Engine.attribution` accepts the three names. `truth()` carries three
+  columns after `dividend`, so its schema widens from 18 columns to 21;
+  every earlier column is where it was. `Explanation.noise_legs` holds the
+  day's legs, `check()` tests that they sum to `random_noise` and match the
+  tape, and `to_json` carries them. They are not contributions in the tree,
+  so the fifteen still sum to the move.
+- `evaluate(noise_legs=True)` ranks `harness.SPLIT_DRIVER_NAMES`, the ten
+  drivers with `random_noise` replaced by its legs, and the card's
+  `noise_legs` is True and its repr says `noise-legs`. Off, the default,
+  the scorer ranks what it always did, `as_dict` leaves the slot out, and
+  the traded known-answer digest is where it was. `Oracle(noise_legs=True)`
+  answers on the split key. The constant-answer baseline on seeds 1 to 10
+  (`Universe.random(20, seed=seed)`, 20 days of pt-v21), min, median and
+  max, whole column then legs split: `random_noise` 0.60, 0.825, 1.0 then
+  never right; `company_noise` 0.15, 0.35, 0.95; `market_noise` 0.05,
+  0.225, 0.50; `sector_noise` 0.00, 0.00, 0.05; `overnight` 0.00, 0.175,
+  0.35 then 0.00, 0.25, 0.45; `jump` 0.00, 0.00, 0.05 on both; the best
+  constant per seed 0.60, 0.825, 1.0 then 0.35, 0.475, 0.95.
+  docs/AGENTS.md, "Explanation scores", has the table.
+- In Rust: `market::factors::NOISE_LEG_KEYS`, `Engine::noise_legs`,
+  `Engine::noise_leg_column`, `Engine::tick_noise_legs`,
+  `Engine::noise_legs_follow_parts` and `Engine::restore_noise_legs`;
+  `SessionBuffer::noise_legs` and `TickTruth::noise_legs` (both
+  `#[non_exhaustive]` structs gain a field). No width moves:
+  `COMPONENT_COUNT` stays 12, and a legs row is `NOISE_PART_COUNT` (3) wide.
+  `Engine::restore_noise_split` now also sets the legs to the parts it
+  restores; call `restore_noise_legs` after it for a night-split engine.
+- Why not `noise_split`: under a night split (pt-v21) the open adds the
+  night's three parts to the GJR's split, which the attribution books in
+  `overnight`, so `noise_split` sums to `garch_innovation` and not to
+  `random_noise`. Its docstring said it was the `random_noise` column's
+  split and now says what it carries. On every model without a night split
+  the legs and `noise_split` are the same sums to the bit.
+- Snapshots: `noise_legs` is a new optional key, carried only where the legs
+  differ from `noise_parts`, which is a night-split model after its first
+  open. Every other snapshot is byte for byte what it was. Neither
+  `Engine::state_hash` nor `manifest.state_hash` covers it, as neither covers
+  `session_tick` or `vix_anchor`, so no leaf moves. A pt-v21 snapshot
+  written before it restores, its legs read from the parts (so carrying the
+  night) until the next open resets them; `state_schema` stays 1.
+- No trajectory moves. `tests/known_answer.py` reports the seven digests of
+  0.10.2 (`sha256` 4ea1d563, `sim` 3a063f0d, `traded` 64b896ef among them),
+  and `state_hash`, `manifest.state_hash`, the prices and the twelve
+  attribution columns were compared before and after on every preset, two
+  seeds, mid-day, after each close and after a mid-day restore, and agree
+  to the bit. `tests/test_noise_legs.py` holds the sum identity on every
+  preset on seeds drawn at random.
 
 ### Index futures
 
