@@ -54,6 +54,14 @@ pub const JUMP_COMPONENT_KEY: &str = "jump";
 /// tick of a day on any preset that carries the overnight process.
 pub const OVERNIGHT_COMPONENT_KEY: &str = "overnight";
 
+/// The names of `random_noise`'s three legs, in the order
+/// `Engine::noise_legs` holds them: the market leg (the crash-amplified
+/// factor loading plus the down-tick recentring), the sector leg and the
+/// company's own. They split the attribution's `random_noise` slot, which
+/// stays their sum; they are not slots of the attribution row, so
+/// `COMPONENT_COUNT` and every name in it are unchanged.
+pub const NOISE_LEG_KEYS: [&str; 3] = ["market_noise", "sector_noise", "company_noise"];
+
 /// The jump's and the overnight move's slots in the engine's attribution,
 /// after the tick's components, and the width of an attribution row. Every
 /// array of components is sized from `COMPONENT_COUNT` rather than written

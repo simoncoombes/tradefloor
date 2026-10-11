@@ -715,6 +715,9 @@ const SNAPSHOT_OPTIONAL_KEYS: &[&str] = &[
     // The spread a `pin_macro(corporate_spread=...)` holds through tonight's
     // close, carried exactly while `macro_pins_today` marks it.
     "pinned_corporate_spread",
+    // The attribution's `random_noise` legs, where they differ from
+    // `noise_parts` (a night split, after an open).
+    "noise_legs",
 ];
 
 const CENTRAL_BANK_KEYS: &[&str] = &[
@@ -1467,6 +1470,16 @@ impl Engine {
         let flat3: Vec<f64> = self.noise_parts().iter().flat_map(|r| r.iter().copied()).collect();
         out.put("noise_parts", V::from_f64s(&flat3));
         out.put("noise_own_scale2", V::from_f64s(self.noise_own_scale2()));
+        // The attribution's `random_noise` legs, only where they are not the
+        // parts above to the bit: under a night split, once an open has
+        // added the night to the parts. Everywhere else they are the same
+        // sums, so the restore takes them from the parts and every snapshot
+        // without a night split is the one it was. Reporting state: the
+        // state hash does not cover it, as it does not cover `session_tick`.
+        if !self.noise_legs_follow_parts() {
+            let legs: Vec<f64> = self.noise_legs().iter().flat_map(|r| r.iter().copied()).collect();
+            out.put("noise_legs", V::from_f64s(&legs));
+        }
         // The day's GJR sum under a night split, which the attribution no
         // longer carries in `random_noise` (see `Engine::innovation_day`).
         if self.night_split_on() {
@@ -2373,6 +2386,15 @@ impl Engine {
                 &read_buffer(snapshot, "", "noise_own_scale2")?,
             )
             .map_err(core)?;
+        // Absent, the legs are the parts, which `restore_noise_split` has
+        // just written: exact on every model without a night split. A
+        // night-split snapshot written before 0.10.3 carries none either,
+        // and its legs then hold the night as well until the next open.
+        if snapshot.get("noise_legs").is_some() {
+            let legs = read_buffer(snapshot, "", "noise_legs")?;
+            check_len("noise_legs", legs.len(), n * 3)?;
+            inner.restore_noise_legs(&legs).map_err(core)?;
+        }
         // Required on a model with a night split, refused on any other by
         // the key check above.
         if inner.night_split_on() {

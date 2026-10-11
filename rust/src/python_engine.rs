@@ -849,6 +849,12 @@ impl PyEngine {
             self.day_buffer.components[k]
                 .extend_from_slice(&self.buffer.components[k][..n]);
         }
+        // The noise slot's three legs, tick for tick beside it. Nothing at
+        // a day boundary books noise, so no pending value joins them.
+        for k in 0..crate::market::factors::NOISE_LEG_KEYS.len() {
+            self.day_buffer.noise_legs[k]
+                .extend_from_slice(&self.buffer.noise_legs[k][..n]);
+        }
         // The fair-value shift: the tick's own, then on the first row the
         // close's jump's, beside the jump (below), so the columns sum to the
         // change in `s` on that row too.
@@ -1326,6 +1332,8 @@ struct DayBuffer {
     fundamental: Vec<f64>,
     anchor: Vec<f64>,
     components: [Vec<f64>; crate::market::factors::COMPONENT_COUNT],
+    /// `random_noise`'s three legs, appended beside `components`.
+    noise_legs: [Vec<f64>; 3],
     shock: Vec<f64>,
     absorbed: Vec<f64>,
     clamp: Vec<f64>,
@@ -1357,6 +1365,9 @@ impl DayBuffer {
         self.unbounded_print.clear();
         self.liquidity_share.clear();
         for column in self.components.iter_mut() {
+            column.clear();
+        }
+        for column in self.noise_legs.iter_mut() {
             column.clear();
         }
     }
@@ -4494,6 +4505,27 @@ impl PyEngine {
         FACTOR_NAMES.iter().map(|s| s.to_string()).collect()
     }
 
+    /// `random_noise` split into its three legs: `market_noise`,
+    /// `sector_noise` and `company_noise`.
+    ///
+    /// A list of its own rather than three more `FACTORS`. The twelve
+    /// `FACTORS` sum to the change in `mispricing_s`, and callers sum them,
+    /// rank them and size buffers by them; the legs are a split of one of
+    /// the twelve, so put among them they would count the noise twice.
+    /// The identity is `market_noise + sector_noise + company_noise ==
+    /// random_noise`, to rounding, per tick in `truth()` and per day in
+    /// `attribution()`, which accepts these names beside the twelve.
+    ///
+    /// The market leg is the name's crash-amplified loading on the tick's
+    /// market draw plus the down-tick recentring; the sector leg its loading
+    /// on its sector's draw; the company leg its own draw. Under a crisis
+    /// epicentre each leg carries its own scaling.
+    #[classattr]
+    #[allow(non_snake_case)]
+    fn NOISE_LEGS() -> Vec<String> {
+        crate::market::factors::NOISE_LEG_KEYS.iter().map(|s| s.to_string()).collect()
+    }
+
     /// One attribution column across every instrument, as f64 bytes.
     ///
     /// # What it labels
@@ -4546,6 +4578,12 @@ impl PyEngine {
     /// This is the DAY grain of exactly what `truth` reports per tick, so
     /// summing a `truth` column over a day reproduces the value here.
     ///
+    /// # The noise legs
+    ///
+    /// `factor` may also be one of `NOISE_LEGS` (`market_noise`,
+    /// `sector_noise`, `company_noise`), which split `random_noise` and sum
+    /// to it to rounding. They are not among the twelve.
+    ///
     /// These are the APPLIED contributions, what each driver did to `s`,
     /// and not the raw factors before scaling. Raw factors were the earlier
     /// behaviour, and they were wrong because the drift factors are divided
@@ -4555,13 +4593,20 @@ impl PyEngine {
     /// `company_news` the dominant driver on sessions that were almost
     /// entirely noise.
     fn attribution(&self, py: Python<'_>, factor: &str) -> PyResult<Py<PyBytes>> {
+        if let Some(leg) = crate::market::factors::NOISE_LEG_KEYS
+            .iter()
+            .position(|f| *f == factor)
+        {
+            return Ok(f64_bytes(py, &self.padded(self.inner.noise_leg_column(leg), 0.0)));
+        }
         let index = FACTOR_NAMES
             .iter()
             .position(|f| *f == factor)
             .ok_or_else(|| {
                 ValidationError::new_err(format!(
-                    "unknown factor {factor:?}. Valid: {}",
-                    FACTOR_NAMES.join(", ")
+                    "unknown factor {factor:?}. Valid: {}; or a leg of random_noise: {}",
+                    FACTOR_NAMES.join(", "),
+                    crate::market::factors::NOISE_LEG_KEYS.join(", ")
                 ))
             })?;
         // Zero in every rate instrument's slot: none of these drivers moves
@@ -4951,15 +4996,23 @@ impl PyEngine {
         Ok(self.inner.night_tick(steps))
     }
 
-    /// The day's `random_noise` column split into the three draws it sums,
+    /// The day's noise innovation split into the three draws it sums,
     /// `"market"`, `"sector"` or `"idio"`, as f64 bytes per company.
     ///
-    /// The `random_noise` column is the innovation the close feeds the
-    /// per-name GJR, and it is the sum of the factor's transmission, the
-    /// sector's and the name's own draw. Only the split says which of the
-    /// three the name's variance process is responding to. Reading it
-    /// changes nothing. The close reads the same accumulator directly, and
-    /// only while `garch_innovation_commensurate` is non-zero.
+    /// The innovation the close feeds the per-name GJR is the sum of the
+    /// factor's transmission, the sector's and the name's own draw. Only the
+    /// split says which of the three the name's variance process is
+    /// responding to. Reading it changes nothing. The close reads the same
+    /// accumulator directly, and only while `garch_innovation_commensurate`
+    /// is non-zero.
+    ///
+    /// On a model without a night split this is the `random_noise`
+    /// attribution split, the same sums as `attribution("market_noise")`
+    /// and its two siblings. Under one (`overnight_market_share` or
+    /// `overnight_idio_share`, pt-v21) it also carries the night's noise,
+    /// which the attribution books in `overnight` and the GJR steps on, so
+    /// it sums to `garch_innovation` rather than to `random_noise`. For the
+    /// attribution's split read `attribution` with a name in `NOISE_LEGS`.
     fn noise_split(&self, py: Python<'_>, part: &str) -> PyResult<Py<PyBytes>> {
         let index = match part {
             "market" => 0,
@@ -5250,6 +5303,7 @@ impl PyEngine {
             fundamental: self.day_buffer.fundamental.clone(),
             anchor: self.day_buffer.anchor.clone(),
             components: std::array::from_fn(|k| self.day_buffer.components[k].clone()),
+            noise_legs: std::array::from_fn(|k| self.day_buffer.noise_legs[k].clone()),
             shock: self.day_buffer.shock.clone(),
             absorbed: self.day_buffer.absorbed.clone(),
             clamp: self.day_buffer.clamp.clone(),
@@ -5347,6 +5401,7 @@ impl PyEngine {
                 fundamental: Vec::new(),
                 anchor: Vec::new(),
                 components: std::array::from_fn(|_| Vec::new()),
+                noise_legs: std::array::from_fn(|_| Vec::new()),
                 shock: Vec::new(),
                 absorbed: Vec::new(),
                 clamp: Vec::new(),
@@ -5459,6 +5514,7 @@ impl PyEngine {
                         vec![0.0; self.written(&self.buffer.components[0]).len()]
                     }
                 }),
+                &std::array::from_fn(|k| self.written(&self.buffer.noise_legs[k]).to_vec()),
             )
             .map_err(crate::python_arrow::arrow_err)?]
         } else {
@@ -5474,6 +5530,7 @@ impl PyEngine {
                         &d.fundamental,
                         &d.anchor,
                         &d.components,
+                        &d.noise_legs,
                     )
                     .map_err(crate::python_arrow::arrow_err)?,
                 );

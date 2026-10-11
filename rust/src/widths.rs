@@ -22,7 +22,7 @@
 //! |---|---|---|
 //! | [`COMPONENT_COUNT`] | 12 | one attribution row, [`crate::engine::Engine::attribution`] |
 //! | [`TICK_COMPONENT_COUNT`] | 9 | one tick row, [`crate::engine::Engine::tick_components`] |
-//! | [`NOISE_PART_COUNT`] | 3 | one row of [`crate::engine::Engine::noise_parts`] |
+//! | [`NOISE_PART_COUNT`] | 3 | one row of [`crate::engine::Engine::noise_parts`], and of [`crate::engine::Engine::noise_legs`] |
 //! | [`RNG_STREAM_WIDTH`] | 5 | one [`crate::rng::RngState`] as numbers |
 //! | [`ENGINE_RNG_STREAMS`] | 10 | the streams in [`crate::engine::EngineRngState`] |
 //! | [`ENGINE_RNG_STATE_WIDTH`] | 50 | a whole [`crate::engine::EngineRngState`] as numbers |
@@ -34,7 +34,10 @@ pub use crate::agent_book::TAKEN_WIDTH;
 pub use crate::market::factors::{COMPONENT_COUNT, TICK_COMPONENT_COUNT};
 
 /// The numbers in one row of [`crate::engine::Engine::noise_parts`]: the
-/// market, sector and idiosyncratic parts of a name's day noise.
+/// market, sector and idiosyncratic parts of a name's day noise. One row of
+/// [`crate::engine::Engine::noise_legs`] and of
+/// [`crate::engine::Engine::tick_noise_legs`], the attribution's three
+/// `random_noise` legs, has the same width; the legs added no width.
 pub const NOISE_PART_COUNT: usize = 3;
 
 /// The numbers in one [`crate::rng::RngState`]: `state`, `increment`,
@@ -190,6 +193,8 @@ mod tests {
         let _: &[[f64; COMPONENT_COUNT]] = engine.attribution();
         let _: &[[f64; TICK_COMPONENT_COUNT]] = engine.tick_components();
         let _: &[[f64; NOISE_PART_COUNT]] = engine.noise_parts();
+        let _: &[[f64; NOISE_PART_COUNT]] = engine.noise_legs();
+        let _: &[[f64; NOISE_PART_COUNT]] = engine.tick_noise_legs();
         let (a, b, c, d, e, f) = engine.market_variance_state();
         assert_eq!([a, b, c, d, e, f].len(), MARKET_VARIANCE_STATE_WIDTH);
         assert_eq!(crate::sectors::keys().len(), SECTOR_COUNT);

@@ -255,7 +255,7 @@ _SNAPSHOT_KEYS = (
     "pending_jump", "pending_overnight",
 )
 
-#: Snapshot keys the state hash accepts and does not cover. Three:
+#: Snapshot keys the state hash accepts and does not cover. Four:
 #: ``session_tick``, the ticks the day has run, which is the tick the book
 #: stamps a fill with. It moves no price, and every snapshot of an open or a
 #: closed day carries a count, so covering it would have moved every leaf
@@ -267,8 +267,14 @@ _SNAPSHOT_KEYS = (
 #: derives from the roster the engine was built on: a constant of the run,
 #: carried so an engine rebuilt on a later roster restores the run's own
 #: (#268). Covering it would have moved every pt-v19 and later leaf written
-#: before it was carried.
-_UNHASHED_KEYS = ("session_tick", "state_schema", "vix_anchor")
+#: before it was carried. And ``noise_legs``, the day's ``random_noise``
+#: attribution split into its market, sector and company legs, carried only
+#: where it differs from ``noise_parts`` (a night split, after an open). It
+#: is reporting state that nothing on the price path reads, and it is
+#: carried so a restored day's legs still sum to its ``random_noise``;
+#: covering it would have moved every pt-v21 leaf written before it was
+#: carried.
+_UNHASHED_KEYS = ("session_tick", "state_schema", "vix_anchor", "noise_legs")
 
 
 def _default_day(day_count: int, market_open: bool) -> int:
@@ -452,12 +458,13 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     ``set_shares_outstanding`` has changed them, and the variance cascade on
     a model that runs it.
 
-    It accepts three keys and does not cover them: ``session_tick``, the
+    It accepts four keys and does not cover them: ``session_tick``, the
     ticks the day has run, ``state_schema``, the snapshot's layout version,
-    and ``vix_anchor``, the derived VIX anchor (:data:`_UNHASHED_KEYS` says
-    why). It accepts the economy's
-    ``qe_assets_ratio``, carried on a model with ``qe_pe_stock_gain`` set,
-    and does not cover it either, as the engine's own hash does not.
+    ``vix_anchor``, the derived VIX anchor, and ``noise_legs``, the day's
+    ``random_noise`` legs (:data:`_UNHASHED_KEYS` says why). It accepts
+    the economy's ``qe_assets_ratio``, carried on a model with
+    ``qe_pe_stock_gain`` set, and does not cover it either, as the engine's
+    own hash does not.
 
     ``market_digest`` covers nine columns and the draw count, which is what a
     published result is checked against. This covers the macro chain and the

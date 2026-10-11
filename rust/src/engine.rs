@@ -820,6 +820,24 @@ pub struct Engine {
     /// parent it is meant to be a copy of.
     noise_parts: Vec<[f64; 3]>,
     noise_own_scale2: Vec<f64>,
+    /// The day's `random_noise` attribution split into its three legs,
+    /// [`crate::market::factors::NOISE_LEG_KEYS`]: the market leg (the
+    /// crash-amplified factor loading plus the down-tick recentring), the
+    /// sector leg and the company's own. Summed tick by tick beside the
+    /// attribution's noise slot from the same per-tick parts `noise_parts`
+    /// adds, and reset with it at the open, so the three sum to that slot
+    /// to rounding.
+    ///
+    /// Not `noise_parts`, which it equals on every model without a night
+    /// split: under `overnight_market_share` or `overnight_idio_share` the
+    /// open adds the night's three parts to `noise_parts`, because the GJR
+    /// steps on the night too, while the attribution books the night once,
+    /// in `overnight`, and `random_noise` holds the session's ticks alone.
+    ///
+    /// REPORTING state. Nothing on the price path reads it, so it is outside
+    /// the state hash, and a snapshot carries it only where it differs from
+    /// `noise_parts` (see `Engine::noise_legs`).
+    noise_legs: Vec<[f64; 3]>,
     /// The day's innovation for each name's GJR under a night split
     /// (`overnight_market_share` or `overnight_idio_share` set): the night's
     /// own noise, then every tick's `random_noise`, summed in that order.
@@ -868,6 +886,11 @@ pub struct Engine {
     /// the previous print, where `shock + absorbed` alone is its move from
     /// the price the tick started from.
     tick_repriced: Vec<f64>,
+    /// The last tick's `random_noise` legs, per slot, as `noise_legs` sums
+    /// them: the per-tick row the `truth` table's three leg columns carry.
+    /// Recording state, zeroed with `tick_components` on every tick and
+    /// outside the snapshot and the state hash, as `tick_shock` is.
+    tick_noise_legs: Vec<[f64; 3]>,
     /// The log move written to each name's price since its last print and
     /// not yet booked onto a tape row, per slot: the close's re-mark and a
     /// `pin_macro`'s (`macro_publication_repricing`) and the opening print
@@ -2249,6 +2272,7 @@ impl Engine {
             attribution: vec![[0.0; crate::market::factors::COMPONENT_COUNT]; companies_len],
             noise_parts: vec![[0.0; 3]; companies_len],
             noise_own_scale2: vec![0.0; companies_len],
+            noise_legs: vec![[0.0; 3]; companies_len],
             innovation_day: if params.overnight_market_share != 0.0
                 || params.overnight_idio_share != 0.0
             {
@@ -2268,6 +2292,7 @@ impl Engine {
             tick_absorbed: vec![0.0; companies_len],
             tick_clamp: vec![0.0; companies_len],
             tick_repriced: vec![0.0; companies_len],
+            tick_noise_legs: vec![[0.0; 3]; companies_len],
             // Nothing has been written to a price before the first print.
             repriced_pending: vec![0.0; companies_len],
             // Empty until the counterfactual is switched on, so emptiness is
@@ -4853,6 +4878,9 @@ impl Engine {
         for slot in self.tick_components.iter_mut() {
             *slot = [0.0; crate::market::factors::TICK_COMPONENT_COUNT];
         }
+        for slot in self.tick_noise_legs.iter_mut() {
+            *slot = [0.0; 3];
+        }
         // The print decomposition is zeroed on the same argument and for the
         // same reason: a company that did not tick moved by nothing, so its
         // shock and the depth that absorbed it are both zero. Carrying the
@@ -4924,6 +4952,23 @@ impl Engine {
                 for (k, value) in computed.iter().enumerate() {
                     acc[k] += value;
                 }
+            }
+            // The attribution's three noise legs: the same per-tick parts,
+            // summed beside the noise slot, and never the night's, which
+            // the open adds to `noise_parts` alone. Reporting only.
+            if let (Some(acc), Some(computed)) = (
+                self.noise_legs.get_mut(*slot),
+                outcome.noise_parts.get(n),
+            ) {
+                for (k, value) in computed.iter().enumerate() {
+                    acc[k] += value;
+                }
+            }
+            if let (Some(row), Some(computed)) = (
+                self.tick_noise_legs.get_mut(*slot),
+                outcome.noise_parts.get(n),
+            ) {
+                *row = *computed;
             }
             if let (Some(acc), Some(computed)) = (
                 self.noise_own_scale2.get_mut(*slot),
@@ -6194,6 +6239,72 @@ impl Engine {
         }
         self.noise_parts = parts.chunks_exact(3).map(|c| [c[0], c[1], c[2]]).collect();
         self.noise_own_scale2 = scale2.to_vec();
+        // The attribution's legs follow the parts unless told otherwise,
+        // which is exact on every model without a night split, where the
+        // two are the same sums. [`Engine::restore_noise_legs`] after this
+        // call writes the legs a night-split snapshot carries.
+        self.noise_legs = self.noise_parts.clone();
+        Ok(())
+    }
+
+    /// The day's `random_noise` attribution split into its three legs, per
+    /// company slot, in [`crate::market::factors::NOISE_LEG_KEYS`] order:
+    /// market, sector, company. The three sum to the attribution's
+    /// `random_noise` slot to rounding.
+    ///
+    /// The market leg is the name's crash-amplified loading on the tick's
+    /// market draw plus the down-tick recentring that gives back the
+    /// tilt's mean; the sector leg its loading on its sector's draw; the
+    /// company leg its own draw. Each at the scale the noise slot carries
+    /// (the intraday curve on an open tick, 0.15 on a closed one), with the
+    /// crisis epicentre's scaling inside the leg it scales.
+    ///
+    /// The same sums as [`Engine::noise_parts`] on every model without a
+    /// night split. Under one, the parts also carry the night's noise,
+    /// which the attribution books in `overnight`; these do not.
+    /// Reporting only: nothing on the price path reads them.
+    pub fn noise_legs(&self) -> &[[f64; 3]] {
+        &self.noise_legs
+    }
+
+    /// One leg of the day's `random_noise` across all companies, by index
+    /// into [`crate::market::factors::NOISE_LEG_KEYS`].
+    pub fn noise_leg_column(&self, leg: usize) -> Vec<f64> {
+        self.noise_legs
+            .iter()
+            .map(|a| a.get(leg).copied().unwrap_or(f64::NAN))
+            .collect()
+    }
+
+    /// The last tick's `random_noise` legs, per company slot: the row the
+    /// recorded tape carries. Zero for a slot the tick did not move.
+    pub fn tick_noise_legs(&self) -> &[[f64; 3]] {
+        &self.tick_noise_legs
+    }
+
+    /// Whether the day's legs are the noise parts to the bit, which is when
+    /// a snapshot need not carry them: every model without a night split,
+    /// and a night-split model before its first open.
+    pub fn noise_legs_follow_parts(&self) -> bool {
+        self.noise_legs.len() == self.noise_parts.len()
+            && self.noise_legs.iter().zip(&self.noise_parts).all(|(a, b)| {
+                a.iter().zip(b).all(|(x, y)| x.to_bits() == y.to_bits())
+            })
+    }
+
+    /// Put the day's legs back, flattened three values per company slot.
+    /// Call it after [`Engine::restore_noise_split`], which sets the legs
+    /// to the parts.
+    pub fn restore_noise_legs(&mut self, legs: &[f64]) -> Result<(), String> {
+        let n = self.companies.len();
+        if legs.len() != n * 3 {
+            return Err(format!(
+                "noise_legs has {} values, expected {}",
+                legs.len(),
+                n * 3
+            ));
+        }
+        self.noise_legs = legs.chunks_exact(3).map(|c| [c[0], c[1], c[2]]).collect();
         Ok(())
     }
 
@@ -6911,6 +7022,8 @@ impl Engine {
         self.noise_parts.resize(self.companies.len(), [0.0; 3]);
         self.noise_own_scale2.clear();
         self.noise_own_scale2.resize(self.companies.len(), 0.0);
+        self.noise_legs.clear();
+        self.noise_legs.resize(self.companies.len(), [0.0; 3]);
         self.innovation_day.clear();
         if self.night_split_on() {
             self.innovation_day.resize(self.companies.len(), 0.0);
@@ -6929,6 +7042,8 @@ impl Engine {
         self.tick_clamp.resize(self.companies.len(), 0.0);
         self.tick_repriced.clear();
         self.tick_repriced.resize(self.companies.len(), 0.0);
+        self.tick_noise_legs.clear();
+        self.tick_noise_legs.resize(self.companies.len(), [0.0; 3]);
         // Not the pending repricing: it carries the close's re-mark across
         // the open to the first print. Only its width follows the roster.
         self.repriced_pending.resize(self.companies.len(), 0.0);
@@ -9674,6 +9789,7 @@ impl Engine {
                 &self.companies,
                 &TickTruth {
                     components: &self.tick_components,
+                    noise_legs: &self.tick_noise_legs,
                     fundamental: &self.tick_fundamental,
                     anchor: &self.tick_anchor,
                     shock: &self.tick_shock,
@@ -11430,6 +11546,8 @@ impl Engine {
         self.attribution.push([0.0; crate::market::factors::COMPONENT_COUNT]);
         self.noise_parts.push([0.0; 3]);
         self.noise_own_scale2.push(0.0);
+        self.noise_legs.push([0.0; 3]);
+        self.tick_noise_legs.push([0.0; 3]);
         if !self.innovation_day.is_empty() {
             self.innovation_day.push(0.0);
         }
@@ -11540,6 +11658,12 @@ impl Engine {
         }
         if index < self.noise_own_scale2.len() {
             self.noise_own_scale2.remove(index);
+        }
+        if index < self.noise_legs.len() {
+            self.noise_legs.remove(index);
+        }
+        if index < self.tick_noise_legs.len() {
+            self.tick_noise_legs.remove(index);
         }
         if index < self.volume_idio.len() {
             self.volume_idio.remove(index);
@@ -13471,6 +13595,10 @@ pub struct SessionBuffer {
     /// `[f64; TICK_COMPONENT_COUNT]`, because each becomes an Arrow column
     /// and a column wants a contiguous run of its own values.
     pub components: [Vec<f64>; crate::market::factors::TICK_COMPONENT_COUNT],
+    /// The `random_noise` component's three legs, each `ticks * companies`,
+    /// in `NOISE_LEG_KEYS` order. They sum to that component's column to
+    /// rounding and are not part of the nine above.
+    pub noise_legs: [Vec<f64>; 3],
     /// The print decomposition, each `ticks * companies`: the shock that
     /// arrived and the depth that absorbed it, in log units.
     pub shock: Vec<f64>,
@@ -13498,6 +13626,8 @@ pub struct SessionBuffer {
 #[non_exhaustive]
 pub struct TickTruth<'a> {
     pub components: &'a [[f64; crate::market::factors::TICK_COMPONENT_COUNT]],
+    /// `random_noise`'s three legs (`Engine::tick_noise_legs`).
+    pub noise_legs: &'a [[f64; 3]],
     pub fundamental: &'a [f64],
     pub anchor: &'a [f64],
     pub shock: &'a [f64],
@@ -13530,6 +13660,9 @@ impl SessionBuffer {
             self.clamp.resize(needed, 0.0);
             self.repriced.resize(needed, 0.0);
             for column in self.components.iter_mut() {
+                column.resize(needed, 0.0);
+            }
+            for column in self.noise_legs.iter_mut() {
                 column.resize(needed, 0.0);
             }
         }
@@ -13585,6 +13718,10 @@ impl SessionBuffer {
             for (k, column) in self.components.iter_mut().enumerate() {
                 column[base + i] = row[k];
             }
+            let legs = truth.noise_legs.get(i).copied().unwrap_or([0.0; 3]);
+            for (k, column) in self.noise_legs.iter_mut().enumerate() {
+                column[base + i] = legs[k];
+            }
         }
     }
 
@@ -13618,6 +13755,9 @@ impl SessionBuffer {
                 self.liquidity_share[at] = 0.0;
             }
             for column in self.components.iter_mut() {
+                column[at] = 0.0;
+            }
+            for column in self.noise_legs.iter_mut() {
                 column[at] = 0.0;
             }
         }

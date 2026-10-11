@@ -148,6 +148,12 @@ pub fn truth_schema() -> SchemaRef {
         DataType::Float64,
         false,
     ));
+    // `random_noise` split into its three legs, after the twelve and not
+    // among them: the legs sum to `random_noise` to rounding, so adding
+    // them to the twelve would count the noise twice.
+    for key in crate::market::factors::NOISE_LEG_KEYS {
+        fields.push(Field::new(key, DataType::Float64, false));
+    }
     Arc::new(Schema::new(fields))
 }
 
@@ -241,6 +247,7 @@ pub fn truth_batch(
     fundamental: &[f64],
     anchor: &[f64],
     components: &[Vec<f64>; crate::market::factors::COMPONENT_COUNT],
+    noise_legs: &[Vec<f64>; 3],
 ) -> Result<RecordBatch, String> {
     let rows = ticks * instruments;
     if mispricing.len() < rows || fundamental.len() < rows || anchor.len() < rows {
@@ -248,7 +255,7 @@ pub fn truth_batch(
             "buffer shorter than {ticks} ticks x {instruments} instruments"
         ));
     }
-    for column in components.iter() {
+    for column in components.iter().chain(noise_legs.iter()) {
         if column.len() < rows {
             return Err(format!(
                 "component buffer shorter than {ticks} ticks x {instruments} instruments"
@@ -275,7 +282,7 @@ pub fn truth_batch(
         Arc::new(Float64Array::from(fundamental[..rows].to_vec())),
         Arc::new(Float64Array::from(anchor[..rows].to_vec())),
     ];
-    for column in components.iter() {
+    for column in components.iter().chain(noise_legs.iter()) {
         columns.push(Arc::new(Float64Array::from(column[..rows].to_vec())));
     }
     RecordBatch::try_new(truth_schema(), columns).map_err(|e| e.to_string())
@@ -847,6 +854,9 @@ pub struct RecordedDay {
     pub fundamental: Vec<f64>,
     pub anchor: Vec<f64>,
     pub components: [Vec<f64>; crate::market::factors::COMPONENT_COUNT],
+    /// `random_noise`'s three legs, in `NOISE_LEG_KEYS` order, each the
+    /// length of a component column. See [`truth_schema`].
+    pub noise_legs: [Vec<f64>; 3],
     /// The print decomposition. See [`prints_schema`].
     pub shock: Vec<f64>,
     pub absorbed: Vec<f64>,
