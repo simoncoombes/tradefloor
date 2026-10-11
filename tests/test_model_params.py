@@ -909,6 +909,9 @@ PERTURBATIONS = [
     # RE-VALUED 2026-09-26: 3.0 is pt-v20's own value since its graded arm.
     # Was (3.0, True).
     ("rate_pe_sensitivity", 4.0, True),
+    # The rate term on a loss-maker's book value (pt-v22 candidate). LIVE on
+    # any roster holding a loss-maker whose discount rate sits off neutral.
+    ("lossmaker_rate_sensitivity", 11.0, True),
     # INERT on every probe by construction: it moves what the engine
     # REPORTS as the phase (`macro_fields`, `macro_state`), never the phase
     # a price or a draw reads. tests/test_cycle_publication_lag.py holds
