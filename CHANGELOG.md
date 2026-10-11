@@ -125,6 +125,14 @@ same with them on as off.
   `usd_crisis_vix_threshold` (0.0 the standing 0.05), read by the dollar's
   step and by the forecast's expected bid. FRED DTWEXM against CBOE's VIX
   measures 0.001.
+- `treasury_zlb_path` and `treasury_zlb_haven_gain` are new dials, 0.0 on
+  every preset and left out of the digest there. At the zero bound the curve
+  prices the part of the Fed put's ask the rate cannot deliver (tonight's and
+  each meeting's, decaying at the priced path's half-life, carried as
+  `zlb_unmet` only with the dial on), and the term premium falls a further
+  amount per VIX point above 20. Kim and Wright's decomposition of the
+  10-year in the 2008-2015 falls that began at the zero bound: expected path
+  -0.35, term premium -0.36, with the funds rate unchanged.
 - `fed_core_inflation` and `treasury_core_inflation` are new switches, 0.0
   on every preset and left out of the digest there: the central bank, and the
   Treasury curve (the 10-year's term premium, the haven's gate, the flight to

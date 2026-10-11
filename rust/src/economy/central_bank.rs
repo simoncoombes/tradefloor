@@ -214,6 +214,12 @@ pub struct PolicyOptions {
     /// reads (its term premium and the haven's gate). `None`, on every
     /// preset, is the inflation the meeting reads.
     pub curve_inflation: Option<f64>,
+    /// `treasury_zlb_path`: the unmet put the curve prices, percentage points
+    /// off the meeting's 10-year target. 0.0, on every preset, is none.
+    pub zlb_path: f64,
+    /// `treasury_zlb_haven_gain`: the zero bound's term-premium fall per VIX
+    /// point above 20 in the meeting's 10-year target. 0.0 is none.
+    pub zlb_haven_gain: f64,
 }
 
 /// [`PolicyOptions::shipped`].
@@ -248,6 +254,8 @@ impl PolicyOptions {
             spread_equity_gain: 0.0,
             policy_inflation: None,
             curve_inflation: None,
+            zlb_path: 0.0,
+            zlb_haven_gain: 0.0,
         }
     }
 }
@@ -696,6 +704,21 @@ pub fn update_central_bank_with(
         && curve_inflation < FED_PUT_INFLATION_CEILING
     {
         treasury_target_10y - super::daily::haven_term_cut(options.haven_gain, economy.vix)
+    } else {
+        treasury_target_10y
+    };
+    // The zero bound's pieces (`treasury_zlb_path`, `treasury_zlb_haven_gain`)
+    // in the target too, as the daily anchor prices them. Guarded.
+    let treasury_target_10y = if options.zlb_path != 0.0 {
+        treasury_target_10y - options.zlb_path
+    } else {
+        treasury_target_10y
+    };
+    let treasury_target_10y = if options.zlb_haven_gain != 0.0
+        && new_economy.federal_funds_rate <= super::daily::ZLB_RATE
+        && curve_inflation < FED_PUT_INFLATION_CEILING
+    {
+        treasury_target_10y - super::daily::haven_term_cut(options.zlb_haven_gain, economy.vix)
     } else {
         treasury_target_10y
     };

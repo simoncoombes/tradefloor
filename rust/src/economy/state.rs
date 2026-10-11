@@ -496,6 +496,12 @@ pub struct EconomyState {
     /// `treasury_core_inflation` are both 0.0, which every preset carries;
     /// snapshotted and hashed only while either is set.
     pub oil_inflation_level: f64,
+    /// The Fed put's unmet asks, percentage points: each meeting adds the
+    /// part of the put's ask the policy rate could not deliver, and it decays
+    /// at `treasury_path_half_life` (`ModelParams::treasury_zlb_path`). 0.0,
+    /// and never read or written, while that dial is 0.0, which every preset
+    /// carries; snapshotted and hashed only while it is set.
+    pub zlb_unmet: f64,
     /// The log of the oil price's truncation at its bounds on the last step,
     /// ln(clamped / unclamped), 0.0 where no bound bound it. TRANSIENT: set
     /// by every step that runs the long factor (`oil_target_drift_sd`) and
@@ -674,6 +680,7 @@ pub fn create_initial_economy_state(options: &InitialEconomyOptions) -> EconomyS
         oil_push_level: 0.0,
         usd_haven_level: 0.0,
         oil_inflation_level: 0.0,
+        zlb_unmet: 0.0,
         oil_bound_log_ratio: 0.0,
         market_pe: Some(18.0),
 

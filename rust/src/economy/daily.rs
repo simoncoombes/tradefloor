@@ -451,6 +451,13 @@ pub struct YieldDials {
     /// `EconomyState::oil_inflation_level`. See
     /// [`crate::params::ModelParams::treasury_core_inflation`].
     pub core_inflation: f64,
+    /// The unmet Fed put the curve prices at the zero bound, percentage
+    /// points off the 10-year's anchor and the 2-year's formula
+    /// (`treasury_zlb_path`); 0.0 is none.
+    pub zlb_path: f64,
+    /// The term premium's fall per VIX point above 20 at the zero bound
+    /// (`treasury_zlb_haven_gain`); 0.0 is none.
+    pub zlb_haven_gain: f64,
     /// The share of the VIX slope taken out of the corporate spread's
     /// formula. See [`crate::params::ModelParams::corporate_spread_vix_cut`].
     pub spread_vix_cut: f64,
@@ -491,6 +498,10 @@ pub const TREASURY_NEUTRAL_RATE: f64 = 2.5;
 /// The Treasury haven's cut to the 10-year's term premium: `gain` points per
 /// VIX point above [`TREASURY_HAVEN_VIX`]. Read by the daily anchor and by
 /// the meeting's 10-year target, only with `treasury_haven_gain` set.
+/// The funds rate at or below which the economy is at the zero bound for
+/// `treasury_zlb_haven_gain`: the QE condition's 0.25.
+pub const ZLB_RATE: f64 = 0.25;
+
 pub fn haven_term_cut(gain: f64, vix: f64) -> f64 {
     gain * mathx::max(0.0, vix - TREASURY_HAVEN_VIX)
 }
@@ -514,6 +525,8 @@ impl Default for YieldDials {
             rate_damping: 0.0,
             haven_gain: 0.0,
             core_inflation: 0.0,
+            zlb_path: 0.0,
+            zlb_haven_gain: 0.0,
             spread_vix_cut: 0.0,
             spread_equity_gain: 0.0,
             spread_equity_decay: 0.0,
@@ -1316,6 +1329,18 @@ fn close_yields(
     } else {
         term_premium_10y
     };
+    // THE ZERO BOUND'S COMPRESSION (`treasury_zlb_haven_gain`): with the
+    // funds rate at or below 0.25 the term premium falls a further `g` a VIX
+    // point above 20, under the haven's gate. Guarded: off, the premium is
+    // the expression above.
+    let term_premium_10y = if inputs.yields.zlb_haven_gain != 0.0
+        && new_state.federal_funds_rate <= ZLB_RATE
+        && curve_inflation < crate::economy::central_bank::FED_PUT_INFLATION_CEILING
+    {
+        term_premium_10y - haven_term_cut(inputs.yields.zlb_haven_gain, new_state.vix)
+    } else {
+        term_premium_10y
+    };
     // THE PRICED FED PUT (`treasury_put_pricing`): the 10-year's anchor, and
     // the 2-year's formula, read the policy rate the market expects after
     // the next meeting rather than the one standing. Guarded, as above.
@@ -1323,6 +1348,14 @@ fn close_yields(
         new_state.federal_funds_rate - inputs.yields.priced_put
     } else {
         new_state.federal_funds_rate
+    };
+    // THE UNMET PUT (`treasury_zlb_path`): the part of the put's ask the rate
+    // cannot deliver, priced too; outside the damped ladder, as the put is.
+    // Guarded, as above.
+    let fed_rate_for_10y = if inputs.yields.zlb_path != 0.0 {
+        fed_rate_for_10y - inputs.yields.zlb_path
+    } else {
+        fed_rate_for_10y
     };
     // THE PRICED PATH (`treasury_path_pricing`): the anchor, and the 2-year's
     // formula, read the rate the market expects the cycle to reach. Guarded,
@@ -4874,6 +4907,29 @@ mod macro_anchors {
         let k = on.inflation_reversion;
         let want = 0.5 + (0.0 - 0.5) * k + (121.0 - OIL_PASSTHROUGH_ANCHOR) * 0.01;
         assert!((b.oil_inflation_level - want).abs() < 1e-12, "{} {want}", b.oil_inflation_level);
+    }
+
+    /// `treasury_zlb_path` and `treasury_zlb_haven_gain`: the unmet put
+    /// lowers the 10-year's anchor whole, so the close moves the yield by the
+    /// 5% pull's share of it; the zero bound's compression acts only with
+    /// the funds rate at or below 0.25.
+    #[test]
+    fn the_zero_bound_pieces_lower_the_ten_year() {
+        let mut e = economy();
+        e.federal_funds_rate = 0.0;
+        e.vix = 40.0;
+        let ten = |e: &EconomyState, z: f64, g: f64| {
+            let mut i = DailyInputs::default();
+            i.yields.zlb_path = z;
+            i.yields.zlb_haven_gain = g;
+            step(e, i).treasury_yield_10y
+        };
+        let base = ten(&e, 0.0, 0.0);
+        assert!(((base - ten(&e, 1.0, 0.0)) - 0.05).abs() < 1e-9, "{}", base - ten(&e, 1.0, 0.0));
+        assert!(ten(&e, 0.0, 0.05) < base - 1e-6);
+        let mut off = e.clone();
+        off.federal_funds_rate = 2.0;
+        assert_eq!(ten(&off, 0.0, 0.05).to_bits(), ten(&off, 0.0, 0.0).to_bits());
     }
 
     /// `treasury_core_inflation`: the flight to quality's sign reads core.

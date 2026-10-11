@@ -9039,6 +9039,11 @@ impl Engine {
         if self.params.treasury_path_pricing != 0.0 {
             self.policy_path *= crate::mathx::pow(0.5, 1.0 / self.params.treasury_path_half_life);
         }
+        // THE UNMET PUT'S CLOCK (`treasury_zlb_path`): one session's decay at
+        // the priced path's half-life. Nothing runs with the dial at 0.0.
+        if self.params.treasury_zlb_path != 0.0 {
+            self.economy.zlb_unmet *= crate::mathx::pow(0.5, 1.0 / self.params.treasury_path_half_life);
+        }
 
         // The DAY's cap-weighted return, in the same percent units as
         // `market_return_pct`. Read only when `vix_return_source` is
@@ -9272,6 +9277,9 @@ impl Engine {
         {
             self.central_bank.next_meeting_date = request.timestamp;
         }
+        // The put's unmet ask as the meeting reads it, before it restarts
+        // the intermeeting return (`treasury_zlb_path`); 0.0 with it off.
+        let unmet_at_meeting = self.zlb_unmet_ask();
         let meeting =
             {
                 rng.site(Site::CentralBank, 0);
@@ -9297,6 +9305,10 @@ impl Engine {
         let announcement_variant = meeting.announcement_variant;
         self.central_bank = meeting.central_bank;
         self.economy = meeting.economy;
+        // A held meeting's unmet ask joins the market's memory of it.
+        if meeting_held && self.params.treasury_zlb_path != 0.0 {
+            self.economy.zlb_unmet += unmet_at_meeting;
+        }
         // The meeting's writes to a pinned field are undone. A held 10-year
         // takes the corporate yield (and the 2-year's formula share) with
         // it, since the meeting set both off the 10-year it re-anchored.
@@ -9406,7 +9418,37 @@ impl Engine {
             } else {
                 None
             },
+            zlb_path: self.priced_zlb_path(),
+            zlb_haven_gain: self.params.treasury_zlb_haven_gain,
         }
+    }
+
+    /// The part of the Fed put's ask the policy rate cannot deliver tonight,
+    /// percentage points (`treasury_zlb_path`): the ask less what the rate
+    /// leaves to cut, under the put's inflation gate. 0.0 with the dial off.
+    fn zlb_unmet_ask(&self) -> f64 {
+        let p = &self.params;
+        if p.treasury_zlb_path == 0.0
+            || p.fed_put_gain == 0.0
+            || self.policy_inflation() >= crate::economy::central_bank::FED_PUT_INFLATION_CEILING
+        {
+            return 0.0;
+        }
+        let asked = crate::economy::central_bank::fed_put_ask(
+            p.fed_put_gain, p.fed_put_threshold, self.economy.intermeeting_return);
+        crate::mathx::max(0.0, asked - crate::mathx::max(0.0, self.economy.federal_funds_rate))
+    }
+
+    /// The unmet put the curve prices tonight (`treasury_zlb_path`),
+    /// percentage points: `k * treasury_put_pricing * (x + U)`. 0.0 with the
+    /// dial off.
+    fn priced_zlb_path(&self) -> f64 {
+        if self.params.treasury_zlb_path == 0.0 {
+            return 0.0;
+        }
+        self.params.treasury_zlb_path
+            * self.params.treasury_put_pricing
+            * (self.zlb_unmet_ask() + self.economy.zlb_unmet)
     }
 
     /// Core inflation: headline less the oil pass-through's accumulated part
@@ -9626,6 +9668,8 @@ impl Engine {
                 rate_damping: self.params.treasury_policy_damping,
                 haven_gain: self.params.treasury_haven_gain,
                 core_inflation: self.params.treasury_core_inflation,
+                zlb_path: self.priced_zlb_path(),
+                zlb_haven_gain: self.params.treasury_zlb_haven_gain,
                 // Credit's VIX slope and leverage term
                 // (`corporate_spread_vix_cut`, `corporate_spread_equity_gain`),
                 // 0.0 unless set; the projection reads them as the close does.
@@ -12867,6 +12911,10 @@ impl Engine {
         // `fed_core_inflation` or `treasury_core_inflation` is set.
         if self.carries_oil_inflation_level() {
             hash_f64(&mut buf, e.oil_inflation_level);
+        }
+        // The put's unmet asks, only while `treasury_zlb_path` is set.
+        if self.params.treasury_zlb_path != 0.0 {
+            hash_f64(&mut buf, e.zlb_unmet);
         }
         // The published GDP growth figure's state, only while
         // `gdp_publication_lag` is set, so every other engine's hash is the
