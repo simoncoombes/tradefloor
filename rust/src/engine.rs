@@ -9298,8 +9298,10 @@ impl Engine {
             } else {
                 0.0
             };
-            self.policy_path +=
-                meeting.economy.federal_funds_rate - self.economy.federal_funds_rate + owed;
+            self.policy_path += match self.anticipated_path_carry() {
+                Some(carry) => carry,
+                None => meeting.economy.federal_funds_rate - self.economy.federal_funds_rate,
+            } + owed;
         }
         let decision = meeting.decision;
         let announcement_variant = meeting.announcement_variant;
@@ -9422,6 +9424,7 @@ impl Engine {
             zlb_haven_gain: self.params.treasury_zlb_haven_gain,
             neutral_real_rate: self.params.fed_neutral_real_rate,
             two_year_carry: self.params.treasury_2y_meeting_carry,
+            path_carry: self.anticipated_path_carry(),
         }
     }
 
@@ -10909,6 +10912,22 @@ impl Engine {
                 self.policy_anticipation_priced = 0.0;
                 Ok(())
             }
+        }
+    }
+
+    /// THE ANTICIPATED PATH (`treasury_path_anticipated`): what a meeting
+    /// tonight moves the priced path by, the part of the eve's priced change
+    /// beyond the next decision, `P (a - 1) / a`, with `a` the anticipation.
+    /// `None` with the switch off: the meeting steps the path by the rate's
+    /// change, as it stood.
+    fn anticipated_path_carry(&self) -> Option<f64> {
+        if self.params.treasury_path_anticipated == 0.0 {
+            None
+        } else if self.params.policy_anticipation == 0.0 {
+            Some(0.0)
+        } else {
+            let a = self.params.policy_anticipation;
+            Some(self.policy_anticipation_priced * (a - 1.0) / a)
         }
     }
 

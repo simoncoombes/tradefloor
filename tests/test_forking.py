@@ -1148,6 +1148,8 @@ def _nothing_dormant():
                    # The priced meeting's half-life (policy_anticipation is
                    # on above), in sessions.
                    policy_anticipation_half_life=10.0,
+                   # The anticipated path (a switch; the path is on above).
+                   treasury_path_anticipated=1.0,
                    oil_price_floor=16.4,
                    oil_price_ceiling=279.0,
                    # The contracts' margin (pt-v22 phase 1).

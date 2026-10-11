@@ -125,6 +125,10 @@ same with them on as off.
   `usd_crisis_vix_threshold` (0.0 the standing 0.05), read by the dollar's
   step and by the forecast's expected bid. FRED DTWEXM against CBOE's VIX
   measures 0.001.
+- `treasury_path_anticipated` is a new switch, 0.0 on every preset and left
+  out of the digest there: at 1 a meeting moves the priced policy path by
+  the further move the anticipated meeting priced, not by the rate's change,
+  so a rate surprise reaches the curve once.
 - `policy_anticipation_half_life` is a new dial, 0.0 on every preset and left
   out of the digest there: between meetings the anticipated meeting's priced
   change moves toward the shadow meeting's at this half-life, in sessions,

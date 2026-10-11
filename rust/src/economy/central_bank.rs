@@ -228,6 +228,10 @@ pub struct PolicyOptions {
     /// to the meeting's formula the meeting keeps. 0.0, on every preset, is
     /// the reset that stood.
     pub two_year_carry: f64,
+    /// `treasury_path_anticipated`: `Some(c)` moves the priced path at the
+    /// meeting by `c`, the further move the anticipation priced, instead of
+    /// the rate's change. `None`, on every preset, is the step that stood.
+    pub path_carry: Option<f64>,
 }
 
 /// [`PolicyOptions::shipped`].
@@ -266,6 +270,7 @@ impl PolicyOptions {
             zlb_haven_gain: 0.0,
             neutral_real_rate: 0.0,
             two_year_carry: 0.0,
+            path_carry: None,
         }
     }
 }
@@ -686,7 +691,14 @@ pub fn update_central_bank_with(
     let owed_moved = if put_on { new_economy.fed_put_owed - economy.fed_put_owed } else { 0.0 };
     let path_after = if path_on {
         options.path_before
-            + options.path_gain * (new_economy.federal_funds_rate - current_rate + owed_moved)
+            + options.path_gain * (match options.path_carry {
+                // THE ANTICIPATED PATH (`treasury_path_anticipated`): the
+                // forecast moves by what the anticipation priced beyond the
+                // next decision, not by the decision, so a surprise reaches
+                // the curve once, through the rate.
+                Some(carry) => carry,
+                None => new_economy.federal_funds_rate - current_rate,
+            } + owed_moved)
     } else {
         0.0
     };

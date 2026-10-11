@@ -999,6 +999,9 @@ PERTURBATIONS = [
     # The priced meeting's half-life. INERT on the probe: pt-v20 has
     # policy_anticipation off, so no change is priced to smooth.
     ("policy_anticipation_half_life", 10.0, False),
+    # The anticipated path. INERT on the probe: pt-v20 has
+    # treasury_path_pricing off, so there is no path to move.
+    ("treasury_path_anticipated", 1.0, False),
     # Oil's bounds from WTI in real terms. INERT on the probe: its burn-in's
     # oil stays inside 35 to 150, so moving the bounds outward moves nothing.
     ("oil_price_floor", 16.4, False),

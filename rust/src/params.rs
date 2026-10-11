@@ -1219,6 +1219,20 @@ pub struct ModelParams {
     /// (0.046) and its other days' sd (6.16 bp), 1994-2025 off the zero bound
     /// (design PR #9, rates/RULE.md addendum C). In [0, 252].
     pub policy_anticipation_half_life: f64,
+    /// A switch: 1.0 moves the priced policy path (`treasury_path_pricing`)
+    /// at a meeting by the further move the anticipated meeting priced
+    /// (`policy_anticipation` a: `P (a - 1) / a` of the eve's priced change
+    /// `P`) instead of by the rate's change. 0.0, on every shipped preset,
+    /// is the step that stood, and a value of 0.0 is left out of the model's
+    /// digest.
+    ///
+    /// The step put a rate surprise into the curve twice, through the rate
+    /// and again through the path (sd 20 bp at the step on R22O5czN, the 2-
+    /// year's meeting-day move 0.99 to 1.35 times the surprise). Off zero the
+    /// path moves with the anticipation and a surprise reaches the curve once.
+    /// Checked on the meeting-day 2-year move against DGS2's on scheduled
+    /// FOMC days off the zero bound, 1994-2025 (sd 7.1 bp). 0 or 1.
+    pub treasury_path_anticipated: f64,
     /// The oil price's lower and upper bounds, dollars. 0.0, on every shipped
     /// preset, is the standing 35 and 150, and a value of 0.0 is left out of
     /// the model's digest.
@@ -8087,6 +8101,7 @@ impl ModelParams {
             fed_neutral_real_rate: 0.0,
             treasury_2y_meeting_carry: 0.0,
             policy_anticipation_half_life: 0.0,
+            treasury_path_anticipated: 0.0,
             oil_price_floor: 0.0,
             oil_price_ceiling: 0.0,
             oil_target_drift_reversion: 0.0,
@@ -10721,6 +10736,7 @@ impl ModelParams {
             "fed_neutral_real_rate" => self.fed_neutral_real_rate,
             "treasury_2y_meeting_carry" => self.treasury_2y_meeting_carry,
             "policy_anticipation_half_life" => self.policy_anticipation_half_life,
+            "treasury_path_anticipated" => self.treasury_path_anticipated,
             "oil_price_floor" => self.oil_price_floor,
             "oil_price_ceiling" => self.oil_price_ceiling,
             "oil_target_drift_reversion" => self.oil_target_drift_reversion,
@@ -11120,6 +11136,7 @@ impl ModelParams {
             "fed_neutral_real_rate" => out.fed_neutral_real_rate = value,
             "treasury_2y_meeting_carry" => out.treasury_2y_meeting_carry = value,
             "policy_anticipation_half_life" => out.policy_anticipation_half_life = value,
+            "treasury_path_anticipated" => out.treasury_path_anticipated = value,
             "oil_price_floor" => out.oil_price_floor = value,
             "oil_price_ceiling" => out.oil_price_ceiling = value,
             "oil_target_drift_reversion" => out.oil_target_drift_reversion = value,
@@ -12562,6 +12579,12 @@ impl ModelParams {
                  20 at the zero bound, in [0, 1].",
                 self.treasury_zlb_haven_gain));
         }
+        if !(self.treasury_path_anticipated == 0.0 || self.treasury_path_anticipated == 1.0) {
+            return Err(format!(
+                "treasury_path_anticipated is {}. It is a switch: 0 (the meeting steps the priced \
+                 path by the rate's change) or 1 (by the further move the anticipation priced).",
+                self.treasury_path_anticipated));
+        }
         if !(0.0..=252.0).contains(&self.policy_anticipation_half_life) {
             return Err(format!(
                 "policy_anticipation_half_life is {}. It is the half-life, in sessions, of the \
@@ -13288,6 +13311,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "fed_neutral_real_rate",
     "treasury_2y_meeting_carry",
     "policy_anticipation_half_life",
+    "treasury_path_anticipated",
     "oil_price_floor",
     "oil_price_ceiling",
     "oil_inflation_passthrough",
@@ -13506,6 +13530,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "fed_neutral_real_rate",
         "treasury_2y_meeting_carry",
         "policy_anticipation_half_life",
+        "treasury_path_anticipated",
         "oil_price_floor",
         "oil_price_ceiling",
         "oil_inflation_passthrough",
