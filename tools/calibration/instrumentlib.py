@@ -879,6 +879,7 @@ PARAM_SPECS: dict[str, dict] = {
     "treasury_2y_meeting_carry": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 1.0)},
     "policy_anticipation_half_life": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 252.0)},
     "treasury_path_anticipated": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0), "derived": False},
+    "policy_anticipation_guidance": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 1.0)},
     "fear_greed_published_inputs": {"kind": "abs", "step_unit": 1.0,
                                     "hard_range": (0.0, 1.0), "derived": False},
     # A switch whose identity is the value: 1.0 prices a macro decision the

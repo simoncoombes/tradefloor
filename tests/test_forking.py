@@ -1150,6 +1150,8 @@ def _nothing_dormant():
                    policy_anticipation_half_life=10.0,
                    # The anticipated path (a switch; the path is on above).
                    treasury_path_anticipated=1.0,
+                   # The Fed's guidance (a share; the anticipation is on).
+                   policy_anticipation_guidance=0.5,
                    oil_price_floor=16.4,
                    oil_price_ceiling=279.0,
                    # The contracts' margin (pt-v22 phase 1).

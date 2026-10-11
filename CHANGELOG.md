@@ -125,6 +125,11 @@ same with them on as off.
   `usd_crisis_vix_threshold` (0.0 the standing 0.05), read by the dollar's
   step and by the forecast's expected bid. FRED DTWEXM against CBOE's VIX
   measures 0.001.
+- `policy_anticipation_guidance` is a new dial, 0.0 on every preset and left
+  out of the digest there: the share of the anticipated meeting's priced
+  change taken from the decision the Fed's own reading implies rather than
+  the published economy's. The tape's policy surprise at scheduled FOMC
+  announcements has an sd of 4.8 bp (Bauer and Swanson 2022).
 - `treasury_path_anticipated` is a new switch, 0.0 on every preset and left
   out of the digest there: at 1 a meeting moves the priced policy path by
   the further move the anticipated meeting priced, not by the rate's change,

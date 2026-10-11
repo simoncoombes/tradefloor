@@ -1233,6 +1233,24 @@ pub struct ModelParams {
     /// Checked on the meeting-day 2-year move against DGS2's on scheduled
     /// FOMC days off the zero bound, 1994-2025 (sd 7.1 bp). 0 or 1.
     pub treasury_path_anticipated: f64,
+    /// The share of the anticipated meeting's priced change (`policy_
+    /// anticipation`) the market takes from the decision the Fed's own
+    /// reading implies, rather than from the published economy. 0.0, on
+    /// every shipped preset, prices the published shadow alone, as it stood,
+    /// and a value of 0.0 is left out of the model's digest.
+    ///
+    /// The meeting reads the true phase, growth and VIX; the shadow the
+    /// market prices reads the published ones, which differ on 48% of
+    /// meeting eves on R22O5czN, so the decision's surprise against the eve's
+    /// priced change has an sd of about 21 bp. Since 1994 the FOMC announces
+    /// its decisions and assessment, and the tape's surprise is small: the
+    /// current-quarter Eurodollar futures move in the 30-minute window of a
+    /// scheduled announcement, off the zero bound, has an sd of 4.8 bp
+    /// 1994-2019 (5.0 before 2008, 4.2 after; Bauer and Swanson, NBER
+    /// Macroeconomics Annual 2022). Off zero the shadow's change is
+    /// `(1 - q) S(published) + q S(the meeting's own economy)`, both silent
+    /// shadows. In [0, 1].
+    pub policy_anticipation_guidance: f64,
     /// The oil price's lower and upper bounds, dollars. 0.0, on every shipped
     /// preset, is the standing 35 and 150, and a value of 0.0 is left out of
     /// the model's digest.
@@ -8102,6 +8120,7 @@ impl ModelParams {
             treasury_2y_meeting_carry: 0.0,
             policy_anticipation_half_life: 0.0,
             treasury_path_anticipated: 0.0,
+            policy_anticipation_guidance: 0.0,
             oil_price_floor: 0.0,
             oil_price_ceiling: 0.0,
             oil_target_drift_reversion: 0.0,
@@ -10737,6 +10756,7 @@ impl ModelParams {
             "treasury_2y_meeting_carry" => self.treasury_2y_meeting_carry,
             "policy_anticipation_half_life" => self.policy_anticipation_half_life,
             "treasury_path_anticipated" => self.treasury_path_anticipated,
+            "policy_anticipation_guidance" => self.policy_anticipation_guidance,
             "oil_price_floor" => self.oil_price_floor,
             "oil_price_ceiling" => self.oil_price_ceiling,
             "oil_target_drift_reversion" => self.oil_target_drift_reversion,
@@ -11137,6 +11157,7 @@ impl ModelParams {
             "treasury_2y_meeting_carry" => out.treasury_2y_meeting_carry = value,
             "policy_anticipation_half_life" => out.policy_anticipation_half_life = value,
             "treasury_path_anticipated" => out.treasury_path_anticipated = value,
+            "policy_anticipation_guidance" => out.policy_anticipation_guidance = value,
             "oil_price_floor" => out.oil_price_floor = value,
             "oil_price_ceiling" => out.oil_price_ceiling = value,
             "oil_target_drift_reversion" => out.oil_target_drift_reversion = value,
@@ -12579,6 +12600,13 @@ impl ModelParams {
                  20 at the zero bound, in [0, 1].",
                 self.treasury_zlb_haven_gain));
         }
+        if !(0.0..=1.0).contains(&self.policy_anticipation_guidance) {
+            return Err(format!(
+                "policy_anticipation_guidance is {}. It is the share of the priced change the \
+                 market takes from the Fed's own reading, in [0, 1]; 0 prices the published \
+                 shadow alone.",
+                self.policy_anticipation_guidance));
+        }
         if !(self.treasury_path_anticipated == 0.0 || self.treasury_path_anticipated == 1.0) {
             return Err(format!(
                 "treasury_path_anticipated is {}. It is a switch: 0 (the meeting steps the priced \
@@ -13312,6 +13340,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "treasury_2y_meeting_carry",
     "policy_anticipation_half_life",
     "treasury_path_anticipated",
+    "policy_anticipation_guidance",
     "oil_price_floor",
     "oil_price_ceiling",
     "oil_inflation_passthrough",
@@ -13531,6 +13560,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "treasury_2y_meeting_carry",
         "policy_anticipation_half_life",
         "treasury_path_anticipated",
+        "policy_anticipation_guidance",
         "oil_price_floor",
         "oil_price_ceiling",
         "oil_inflation_passthrough",

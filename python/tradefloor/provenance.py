@@ -567,6 +567,10 @@ OUT_OF_SCOPE = {
         "inert at 0.0: the Taylor rule's neutral is the one that stood (a "
         "branch on `== 0.0` in the meeting); at 0.0 it is also left out of "
         "the model's digest",
+    "policy_anticipation_guidance":
+        "inert at 0.0: the anticipated meeting prices the published shadow "
+        "alone, as it stood (a branch on `== 0.0` in the shadow meeting); at "
+        "0.0 it is also left out of the model's digest",
     "treasury_path_anticipated":
         "inert at 0.0: the meeting steps the priced path by the rate's "
         "change as it stood (a branch on the switch in the meeting and the "

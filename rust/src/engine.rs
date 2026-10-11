@@ -10969,7 +10969,20 @@ impl Engine {
             ..*options
         };
         let shadow = update_central_bank_with(&cb, &economy, request.timestamp, &mut Silent, &options);
-        shadow.economy.federal_funds_rate - self.economy.federal_funds_rate
+        let published = shadow.economy.federal_funds_rate - self.economy.federal_funds_rate;
+        // THE FED'S GUIDANCE (`policy_anticipation_guidance` q): the market
+        // prices q of the decision the Fed's own reading (the economy the
+        // meeting reads) implies, and 1 - q of the published one's. A second
+        // silent shadow, no draw. A branch: at 0.0 the change is the
+        // published shadow's, as it stood.
+        let q = self.params.policy_anticipation_guidance;
+        if q != 0.0 {
+            let own = update_central_bank_with(&cb, &self.economy, request.timestamp, &mut Silent, &options);
+            let own = own.economy.federal_funds_rate - self.economy.federal_funds_rate;
+            (1.0 - q) * published + q * own
+        } else {
+            published
+        }
     }
 
     /// `policy_anticipation` at the close: `P = a w S`, with `S` the shadow
