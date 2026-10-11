@@ -84,7 +84,34 @@ pub fn name_offset(key: u64, name: u64) -> i64 {
 }
 
 /// The session name `name` reacts to its report of quarter `quarter` on.
+///
+/// A pure function of its three arguments, and asked the same question by
+/// every name on every open minute of a session (the walk, the volume
+/// multiple and the night each ask it), so it is answered from a small
+/// per-thread memo of exactly those arguments: a hit returns the value this
+/// function computed for them, so the memo changes no result, only how
+/// often the two keyed generators are built.
 pub fn reaction_session(key: u64, name: u64, quarter: i64) -> i64 {
+    const SLOTS: usize = 128;
+    std::thread_local! {
+        static MEMO: std::cell::RefCell<[Option<(u64, u64, i64, i64)>; SLOTS]> =
+            const { std::cell::RefCell::new([None; SLOTS]) };
+    }
+    let slot = ((name ^ (quarter as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15))
+        .wrapping_mul(0x9E37_79B9_7F4A_7C15) >> 57) as usize % SLOTS;
+    let hit = MEMO.with(|m| match m.borrow()[slot] {
+        Some((k, n, q, session)) if k == key && n == name && q == quarter => Some(session),
+        _ => None,
+    });
+    if let Some(session) = hit {
+        return session;
+    }
+    let session = reaction_session_uncached(key, name, quarter);
+    MEMO.with(|m| m.borrow_mut()[slot] = Some((key, name, quarter, session)));
+    session
+}
+
+fn reaction_session_uncached(key: u64, name: u64, quarter: i64) -> i64 {
     let mut g = keyed(key, name, quarter, SLOT_JITTER);
     let u = g.next_f64();
     let j = std::cmp::min((u * (2 * JITTER + 1) as f64) as i64, 2 * JITTER) - JITTER;
