@@ -713,11 +713,35 @@ pub fn expected_return_spike(sigma_pct: f64, gain: f64, gain_up: f64, exponent: 
         return 0.5 * (gain - gain_up) * sigma_pct * (2.0 / SQRT_TWO_PI);
     }
     let e_abs = sigma_pct * (2.0 / SQRT_TWO_PI);
+    let (two, gamma) = gaussian_moment_factors(exponent);
     let e_pow = mathx::pow(sigma_pct, exponent)
-        * mathx::pow(2.0, 0.5 * exponent)
-        * mathx::tgamma(0.5 * (exponent + 1.0))
+        * two
+        * gamma
         / mathx::sqrt(core::f64::consts::PI);
     0.5 * (gain * e_pow - gain_up * e_abs)
+}
+
+/// The two factors of the Gaussian absolute moment of order `q` that depend
+/// on `q` alone, `(2^(q/2), Gamma((q + 1) / 2))`, each by the expression
+/// the moment always used. The order is a dial, so the last two orders asked
+/// for are kept per thread against their exact bits and a repeat returns
+/// the pair computed for them.
+fn gaussian_moment_factors(q: f64) -> (f64, f64) {
+    type Memo = [Option<(u64, f64, f64)>; 2];
+    std::thread_local! {
+        static LAST: std::cell::Cell<Memo> = const { std::cell::Cell::new([None; 2]) };
+    }
+    let key = q.to_bits();
+    let memo = LAST.with(|m| m.get());
+    for (k, two, gamma) in memo.iter().flatten() {
+        if *k == key {
+            return (*two, *gamma);
+        }
+    }
+    let two = mathx::pow(2.0, 0.5 * q);
+    let gamma = mathx::tgamma(0.5 * (q + 1.0));
+    LAST.with(|m| m.set([Some((key, two, gamma)), memo[0]]));
+    (two, gamma)
 }
 
 /// `sqrt(2 pi)`, as `market::factors` spells it. A literal because `sqrt`
@@ -841,8 +865,45 @@ pub fn return_spike_at_level(
 /// are the Gaussian ones `expected_return_spike` already carries, with the
 /// up side's own order. Same branch as the spike: at the three defaults it
 /// IS `expected_return_spike`, evaluated by that function.
+///
+/// A pure function of its eight arguments, and the projections of the close
+/// (the forecast's eight nodes a step, the live marks' eight) ask it the
+/// same question node after node, since only the session's return moves
+/// between them. So the last answer is kept per thread with the exact bits
+/// it was asked for, and a repeat returns it: the value is the one this
+/// function computed for those arguments, so nothing it returns changes.
 #[allow(clippy::too_many_arguments)]
 pub fn expected_return_spike_at_level(
+    sigma_pct: f64,
+    gain: f64,
+    gain_up: f64,
+    exponent: f64,
+    exponent_up: f64,
+    level_exponent: f64,
+    level_exponent_up: f64,
+    vix: f64,
+) -> f64 {
+    type Memo = Option<([u64; 8], f64)>;
+    std::thread_local! {
+        static LAST: std::cell::Cell<Memo> = const { std::cell::Cell::new(None) };
+    }
+    let key = [
+        sigma_pct.to_bits(), gain.to_bits(), gain_up.to_bits(), exponent.to_bits(),
+        exponent_up.to_bits(), level_exponent.to_bits(), level_exponent_up.to_bits(), vix.to_bits(),
+    ];
+    if let Some((k, value)) = LAST.with(|m| m.get()) {
+        if k == key {
+            return value;
+        }
+    }
+    let value = expected_return_spike_at_level_uncached(
+        sigma_pct, gain, gain_up, exponent, exponent_up, level_exponent, level_exponent_up, vix);
+    LAST.with(|m| m.set(Some((key, value))));
+    value
+}
+
+#[allow(clippy::too_many_arguments)]
+fn expected_return_spike_at_level_uncached(
     sigma_pct: f64,
     gain: f64,
     gain_up: f64,
@@ -856,9 +917,10 @@ pub fn expected_return_spike_at_level(
         return expected_return_spike(sigma_pct, gain, gain_up, exponent);
     }
     let moment = |q: f64| -> f64 {
+        let (two, gamma) = gaussian_moment_factors(q);
         mathx::pow(sigma_pct, q)
-            * mathx::pow(2.0, 0.5 * q)
-            * mathx::tgamma(0.5 * (q + 1.0))
+            * two
+            * gamma
             / mathx::sqrt(core::f64::consts::PI)
     };
     let down = if level_exponent == 0.0 { 1.0 } else { mathx::pow(vix, -level_exponent) };
@@ -903,7 +965,27 @@ pub const OIL_CONVENIENCE_MIN: f64 = 0.25;
 /// standard deviations either side at a tenth of one, which the floor's kink
 /// costs nothing to (a Gauss-Hermite rule, exact for smooth polynomials,
 /// was 0.6 per cent off at the floor).
+///
+/// A pure function of its three arguments, and a forecast step asks it of
+/// the inventory the previous step left at the variance it left, which is
+/// the question that step asked last. So the last answer is kept per thread
+/// against the exact bits it was asked for, and a repeat returns it.
 pub fn oil_convenience_factor(kappa: f64, inventory: f64, var: f64) -> f64 {
+    std::thread_local! {
+        static LAST: std::cell::Cell<Option<([u64; 3], f64)>> = const { std::cell::Cell::new(None) };
+    }
+    let key = [kappa.to_bits(), inventory.to_bits(), var.to_bits()];
+    if let Some((k, value)) = LAST.with(|m| m.get()) {
+        if k == key {
+            return value;
+        }
+    }
+    let value = oil_convenience_factor_uncached(kappa, inventory, var);
+    LAST.with(|m| m.set(Some((key, value))));
+    value
+}
+
+fn oil_convenience_factor_uncached(kappa: f64, inventory: f64, var: f64) -> f64 {
     // LINEAR in log inventory, the convenience yield of Working (1949) and
     // Gibson and Schwartz (Journal of Finance 45(3), 1990), in which log
     // futures are linear in it: its expectation over inventory's spread is
@@ -922,14 +1004,32 @@ pub fn oil_convenience_factor(kappa: f64, inventory: f64, var: f64) -> f64 {
         return at(inventory);
     }
     let sd = mathx::sqrt(var);
-    let (mut total, mut mass) = (0.0, 0.0);
-    for i in -60..=60 {
-        let z = i as f64 / 10.0;
-        let w = mathx::exp(-0.5 * z * z);
+    // The trapezoid's weights and their sum depend on nothing passed in, so
+    // they are computed once, by the same expressions in the same order.
+    let (weights, mass) = oil_convenience_weights();
+    let mut total = 0.0;
+    for (k, &w) in weights.iter().enumerate() {
+        let z = (k as i64 - 60) as f64 / 10.0;
         total += w * at(inventory + z * sd);
-        mass += w;
     }
     total / mass
+}
+
+/// The weights `exp(-z^2 / 2)` of [`oil_convenience_factor`]'s trapezoid at
+/// `z` from -6 to 6 by a tenth, and their sum taken in that order.
+fn oil_convenience_weights() -> &'static ([f64; 121], f64) {
+    static WEIGHTS: std::sync::OnceLock<([f64; 121], f64)> = std::sync::OnceLock::new();
+    WEIGHTS.get_or_init(|| {
+        let mut weights = [0.0; 121];
+        let mut mass = 0.0;
+        for i in -60..=60 {
+            let z = i as f64 / 10.0;
+            let w = mathx::exp(-0.5 * z * z);
+            weights[(i + 60) as usize] = w;
+            mass += w;
+        }
+        (weights, mass)
+    })
 }
 
 /// The oil price at which inflation takes no oil term under
