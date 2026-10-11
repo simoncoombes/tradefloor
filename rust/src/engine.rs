@@ -10983,6 +10983,17 @@ impl Engine {
         };
         let priced = a * w * change;
         let before = self.policy_anticipation_priced;
+        // THE PRICED PATH'S MEMORY (`policy_anticipation_half_life`): between
+        // meetings the priced change moves toward the shadow's at the dial's
+        // half-life, an average of the closes the market has seen rather than
+        // the last one; a meeting's close sets it. A branch: at 0.0 the priced
+        // change is the shadow's, as it stood.
+        let h = self.params.policy_anticipation_half_life;
+        let priced = if h != 0.0 && !meeting_held {
+            before + (1.0 - crate::mathx::pow(0.5, 1.0 / h)) * (priced - before)
+        } else {
+            priced
+        };
         self.policy_anticipation_priced = priced;
         let f10 = 1.0 - self.params.treasury_policy_damping;
         let f2 = 0.85 + 0.15 * f10;

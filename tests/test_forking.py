@@ -1145,6 +1145,9 @@ def _nothing_dormant():
                    fed_neutral_real_rate=2.0,
                    # The 2-year's carry through a meeting (a share).
                    treasury_2y_meeting_carry=1.0,
+                   # The priced meeting's half-life (policy_anticipation is
+                   # on above), in sessions.
+                   policy_anticipation_half_life=10.0,
                    oil_price_floor=16.4,
                    oil_price_ceiling=279.0,
                    # The contracts' margin (pt-v22 phase 1).

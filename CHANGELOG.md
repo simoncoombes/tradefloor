@@ -125,6 +125,11 @@ same with them on as off.
   `usd_crisis_vix_threshold` (0.0 the standing 0.05), read by the dollar's
   step and by the forecast's expected bid. FRED DTWEXM against CBOE's VIX
   measures 0.001.
+- `policy_anticipation_half_life` is a new dial, 0.0 on every preset and left
+  out of the digest there: between meetings the anticipated meeting's priced
+  change moves toward the shadow meeting's at this half-life, in sessions,
+  rather than jumping to it each close. DGS2 off the zero bound: FOMC days
+  carry 0.046 of the variance, the other days' sd is 6.16 bp.
 - `treasury_2y_meeting_carry` is a new dial, 0.0 on every preset and left
   out of the digest there: the share of the 2-year's standing gap to the
   meeting's formula (`0.85 (ff + path) + 0.15 x 10y`) that a meeting keeps.

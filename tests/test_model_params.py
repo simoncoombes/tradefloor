@@ -996,6 +996,9 @@ PERTURBATIONS = [
     # a gap to keep: 0.15% against 0.23% after the third close, measured
     # 2026-10-11), but no column this table reads takes the 2-year.
     ("treasury_2y_meeting_carry", 1.0, False),
+    # The priced meeting's half-life. INERT on the probe: pt-v20 has
+    # policy_anticipation off, so no change is priced to smooth.
+    ("policy_anticipation_half_life", 10.0, False),
     # Oil's bounds from WTI in real terms. INERT on the probe: its burn-in's
     # oil stays inside 35 to 150, so moving the bounds outward moves nothing.
     ("oil_price_floor", 16.4, False),
