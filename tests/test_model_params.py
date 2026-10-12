@@ -1438,6 +1438,11 @@ PERTURBATIONS = [
     # INERT: credit's repricing lag is read only with
     # corporate_spread_equity_gain non-zero, which pt-v20 leaves off.
     ("corporate_spread_equity_lag", 5.0, False),
+    # Credit's own state: its opening draw moves the meeting's corporate
+    # re-anchor, and with it the discount rate.
+    ("corporate_spread_noise_sd", 0.025, True),
+    # INERT: the half-life alone is read by nothing (the sd is 0).
+    ("corporate_spread_noise_half_life", 16.0, False),
     # The market's fall in the cycle's hazard (sim/r17-b12). Carries its
     # half-life as a companion, without which it is refused. INERT on this
     # probe: the ladder reads the gap only in an expansion or at a peak past
@@ -2134,6 +2139,7 @@ COMPANIONS: dict[str, dict[str, float]] = {
     # nothing between 50 and 80).
     "fed_core_inflation": {"oil_inflation_passthrough": 1.0},
     "core_trend_sd": {"core_trend_persistence": 0.993},
+    "corporate_spread_noise_sd": {"corporate_spread_noise_half_life": 16.0},
     "treasury_core_inflation": {"oil_inflation_passthrough": 1.0},
     # The unmet put needs the put and the priced path it decays like.
     "treasury_zlb_path": {"fed_put_gain": 3.0, "fed_put_half_life": 126.0, "treasury_put_pricing": 1.0,

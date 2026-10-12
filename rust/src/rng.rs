@@ -677,6 +677,19 @@ pub fn core_trend_key(root_seed: u64) -> u64 {
     splitmix64_mix(root_seed ^ (((CORE_TREND_TAG as u64) << 32) | 0xFFFF_FFFF))
 }
 
+/// The tag of credit's own state (`corporate_spread_noise_sd`), ASCII
+/// "CSPN".
+pub const SPREAD_NOISE_TAG: u32 = 0x4353_504E;
+
+/// The key of a root seed's credit-state draws: as [`publication_key`] under
+/// [`SPREAD_NOISE_TAG`]. Each session's normal is the first of
+/// `GameRng::keyed(key, SPREAD_NOISE_TAG, day)`, and the opening's the first
+/// of `GameRng::keyed(key, SPREAD_NOISE_TAG, u64::MAX)`, so it takes nothing
+/// from any stream.
+pub fn spread_noise_key(root_seed: u64) -> u64 {
+    splitmix64_mix(root_seed ^ (((SPREAD_NOISE_TAG as u64) << 32) | 0xFFFF_FFFF))
+}
+
 pub fn publication_key(root_seed: u64) -> u64 {
     splitmix64_mix(root_seed ^ (((PUBLICATION_TAG as u64) << 32) | 0xFFFF_FFFF))
 }

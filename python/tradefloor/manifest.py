@@ -595,6 +595,10 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          "margin",
          # Oil's long factor, only while `oil_target_drift_sd` is set.
          "oil_target_drift",
+         # Core inflation's trend, only while `core_trend_sd` is set; the
+         # eve's decision, only while `fed_eve_decision` is; credit's own
+         # state, only while `corporate_spread_noise_sd` is.
+         "core_trend", "eve_decision", "spread_noise",
          # The dividend states, on a model that pays dividends, and an
          # ex-date's move in `s` waiting for its tape row.
          "dividend", "pending_dividend",
@@ -1068,6 +1072,13 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         _f64(buf, 55.0)
         for value in _column(snapshot["oil_target_drift"], 3, "oil_target_drift"):
             _f64(buf, value)
+    # Core inflation's trend (57), the eve's decision (58) and credit's own
+    # state (59), each only while its dial is set, behind its own tag.
+    for name, tag, width in (("core_trend", 57.0, 3), ("eve_decision", 58.0, 2), ("spread_noise", 59.0, 3)):
+        if name in snapshot:
+            _f64(buf, tag)
+            for value in _column(snapshot[name], width, name):
+                _f64(buf, value)
     # LENGTH-PREFIXED, because these two are empty between the tape row that
     # consumes them and the close that fills them again -- unlike every
     # per-slot array above, which always follows the roster. An empty buffer
@@ -1721,7 +1732,8 @@ _LEDGER_OPTIONAL_BUFFERS = ("fair_value_offset", "opening_z", "pending_fair_valu
                             "innovation_day", "forecast", "futures",
                             "night_bridge", "vix_futures", "rate_futures",
                             "oil_futures", "margin", "shares_outstanding",
-                            "oil_target_drift")
+                            "oil_target_drift", "core_trend", "eve_decision",
+                            "spread_noise")
 
 #: The ``fundamentals`` block's buffers, one per company each.
 _LEDGER_FUNDAMENTALS = ("eps", "book_value_per_share", "revenue_growth")

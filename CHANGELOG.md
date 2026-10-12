@@ -125,6 +125,15 @@ same with them on as off.
   `usd_crisis_vix_threshold` (0.0 the standing 0.05), read by the dollar's
   step and by the forecast's expected bid. FRED DTWEXM against CBOE's VIX
   measures 0.001.
+- `corporate_spread_noise_sd` and `corporate_spread_noise_half_life` are new
+  dials, 0.0 on every preset and left out of the digest there: off zero
+  credit carries its own state, an AR(1) stepped every session on its own
+  keyed draws (no stream moves) and opened from its stationary distribution,
+  added to the spread formula's base beside the leverage term in the close's
+  corporate move, the meeting's re-anchor and the prehistory carry. Without
+  it the spread is nearly an equity echo: the part of its change the index
+  does not explain is half the IG closing-price spread's (LQD less IEF on
+  SPY, 2015-2025) from a session to a quarter.
 - `corporate_spread_equity_lag` is a new dial, 0.0 on every preset and left
   out of the digest there: a half-life in sessions at which the gap the
   corporate spread prices follows credit's leverage gap, so the spread

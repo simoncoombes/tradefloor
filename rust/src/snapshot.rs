@@ -1666,6 +1666,10 @@ impl Engine {
         if let Some(words) = self.core_trend_words() {
             out.put("core_trend", V::from_f64s(&words));
         }
+        // Credit's own state (`corporate_spread_noise_sd`).
+        if let Some(words) = self.spread_noise_words() {
+            out.put("spread_noise", V::from_f64s(&words));
+        }
         // The eve's decision (`fed_eve_decision`).
         if let Some(words) = self.eve_decision_words() {
             out.put("eve_decision", V::from_f64s(&words));
@@ -2051,6 +2055,7 @@ impl Engine {
             Gated::dial("margin", "margin_scan_coverage", p.margin_scan_coverage),
             Gated::dial("oil_target_drift", "oil_target_drift_sd", p.oil_target_drift_sd),
             Gated::dial("core_trend", "core_trend_sd", p.core_trend_sd),
+            Gated::dial("spread_noise", "corporate_spread_noise_sd", p.corporate_spread_noise_sd),
             Gated::dial("eve_decision", "fed_eve_decision", p.fed_eve_decision),
             Gated::when(
                 "buyback_log_shares",
@@ -2801,6 +2806,14 @@ impl Engine {
                 None => None,
             };
             inner.set_core_trend_state(words.as_deref()).map_err(core)?;
+        }
+        // Credit's own state (`corporate_spread_noise_sd`).
+        {
+            let words = match snapshot.get("spread_noise") {
+                Some(_) => Some(read_buffer(snapshot, "", "spread_noise")?),
+                None => None,
+            };
+            inner.set_spread_noise_state(words.as_deref()).map_err(core)?;
         }
         // The eve's decision (`fed_eve_decision`).
         {

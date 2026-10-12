@@ -1300,6 +1300,13 @@ pub struct Engine {
     /// reverts to (`core_trend_sd`): 0.0 with the dial off, which it never
     /// leaves.
     core_trend: f64,
+    /// The key of credit's own state's draws (`corporate_spread_noise_sd`),
+    /// derived from the root seed and carried by a snapshot that holds it.
+    spread_noise_key: u64,
+    /// Credit's own state, points of the spread formula's base
+    /// (`corporate_spread_noise_sd`): 0.0 with the dial off, which it never
+    /// leaves.
+    spread_noise: f64,
     /// The decision the Fed's own reading implied at the last close
     /// (`fed_eve_decision`), which the next scheduled meeting delivers;
     /// `None` before the first close with the switch on, and always with it
@@ -2386,12 +2393,17 @@ impl Engine {
             oil_target_drift: 0.0,
             core_trend_key: crate::rng::core_trend_key(seed),
             core_trend: 0.0,
+            spread_noise_key: crate::rng::spread_noise_key(seed),
+            spread_noise: 0.0,
             eve_decision: None,
             population: None,
         };
         // CORE INFLATION'S TREND OPENING (`core_trend_sd`): a draw from the
         // process's stationary distribution on its own key. Nothing at 0.0.
         engine.core_trend = engine.core_trend_opening();
+        // CREDIT'S OWN STATE OPENING (`corporate_spread_noise_sd`): a draw
+        // from its stationary distribution on its own key. Nothing at 0.0.
+        engine.spread_noise = engine.spread_noise_opening();
         engine.vix_anchor = engine.derive_vix_anchor();
         engine.cycle_nowcast_terms = engine.derive_cycle_nowcast_terms();
         // The front two index futures (`futures_index_listed`); nothing with
@@ -2660,7 +2672,7 @@ impl Engine {
             self.anticipation_drift = pre.anticipation_drift;
         }
         self.refresh_earnings_anticipation();
-        if self.carries_spread_equity_gap() {
+        if self.carries_spread_equity_gap() || self.carries_spread_noise() {
             let gap = pre.economy.spread_equity_gap;
             let m = if self.params.cycle_nowcast_accuracy != 0.0
                 || self.params.corporate_spread_cycle != 0.0
@@ -2676,14 +2688,25 @@ impl Engine {
             // priced gap's, carried with it.
             let (then, now) = if self.carries_spread_priced_gap() {
                 (pre.economy.spread_priced_gap, self.economy.spread_priced_gap)
-            } else {
+            } else if self.carries_spread_equity_gap() {
                 (gap, self.economy.spread_equity_gap)
+            } else {
+                (0.0, 0.0)
             };
-            let moved = crate::economy::central_bank::spread_formula_with(vix, m, cut, gain * then)
-                - crate::economy::central_bank::spread_formula_with(vix, m, cut, gain * now);
-            self.economy.spread_equity_gap = gap;
+            // Credit's own state (`corporate_spread_noise_sd`) is carried
+            // the same way, beside the leverage term.
+            let noise = self.carries_spread_noise();
+            let base = |g: f64, x: f64| if noise { gain * g + x } else { gain * g };
+            let moved = crate::economy::central_bank::spread_formula_with(vix, m, cut, base(then, pre.spread_noise))
+                - crate::economy::central_bank::spread_formula_with(vix, m, cut, base(now, self.spread_noise));
+            if self.carries_spread_equity_gap() {
+                self.economy.spread_equity_gap = gap;
+            }
             if self.carries_spread_priced_gap() {
                 self.economy.spread_priced_gap = then;
+            }
+            if noise {
+                self.spread_noise = pre.spread_noise;
             }
             self.economy.corporate_bond_yield += moved;
         }
@@ -9199,6 +9222,13 @@ impl Engine {
             self.core_trend = next;
         }
         inputs.core_trend = self.core_trend;
+        // CREDIT'S OWN STATE (`corporate_spread_noise_sd`): one session of
+        // its process on its own key, the pair handed to the close's
+        // corporate move; nothing at 0.0.
+        if let Some(next) = self.spread_noise_step(request.game_day) {
+            inputs.yields.spread_noise = Some((self.spread_noise, next));
+            self.spread_noise = next;
+        }
         self.economy = update_economy_daily(&self.economy, &inputs, rng);
         // The host's premium on the target (`set_vix_target_premium`), read
         // by the step above, faded for the next close.
@@ -9470,6 +9500,8 @@ impl Engine {
             spread_vix_cut: self.params.corporate_spread_vix_cut,
             spread_equity_gain: self.params.corporate_spread_equity_gain,
             spread_priced_gap: self.carries_spread_priced_gap(),
+            // Credit's own state (`corporate_spread_noise_sd`); `None` off.
+            spread_noise: if self.carries_spread_noise() { Some(self.spread_noise) } else { None },
             // Core in headline's place for the bank and the curve
             // (`fed_core_inflation`, `treasury_core_inflation`); `None` with
             // the switches off.
@@ -9758,6 +9790,10 @@ impl Engine {
                 } else {
                     0.0
                 },
+                // Credit's own state's step (`corporate_spread_noise_sd`) is
+                // set by the session's own step, which draws it; a projection
+                // of the close leaves it out.
+                spread_noise: None,
             },
             volatility: request.volatility,
             active_shocks: request.active_shocks,
@@ -10070,6 +10106,84 @@ impl Engine {
     /// 0.0 off.
     pub fn core_trend_level(&self) -> f64 {
         self.core_trend
+    }
+
+    /// Whether this engine's model carries credit's own state
+    /// (`corporate_spread_noise_sd` set), which is when the snapshot and the
+    /// state hash carry it. Off on every preset.
+    pub fn carries_spread_noise(&self) -> bool {
+        self.params.corporate_spread_noise_sd != 0.0
+    }
+
+    /// Credit's own state's one-session keep, `0.5^(1/H)`, H
+    /// `corporate_spread_noise_half_life`; 0.0 (no persistence) at H 0.0.
+    fn spread_noise_keep(&self) -> f64 {
+        let h = self.params.corporate_spread_noise_half_life;
+        if h == 0.0 { 0.0 } else { crate::mathx::pow(0.5, 1.0 / h) }
+    }
+
+    /// Credit's own state's opening: the stationary sd `sigma / sqrt(1 -
+    /// phi^2)` times the first normal of `GameRng::keyed(key,
+    /// SPREAD_NOISE_TAG << 32, 0)`, a word no session's draw uses; 0.0 with
+    /// `corporate_spread_noise_sd` at 0.0.
+    fn spread_noise_opening(&self) -> f64 {
+        if !self.carries_spread_noise() {
+            return 0.0;
+        }
+        let sigma = self.params.corporate_spread_noise_sd;
+        let phi = self.spread_noise_keep();
+        let z = crate::rng::GameRng::keyed(
+            self.spread_noise_key, (crate::rng::SPREAD_NOISE_TAG as u64) << 32, 0).next_normal();
+        sigma / (1.0 - phi * phi).sqrt() * z
+    }
+
+    /// Credit's own state after tonight's session, or `None` with
+    /// `corporate_spread_noise_sd` at 0.0: `phi x + sigma z`, `z` the first
+    /// normal of `GameRng::keyed(key, SPREAD_NOISE_TAG, game_day)`.
+    fn spread_noise_step(&self, game_day: i64) -> Option<f64> {
+        if !self.carries_spread_noise() {
+            return None;
+        }
+        let z = crate::rng::GameRng::keyed(
+            self.spread_noise_key, crate::rng::SPREAD_NOISE_TAG as u64, game_day as u64).next_normal();
+        Some(self.spread_noise_keep() * self.spread_noise + self.params.corporate_spread_noise_sd * z)
+    }
+
+    /// Credit's own state for a snapshot and the state hash, `[x, key high
+    /// word, key low word]`, or `None` with `corporate_spread_noise_sd` at 0.0.
+    pub fn spread_noise_words(&self) -> Option<[f64; 3]> {
+        if !self.carries_spread_noise() {
+            return None;
+        }
+        Some([self.spread_noise, (self.spread_noise_key >> 32) as f64, (self.spread_noise_key & 0xFFFF_FFFF) as f64])
+    }
+
+    /// Credit's own state now, points of the spread formula's base
+    /// (`corporate_spread_noise_sd`); 0.0 off.
+    pub fn spread_noise_level(&self) -> f64 {
+        self.spread_noise
+    }
+
+    /// Put credit's own state back from [`Engine::spread_noise_words`].
+    pub fn set_spread_noise_state(&mut self, words: Option<&[f64]>) -> Result<(), String> {
+        match (words, self.carries_spread_noise()) {
+            (None, false) => Ok(()),
+            (Some(w), true) => {
+                let whole = |v: f64| v.is_finite() && v >= 0.0 && v <= u32::MAX as f64 && v.fract() == 0.0;
+                if w.len() != 3 || !w[0].is_finite() || !whole(w[1]) || !whole(w[2]) {
+                    return Err(format!(
+                        "this snapshot's spread_noise is {w:?}: it is credit's own state and its \
+                         key's two 32-bit words"));
+                }
+                self.spread_noise = w[0];
+                self.spread_noise_key = ((w[1] as u64) << 32) | (w[2] as u64);
+                Ok(())
+            }
+            (None, true) => Err(
+                "this model sets corporate_spread_noise_sd and the snapshot carries no spread_noise".to_string()),
+            (Some(_), false) => Err(
+                "this snapshot carries spread_noise and this model's corporate_spread_noise_sd is 0".to_string()),
+        }
     }
 
     /// Put core inflation's trend back from [`Engine::core_trend_words`].
@@ -13060,6 +13174,14 @@ impl Engine {
         // own tag.
         if let Some(words) = self.eve_decision_words() {
             hash_f64(&mut buf, 58.0);
+            for value in words {
+                hash_f64(&mut buf, value);
+            }
+        }
+        // Credit's own state, only while `corporate_spread_noise_sd` is set,
+        // behind its own tag.
+        if let Some(words) = self.spread_noise_words() {
+            hash_f64(&mut buf, 59.0);
             for value in words {
                 hash_f64(&mut buf, value);
             }

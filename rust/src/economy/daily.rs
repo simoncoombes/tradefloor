@@ -479,6 +479,10 @@ pub struct YieldDials {
     /// off, the spread reading the gap itself. Read only with
     /// `spread_equity_gain` set.
     pub spread_priced_keep: f64,
+    /// Credit's own state before and after tonight's step, points of the
+    /// spread formula's base ([`crate::params::ModelParams::corporate_spread_noise_sd`]);
+    /// `None`, on every preset, is no state.
+    pub spread_noise: Option<(f64, f64)>,
 }
 
 /// The largest move the corporate yield takes in one session under
@@ -541,6 +545,7 @@ impl Default for YieldDials {
             spread_equity_gain: 0.0,
             spread_equity_decay: 0.0,
             spread_priced_keep: 0.0,
+            spread_noise: None,
         }
     }
 }
@@ -1554,15 +1559,23 @@ fn close_yields(
         // sides of the change. A VIX pin takes the VIX out, not the index.
         // Guarded, so with both at 0.0 the expressions are the ones that
         // stood.
-        let spread_dials = inputs.yields.spread_vix_cut != 0.0 || equity_gain != 0.0;
+        //
+        // CREDIT'S OWN STATE (`corporate_spread_noise_sd`): its step tonight
+        // is added to the base beside the leverage term, on both sides of
+        // the change, so the level stays on the formula the meeting reads.
+        // Guarded, so with no state the expressions are the ones that stood.
+        let spread_noise = inputs.yields.spread_noise;
+        let spread_dials = inputs.yields.spread_vix_cut != 0.0 || equity_gain != 0.0 || spread_noise.is_some();
+        let base_term = |gap: f64, x: f64| if spread_noise.is_some() { equity_gain * gap + x } else { equity_gain * gap };
+        let (x_before, x_after) = spread_noise.unwrap_or((0.0, 0.0));
         let vix_term = if let Some((m0, m1)) = inputs.yields.spread_multiplier {
             let vix_close = if inputs.yields.vix_pinned { economy.vix } else { new_state.vix };
             if spread_dials {
                 let cut = inputs.yields.spread_vix_cut;
                 crate::economy::central_bank::spread_formula_with(
-                    vix_close, m1, cut, equity_gain * gap_after)
+                    vix_close, m1, cut, base_term(gap_after, x_after))
                     - crate::economy::central_bank::spread_formula_with(
-                        economy.vix, m0, cut, equity_gain * gap_before)
+                        economy.vix, m0, cut, base_term(gap_before, x_before))
             } else {
                 crate::economy::central_bank::spread_formula(vix_close, m1)
                     - crate::economy::central_bank::spread_formula(economy.vix, m0)
@@ -1574,7 +1587,8 @@ fn close_yields(
                 0.02 * (1.0 - inputs.yields.spread_vix_cut)
                     * cycle_spread_multiplier * (new_state.vix - economy.vix)
             };
-            vix_part + equity_gain * cycle_spread_multiplier * (gap_after - gap_before)
+            let own = if spread_noise.is_some() { cycle_spread_multiplier * (x_after - x_before) } else { 0.0 };
+            vix_part + equity_gain * cycle_spread_multiplier * (gap_after - gap_before) + own
         } else if inputs.yields.vix_pinned {
             0.0
         } else {

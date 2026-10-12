@@ -582,6 +582,16 @@ OUT_OF_SCOPE = {
         "the spread's leverage term reads the gap itself, as it stood; the "
         "priced gap is neither stepped, snapshotted nor hashed; at 0.0 it is "
         "also left out of the model's digest",
+    "corporate_spread_noise_sd":
+        "inert at 0.0: the corporate spread moves with the VIX, the cycle and "
+        "the leverage gap as it stood (a branch on the state's presence in "
+        "the close's corporate move, the meeting's formula and the prehistory "
+        "carry); credit's own state and its key are neither stepped, "
+        "snapshotted nor hashed; at 0.0 it is also left out of the model's "
+        "digest",
+    "corporate_spread_noise_half_life":
+        "inert at 0.0 and read only with `corporate_spread_noise_sd` set; at "
+        "0.0 it is also left out of the model's digest",
     "cycle_inflation_hazard":
         "inert at 0.0: an expansion adds the legacy 0.1 a month with "
         "inflation above 4 (a branch on `== 0.0` in the cycle's ladder); at "

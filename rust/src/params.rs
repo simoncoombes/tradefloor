@@ -1276,6 +1276,32 @@ pub struct ModelParams {
     /// 0.17 (design PR #9, r22o5czN-B/inflation addendum K). No draw. The
     /// priced gap is snapshotted and hashed only with this set. In [0, 252].
     pub corporate_spread_equity_lag: f64,
+    /// The per-session innovation sd of credit's own state, points of the
+    /// corporate spread's base. 0.0, on every shipped preset, is no state
+    /// (the spread moves only with the VIX, the cycle and the leverage gap),
+    /// and a value of 0.0 is left out of the model's digest.
+    ///
+    /// Off zero credit's state x follows an AR(1), `x' = phi x + sd z` with
+    /// `phi = 0.5^(1/H)`, H `corporate_spread_noise_half_life`, stepped once
+    /// a session on its own key (`GameRng::keyed(key, SPREAD_NOISE_TAG,
+    /// day)`, so no stream moves) and opened at a draw from its stationary
+    /// distribution. x is added to the spread formula's base before the
+    /// cycle multiplier wherever the leverage term is: the close's daily
+    /// move, the meeting's re-anchor and the prehistory carry. The spread
+    /// had almost none of its own movement: off the zero bound, the part of
+    /// its change the index does not explain has an sd of 1.36 bp a session,
+    /// 6.4 over 21 and 11.6 over 63 where the IG closing-price spread
+    /// (LQD's return less 0.913 IEF's at duration 8.5, on SPY, 2015-2025)
+    /// has 2.54, 11.5 and 16.7. The 21- and 63-session pair gives H 16 and
+    /// a stationary sd of 8.8 bp (design PR #9, r22o5czN-B/inflation
+    /// addendum L). x and its key are snapshotted and hashed only with this
+    /// set. In [0, 0.5].
+    pub corporate_spread_noise_sd: f64,
+    /// The half-life, sessions, of credit's own state
+    /// (`corporate_spread_noise_sd`). 0.0, on every shipped preset, is read
+    /// by nothing, and a value of 0.0 is left out of the model's digest.
+    /// With the sd set, 0.0 is no persistence (`phi` 0). In [0, 2520].
+    pub corporate_spread_noise_half_life: f64,
     /// The share of the 2-year's standing gap to the meeting's formula that a
     /// central-bank meeting keeps. 0.0, on every shipped preset, is the
     /// meeting as it stood, and a value of 0.0 is left out of the model's
@@ -8218,6 +8244,8 @@ impl ModelParams {
             fed_eve_decision: 0.0,
             treasury_path_owed_excluded: 0.0,
             corporate_spread_equity_lag: 0.0,
+            corporate_spread_noise_sd: 0.0,
+            corporate_spread_noise_half_life: 0.0,
             treasury_2y_meeting_carry: 0.0,
             policy_anticipation_half_life: 0.0,
             treasury_path_anticipated: 0.0,
@@ -10861,6 +10889,8 @@ impl ModelParams {
             "fed_eve_decision" => self.fed_eve_decision,
             "treasury_path_owed_excluded" => self.treasury_path_owed_excluded,
             "corporate_spread_equity_lag" => self.corporate_spread_equity_lag,
+            "corporate_spread_noise_sd" => self.corporate_spread_noise_sd,
+            "corporate_spread_noise_half_life" => self.corporate_spread_noise_half_life,
             "treasury_2y_meeting_carry" => self.treasury_2y_meeting_carry,
             "policy_anticipation_half_life" => self.policy_anticipation_half_life,
             "treasury_path_anticipated" => self.treasury_path_anticipated,
@@ -11269,6 +11299,8 @@ impl ModelParams {
             "fed_eve_decision" => out.fed_eve_decision = value,
             "treasury_path_owed_excluded" => out.treasury_path_owed_excluded = value,
             "corporate_spread_equity_lag" => out.corporate_spread_equity_lag = value,
+            "corporate_spread_noise_sd" => out.corporate_spread_noise_sd = value,
+            "corporate_spread_noise_half_life" => out.corporate_spread_noise_half_life = value,
             "treasury_2y_meeting_carry" => out.treasury_2y_meeting_carry = value,
             "policy_anticipation_half_life" => out.policy_anticipation_half_life = value,
             "treasury_path_anticipated" => out.treasury_path_anticipated = value,
@@ -12789,6 +12821,18 @@ impl ModelParams {
                  0 is the spread reading the leverage gap itself.",
                 self.corporate_spread_equity_lag));
         }
+        if !(self.corporate_spread_noise_sd >= 0.0 && self.corporate_spread_noise_sd <= 0.5) {
+            return Err(format!(
+                "corporate_spread_noise_sd is {}. It is the per-session innovation sd of credit's \
+                 own state, points of the spread's base, in [0, 0.5]; 0 is no state.",
+                self.corporate_spread_noise_sd));
+        }
+        if !(self.corporate_spread_noise_half_life >= 0.0 && self.corporate_spread_noise_half_life <= 2520.0) {
+            return Err(format!(
+                "corporate_spread_noise_half_life is {}. It is the half-life in sessions of credit's \
+                 own state, in [0, 2520].",
+                self.corporate_spread_noise_half_life));
+        }
         if !(self.oil_forecast_clamp == 0.0 || self.oil_forecast_clamp == 1.0) {
             return Err(format!(
                 "oil_forecast_clamp is {}. It is a switch: 0 (the forecast publishes the \
@@ -13501,6 +13545,8 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "fed_eve_decision",
     "treasury_path_owed_excluded",
     "corporate_spread_equity_lag",
+    "corporate_spread_noise_sd",
+    "corporate_spread_noise_half_life",
     "treasury_2y_meeting_carry",
     "policy_anticipation_half_life",
     "treasury_path_anticipated",
@@ -13728,6 +13774,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "fed_eve_decision",
         "treasury_path_owed_excluded",
         "corporate_spread_equity_lag",
+        "corporate_spread_noise_sd",
+        "corporate_spread_noise_half_life",
         "treasury_2y_meeting_carry",
         "policy_anticipation_half_life",
         "treasury_path_anticipated",
