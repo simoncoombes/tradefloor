@@ -143,6 +143,11 @@ CASES = {
     "spread_equity_gain": (dict(corporate_spread_equity_gain=1.8,
                                 corporate_spread_equity_half_life=126.0),
                            (), ("spread_equity_gap",), (), {}),
+    # Credit's repricing lag: the priced gap beside the gap.
+    "spread_equity_lag": (dict(corporate_spread_equity_gain=1.8,
+                               corporate_spread_equity_half_life=126.0,
+                               corporate_spread_equity_lag=5.0),
+                          (), ("spread_equity_gap", "spread_priced_gap"), (), {}),
     "cycle_equity_hazard": (dict(cycle_equity_hazard=5.0, cycle_equity_hazard_knee=0.1,
                                  cycle_equity_hazard_opening=0.007,
                                  corporate_spread_equity_half_life=126.0),

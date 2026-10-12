@@ -577,6 +577,11 @@ OUT_OF_SCOPE = {
         "inert at 0.0 and read only with `treasury_path_anticipated` on: the "
         "anticipated path's meeting step carries the put's owed step as it "
         "stood; at 0.0 it is also left out of the model's digest",
+    "corporate_spread_equity_lag":
+        "inert at 0.0 and read only with `corporate_spread_equity_gain` set: "
+        "the spread's leverage term reads the gap itself, as it stood; the "
+        "priced gap is neither stepped, snapshotted nor hashed; at 0.0 it is "
+        "also left out of the model's digest",
     "cycle_inflation_hazard":
         "inert at 0.0: an expansion adds the legacy 0.1 a month with "
         "inflation above 4 (a branch on `== 0.0` in the cycle's ladder); at "

@@ -1852,6 +1852,14 @@ impl Engine {
         self.params.corporate_spread_equity_gain != 0.0 || self.params.cycle_equity_hazard != 0.0
     }
 
+    /// Whether this engine's model carries the gap credit has priced
+    /// (`EconomyState::spread_priced_gap`), which is when the snapshot and
+    /// the state hash carry it: `corporate_spread_equity_lag` and
+    /// `corporate_spread_equity_gain` both set. Off on every preset.
+    pub fn carries_spread_priced_gap(&self) -> bool {
+        self.params.corporate_spread_equity_lag != 0.0 && self.params.corporate_spread_equity_gain != 0.0
+    }
+
     /// The Fed put's cut the curve prices tonight (`treasury_put_pricing`),
     /// percentage points: the share of the cut the put would ask for at a
     /// meeting now, no more than the policy rate, and 0.0 with inflation at
@@ -2664,10 +2672,19 @@ impl Engine {
             let cut = self.params.corporate_spread_vix_cut;
             let gain = self.params.corporate_spread_equity_gain;
             let vix = self.economy.vix;
-            let moved = crate::economy::central_bank::spread_formula_with(vix, m, cut, gain * gap)
-                - crate::economy::central_bank::spread_formula_with(
-                    vix, m, cut, gain * self.economy.spread_equity_gap);
+            // Under `corporate_spread_equity_lag` the spread's term is the
+            // priced gap's, carried with it.
+            let (then, now) = if self.carries_spread_priced_gap() {
+                (pre.economy.spread_priced_gap, self.economy.spread_priced_gap)
+            } else {
+                (gap, self.economy.spread_equity_gap)
+            };
+            let moved = crate::economy::central_bank::spread_formula_with(vix, m, cut, gain * then)
+                - crate::economy::central_bank::spread_formula_with(vix, m, cut, gain * now);
             self.economy.spread_equity_gap = gap;
+            if self.carries_spread_priced_gap() {
+                self.economy.spread_priced_gap = then;
+            }
             self.economy.corporate_bond_yield += moved;
         }
         if self.params.fed_put_gain != 0.0 {
@@ -9452,6 +9469,7 @@ impl Engine {
             rate_damping: self.params.treasury_policy_damping,
             spread_vix_cut: self.params.corporate_spread_vix_cut,
             spread_equity_gain: self.params.corporate_spread_equity_gain,
+            spread_priced_gap: self.carries_spread_priced_gap(),
             // Core in headline's place for the bank and the curve
             // (`fed_core_inflation`, `treasury_core_inflation`); `None` with
             // the switches off.
@@ -9731,6 +9749,12 @@ impl Engine {
                 // The gap also runs for the cycle's hazard (`cycle_equity_hazard`).
                 spread_equity_decay: if self.carries_spread_equity_gap() {
                     crate::mathx::pow(0.5, 1.0 / self.params.corporate_spread_equity_half_life)
+                } else {
+                    0.0
+                },
+                // Credit's repricing lag (`corporate_spread_equity_lag`).
+                spread_priced_keep: if self.carries_spread_priced_gap() {
+                    crate::mathx::pow(0.5, 1.0 / self.params.corporate_spread_equity_lag)
                 } else {
                     0.0
                 },
@@ -12788,6 +12812,11 @@ impl Engine {
         // `corporate_spread_equity_gain` set.
         if self.carries_spread_equity_gap() {
             hash_f64(&mut buf, self.economy.spread_equity_gap);
+        }
+        // The gap credit has priced, only with `corporate_spread_equity_lag`
+        // and the gain set.
+        if self.carries_spread_priced_gap() {
+            hash_f64(&mut buf, self.economy.spread_priced_gap);
         }
         // The fair-value levels and the unspent opening draws, on the same
         // rule: only when a dial can move them.

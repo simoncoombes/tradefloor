@@ -813,6 +813,9 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # Credit's leverage gap, only on a model with `corporate_spread_equity_gain` set.
     if "spread_equity_gap" in snapshot["economy"]:
         _f64(buf, snapshot["economy"]["spread_equity_gap"])
+    # The gap credit has priced, only with `corporate_spread_equity_lag` set too.
+    if "spread_priced_gap" in snapshot["economy"]:
+        _f64(buf, snapshot["economy"]["spread_priced_gap"])
     if "fair_value_offset" in snapshot:
         for name in ("fair_value_offset", "opening_z"):
             if len(snapshot[name]) % 8:
@@ -1118,7 +1121,8 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # after `earnings_cycle`. The Fed put's four fields only with
     # `fed_put_gain` set, together; hashed after the night's market draw.
     # `spread_equity_gap` only with `corporate_spread_equity_gain` set;
-    # hashed after the Fed put's fields.
+    # hashed after the Fed put's fields. `spread_priced_gap` only with
+    # `corporate_spread_equity_lag` set as well; hashed after the gap.
     # `cycle_nowcast` only on a model with `cycle_nowcast_accuracy` set,
     # together with the snapshot's `cycle_nowcast_rng`; hashed after the
     # phase, before the history.
@@ -1133,7 +1137,8 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         {"earnings_cycle", "cycle_history", "gdp_publication",
          "unemployment_impulse", "vix_feedback", "qe_assets_ratio",
          "cycle_nowcast", "cycle_publication", "anticipation_drift",
-         "anticipation_raw", "spread_equity_gap", "oil_push_level", "usd_haven_level"}
+         "anticipation_raw", "spread_equity_gap", "spread_priced_gap", "oil_push_level",
+         "usd_haven_level"}
         & set(economy))
     if "fed_put" in economy:
         economy_expected |= {"intermeeting_return", "fed_put", "fed_put_owed",

@@ -1435,6 +1435,9 @@ PERTURBATIONS = [
     ("corporate_spread_equity_gain", 1.5, True),
     # INERT: read only with corporate_spread_equity_gain non-zero.
     ("corporate_spread_equity_half_life", 126.0, False),
+    # INERT: credit's repricing lag is read only with
+    # corporate_spread_equity_gain non-zero, which pt-v20 leaves off.
+    ("corporate_spread_equity_lag", 5.0, False),
     # The market's fall in the cycle's hazard (sim/r17-b12). Carries its
     # half-life as a companion, without which it is refused. INERT on this
     # probe: the ladder reads the gap only in an expansion or at a peak past

@@ -703,6 +703,8 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # Two switches.
     "fed_eve_decision": (0.0, 1.0),
     "treasury_path_owed_excluded": (0.0, 1.0),
+    # Credit's repricing lag, sessions.
+    "corporate_spread_equity_lag": (0.0, 21.0),
     "cycle_rate_hazard": (0.0, 0.1),
     "core_trend_persistence": (0.0, 0.998),
     # The 2-year's carry through a meeting: a share, so its own bounds.

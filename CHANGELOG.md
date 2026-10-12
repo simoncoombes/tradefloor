@@ -125,6 +125,14 @@ same with them on as off.
   `usd_crisis_vix_threshold` (0.0 the standing 0.05), read by the dollar's
   step and by the forecast's expected bid. FRED DTWEXM against CBOE's VIX
   measures 0.001.
+- `corporate_spread_equity_lag` is a new dial, 0.0 on every preset and left
+  out of the digest there: a half-life in sessions at which the gap the
+  corporate spread prices follows credit's leverage gap, so the spread
+  reprices an equity move over weeks rather than on the day. Read only with
+  `corporate_spread_equity_gain` set; the cycle's equity hazard keeps the
+  gap itself. The tape's spread beta on the index builds from -0.47 bp per 1%
+  over a session to -2.3 over a month (FRED BAA10Y, 1990-2025); with the gap
+  read whole the model's is -2.2 at every horizon.
 - `fed_eve_decision` is a new switch, 0.0 on every preset and left out of the
   digest there: at 1 a scheduled meeting delivers the decision the Fed's own
   reading implied at the eve's close (the decision the market priced), after

@@ -206,6 +206,10 @@ pub struct PolicyOptions {
     /// formula's base per unit of `EconomyState::spread_equity_gap`. 0.0 is
     /// none.
     pub spread_equity_gain: f64,
+    /// `corporate_spread_equity_lag`: the formula's leverage term reads
+    /// `EconomyState::spread_priced_gap` in place of `spread_equity_gap`.
+    /// `false`, on every preset, is the gap itself.
+    pub spread_priced_gap: bool,
     /// `fed_core_inflation`: the inflation the meeting reads in place of
     /// headline, core (headline less `EconomyState::oil_inflation_level`).
     /// `None`, on every preset, is headline.
@@ -275,6 +279,7 @@ impl PolicyOptions {
             rate_damping: 0.0,
             spread_vix_cut: 0.0,
             spread_equity_gain: 0.0,
+            spread_priced_gap: false,
             policy_inflation: None,
             curve_inflation: None,
             zlb_path: 0.0,
@@ -845,10 +850,12 @@ pub fn update_central_bank_with(
     // (`corporate_spread_vix_cut`, `corporate_spread_equity_gain`), as the
     // close's daily move carries them, so the meeting re-anchors the level
     // the daily move keeps. Guarded: with both at 0.0 the base is the
-    // expression that stood.
+    // expression that stood. Under `corporate_spread_equity_lag` the
+    // leverage term reads the gap the spread has priced.
+    let spread_gap = if options.spread_priced_gap { economy.spread_priced_gap } else { economy.spread_equity_gap };
     let base_corporate_spread = if options.spread_vix_cut != 0.0 || options.spread_equity_gain != 0.0 {
         1.0 + (economy.vix - 12.0) * 0.02 * (1.0 - options.spread_vix_cut)
-            + options.spread_equity_gain * economy.spread_equity_gap
+            + options.spread_equity_gain * spread_gap
     } else {
         1.0 + (economy.vix - 12.0) * 0.02
     };

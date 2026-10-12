@@ -880,6 +880,7 @@ PARAM_SPECS: dict[str, dict] = {
     "cycle_inflation_hazard": {"kind": "abs", "step_unit": 0.005, "hard_range": (0.0, 0.5)},
     "fed_eve_decision": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0), "derived": False},
     "treasury_path_owed_excluded": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0), "derived": False},
+    "corporate_spread_equity_lag": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 252.0), "derived": False},
     "cycle_rate_hazard": {"kind": "abs", "step_unit": 0.005, "hard_range": (0.0, 0.5)},
     "core_trend_persistence": {"kind": "abs", "step_unit": 0.001, "hard_range": (0.0, 1.0)},
     "treasury_2y_meeting_carry": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 1.0)},

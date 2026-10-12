@@ -474,6 +474,11 @@ pub struct YieldDials {
     /// [`crate::params::ModelParams::corporate_spread_equity_half_life`].
     /// Read only with `spread_equity_gain` set.
     pub spread_equity_decay: f64,
+    /// The priced gap's one-session keep, `0.5^(1/H)` with H
+    /// [`crate::params::ModelParams::corporate_spread_equity_lag`]; 0.0 is
+    /// off, the spread reading the gap itself. Read only with
+    /// `spread_equity_gain` set.
+    pub spread_priced_keep: f64,
 }
 
 /// The largest move the corporate yield takes in one session under
@@ -535,6 +540,7 @@ impl Default for YieldDials {
             spread_vix_cut: 0.0,
             spread_equity_gain: 0.0,
             spread_equity_decay: 0.0,
+            spread_priced_keep: 0.0,
         }
     }
 }
@@ -1490,6 +1496,18 @@ fn close_yields(
         (economy.spread_equity_gap, g)
     } else {
         (0.0, 0.0)
+    };
+    // CREDIT'S REPRICING LAG (`corporate_spread_equity_lag`): the spread's
+    // leverage term reads the gap it has priced, which closes a share of
+    // its distance to the gap each session. No draw. Guarded, so with the
+    // lag at 0.0 the pair is the gap's own.
+    let (gap_before, gap_after) = if equity_gain != 0.0 && inputs.yields.spread_priced_keep != 0.0 {
+        let p = economy.spread_priced_gap;
+        let q = p + (1.0 - inputs.yields.spread_priced_keep) * (gap_after - p);
+        new_state.spread_priced_gap = q;
+        (p, q)
+    } else {
+        (gap_before, gap_after)
     };
 
     // THE CORPORATE YIELD BETWEEN MEETINGS. It was written only at a

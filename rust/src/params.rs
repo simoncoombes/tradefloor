@@ -1256,6 +1256,26 @@ pub struct ModelParams {
     /// (DGS2 on scheduled cuts off the zero bound, 1994-2025). Read only
     /// with `treasury_path_anticipated` on. 0 or 1.
     pub treasury_path_owed_excluded: f64,
+    /// Credit's repricing lag: the half-life, in sessions, at which the gap
+    /// the corporate spread prices (`EconomyState::spread_priced_gap`)
+    /// follows credit's leverage gap (`EconomyState::spread_equity_gap`).
+    /// Each close steps `P = P + (1 - 0.5^(1/H)) (D - P)`, and the spread's
+    /// equity term reads `P` wherever it read `D`: the close's daily move,
+    /// the meeting's re-anchor and the restore's re-mark. The cycle's equity
+    /// hazard keeps reading `D`. 0.0, on every shipped preset, is the spread
+    /// reading the gap itself, as it stood, and a value of 0.0 is left out of
+    /// the model's digest. Read only with `corporate_spread_equity_gain` set.
+    ///
+    /// The tape's spread reprices an equity move over weeks: the beta of
+    /// FRED BAA10Y's change on the S&P 500's log return, off the zero bound
+    /// 1990-2025, is -0.47 bp per 1% over one session (se 0.16), -0.91 over
+    /// five (0.29), -2.28 over 21 (0.66) and -2.51 over 63 (0.68); ICE BofA
+    /// IG OAS reads -0.65 a session over the 2023-2025 it publishes. With
+    /// the gap read whole the spread moves -2.2 a session at every horizon
+    /// and its daily correlation with the index is 0.89 against the tape's
+    /// 0.17 (design PR #9, r22o5czN-B/inflation addendum K). No draw. The
+    /// priced gap is snapshotted and hashed only with this set. In [0, 252].
+    pub corporate_spread_equity_lag: f64,
     /// The share of the 2-year's standing gap to the meeting's formula that a
     /// central-bank meeting keeps. 0.0, on every shipped preset, is the
     /// meeting as it stood, and a value of 0.0 is left out of the model's
@@ -8197,6 +8217,7 @@ impl ModelParams {
             cycle_rate_hazard: 0.0,
             fed_eve_decision: 0.0,
             treasury_path_owed_excluded: 0.0,
+            corporate_spread_equity_lag: 0.0,
             treasury_2y_meeting_carry: 0.0,
             policy_anticipation_half_life: 0.0,
             treasury_path_anticipated: 0.0,
@@ -10839,6 +10860,7 @@ impl ModelParams {
             "cycle_rate_hazard" => self.cycle_rate_hazard,
             "fed_eve_decision" => self.fed_eve_decision,
             "treasury_path_owed_excluded" => self.treasury_path_owed_excluded,
+            "corporate_spread_equity_lag" => self.corporate_spread_equity_lag,
             "treasury_2y_meeting_carry" => self.treasury_2y_meeting_carry,
             "policy_anticipation_half_life" => self.policy_anticipation_half_life,
             "treasury_path_anticipated" => self.treasury_path_anticipated,
@@ -11246,6 +11268,7 @@ impl ModelParams {
             "cycle_rate_hazard" => out.cycle_rate_hazard = value,
             "fed_eve_decision" => out.fed_eve_decision = value,
             "treasury_path_owed_excluded" => out.treasury_path_owed_excluded = value,
+            "corporate_spread_equity_lag" => out.corporate_spread_equity_lag = value,
             "treasury_2y_meeting_carry" => out.treasury_2y_meeting_carry = value,
             "policy_anticipation_half_life" => out.policy_anticipation_half_life = value,
             "treasury_path_anticipated" => out.treasury_path_anticipated = value,
@@ -12760,6 +12783,12 @@ impl ModelParams {
                  carries the put's owed step) or 1 (it leaves it out).",
                 self.treasury_path_owed_excluded));
         }
+        if !(self.corporate_spread_equity_lag >= 0.0 && self.corporate_spread_equity_lag <= 252.0) {
+            return Err(format!(
+                "corporate_spread_equity_lag is {}. It is a half-life in sessions, in [0, 252]; \
+                 0 is the spread reading the leverage gap itself.",
+                self.corporate_spread_equity_lag));
+        }
         if !(self.oil_forecast_clamp == 0.0 || self.oil_forecast_clamp == 1.0) {
             return Err(format!(
                 "oil_forecast_clamp is {}. It is a switch: 0 (the forecast publishes the \
@@ -13471,6 +13500,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "cycle_rate_hazard",
     "fed_eve_decision",
     "treasury_path_owed_excluded",
+    "corporate_spread_equity_lag",
     "treasury_2y_meeting_carry",
     "policy_anticipation_half_life",
     "treasury_path_anticipated",
@@ -13697,6 +13727,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "cycle_rate_hazard",
         "fed_eve_decision",
         "treasury_path_owed_excluded",
+        "corporate_spread_equity_lag",
         "treasury_2y_meeting_carry",
         "policy_anticipation_half_life",
         "treasury_path_anticipated",
