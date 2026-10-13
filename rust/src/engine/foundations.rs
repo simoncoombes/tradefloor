@@ -950,15 +950,37 @@ impl Engine {
             let oil_before = econ.oil_price;
             let mut next = update_economy_daily(&econ, &inputs, &mut crate::economy::daily::MeanDraws);
             let kappa = p.oil_inventory_reversion;
+            let sd_before = crate::mathx::sqrt(var_inventory);
             var_inventory = (1.0 - kappa) * (1.0 - kappa) * var_inventory + 0.25;
             let sd_inv = crate::mathx::sqrt(var_inventory);
-            next.oil_price += crate::economy::daily::inventory_pressure_expected(next.oil_inventory_level, sd_inv)
-                - crate::economy::daily::inventory_pressure(next.oil_inventory_level);
+            let gap = |level: f64, sd: f64| {
+                crate::economy::daily::inventory_pressure_expected(level, sd)
+                    - crate::economy::daily::inventory_pressure(level)
+            };
+            // The step read the pressure at the inventory's expected path;
+            // its expectation over inventory's spread is what the price
+            // expects. Under `oil_inventory_level_gain` the step read the
+            // change in the pressure, so the gap is the change in the gaps.
+            next.oil_price += if p.oil_inventory_level_gain == 0.0 {
+                gap(next.oil_inventory_level, sd_inv)
+            } else {
+                p.oil_inventory_level_gain
+                    * (gap(next.oil_inventory_level, sd_inv) - gap(econ.oil_inventory_level, sd_before))
+            };
             if next.oil_last_opec_day != opec_day {
                 next.oil_price += crate::economy::daily::opec_expected_impact(
                     oil_before, crate::mathx::sqrt(var_oil), p.oil_opec_symmetry);
             }
-            var_oil = 0.97 * 0.97 * var_oil + 4.0;
+            // Oil's own spread about its expectation, for the OPEC rule's
+            // expected decision: the law's reversion and noise.
+            // A branch, so the standing law keeps its arithmetic to the bit.
+            var_oil = if p.oil_mean_reversion == 0.0 && p.oil_noise_sd == 0.0 {
+                0.97 * 0.97 * var_oil + 4.0
+            } else {
+                let keep = if p.oil_mean_reversion == 0.0 { 0.97 } else { 1.0 - p.oil_mean_reversion };
+                let noise = if p.oil_noise_sd == 0.0 { 2.0 } else { p.oil_noise_sd };
+                keep * keep * var_oil + noise * noise
+            };
             if spread > 0.0 {
                 let k = p.usd_crisis_vix_threshold;
                 let at_mean = if vix > k { vix - k } else { 0.0 };
