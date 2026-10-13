@@ -383,7 +383,7 @@ pub fn term_shape(inputs: &TermInputs<'_>, n_max: usize) -> Vec<f64> {
         if inputs.variance.is_empty() {
             1.0
         } else {
-            inputs.variance[h.min(inputs.variance.len()) - 1]
+            inputs.variance[std::cmp::min(h, inputs.variance.len()) - 1]
         }
     };
     let mut out = Vec::with_capacity(n_max);

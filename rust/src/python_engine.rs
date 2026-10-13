@@ -6519,7 +6519,7 @@ pub struct PySurface {
 impl PySurface {
     fn carry_at(&self, t: f64) -> (f64, f64, f64) {
         let n = (t + self.inner.curve.elapsed).round();
-        let i = if n.is_finite() && n > 0.0 { (n as usize).min(self.carry.len() - 1) } else { 0 };
+        let i = if n.is_finite() && n > 0.0 { std::cmp::min(n as usize, self.carry.len() - 1) } else { 0 };
         let (_, rate, dividends) = self.carry[i];
         // The forward to `t` exactly, on the carry of the session it reaches.
         let index = self.carry[0].0 + self.carry[0].2;

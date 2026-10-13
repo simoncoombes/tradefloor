@@ -421,7 +421,7 @@ impl Engine {
         };
         let fit = self.surface_fit(vix, target)?;
         let last = self.options.expiries.last().map_or(0, |e| e.expiry - clock.base);
-        let n_max = std::cmp::max(SURFACE_MIN_KNOTS, last.max(0) as usize + 2);
+        let n_max = std::cmp::max(SURFACE_MIN_KNOTS, std::cmp::max(last, 0) as usize + 2);
         let events = self.surface_events(clock, n_max);
         let variance: &[f64] = match self.forecast() {
             Some(f) => &f.index_variance,
