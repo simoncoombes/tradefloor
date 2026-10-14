@@ -714,10 +714,11 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "corporate_spread_noise_sd": (0.0, 0.05),
     # Every pin sets the variance: a switch.
     "pinned_vix_sets_variance": (0.0, 1.0),
-    # The valuation multiple: off to every market move; half-life a year to
-    # twice the tape's (CAPE, 7.1 years).
+    # The valuation multiple: off to every market move. Sessions; read only
+    # with the share set, up to twice the tape's (CAPE, 7.1 years). A draw
+    # with the share set and the half-life at 0 is the model's refusal.
     "valuation_multiple_share": (0.0, 1.0),
-    "valuation_multiple_half_life": (252.0, 3558.0),
+    "valuation_multiple_half_life": (0.0, 3558.0),
     "corporate_spread_noise_half_life": (0.0, 252.0),
     "cycle_rate_hazard": (0.0, 0.1),
     "core_trend_persistence": (0.0, 0.998),

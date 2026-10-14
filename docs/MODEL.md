@@ -1905,6 +1905,81 @@ mirrored rules breaches C10c. At 90 histories the 126-session rise splits as
 against +3.72, +1.98 and +2.08 on R15F. V1 reads 0.90 and 0.83 (R15F 0.86
 and 0.82; S&P 500 0.93 and 0.87), and all 40 registered rows pass.
 
+### The valuation multiple
+
+**Timescale:** every tick, the night and the close's jumps; pulled once a
+session at the close. **State:** a log multiple $\mu_i$ per company, carried
+only with `valuation_multiple_share` set, which no preset sets.
+
+With the permanent share alone, every permanent market move lands in $v_i$,
+which scales the earnings the valuation and the market P/E read. Each name's
+P/E then stays near its target and the market multiple hardly moves: over
+270 held-out 21-year histories of a research calibration built on pt-v20 the market P/E's
+log sd is 0.09, and its 1-, 5- and 10-year changes have sds of 0.05, 0.08
+and 0.10. Shiller's S&P 500 CAPE over 1881-2023 has a log sd of 0.42 and
+changes of 0.19, 0.39 and 0.51. On the tape CAPE's change carries all of the
+index's price variance at 1 to 10 years, and the next ten years' log real
+return on log CAPE has a slope of -0.66 and an $R^2$ of 0.29. In the model
+without the multiple the P/E carries 4 to 10 per cent of the price variance
+at those horizons, and the same regression has an $R^2$ of 0.03.
+
+Off zero, with $\chi$ = `valuation_multiple_share`, the market part of each
+permanent move is split between the level and the multiple. Writing
+$q_{i,t} = \psi_m(\sigma_t)\,(u\,m_{i,t} + N^{mkt}_{i,t})$ for the market
+term of $\Delta v_{i,t}$ above:
+
+```math
+\Delta v_{i,t} = \psi\,\big(u\,(\varepsilon^{I}_{i,t} + \varepsilon^{S}_{i,t}) + N^{own}_{i,t}\big) + (1-\chi)\,q_{i,t},
+\qquad
+\Delta \mu_{i,t} = \chi\,q_{i,t},
+\qquad
+s_{i,t+1} \leftarrow s_{i,t+1} - \Delta v_{i,t} - \Delta \mu_{i,t}
+```
+
+and each level takes its own Ito term, $\mu_i \leftarrow \mu_i + \Delta\mu -
+\tfrac{1}{2}\Delta\mu^{2}$. The night and the close's market jump split the
+same way. Fair value is multiplied by $e^{\mu_i}$ after the volatility
+feedback and before the accrued dividend (`market::tick::with_valuation_multiple`).
+Nothing that reads earnings reads $\mu_i$: the market P/E, the buyback
+accrual and the dividends keep reading $v_i$ alone, so the P/E carries the
+multiple and the payout yields move against it. At each close, with $H$ =
+`valuation_multiple_half_life`:
+
+```math
+\mu_i \leftarrow 0.5^{1/H}\,\mu_i
+```
+
+a drift back to the valuation's target of $(1 - 0.5^{1/H})\,\mu_i$ a session,
+taking no draw (`Engine::pull_valuation_multiples`). A share with no
+half-life is refused.
+
+**The opening.** The stationary opening opens every company at
+$\mu_i = \beta_i M_0$, with
+
+```math
+M_0 = \frac{\chi\,\psi_m\,\sigma_F}{\sqrt{1 - a^{2}}}\,z_0, \qquad a = 0.5^{1/H}
+```
+
+the stationary spread of a unit-beta multiple fed the market factor's base
+sigma $\sigma_F$, and $z_0$ the first normal of `GameRng::keyed(key,
+VALUATION_MULTIPLE_TAG, u64::MAX)` on a key mixed from the root seed, so no
+stream moves. The company's level takes the rest of its opening premium,
+$v_i - \mu_i$ in place of $v_i$, so no opening price moves. A company listed
+later opens at $\mu_i = 0$. The prehistory carries nothing of $\mu_i$.
+
+With $\chi = 1$ and $H = 1779$ on the same calibration and histories, the market
+P/E's log sd is 0.28, its 1-, 5- and 10-year changes 0.13, 0.24 and 0.31, its
+share of the price variance 0.66, 0.57 and 0.53, and the ten-year return on
+it has a slope of -0.87 and an $R^2$ of 0.29. The P/E's spread across
+histories is 0.24 in year 0 and 0.29 in year 20. The index's long-run return
+rises by about 0.8 points a year, because a stationary multiple carries no
+permanent volatility drag.
+
+| Symbol | Dial | pt-v20 | pt-v21 | Kind | Source |
+|---|---|---|---|---|---|
+| $\chi$ | `valuation_multiple_share` | 0 (every permanent market move is an earnings move) | same | derived | CAPE's change carries 1.06 to 1.08 of the S&P 500's price variance at 1 to 10 years (Shiller, 1881-2023): 1.0 |
+| $H$ | `valuation_multiple_half_life` | 0 (read only with $\chi$ set) | same | measured | log CAPE's annual AR(1), 0.906 on 1881-2023: 1779 sessions (7.06 years); the implied ten-year return slope, -0.63, matches the tape's -0.66 |
+
 ### Volatility feedback
 
 **Timescale:** wherever fair value is read, and once a session for the
@@ -4685,6 +4760,10 @@ changes, so it waits for a new preset.
 - `ModelParams`' doc comment says market and sector shocks stay in $s$; the code sends sector noise and sector news to $v$, as this document states.
 - The company GJR is fed the whole noise term, market and sector parts included, while its coefficients describe a company's own returns. The floor, not $\omega$, sets the resting level in 8 of 12 sectors.
 - The buyback factor is re-evaluated each tick at the current price over all elapsed sessions rather than integrated along the path, and it uses the engine's global session count, so a company listed mid-run is credited with buybacks from before it existed, and no shares are retired.
+
+- On every shipped preset the market P/E barely moves. Every permanent market move is an earnings move, so the P/E's log sd over 21-year histories is about 0.09 against 0.42 for the S&P 500's CAPE since 1881, and a cheap market is not followed by higher returns (the ten-year $R^2$ is 0.03 against the tape's 0.29). `valuation_multiple_share` and `valuation_multiple_half_life` (see [The valuation multiple](#the-valuation-multiple)) close most of it. *Next preset.*
+- With the valuation multiple on at the tape's values, the market P/E is still less variable than the S&P 500's: a log sd of 0.28 against CAPE's 0.42, and 1-, 5- and 10-year changes about two thirds of the tape's. The share is already at its ceiling of 1, and the model's permanent market factor moves about 10.5% a year, less than the S&P 500's common movement. A longer half-life would widen the P/E but weaken its ten-year return slope, which matches the tape.
+- With the valuation multiple on, the pull after a run-up deepens falls from peaks: 20% bear markets come 1.68 times a decade against 1.50 without it and 1.12 for the S&P 500. A year ahead the P/E predicts a little more of the return than on the tape ($R^2$ 0.06 against 0.04).
 
 **Volatility.**
 
