@@ -4763,7 +4763,7 @@ changes, so it waits for a new preset.
 
 - On every shipped preset the market P/E barely moves. Every permanent market move is an earnings move, so the P/E's log sd over 21-year histories is about 0.09 against 0.42 for the S&P 500's CAPE since 1881, and a cheap market is not followed by higher returns (the ten-year $R^2$ is 0.03 against the tape's 0.29). `valuation_multiple_share` and `valuation_multiple_half_life` (see [The valuation multiple](#the-valuation-multiple)) close most of it. *Next preset.*
 - With the valuation multiple on at the tape's values, the market P/E is still less variable than the S&P 500's: a log sd of 0.28 against CAPE's 0.42, and 1-, 5- and 10-year changes about two thirds of the tape's. The share is already at its ceiling of 1, and the model's permanent market factor moves about 10.5% a year, less than the S&P 500's common movement. A longer half-life would widen the P/E but weaken its ten-year return slope, which matches the tape.
-- With the valuation multiple on, the pull after a run-up deepens falls from peaks: 20% bear markets come 1.68 times a decade against 1.50 without it and 1.12 for the S&P 500. A year ahead the P/E predicts a little more of the return than on the tape ($R^2$ 0.06 against 0.04).
+- With the valuation multiple on, the pull after a run-up deepens falls from peaks: 20% bear markets come 1.68 times a decade against 1.12 for the S&P 500, inside the band of 0.56 to 2.24. A year ahead the P/E predicts a little more of the return than on the tape ($R^2$ 0.06 against 0.04).
 
 **Volatility.**
 
