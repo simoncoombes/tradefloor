@@ -32,12 +32,15 @@ try {
   refusedUnsafe = String(e.message ?? e).includes('2**64 - 1');
 }
 
-// The derivatives' getters (pt-v22 phase 1): no shipped preset lists the
-// index or a future, so a page reads `undefined` and an empty list.
+// The derivatives' getters (pt-v22 phases 1 and 2): no shipped preset lists
+// the index, a future or an option, so a page reads `undefined` and empty
+// lists.
 const sim = new pt.Sim(12, 7, 3, 'pt-v21');
 sim.runDay(65);
 const fronts = sim.frontFutures;
-const getters = sim.indexLevel === undefined && Array.isArray(fronts) && fronts.length === 0;
+const expiries = sim.optionExpiries;
+const getters = sim.indexLevel === undefined && Array.isArray(fronts) && fronts.length === 0
+  && Array.isArray(expiries) && expiries.length === 0;
 
 console.log(`  tradefloor ${pt.version()}, fixed simulation v${FIXED_SIMULATION_KAT_VERSION}`);
 console.log(`  presets   ${pt.preset_names().join(', ')}`);
@@ -57,8 +60,8 @@ if (!sameAsNumber || !refusedUnsafe) {
   process.exit(1);
 }
 if (!getters) {
-  console.error('\nGETTERS: on a shipped preset Sim.indexLevel is undefined ' +
-                'and Sim.frontFutures an empty array.');
+  console.error('\nGETTERS: on a shipped preset Sim.indexLevel is undefined, ' +
+                'and Sim.frontFutures and Sim.optionExpiries empty arrays.');
   process.exit(1);
 }
 console.log('\n  bit-identical with the native build.');

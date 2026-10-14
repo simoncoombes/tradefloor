@@ -4787,6 +4787,14 @@ impl PyEngine {
         self.inner.lists_futures()
     }
 
+    /// Whether the model lists index options (`options_index_listed`): a
+    /// property of the model, as `lists_futures` is. False on every shipped
+    /// preset.
+    #[getter]
+    fn lists_options(&self) -> bool {
+        self.inner.lists_options()
+    }
+
     /// The forecast the last close computed (`forecast_horizon_sessions`), or
     /// None with the dial at 0 and before the first close. Entry `h - 1` of
     /// each list is the expectation `h` sessions ahead: `vix`, the published
@@ -4989,6 +4997,40 @@ impl PyEngine {
             ))
         })?;
         rows.iter().map(|q| option_quote_dict(py, q)).collect()
+    }
+
+    /// Every listed expiry of the index options (`options_index_listed`) as
+    /// a trader reads it off the chain now, in expiry order, a list of
+    /// dicts: `root`, `expiry` (the session it settles at, counted from 0),
+    /// `sessions_to_expiry`, `forward`, the strike grid (`strike_low` to
+    /// `strike_high` in steps of `strike_step`, index points), `atm_iv`, the
+    /// dealer's mid volatility at the forward, linear in log-moneyness
+    /// between the strikes either side; `put_25d_iv` and `call_25d_iv`, its
+    /// volatility where a put's delta is -0.25 and a call's 0.25, linear in
+    /// delta between the strikes either side; and `skew_25d`, the put's less
+    /// the call's. A volatility the grid does not reach, or on a chain with
+    /// no time left, is None. Empty with the switch off. A read.
+    #[pyo3(signature = (root = "IDX"))]
+    fn option_expiries<'py>(&self, py: Python<'py>, root: &str) -> PyResult<Vec<Bound<'py, PyDict>>> {
+        self.inner
+            .option_expiries(root)
+            .iter()
+            .map(|e| {
+                let d = PyDict::new_bound(py);
+                d.set_item("root", &e.root)?;
+                d.set_item("expiry", e.expiry)?;
+                d.set_item("sessions_to_expiry", e.sessions_to_expiry)?;
+                d.set_item("forward", e.forward)?;
+                d.set_item("strike_low", e.strike_low)?;
+                d.set_item("strike_high", e.strike_high)?;
+                d.set_item("strike_step", e.strike_step)?;
+                d.set_item("atm_iv", e.atm_iv)?;
+                d.set_item("put_25d_iv", e.put_25d_iv)?;
+                d.set_item("call_25d_iv", e.call_25d_iv)?;
+                d.set_item("skew_25d", e.skew_25d)?;
+                Ok(d)
+            })
+            .collect()
     }
 
     /// The implied-volatility surface on `root` now (`surface_ssvi`), a
@@ -5387,7 +5429,7 @@ impl PyEngine {
         // only: `contracts` and `quote` are reads, so recording moves
         // nothing, and every other model records what it did.
         if self.inner.lists_futures() {
-            for c in self.inner.contracts() {
+            for c in self.inner.contracts().into_iter().filter(|c| c.kind.is_future()) {
                 let Some(q) = self.inner.quote(&c.symbol) else { continue };
                 self.recorded_futures.push(crate::python_arrow::FuturesBarRow {
                     day,
@@ -5876,6 +5918,40 @@ impl PyEngine {
         Ok(crate::python_arrow::PyArrowStream::new(
             "settlements",
             crate::python_arrow::settlements_schema(),
+            vec![batch],
+        ))
+    }
+
+    /// The `option_quotes` table (pt-v22 phase 2): the index options'
+    /// chains now as Arrow, every listed expiry's in expiry order, or
+    /// `expiry`'s alone, each by strike, the call before the put, as
+    /// `chain` quotes them. `day` is the engine's day count when read, so
+    /// tables read at successive closes stack into a history. Read now, not
+    /// recorded: a chain is several hundred contracts. Empty on a model that
+    /// lists no options, which is every shipped preset; an expiry not listed
+    /// is refused. The schema's `schema_version` metadata key is "1".
+    #[pyo3(signature = (root = "IDX", expiry = None))]
+    fn chain_table(&self, root: &str, expiry: Option<i64>) -> PyResult<crate::python_arrow::PyArrowStream> {
+        let mut rows = Vec::new();
+        if self.inner.lists_options() {
+            let expiries: Vec<i64> = match expiry {
+                Some(x) => vec![x],
+                None => self.inner.option_expiries(root).iter().map(|e| e.expiry).collect(),
+            };
+            for x in expiries {
+                rows.extend(self.inner.chain(root, x).ok_or_else(|| {
+                    ValidationError::new_err(format!(
+                        "no option chain on {root:?} at expiry {x}: Engine.option_expiries() lists the \
+                         expiries that trade"
+                    ))
+                })?);
+            }
+        }
+        let batch = crate::python_arrow::option_quotes_batch(self.day_count, &rows)
+            .map_err(crate::python_arrow::arrow_err)?;
+        Ok(crate::python_arrow::PyArrowStream::new(
+            "option_quotes",
+            crate::python_arrow::option_quotes_schema(),
             vec![batch],
         ))
     }

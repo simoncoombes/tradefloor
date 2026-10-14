@@ -376,6 +376,18 @@ class MarketView:
     # The index options' public reads (pt-v22 phase 2): the dealer's quotes
     # and the surface they come from, which reads public state only.
 
+    @property
+    def lists_options(self) -> bool:
+        """Whether the model lists index options, as ``Engine.lists_options``:
+        a property of the model. False on every shipped preset."""
+        return _WRAPPED[self].lists_options
+
+    def option_expiries(self, root: str = "IDX") -> list[dict[str, Any]]:
+        """Every listed expiry with its strike grid, at-the-money volatility
+        and 25-delta skew, as ``Engine.option_expiries`` reads them. Empty on
+        a model that lists no options."""
+        return _WRAPPED[self].option_expiries(root)
+
     def chain(self, root: str, expiry: int) -> list[dict[str, Any]]:
         """One expiry's index options, as ``Engine.chain`` quotes them."""
         return _WRAPPED[self].chain(root, expiry)
@@ -702,8 +714,8 @@ class PortfolioView:
         portfolio, live = _WRAPPED[self]
         return [dict(o) for o in portfolio.open_orders(live)]
 
-    # The futures (pt-v22 phase 1), as copies: the view's holder cannot
-    # move a mark or a quantity.
+    # The futures (pt-v22 phase 1) and the options (phase 2), as copies:
+    # the view's holder cannot move a mark, a cost or a quantity.
 
     @property
     def futures(self) -> dict[str, Any]:
@@ -717,6 +729,22 @@ class PortfolioView:
             twin = FuturesPosition(symbol, held.multiplier, held.mark)
             twin.quantity = held.quantity
             twin.variation = held.variation
+            out[symbol] = twin
+        return out
+
+    @property
+    def options(self) -> dict[str, Any]:
+        """The index options held (pt-v22 phase 2), by symbol, as copies of
+        the portfolio's :class:`~tradefloor.portfolio.OptionPosition`. Empty
+        without options."""
+        from .portfolio import OptionPosition
+
+        out: dict[str, OptionPosition] = {}
+        for symbol, held in _WRAPPED[self][0].options.items():
+            twin = OptionPosition(symbol, held.multiplier)
+            twin.quantity = held.quantity
+            twin.cost = held.cost
+            twin.realised = held.realised
             out[symbol] = twin
         return out
 

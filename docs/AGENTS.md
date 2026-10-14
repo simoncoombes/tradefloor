@@ -41,6 +41,23 @@ session's futures, and `session_step` trades one by its symbol.
 `Engine.futures_bars()` and `Engine.settlements_table()` give them as Arrow
 tables.
 
+On a model that lists index options (`options_index_listed`, off on every
+shipped preset), `obs.engine.option_expiries()` reads each listed expiry's
+strike grid, forward, at-the-money volatility and 25-delta skew,
+`obs.engine.chain("IDX", expiry)` one expiry's options from the dealer, and
+`obs.engine.quote(symbol)` one option with its scan margin. `act` trades an
+option by its symbol, `IDX.O0035.C1050.00` being the 1050 call settling at
+session 35, in contracts of $100 a point, during the session only. The
+premium moves cash at the fill, the position is worth the dealer's mid and
+settles in cash on the expiry session's opening prints, and short options
+add a scan margin to `obs.portfolio.margin()`; `obs.portfolio.options` holds
+the positions. The payload gains `options` (each expiry's summary and the
+options held) with `index` and `margin`, and an action may name a listed
+option. The MCP server's `option_chain` reads a session's expiries and one
+expiry's chain, `quote_contracts` quotes an option, and `session_step`
+trades one by its symbol. `Engine.chain_table()` gives the chains now as an
+Arrow table.
+
 In the mapping `act` returns, a plain number is a market order for that many
 shares, negative to sell. A native Python agent can also return
 `tf.Limit(quantity, price)`, which waits in the book for what does not fill,

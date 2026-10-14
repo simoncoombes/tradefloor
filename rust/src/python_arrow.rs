@@ -723,12 +723,13 @@ pub fn distributions_batch(rows: &[&crate::engine::Distribution]) -> Result<Reco
     RecordBatch::try_new(distributions_schema(), columns).map_err(|e| e.to_string())
 }
 
-/// The version the futures tables (`futures_bars`, `settlements`) carry in
-/// their schema's `schema_version` metadata key. The older tables carry no
-/// version, and their columns are frozen by the known-answer gate; these
-/// are new in pt-v22 phase 1 and will gain columns as options arrive, so a
-/// reader can tell which layout it holds from the stream alone. One key per
-/// schema, for the reason [`prints_schema`] gives.
+/// The version the derivatives' tables (`futures_bars`, `settlements`, and
+/// `option_quotes` from pt-v22 phase 2) carry in their schema's
+/// `schema_version` metadata key. The older tables carry no version, and
+/// their columns are frozen by the known-answer gate; these are new in
+/// pt-v22 and may gain columns, so a reader can tell which layout it holds
+/// from the stream alone. One key per schema, for the reason
+/// [`prints_schema`] gives.
 pub const FUTURES_TABLES_SCHEMA_VERSION: &str = "1";
 
 fn versioned(fields: Vec<Field>) -> SchemaRef {
@@ -838,6 +839,80 @@ pub fn settlements_batch(rows: &[crate::derivatives::Settlement]) -> Result<Reco
         Arc::new(Float64Array::from(rows.iter().map(|r| r.reference).collect::<Vec<_>>())),
     ];
     RecordBatch::try_new(settlements_schema(), columns).map_err(|e| e.to_string())
+}
+
+/// `option_quotes`: one row per listed index option, as
+/// `Engine.chain_table` reads the chains: `day` (the engine's day count when
+/// read), `symbol`, `expiry`, `right` (`"C"` or `"P"`), `strike`; the
+/// dealer's `bid` and `ask` (null on a side it does not show) and the
+/// contracts shown at each; `mid`, `iv` (the dealer's volatility), `fair`
+/// and `surface_iv` (the surface's, without the dealer's inventory);
+/// `delta`, `gamma`, `vega` and `theta` at `iv`; the carry (`forward`,
+/// `index`, `rate`, `dividends`), `sessions_to_expiry` and
+/// `open_interest`. Every field is [`crate::derivatives::OptionQuote`]'s.
+pub fn option_quotes_schema() -> SchemaRef {
+    versioned(vec![
+        Field::new("day", DataType::UInt32, false),
+        Field::new("symbol", DataType::Utf8, false),
+        Field::new("expiry", DataType::Int64, false),
+        Field::new("right", DataType::Utf8, false),
+        Field::new("strike", DataType::Float64, false),
+        Field::new("bid", DataType::Float64, true),
+        Field::new("ask", DataType::Float64, true),
+        Field::new("bid_size", DataType::Float64, false),
+        Field::new("ask_size", DataType::Float64, false),
+        Field::new("mid", DataType::Float64, false),
+        Field::new("iv", DataType::Float64, false),
+        Field::new("fair", DataType::Float64, false),
+        Field::new("surface_iv", DataType::Float64, false),
+        Field::new("delta", DataType::Float64, false),
+        Field::new("gamma", DataType::Float64, false),
+        Field::new("vega", DataType::Float64, false),
+        Field::new("theta", DataType::Float64, false),
+        Field::new("forward", DataType::Float64, false),
+        Field::new("index", DataType::Float64, false),
+        Field::new("rate", DataType::Float64, false),
+        Field::new("dividends", DataType::Float64, false),
+        Field::new("sessions_to_expiry", DataType::Float64, false),
+        Field::new("open_interest", DataType::Float64, false),
+    ])
+}
+
+pub fn option_quotes_batch(day: u32, rows: &[crate::derivatives::OptionQuote]) -> Result<RecordBatch, String> {
+    use crate::derivatives::OptionQuote;
+    use arrow::array::{Int64Array, StringArray};
+    let f = |g: fn(&OptionQuote) -> f64| -> ArrayRef {
+        Arc::new(Float64Array::from(rows.iter().map(g).collect::<Vec<_>>()))
+    };
+    let o = |g: fn(&OptionQuote) -> Option<f64>| -> ArrayRef {
+        Arc::new(Float64Array::from(rows.iter().map(g).collect::<Vec<_>>()))
+    };
+    let columns: Vec<ArrayRef> = vec![
+        Arc::new(UInt32Array::from(vec![day; rows.len()])),
+        Arc::new(StringArray::from(rows.iter().map(|r| r.symbol.as_str()).collect::<Vec<_>>())),
+        Arc::new(Int64Array::from(rows.iter().map(|r| r.expiry).collect::<Vec<_>>())),
+        Arc::new(StringArray::from(rows.iter().map(|r| r.right.letter().to_string()).collect::<Vec<_>>())),
+        f(|r| r.strike),
+        o(|r| r.bid),
+        o(|r| r.ask),
+        f(|r| r.bid_size),
+        f(|r| r.ask_size),
+        f(|r| r.mid),
+        f(|r| r.iv),
+        f(|r| r.fair),
+        f(|r| r.surface_iv),
+        f(|r| r.greeks.delta),
+        f(|r| r.greeks.gamma),
+        f(|r| r.greeks.vega),
+        f(|r| r.greeks.theta),
+        f(|r| r.forward),
+        f(|r| r.index),
+        f(|r| r.rate),
+        f(|r| r.dividends),
+        f(|r| r.sessions_to_expiry),
+        f(|r| r.open_interest),
+    ];
+    RecordBatch::try_new(option_quotes_schema(), columns).map_err(|e| e.to_string())
 }
 
 /// `fills`: one row per execution.

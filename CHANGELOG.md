@@ -20,13 +20,66 @@ priced at its carry fair value plus a basis, with its own book, and settled
 on the index of its expiry session's opening prints. Stock prices are the
 same with them on as off.
 
-Three more switches, off on every preset, list European index options,
-quoted by one dealer from an arbitrage-free surface.
-
-The MCP server, the agent payload (version 3), Arrow tables and the
-browser build now show the futures, and agents can trade them by symbol.
+Three more switches list European index options from one dealer quoting
+an arbitrage-free surface. The MCP server, agent payload, Arrow and browser
+build show futures and options, which agents trade by symbol.
 
 <!-- release-note-ends -->
+
+### The options' public API
+
+- MCP: `option_chain(session_id, expiry, strikes)` reads the index options
+  a session's market lists: each listed expiry's strike grid, forward,
+  at-the-money implied volatility and 25-delta skew, and one expiry's chain
+  (the nearest when none is named), `strikes` strikes either side of the
+  forward (10 by default), each option's symbol, the dealer's bid, ask and
+  sizes, mid, implied volatility, Greeks and open interest. It is
+  read-only, so the server has 22 tools, 16 of them read-only.
+  `quote_contracts` quotes an option by symbol, with the surface's
+  volatility, the carry and the scan margin on one short contract.
+  `session_step` places, rests and cancels option orders by symbol, counted
+  in contracts, as it does futures. On a market that lists options
+  `session_state` (and every session result) adds the price index, the
+  number of options listed, and each agent's `options` (quantity, average
+  premium, the dealer's mid, realised premium) and `margin`.
+  `list_contracts` lists the futures only and, on a market with options,
+  adds `option_expiries`, the same summary, where it returned every option
+  as a row; a refused symbol names the futures and points to
+  `option_chain` rather than spelling out every option.
+  `describe_simulator`'s `instruments` gains `options`.
+- Payloads: on a model that lists index options the observation (version
+  3) gains `options`, beside `index` and `margin`: `expiries`, each listed
+  expiry's summary, and `positions`, the options held with the dealer's
+  quote. A decision's action may name a listed option, counted in
+  contracts. An option has no daily volume, so the 2% participation cap
+  does not apply to it: the dealer's ladder bounds a fill (ten levels of 50
+  contracts a side) and the leverage limit applies. `TextRenderer` renders
+  an `Index options` block (English and French) when the payload has the
+  key.
+- Arrow: `Engine.chain_table(root="IDX", expiry=None)`, the
+  `option_quotes` table: every listed option's quote now, one row each,
+  with `day` the engine's day count, so tables read at successive closes
+  stack into a history. It is read when asked, not recorded, because a
+  model's chains are some 650 options a day. Its schema carries
+  `schema_version` "1".
+- WASM: `Sim.optionExpiries`, each listed expiry as an `OptionExpiry`
+  (`expiry`, `sessionsToExpiry`, `forward`, `strikeLow`, `strikeHigh`,
+  `strikeStep`, `atmIv`, `put25dIv`, `call25dIv`, `skew25d`). Empty on every
+  shipped preset.
+- Python: `Engine.lists_options` and `MarketView.lists_options`, a property
+  of the model; `Engine.option_expiries(root="IDX")` and
+  `MarketView.option_expiries`; `PortfolioView.options`, as copies; and
+  `tf.contracts.OPTION_ROOTS`.
+- Rust: `Engine::lists_options`, `Engine::option_expiries`,
+  `derivatives::ExpirySummary` and `derivatives::dealer::read_smile`, which
+  reads the at-the-money volatility at the forward (linear in
+  log-moneyness) and each 25-delta volatility (linear in delta) off a
+  chain; and `wasm::OptionExpiry`.
+- On a model that lists futures and options both, `futures_bars`, the
+  payload's `futures` and a decision's volume cap read the futures only.
+  Each read every listed contract, and an option's quote has none of a
+  future's keys.
+- Every known-answer digest is where it was.
 
 ### The futures' public API
 

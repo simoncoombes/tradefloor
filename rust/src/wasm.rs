@@ -204,6 +204,15 @@ impl Sim {
         front_future_quotes(&self.inner)
     }
 
+    /// Every listed expiry of the index options, in expiry order, as
+    /// `Engine::option_expiries` reads it off the chain: the strike grid,
+    /// the forward, the at-the-money volatility and the 25-delta skew. Empty
+    /// on a model that lists none, which is every shipped preset.
+    #[wasm_bindgen(getter, js_name = optionExpiries)]
+    pub fn option_expiries(&self) -> Vec<OptionExpiry> {
+        self.inner.option_expiries("IDX").into_iter().map(OptionExpiry::from).collect()
+    }
+
     /// Advance one trading day: number it, open, trade, close, step the
     /// macro chain.
     ///
@@ -321,6 +330,104 @@ impl FutureQuote {
     #[wasm_bindgen(getter)]
     pub fn multiplier(&self) -> f64 {
         self.multiplier
+    }
+}
+
+/// One listed expiry of the index options, as `Sim.optionExpiries` lists
+/// it: a read of [`Engine::option_expiries`] and nothing decided here.
+/// Volatilities are fractions a year, `undefined` where the strike grid does
+/// not reach the point or the expiry has no time left.
+#[wasm_bindgen]
+#[derive(Debug, Clone)]
+pub struct OptionExpiry {
+    expiry: i64,
+    sessions_to_expiry: f64,
+    forward: f64,
+    strike_low: f64,
+    strike_high: f64,
+    strike_step: f64,
+    atm_iv: Option<f64>,
+    put_25d_iv: Option<f64>,
+    call_25d_iv: Option<f64>,
+    skew_25d: Option<f64>,
+}
+
+impl From<crate::derivatives::ExpirySummary> for OptionExpiry {
+    fn from(e: crate::derivatives::ExpirySummary) -> Self {
+        OptionExpiry {
+            expiry: e.expiry,
+            sessions_to_expiry: e.sessions_to_expiry,
+            forward: e.forward,
+            strike_low: e.strike_low,
+            strike_high: e.strike_high,
+            strike_step: e.strike_step,
+            atm_iv: e.atm_iv,
+            put_25d_iv: e.put_25d_iv,
+            call_25d_iv: e.call_25d_iv,
+            skew_25d: e.skew_25d,
+        }
+    }
+}
+
+#[wasm_bindgen]
+impl OptionExpiry {
+    /// The session it settles at, counted from 0: `IDX.O0035.C1050.00` is
+    /// the 1050 call settling at session 35.
+    #[wasm_bindgen(getter)]
+    pub fn expiry(&self) -> f64 {
+        self.expiry as f64
+    }
+
+    /// Sessions from now to the expiry.
+    #[wasm_bindgen(getter, js_name = sessionsToExpiry)]
+    pub fn sessions_to_expiry(&self) -> f64 {
+        self.sessions_to_expiry
+    }
+
+    /// The index's forward to the expiry.
+    #[wasm_bindgen(getter)]
+    pub fn forward(&self) -> f64 {
+        self.forward
+    }
+
+    /// The lowest and highest listed strikes, and the step between them.
+    #[wasm_bindgen(getter, js_name = strikeLow)]
+    pub fn strike_low(&self) -> f64 {
+        self.strike_low
+    }
+
+    #[wasm_bindgen(getter, js_name = strikeHigh)]
+    pub fn strike_high(&self) -> f64 {
+        self.strike_high
+    }
+
+    #[wasm_bindgen(getter, js_name = strikeStep)]
+    pub fn strike_step(&self) -> f64 {
+        self.strike_step
+    }
+
+    /// The dealer's volatility at the forward.
+    #[wasm_bindgen(getter, js_name = atmIv)]
+    pub fn atm_iv(&self) -> Option<f64> {
+        self.atm_iv
+    }
+
+    /// The volatility where a put's delta is -0.25.
+    #[wasm_bindgen(getter, js_name = put25dIv)]
+    pub fn put_25d_iv(&self) -> Option<f64> {
+        self.put_25d_iv
+    }
+
+    /// The volatility where a call's delta is 0.25.
+    #[wasm_bindgen(getter, js_name = call25dIv)]
+    pub fn call_25d_iv(&self) -> Option<f64> {
+        self.call_25d_iv
+    }
+
+    /// The 25-delta put's volatility less the 25-delta call's.
+    #[wasm_bindgen(getter, js_name = skew25d)]
+    pub fn skew_25d(&self) -> Option<f64> {
+        self.skew_25d
     }
 }
 
@@ -503,6 +610,53 @@ mod tests {
             assert_eq!(q.fair(), quoted.fair);
             assert_eq!(q.mark(), quoted.mark);
             assert_eq!(q.expiry(), quoted.expiry as f64);
+        }
+        assert_eq!(sim.inner.state_hash(2, false), before);
+    }
+
+    /// Every shipped preset lists no options, so a page sees an empty list.
+    #[test]
+    fn on_a_shipped_preset_there_is_no_option_expiry() {
+        let mut sim = Sim::build(12, 7, 3, "pt-v21").unwrap();
+        sim.run_days(2, 65).unwrap();
+        let before = sim.inner.state_hash(2, false);
+        assert!(sim.option_expiries().is_empty());
+        assert_eq!(sim.inner.state_hash(2, false), before);
+    }
+
+    /// With the phase 2 switches on, each listed expiry reads through as
+    /// `Engine::option_expiries` gives it, and reading moves nothing.
+    #[test]
+    fn with_the_options_on_each_expiry_reads_through() {
+        let mut p = crate::params::PT_V21;
+        for (name, value) in [
+            ("index_level_listed", 1.0),
+            ("vix_intraday_live", 1.0),
+            ("forecast_horizon_sessions", 252.0),
+            ("surface_ssvi", 1.0),
+            ("surface_skew_physical", -0.8),
+            ("surface_skew_premium", -1.0),
+            ("surface_curvature", 1.0),
+            ("surface_curvature_exponent", 0.5),
+            ("options_index_listed", 1.0),
+            ("option_dealer_spread", 0.004),
+        ] {
+            p = p.with_override(name, value).unwrap();
+        }
+        let mut sim = Sim::with_params(12, 7, 3, p);
+        sim.run_days(2, 65).unwrap();
+        let before = sim.inner.state_hash(2, false);
+        let read = sim.option_expiries();
+        let core = sim.inner.option_expiries("IDX");
+        assert_eq!(read.len(), 8);
+        assert_eq!(read.len(), core.len());
+        for (w, e) in read.iter().zip(&core) {
+            assert_eq!(w.expiry(), e.expiry as f64);
+            assert_eq!(w.forward(), e.forward);
+            assert_eq!(w.atm_iv(), e.atm_iv);
+            assert_eq!(w.skew_25d(), e.skew_25d);
+            assert!(w.skew_25d().unwrap() > 0.0, "the put side is dearer");
+            assert!(w.strike_low() < w.forward() && w.forward() < w.strike_high());
         }
         assert_eq!(sim.inner.state_hash(2, false), before);
     }

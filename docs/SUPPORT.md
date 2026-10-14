@@ -90,7 +90,8 @@ carries neither field, predates this payload, and does not replay on 0.8.5.
 - Each entry of `assets`: `symbol`, `price`, `return_1d`, `return_5d`, `volatility`, `best_bid`, `best_ask`, `avg_daily_volume`, `max_order_shares`, `position`, `fundamentals`. `fundamentals` holds whatever the caller supplied for that symbol. On a model that pays dividends an entry also carries `dividend`, the cash per share the name went ex for at that day's open, and on a model that runs the earnings calendar `next_earnings_in_sessions`, the sessions to its next report. pt-v21, the default from 0.10.0, does both; no earlier preset does either.
 - `portfolio`: `cash`, `net_worth`, `leverage`, `max_leverage`, `buying_power`, `open_orders`. `leverage` is gross exposure as a multiple of net worth. `cash`, `net_worth` and `buying_power` are dollars.
 - Each entry of `open_orders`, one per limit order of the agent's still waiting in the book: `symbol`, `side`, `limit_price`, `remaining`.
-- On a model that lists futures (any of `futures_index_listed`, `futures_vix_listed`, `futures_rates_listed`, `futures_oil_listed`; no shipped preset sets one), three more top-level keys. `index`: `level` and `close` of the price index, or `null` without `index_level_listed`. `futures`: one entry per contract listed now, `symbol`, `root`, `expiry`, `sessions_to_expiry`, `front`, `settlement`, `price`, `fair`, `basis_bp`, `mark`, `best_bid`, `best_ask`, `underlying`, `rate`, `dividends`, `expected`, `premium`, `multiplier`, `tick`, `daily_volume`, `max_order_contracts`, `initial_margin`, `maintenance_margin`, `position` (contracts, signed). `margin`: `initial`, `maintenance`, `excess` (net worth less `initial`) and `call` (the margin call the last close made, or `null`), dollars.
+- On a model that lists futures (any of `futures_index_listed`, `futures_vix_listed`, `futures_rates_listed`, `futures_oil_listed`; no shipped preset sets one), three more top-level keys. `index`: `level` and `close` of the price index, or `null` without `index_level_listed`. `futures`: one entry per future listed now, `symbol`, `root`, `expiry`, `sessions_to_expiry`, `front`, `settlement`, `price`, `fair`, `basis_bp`, `mark`, `best_bid`, `best_ask`, `underlying`, `rate`, `dividends`, `expected`, `premium`, `multiplier`, `tick`, `daily_volume`, `max_order_contracts`, `initial_margin`, `maintenance_margin`, `position` (contracts, signed). `margin`: `initial`, `maintenance`, `excess` (net worth less `initial`) and `call` (the margin call the last close made, or `null`), dollars.
+- On a model that lists index options (`options_index_listed`, from pt-v22 phase 2; no shipped preset sets it), `index` and `margin` as above, and `options` with two lists. `expiries`: one entry per listed expiry, `root`, `expiry` (the session it settles at), `sessions_to_expiry`, `forward`, `strike_low`, `strike_high` and `strike_step` (the listed strikes), `atm_iv` (the dealer's implied volatility at the forward), `put_25d_iv` and `call_25d_iv` (its volatility where a put's delta is -0.25 and where a call's is 0.25) and `skew_25d` (the put's less the call's); volatilities are a fraction a year, and `null` where the strikes do not reach. `positions`: one entry per option held, `symbol`, `expiry`, `right`, `strike`, `quantity` (contracts, signed), `cost` (the average premium a contract), `multiplier`, `best_bid`, `best_ask`, `mid`, `iv`, `delta`, `sessions_to_expiry`. A model that lists both carries `index`, `futures`, `margin` and `options`.
 
 A return or volatility the agent has not yet seen enough prices for is
 `null`. `return_5d` covers 30 steps, five days at six steps a day.
@@ -99,9 +100,9 @@ Compared with version 1, the 0.8.x and 0.9.x payload: each asset gains
 `dividend` and `next_earnings_in_sessions` on a model that has them, and
 nothing else changes. On a model with neither the payload is version 1's,
 so a version-1 recording still replays there. Compared with version 2,
-version 3 adds only `index`, `futures` and `margin`, and only on a model
-that lists futures, so on every shipped preset the payload is version 2's
-and a version-2 recording replays.
+version 3 adds only `index`, `futures`, `margin` and `options`, and only on
+a model that lists futures or index options, so on every shipped preset the
+payload is version 2's and a version-2 recording replays.
 
 Compared with 0.8.1: `portfolio.gross_exposure` is renamed `leverage` (same
 value), `portfolio.open_orders` is new, and `return_5d` covers five days
@@ -117,7 +118,11 @@ own, with the reason in the decision's `refused` list and the scorecard's
 `errors`, and the other actions in the decision trade. Version 3 keeps
 version 2's shape: on a model that lists futures, `symbol` may name a
 listed contract (`IDX.F0119`), its `quantity` counted in contracts and
-capped at 2% of the contract's `daily_volume`.
+capped at 2% of the contract's `daily_volume`. On a model that lists index
+options, `symbol` may name a listed option (`IDX.O0035.C1050.00`, the 1050
+call settling at session 35), its `quantity` counted in contracts. An option
+has no daily volume to cap it at: its dealer fills at most the ten levels of
+50 contracts it shows a side, and the leverage limit applies.
 
 ### Errata for trajectory bugs
 

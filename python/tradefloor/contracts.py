@@ -10,8 +10,10 @@ the order the engine listed contracts in.
   opening print of session 273.
 - An option is ``ROOT.Onnnn.Rk.cc``: the expiry after ``O``, the right
   (``C`` or ``P``) and the strike in dollars and cents.
-  ``ACME.O0294.C42.50`` is the 42.50 call on ACME expiring at session 294.
-  No model lists options yet (pt-v22 phase 2).
+  ``IDX.O0035.C1050.00`` is the 1050 call on the price index settling at
+  session 35, which a model with ``options_index_listed`` lists (pt-v22
+  phase 2); ``ACME.O0294.C42.50`` spells the 42.50 call on ACME, a name no
+  model lists options on yet.
 
 :func:`parse` reads only the canonical spelling :func:`format` writes, so
 the two round-trip exactly. Both call the engine's own reader
@@ -29,7 +31,7 @@ from typing import Any
 
 from . import _core
 
-__all__ = ["FUTURE_ROOTS", "format", "is_contract", "parse"]
+__all__ = ["FUTURE_ROOTS", "OPTION_ROOTS", "format", "is_contract", "parse"]
 
 #: The root of each futures family pt-v22 phase 1 lists, and the switch
 #: that lists it: the price index (``futures_index_listed``), the VIX
@@ -41,6 +43,13 @@ FUTURE_ROOTS: dict[str, str] = {
     "FF": "futures_rates_listed",
     "TR3": "futures_rates_listed",
     "OIL": "futures_oil_listed",
+}
+
+#: The underlying of each options family pt-v22 phase 2 lists, and the
+#: switch that lists it: European options on the price index
+#: (``options_index_listed``).
+OPTION_ROOTS: dict[str, str] = {
+    "IDX": "options_index_listed",
 }
 
 

@@ -39,7 +39,7 @@ pub use contract::{
     SettlementRule, VixFutureSpec, VixPremium, INDEX_FUTURE, INDEX_OPTION, OIL_FUTURE, POLICY_RATE_FUTURE,
     RATE_PREMIUM, TERM_RATE_FUTURE, VIX_FUTURE,
 };
-pub use dealer::{OptionDealerSpec, OptionQuote, INDEX_OPTION_DEALER};
+pub use dealer::{ExpirySummary, OptionDealerSpec, OptionQuote, INDEX_OPTION_DEALER};
 pub use forecast::Forecast;
 pub use pricing::Greeks;
 pub use surface::{Ssvi, StripMoments, Surface};

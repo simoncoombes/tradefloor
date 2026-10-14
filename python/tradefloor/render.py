@@ -209,6 +209,17 @@ _LABELS: dict[str, dict[str, str]] = {
         "margin_maintenance": "margin, maintenance",
         "margin_call": "margin call",
         "call_day": "made at the close of day {day}",
+        "options": "Index options",
+        "options_intro": ("Strikes run from low to high in steps "
+                          "(low-high/step). An option trades by its "
+                          "symbol, IDX.O0035.C1050.00 being the 1050 call "
+                          "settling at session 35, in contracts of 100 a "
+                          "point. Volatilities are per year."),
+        "options_head": ("expiry|sessions|forward|strikes|atm vol|25d put|"
+                         "25d call|skew"),
+        "options_held": "Options held:",
+        "cost": "cost",
+        "mid": "mid",
     },
     "fr": {
         "title": "MARCHE SIMULE",
@@ -268,6 +279,18 @@ _LABELS: dict[str, dict[str, str]] = {
         "margin_maintenance": "marge de maintien",
         "margin_call": "appel de marge",
         "call_day": "emis a la cloture du jour {day}",
+        "options": "Options sur indice",
+        "options_intro": ("Les prix d'exercice vont du plus bas au plus "
+                          "haut par pas (bas-haut/pas). Une option se "
+                          "negocie par son symbole, IDX.O0035.C1050.00 "
+                          "etant le call 1050 regle a la seance 35, en "
+                          "contrats de 100 par point. Les volatilites sont "
+                          "annuelles."),
+        "options_head": ("echeance|seances|a terme|exercice|vol atm|put 25d|"
+                         "call 25d|pente"),
+        "options_held": "Options detenues :",
+        "cost": "cout",
+        "mid": "milieu",
     },
 }
 
@@ -296,6 +319,15 @@ def _pct(value: Any) -> str:
 
 def _qty(value: Any) -> str:
     return "not available" if value is None else f"{value:,.0f}"
+
+
+def _vol(value: Any) -> str:
+    return "-" if value is None else f"{value * 100:.2f}%"
+
+
+#: The index options' expiry table (pt-v22 phase 2), fixed widths as `_ROW`.
+_OPTION_ROW = ("{expiry:>8}{sessions:>10}{forward:>12}{strikes:>18}{atm:>10}"
+               "{put:>10}{call:>10}{skew:>9}")
 
 
 def _bps(value: Any) -> str:
@@ -593,6 +625,12 @@ class TextRenderer:
         # did.
         if "futures" in payload:
             out += self._futures_block(payload, L)
+        # And the index options' summary on a model that lists them (pt-v22
+        # phase 2), with the index and the margin when no futures block
+        # has shown them.
+        if "options" in payload:
+            out += self._options_block(payload, L,
+                                       alone="futures" not in payload)
         return "\n".join(out)
 
     def _futures_block(self, payload: dict[str, Any],
@@ -616,19 +654,57 @@ class TextRenderer:
                 f"{L['max_order_shares']:<23}"
                 f"{_qty(c['max_order_contracts'])} {L['contracts']}",
             ]
+        return out + self._margin_lines(payload, L)
+
+    @staticmethod
+    def _margin_lines(payload: dict[str, Any],
+                      L: dict[str, str]) -> list[str]:
+        """The account's margin, when the payload carries it."""
         margin = payload.get("margin")
-        if margin is not None:
-            call = margin["call"]
-            out += [
-                "",
-                f"{L['margin_initial']:<23}{_money(margin['initial'])}",
-                f"{L['margin_maintenance']:<23}"
-                f"{_money(margin['maintenance'])}",
-                f"{L['margin_call']:<23}"
-                + (L["none"] if call is None
-                   else L["call_day"].format(day=call["day"])),
-            ]
-        return out
+        if margin is None:
+            return []
+        call = margin["call"]
+        return [
+            "",
+            f"{L['margin_initial']:<23}{_money(margin['initial'])}",
+            f"{L['margin_maintenance']:<23}"
+            f"{_money(margin['maintenance'])}",
+            f"{L['margin_call']:<23}"
+            + (L["none"] if call is None
+               else L["call_day"].format(day=call["day"])),
+        ]
+
+    def _options_block(self, payload: dict[str, Any], L: dict[str, str],
+                       *, alone: bool) -> list[str]:
+        """The listed expiries, the options held and, ``alone``, the price
+        index and the account's margin."""
+        out = ["", L["options"], "-" * len(L["options"])]
+        index = payload.get("index")
+        if alone and index is not None:
+            out.append(f"{L['index_level']:<23}{_num(index['level'])}")
+        options = payload["options"]
+        out += ["", L["options_intro"], "",
+                _OPTION_ROW.format(**dict(zip(
+                    ("expiry", "sessions", "forward", "strikes", "atm",
+                     "put", "call", "skew"), L["options_head"].split("|"))))]
+        for e in options["expiries"]:
+            out.append(_OPTION_ROW.format(
+                expiry=e["expiry"],
+                sessions=f"{e['sessions_to_expiry']:.2f}",
+                forward=f"{e['forward']:.2f}",
+                strikes=(f"{e['strike_low']:g}-{e['strike_high']:g}"
+                         f"/{e['strike_step']:g}"),
+                atm=_vol(e["atm_iv"]), put=_vol(e["put_25d_iv"]),
+                call=_vol(e["call_25d_iv"]), skew=_vol(e["skew_25d"])))
+        out += ["", L["options_held"]]
+        if not options["positions"]:
+            out.append(f"  {L['none']}")
+        for p in options["positions"]:
+            out.append(f"  {p['symbol']:<20} {_qty(p['quantity'])} "
+                       f"{L['contracts']}, {L['cost']} {_num(p['cost'])}, "
+                       f"{L['mid']} {_num(p['mid'])}, "
+                       f"delta {_num(p['delta'])}")
+        return out + (self._margin_lines(payload, L) if alone else [])
 
     def _price_line(self, asset: dict[str, Any]) -> tuple[str, str]:
         """The (label, value) for an asset's headline price line."""

@@ -35,7 +35,9 @@
 use super::*;
 use crate::agent_book::{AgentFill, AgentOrder, BookState, Liquidity, RestMode, AGENT_BOOK_CAP};
 use crate::derivatives::calendar;
-use crate::derivatives::dealer::{chain_violations, dealer_thetas, ladder, pressure_after, walk, Ladder, OptionQuote};
+use crate::derivatives::dealer::{
+    chain_violations, dealer_thetas, ladder, pressure_after, read_smile, walk, ExpirySummary, Ladder, OptionQuote,
+};
 use crate::derivatives::pricing::{black_greeks, black_price, intrinsic};
 use crate::derivatives::surface::{fit_smile, term_shape, SmileFit, Ssvi, Surface, TermInputs, ThetaCurve, VIX_SESSIONS};
 use crate::derivatives::{
@@ -630,14 +632,67 @@ impl Engine {
         let surface = self.surface_at(&clock)?;
         let thetas = self.option_thetas(&surface, &clock);
         let ctx = self.expiry_context(&clock, slot, &thetas);
+        Some(self.expiry_chain(&surface, &ctx, slot))
+    }
+
+    /// The listed expiry in `slot`'s chain, by strike, the call before the
+    /// put at each.
+    fn expiry_chain(&self, surface: &Surface, ctx: &ExpiryContext, slot: usize) -> Vec<OptionQuote> {
         let e = &self.options.expiries[slot];
         let mut out = Vec::with_capacity(2 * (e.hi - e.lo + 1) as usize);
         for strike in e.strikes() {
             for right in [Right::Call, Right::Put] {
-                out.push(self.option_priced(&surface, &ctx, expiry, right, strike).1);
+                out.push(self.option_priced(surface, ctx, e.expiry, right, strike).1);
             }
         }
-        Some(out)
+        out
+    }
+
+    /// Whether this model lists index options (`options_index_listed`): a
+    /// property of the model, as [`Engine::lists_futures`] is. False on
+    /// every shipped preset.
+    pub fn lists_options(&self) -> bool {
+        self.options_on()
+    }
+
+    /// Every listed expiry on `root` as a trader reads it off the chain now,
+    /// in expiry order: its strike grid, forward, the dealer's at-the-money
+    /// volatility and the 25-delta skew ([`ExpirySummary`],
+    /// [`crate::derivatives::dealer::read_smile`]). Empty with the switch
+    /// off, for a root other than `IDX` and where the surface does not
+    /// price. A read.
+    pub fn option_expiries(&self, root: &str) -> Vec<ExpirySummary> {
+        if !self.options_on() || root != ContractKind::IndexOption.root() {
+            return Vec::new();
+        }
+        let clock = self.options_clock();
+        let Some(surface) = self.surface_at(&clock) else {
+            return Vec::new();
+        };
+        let thetas = self.option_thetas(&surface, &clock);
+        (0..self.options.expiries.len())
+            .map(|slot| {
+                let e = &self.options.expiries[slot];
+                let ctx = self.expiry_context(&clock, slot, &thetas);
+                let (atm_iv, put_25d_iv, call_25d_iv) = read_smile(&self.expiry_chain(&surface, &ctx, slot));
+                ExpirySummary {
+                    root: root.to_string(),
+                    expiry: e.expiry,
+                    sessions_to_expiry: ctx.sessions,
+                    forward: ctx.forward,
+                    strike_low: strike_at(e.lo, e.step),
+                    strike_high: strike_at(e.hi, e.step),
+                    strike_step: e.step,
+                    atm_iv,
+                    put_25d_iv,
+                    call_25d_iv,
+                    skew_25d: match (put_25d_iv, call_25d_iv) {
+                        (Some(p), Some(c)) => Some(p - c),
+                        _ => None,
+                    },
+                }
+            })
+            .collect()
     }
 
     /// Static-arbitrage violations on every listed chain now (row SV2), and
@@ -1273,6 +1328,33 @@ mod tests {
             assert!(q.iv > 0.0 && (q.iv - q.surface_iv).abs() < 1e-15, "no inventory, no shift");
             assert_eq!(q.open_interest, 0.0);
         }
+    }
+
+    #[test]
+    fn each_expiry_reads_its_own_chain_and_off_there_is_none() {
+        let mut e = engine(19, ON);
+        let mut buffer = SessionBuffer::new();
+        assert!(e.lists_options());
+        for d in 0..3 {
+            day(&mut e, d, &mut buffer);
+        }
+        let read = e.option_expiries("IDX");
+        assert_eq!(read.len(), e.options.expiries.len());
+        for (s, x) in read.iter().zip(&e.options.expiries) {
+            assert_eq!(s.expiry, x.expiry);
+            let chain = e.chain("IDX", x.expiry).unwrap();
+            assert_eq!(read_smile(&chain), (s.atm_iv, s.put_25d_iv, s.call_25d_iv));
+            assert_eq!(s.forward.to_bits(), chain[0].forward.to_bits());
+            assert_eq!(s.sessions_to_expiry.to_bits(), chain[0].sessions_to_expiry.to_bits());
+            assert_eq!((s.strike_low, s.strike_high), (chain[0].strike, chain[chain.len() - 1].strike));
+            let strikes = ((s.strike_high - s.strike_low) / s.strike_step).round() as usize + 1;
+            assert_eq!(chain.len(), 2 * strikes);
+            assert!(s.skew_25d.unwrap() > 0.0, "{s:?}");
+        }
+        assert!(e.option_expiries("VIX").is_empty());
+        let off = engine(19, &[]);
+        assert!(!off.lists_options());
+        assert!(off.option_expiries("IDX").is_empty());
     }
 
     #[test]

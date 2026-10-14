@@ -1406,7 +1406,7 @@ def test_every_tool_says_what_it_does_to_the_world():
     tool. Every other tool builds its own engine and only reads, or reads a
     session without changing it."""
     tools = asyncio.run(mcp.server.list_tools())
-    assert len(tools) == 21
+    assert len(tools) == 22
     assert set(NOT_READ_ONLY) <= {t.name for t in tools}
     for t in tools:
         a = t.annotations

@@ -177,6 +177,10 @@ MAX_PARTICIPATION = 0.02
 #: counted in contracts and capped at ``MAX_PARTICIPATION`` of the
 #: contract's stated daily volume. The shape is version 2's: no field is
 #: added, and a decision valid under 2 is valid and means the same under 3.
+#: From pt-v22 phase 2 a symbol may also name a listed index option
+#: (``IDX.O0035.C1050.00``), counted in contracts. An option has no daily
+#: volume to cap it at: its dealer fills at most the ladder it shows, ten
+#: levels of 50 contracts a side, and the leverage limit applies.
 DECISION_SCHEMA_VERSION = "3"
 
 #: Version of the observation payload :func:`serialize_observation` builds
@@ -199,13 +203,17 @@ DECISION_SCHEMA_VERSION = "3"
 #: Version 3 (pt-v22 phase 1) adds three top-level keys, `index`,
 #: `futures` and `margin`, on a model that lists futures (any of
 #: `futures_index_listed`, `futures_vix_listed`, `futures_rates_listed`,
-#: `futures_oil_listed`), and nothing else. No shipped preset lists any, so
-#: on every shipped preset the payload is version 2's (or 1's) to the byte.
+#: `futures_oil_listed`), and nothing else. From pt-v22 phase 2 a model that
+#: lists index options (`options_index_listed`) adds `options`, a summary
+#: of each listed expiry and the options held, with `index` and `margin`.
+#: No shipped preset lists any, so on every shipped preset the payload is
+#: version 2's (or 1's) to the byte.
 OBSERVATION_SCHEMA_VERSION = "3"
 
 #: The recorded payload versions a replay looks up. Versions 2 and 3 only
 #: add keys, each only on a model with what the keys describe (dividends or
-#: the earnings calendar; listed futures), so an older recording's keys are
+#: the earnings calendar; listed futures or options), so an older
+#: recording's keys are
 #: still the digests of what this build sends on any model without them; on
 #: one with them the lookup misses and says so.
 REPLAYABLE_SCHEMA_VERSIONS = ("1", "2", "3")
@@ -656,14 +664,20 @@ def decision_schema() -> dict[str, Any]:
                                            "assets, or on a model that "
                                            "lists futures a contract "
                                            "symbol from its futures, such "
-                                           "as IDX.F0119.",
+                                           "as IDX.F0119, or on one that "
+                                           "lists options an option's "
+                                           "symbol, ROOT.Onnnn.Rk.cc, such "
+                                           "as IDX.O0035.C1050.00 (the "
+                                           "1050 call settling at session "
+                                           "35).",
                         },
                         "side": {"enum": list(SIDES)},
                         "quantity": {
                             "type": "number",
                             "minimum": 0,
                             "description": "Shares, or contracts for a "
-                                           "future; non-negative. The side "
+                                           "future or an option; "
+                                           "non-negative. The side "
                                            "carries the direction. Omit or "
                                            "zero for HOLD and CANCEL.",
                         },
@@ -1145,15 +1159,25 @@ def _orders_from(decision: Decision, obs: Any, *, max_participation: float,
     # book is sized to (decision schema 3); empty, asking the engine
     # nothing, on a model that lists none.
     contracts = _listed_contracts(obs.engine)
+    # Whether index options are listed (pt-v22 phase 2): a symbol then may
+    # name one, which the engine is asked about only when one is named.
+    options = _lists_options(obs.engine)
     orders: dict[str, Any] = {}
     notes: list[str] = []
 
     for action in decision.actions:
-        if action.symbol not in listed and action.symbol not in contracts:
+        option = (options and action.symbol not in listed
+                  and _listed_option(obs.engine, action.symbol))
+        if (action.symbol not in listed and action.symbol not in contracts
+                and not option):
             message = (f"{action.symbol!r} is not listed in this market. The "
                        f"universe is {', '.join(listed)}."
                        + (f" The futures listed are {', '.join(contracts)}."
-                          if contracts else ""))
+                          if contracts else "")
+                       + (" The index options listed are each expiry's "
+                          "strikes in the payload's options, named "
+                          "ROOT.Onnnn.Rk.cc (IDX.O0035.C1050.00)."
+                          if options else ""))
             if refused is None:
                 raise unlisted(message)
             refused.append({"action": action.as_dict(), "reason": message})
@@ -1163,6 +1187,13 @@ def _orders_from(decision: Decision, obs: Any, *, max_participation: float,
             continue
         delta = action.signed()
         if not delta:
+            continue
+        if option:
+            # No daily volume to take a share of: the dealer's ladder fills
+            # what it shows and the leverage limit decides the rest.
+            if abs(delta) >= 1.0:
+                orders[action.symbol] = (delta if action.limit_price is None
+                                         else Limit(delta, action.limit_price))
             continue
         # A cap of zero IS a cap. `if cap > 0` once read "no volume to
         # participate in" as "no cap at all": with avg_volume or
@@ -1242,27 +1273,53 @@ def _lists_futures(engine: Any) -> bool:
         return False
 
 
+def _lists_options(engine: Any) -> bool:
+    """Whether the model lists index options (``Engine.lists_options``),
+    from a :class:`~tradefloor.sandbox.MarketView` or a live engine; False
+    on an engine without the property."""
+    try:
+        return bool(engine.lists_options)
+    except AttributeError:
+        return False
+
+
+def _listed_option(engine: Any, symbol: str) -> bool:
+    """Whether ``symbol`` names an index option the engine lists now."""
+    from ..contracts import is_contract, parse
+
+    if not is_contract(symbol) or parse(symbol)["kind"] != "option":
+        return False
+    try:
+        engine.quote(symbol)
+    except ValidationError:
+        return False
+    return True
+
+
 def _listed_contracts(engine: Any) -> dict[str, float]:
     """The futures listed now, symbol to the daily volume (contracts) each
     one's book is sized to, in the engine's order; empty on a model that
-    lists none, which asks the engine nothing beyond the flag."""
+    lists none, which asks the engine nothing beyond the flag. The index
+    options are not among them: an option has no daily volume."""
     if not _lists_futures(engine):
         return {}
     return {c["symbol"]: float(engine.quote(c["symbol"])["daily_volume"])
-            for c in engine.contracts()}
+            for c in engine.contracts() if c["kind"] == "future"}
 
 
 def derivatives_payload(obs: Any, *,
                         max_participation: float = MAX_PARTICIPATION,
                         ) -> dict[str, Any]:
     """The observation payload's derivative keys, version 3: ``index``,
-    ``futures`` and ``margin``, on a model that lists futures, and an empty
-    dict on every other model, so its payload is the one version 2 sent.
+    ``futures`` and ``margin`` on a model that lists futures; ``index``,
+    ``margin`` and ``options`` on one that lists index options; all four on
+    one that lists both; and an empty dict on every other model, so its
+    payload is the one version 2 sent.
 
     ``index`` is the price index (``index_level_listed``) as ``level`` now
     and ``close`` at the last close, or None on a model without it.
 
-    ``futures`` lists each contract the engine lists now, in its order:
+    ``futures`` lists each future the engine lists now, in its order:
     ``symbol``, ``root``, ``expiry`` (the session it settles at),
     ``sessions_to_expiry``, ``front``, ``settlement`` (what it settles on),
     ``price``, ``fair``, ``basis_bp``, ``mark`` (the last close's settlement
@@ -1277,19 +1334,39 @@ def derivatives_payload(obs: Any, *,
     public state only.
 
     ``margin`` is the account's: ``initial`` and ``maintenance`` (dollars
-    the futures held ask), ``excess`` (net worth less ``initial``) and
-    ``call`` (the margin call the last close made and the next open
-    decides, or None). None for a portfolio that cannot say.
+    the futures and options held ask), ``excess`` (net worth less
+    ``initial``) and ``call`` (the margin call the last close made and the
+    next open decides, or None). None for a portfolio that cannot say.
+
+    ``options`` summarises the index options (pt-v22 phase 2) in two lists,
+    so the payload stays small; ``Engine.chain`` and the MCP server's
+    ``option_chain`` give whole chains. ``expiries``, one entry per listed
+    expiry in expiry order, as ``Engine.option_expiries`` reads it off the
+    chain: ``root``, ``expiry``, ``sessions_to_expiry``, ``forward``, the
+    strike grid (``strike_low`` to ``strike_high`` by ``strike_step``),
+    ``atm_iv`` (the dealer's volatility at the forward), ``put_25d_iv`` and
+    ``call_25d_iv`` (where a put's delta is -0.25 and a call's 0.25) and
+    ``skew_25d`` (the put's less the call's), volatilities a fraction a
+    year and None where the grid does not reach. ``positions``, one entry
+    per option held, by symbol: ``symbol``, ``expiry``, ``right``,
+    ``strike``, ``quantity`` (contracts, signed), ``cost`` (the average
+    premium paid a contract), ``multiplier``, ``best_bid``, ``best_ask``,
+    ``mid``, ``iv``, ``delta`` and ``sessions_to_expiry`` from the dealer's
+    quote. An option is named ``ROOT.Onnnn.Rk.cc``: ``IDX.O0035.C1050.00``
+    is the 1050 call settling at session 35 (``tf.contracts.format``).
 
     Shared by :func:`serialize_observation` and the FinRobot adapter's own
     serializer, so both payloads carry the same keys on every model.
     """
     engine = obs.engine
-    if not _lists_futures(engine):
+    lists_futures, lists_options = _lists_futures(engine), _lists_options(engine)
+    if not lists_futures and not lists_options:
         return {}
     level = engine.index_level
     futures = []
-    for contract in engine.contracts():
+    for contract in engine.contracts() if lists_futures else ():
+        if contract["kind"] != "future":
+            continue
         symbol = contract["symbol"]
         q = engine.quote(symbol)
         futures.append({
@@ -1326,12 +1403,45 @@ def derivatives_payload(obs: Any, *,
                   "maintenance": held["maintenance"],
                   "excess": held["excess"],
                   "call": held["call"]}
-    return {
+    out: dict[str, Any] = {
         "index": (None if level is None
                   else {"level": level["level"], "close": level["close"]}),
-        "futures": futures,
-        "margin": margin,
     }
+    if lists_futures:
+        out["futures"] = futures
+    out["margin"] = margin
+    if lists_options:
+        out["options"] = _options_payload(obs)
+    return out
+
+
+def _options_payload(obs: Any) -> dict[str, Any]:
+    """The payload's ``options`` key (:func:`derivatives_payload`)."""
+    engine = obs.engine
+    positions = []
+    held = getattr(obs.portfolio, "options", None) or {}
+    for symbol in sorted(held):
+        try:
+            q = engine.quote(symbol)
+        except ValidationError:
+            # Settled at this open and paid: no longer quoted.
+            continue
+        positions.append({
+            "symbol": symbol,
+            "expiry": q["expiry"],
+            "right": q["right"],
+            "strike": q["strike"],
+            "quantity": held[symbol].quantity,
+            "cost": held[symbol].cost,
+            "multiplier": q["multiplier"],
+            "best_bid": q["bid"],
+            "best_ask": q["ask"],
+            "mid": q["mid"],
+            "iv": q["iv"],
+            "delta": q["delta"],
+            "sessions_to_expiry": q["sessions_to_expiry"],
+        })
+    return {"expiries": engine.option_expiries(), "positions": positions}
 
 
 def serialize_observation(obs: Any, *,
@@ -1397,14 +1507,15 @@ def serialize_observation(obs: Any, *,
     another or a CANCEL.
 
     On a model that lists futures the payload also carries ``index``,
-    ``futures`` and ``margin`` (:func:`derivatives_payload`), and an agent
-    trades a future by naming its symbol in an action, the quantity in
-    contracts.
+    ``futures`` and ``margin``, and on one that lists index options
+    ``index``, ``margin`` and ``options`` (:func:`derivatives_payload`). An
+    agent trades a future or an option by naming its symbol in an action,
+    the quantity in contracts.
 
     The payload is version ``OBSERVATION_SCHEMA_VERSION``: no key is added,
     removed or renamed, and no value changes meaning, in a patch release
     (``docs/SUPPORT.md``). Version 2 (0.10.0) added the two conditional
-    asset keys below to version 1, and version 3 the three conditional
+    asset keys below to version 1, and version 3 the four conditional
     derivative keys. ``tests/test_integrations.py`` pins every key.
     """
     macro_state = obs.engine.macro_state
