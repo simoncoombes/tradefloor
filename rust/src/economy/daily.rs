@@ -324,6 +324,55 @@ pub struct DailyInputs<'a> {
     /// Inventory's pressure on oil's level, sessions. 0.0 is the shipped
     /// daily push. See `ModelParams::oil_inventory_level_gain`.
     pub oil_inventory_level_gain: f64,
+    /// The convenience yield's elasticity of oil's target to inventory. 0.0
+    /// is no premium. See `ModelParams::oil_convenience_yield`.
+    pub oil_convenience_yield: f64,
+    /// The variance of the inventory the premium reads after the step, about
+    /// the level the step computes: 0.0 at a close, which reads the
+    /// inventory it has; the forecast's spread on its expected path, so the
+    /// step reads the premium's expectation. See [`oil_convenience_factor`].
+    pub oil_convenience_inventory_var: f64,
+    /// The same before the step, about the inventory the step starts from.
+    pub oil_convenience_inventory_var_before: f64,
+    /// The oil price's long factor (`ModelParams::oil_target_drift_sd`): the
+    /// log of its level before the step and after it. `None` is no long
+    /// factor. The forecast passes the log of the level's expectation.
+    pub oil_target_drift: Option<(f64, f64)>,
+    /// Whether the oil pushes decay at the shipped 0.03 apart from the rest
+    /// of the price. See `ModelParams::oil_pushes_in_target`.
+    pub oil_pushes_in_target: bool,
+    /// The oil noise as a share of the price; 0.0 is the noise in dollars.
+    /// See `ModelParams::oil_noise_log_sd`.
+    pub oil_noise_log_sd: f64,
+    /// The oil price's elasticity to the dollar as a level; 0.0 is the
+    /// dollar's daily drag. See `ModelParams::oil_dollar_elasticity`.
+    pub oil_dollar_elasticity: f64,
+    /// The sd of oil inventory's daily noise; 0.0 is the standing 0.5. See
+    /// `ModelParams::oil_inventory_noise_sd`.
+    pub oil_inventory_noise_sd: f64,
+    /// The dollar index's daily reversion share; 0.0 is the standing 0.02.
+    /// See `ModelParams::usd_mean_reversion`.
+    pub usd_mean_reversion: f64,
+    /// The dollar index's daily noise sd; 0.0 is the standing 0.3. See
+    /// `ModelParams::usd_noise_sd`.
+    pub usd_noise_sd: f64,
+    /// The dollar's daily drift per VIX point above
+    /// `usd_crisis_vix_threshold`; 0.0 is the standing
+    /// [`USD_SAFE_HAVEN_GAIN`]. See `ModelParams::usd_safe_haven_gain`.
+    pub usd_safe_haven_gain: f64,
+    /// Whether the month-start step keeps the oil pass-through's part of
+    /// headline (`EconomyState::oil_inflation_level`): true while
+    /// `fed_core_inflation` or `treasury_core_inflation` is set.
+    pub oil_inflation_tracked: bool,
+    /// Core inflation's slow trend (`ModelParams::core_trend_sd`), points
+    /// over the 2.0 target: the month-start step closes headline's gap to
+    /// `2.0 + core_trend` instead of 2.0. 0.0, with the dial off, is the
+    /// target that stood.
+    pub core_trend: f64,
+    /// The oil price's bounds, dollars; 0.0 is the standing 35 and 150. See
+    /// `ModelParams::oil_price_floor`.
+    pub oil_price_floor: f64,
+    pub oil_price_ceiling: f64,
     /// The business-cycle phase and the GDP growth (percent) the fear/greed
     /// index reads, as PUBLISHED (`ModelParams::fear_greed_published_inputs`),
     /// or `None` for the economy's own, as it always read them.
@@ -402,6 +451,18 @@ pub struct YieldDials {
     /// 20 while inflation is under 4. See
     /// [`crate::params::ModelParams::treasury_haven_gain`].
     pub haven_gain: f64,
+    /// A switch: 1.0 has the term premium, the haven's gate and the flight
+    /// to quality's sign read core inflation, headline less
+    /// `EconomyState::oil_inflation_level`. See
+    /// [`crate::params::ModelParams::treasury_core_inflation`].
+    pub core_inflation: f64,
+    /// The unmet Fed put the curve prices at the zero bound, percentage
+    /// points off the 10-year's anchor and the 2-year's formula
+    /// (`treasury_zlb_path`); 0.0 is none.
+    pub zlb_path: f64,
+    /// The term premium's fall per VIX point above 20 at the zero bound
+    /// (`treasury_zlb_haven_gain`); 0.0 is none.
+    pub zlb_haven_gain: f64,
     /// The share of the VIX slope taken out of the corporate spread's
     /// formula. See [`crate::params::ModelParams::corporate_spread_vix_cut`].
     pub spread_vix_cut: f64,
@@ -413,6 +474,15 @@ pub struct YieldDials {
     /// [`crate::params::ModelParams::corporate_spread_equity_half_life`].
     /// Read only with `spread_equity_gain` set.
     pub spread_equity_decay: f64,
+    /// The priced gap's one-session keep, `0.5^(1/H)` with H
+    /// [`crate::params::ModelParams::corporate_spread_equity_lag`]; 0.0 is
+    /// off, the spread reading the gap itself. Read only with
+    /// `spread_equity_gain` set.
+    pub spread_priced_keep: f64,
+    /// Credit's own state before and after tonight's step, points of the
+    /// spread formula's base ([`crate::params::ModelParams::corporate_spread_noise_sd`]);
+    /// `None`, on every preset, is no state.
+    pub spread_noise: Option<(f64, f64)>,
 }
 
 /// The largest move the corporate yield takes in one session under
@@ -442,6 +512,10 @@ pub const TREASURY_NEUTRAL_RATE: f64 = 2.5;
 /// The Treasury haven's cut to the 10-year's term premium: `gain` points per
 /// VIX point above [`TREASURY_HAVEN_VIX`]. Read by the daily anchor and by
 /// the meeting's 10-year target, only with `treasury_haven_gain` set.
+/// The funds rate at or below which the economy is at the zero bound for
+/// `treasury_zlb_haven_gain`: the QE condition's 0.25.
+pub const ZLB_RATE: f64 = 0.25;
+
 pub fn haven_term_cut(gain: f64, vix: f64) -> f64 {
     gain * mathx::max(0.0, vix - TREASURY_HAVEN_VIX)
 }
@@ -464,9 +538,14 @@ impl Default for YieldDials {
             priced_anticipation: 0.0,
             rate_damping: 0.0,
             haven_gain: 0.0,
+            core_inflation: 0.0,
+            zlb_path: 0.0,
+            zlb_haven_gain: 0.0,
             spread_vix_cut: 0.0,
             spread_equity_gain: 0.0,
             spread_equity_decay: 0.0,
+            spread_priced_keep: 0.0,
+            spread_noise: None,
         }
     }
 }
@@ -488,6 +567,21 @@ impl<'a> Default for DailyInputs<'a> {
             oil_mean_reversion: 0.0,
             oil_noise_sd: 0.0,
             oil_inventory_level_gain: 0.0,
+            oil_convenience_yield: 0.0,
+            oil_convenience_inventory_var: 0.0,
+            oil_convenience_inventory_var_before: 0.0,
+            oil_target_drift: None,
+            oil_pushes_in_target: false,
+            oil_noise_log_sd: 0.0,
+            oil_dollar_elasticity: 0.0,
+            oil_inventory_noise_sd: 0.0,
+            usd_mean_reversion: 0.0,
+            usd_noise_sd: 0.0,
+            usd_safe_haven_gain: 0.0,
+            oil_inflation_tracked: false,
+            core_trend: 0.0,
+            oil_price_floor: 0.0,
+            oil_price_ceiling: 0.0,
             oil_inflation_passthrough: 0.0,
             fear_greed_published: None,
             yields: YieldDials::default(),
@@ -803,6 +897,57 @@ pub fn unemployment_drive(unemployment_trend: f64, phase: CyclePhase, growth: f6
 /// which inventory puts no pressure on the oil price, and the level it
 /// opens at. Read only under `ModelParams::oil_inventory_reversion`.
 pub const OIL_INVENTORY_NORMAL: f64 = 50.0;
+
+/// The lowest inventory the convenience premium reads
+/// (`ModelParams::oil_convenience_yield`): half the normal level, where the
+/// premium is `2^k`. Below it the target is pinned at its steepest, so a
+/// premium that grows without bound as stocks run out cannot carry the price
+/// past what its clamps hold.
+pub const OIL_CONVENIENCE_FLOOR: f64 = 25.0;
+
+/// The convenience factor's floor: a quarter of the premium-free price, so
+/// a large k on stocks far above normal cannot take the factor to zero or
+/// below. At EIA's inventory scale (`oil_inventory_noise_sd` 0.35) it binds
+/// only past 1 / (0.75 k) of log deviation, beyond any session measured.
+pub const OIL_CONVENIENCE_MIN: f64 = 0.25;
+
+/// The convenience premium's factor on oil's level, `1 - k ln(I / 50)`
+/// (at least [`OIL_CONVENIENCE_MIN`]) with `I` read at no lower than
+/// [`OIL_CONVENIENCE_FLOOR`] and no higher than 100. With `var` above 0 it is the factor's expectation over an
+/// inventory normal about `inventory` with that variance, as the forecast
+/// needs it: the factor is convex, so its value at the expected inventory is
+/// below its expected value. The expectation is a trapezoid sum over six
+/// standard deviations either side at a tenth of one, which the floor's kink
+/// costs nothing to (a Gauss-Hermite rule, exact for smooth polynomials,
+/// was 0.6 per cent off at the floor).
+pub fn oil_convenience_factor(kappa: f64, inventory: f64, var: f64) -> f64 {
+    // LINEAR in log inventory, the convenience yield of Working (1949) and
+    // Gibson and Schwartz (Journal of Finance 45(3), 1990), in which log
+    // futures are linear in it: its expectation over inventory's spread is
+    // its value at the expected inventory, so it puts no standing tilt on
+    // the curve. The exponential tried first, exp(-k ln(I / 50)), is convex,
+    // and its expectation rose with the horizon as inventory's spread
+    // widened: a standing contango of k^2 dv / 2, about 1.7 per cent between
+    // contracts 1 and 4 at k 3.6, which held OF1 under its band. Floored at
+    // a quarter of the price, where it is never read at EIA's inventory
+    // scale.
+    let at = |i: f64| {
+        let i = clamp(i, OIL_CONVENIENCE_FLOOR, 100.0);
+        mathx::max(OIL_CONVENIENCE_MIN, 1.0 - kappa * mathx::log(i / OIL_INVENTORY_NORMAL))
+    };
+    if !(var > 0.0) {
+        return at(inventory);
+    }
+    let sd = mathx::sqrt(var);
+    let (mut total, mut mass) = (0.0, 0.0);
+    for i in -60..=60 {
+        let z = i as f64 / 10.0;
+        let w = mathx::exp(-0.5 * z * z);
+        total += w * at(inventory + z * sd);
+        mass += w;
+    }
+    total / mass
+}
 
 /// The oil price at which inflation takes no oil term under
 /// `ModelParams::oil_inflation_passthrough`: the level oil's reversion
@@ -1168,9 +1313,18 @@ fn close_yields(
     rng: &mut impl Rng,
 ) {
     // ── Treasury yields ───────────────────────────────────────────────────
+    // THE CURVE'S INFLATION (`treasury_core_inflation`): core, headline less
+    // the oil pass-through's part, for the term premium, the haven's gate
+    // and the flight to quality's sign. A branch: off, it is headline, the
+    // value every read below took.
+    let curve_inflation = if inputs.yields.core_inflation != 0.0 {
+        economy.inflation_rate - economy.oil_inflation_level
+    } else {
+        economy.inflation_rate
+    };
     let debt_premium = mathx::max(0.0, (economy.government_debt_to_gdp - 100.0) * 0.002);
     let term_premium_10y =
-        1.0 + mathx::max(0.0, (economy.inflation_rate - 2.0) * 0.3) + debt_premium;
+        1.0 + mathx::max(0.0, (curve_inflation - 2.0) * 0.3) + debt_premium;
     // THE TREASURY HAVEN (`treasury_haven_gain`): the term premium falls
     // with the VIX above 20 while inflation is under 4, so the 10-year
     // rallies through a stressed month in a low-inflation regime. Guarded,
@@ -1186,9 +1340,21 @@ fn close_yields(
     // (`rate_intraday_live`), so the projection carries the haven and the
     // priced put below.
     let term_premium_10y = if inputs.yields.haven_gain != 0.0
-        && economy.inflation_rate < crate::economy::central_bank::FED_PUT_INFLATION_CEILING
+        && curve_inflation < crate::economy::central_bank::FED_PUT_INFLATION_CEILING
     {
         term_premium_10y - haven_term_cut(inputs.yields.haven_gain, new_state.vix)
+    } else {
+        term_premium_10y
+    };
+    // THE ZERO BOUND'S COMPRESSION (`treasury_zlb_haven_gain`): with the
+    // funds rate at or below 0.25 the term premium falls a further `g` a VIX
+    // point above 20, under the haven's gate. Guarded: off, the premium is
+    // the expression above.
+    let term_premium_10y = if inputs.yields.zlb_haven_gain != 0.0
+        && new_state.federal_funds_rate <= ZLB_RATE
+        && curve_inflation < crate::economy::central_bank::FED_PUT_INFLATION_CEILING
+    {
+        term_premium_10y - haven_term_cut(inputs.yields.zlb_haven_gain, new_state.vix)
     } else {
         term_premium_10y
     };
@@ -1199,6 +1365,14 @@ fn close_yields(
         new_state.federal_funds_rate - inputs.yields.priced_put
     } else {
         new_state.federal_funds_rate
+    };
+    // THE UNMET PUT (`treasury_zlb_path`): the part of the put's ask the rate
+    // cannot deliver, priced too; outside the damped ladder, as the put is.
+    // Guarded, as above.
+    let fed_rate_for_10y = if inputs.yields.zlb_path != 0.0 {
+        fed_rate_for_10y - inputs.yields.zlb_path
+    } else {
+        fed_rate_for_10y
     };
     // THE PRICED PATH (`treasury_path_pricing`): the anchor, and the 2-year's
     // formula, read the rate the market expects the cycle to reach. Guarded,
@@ -1288,10 +1462,10 @@ fn close_yields(
     };
     let ftq_gain = inputs.yields.flight_to_quality_gain;
     if prev_mkt_ret.abs() > ftq_gate {
-        let bond_stock_yield_shift = if economy.inflation_rate > 4.0 {
+        let bond_stock_yield_shift = if curve_inflation > 4.0 {
             // Positive correlation: stocks down, yields up.
             -prev_mkt_ret * ftq_gain
-        } else if economy.inflation_rate < 3.0 {
+        } else if curve_inflation < 3.0 {
             // Flight to quality.
             prev_mkt_ret * ftq_gain
         } else {
@@ -1327,6 +1501,18 @@ fn close_yields(
         (economy.spread_equity_gap, g)
     } else {
         (0.0, 0.0)
+    };
+    // CREDIT'S REPRICING LAG (`corporate_spread_equity_lag`): the spread's
+    // leverage term reads the gap it has priced, which closes a share of
+    // its distance to the gap each session. No draw. Guarded, so with the
+    // lag at 0.0 the pair is the gap's own.
+    let (gap_before, gap_after) = if equity_gain != 0.0 && inputs.yields.spread_priced_keep != 0.0 {
+        let p = economy.spread_priced_gap;
+        let q = p + (1.0 - inputs.yields.spread_priced_keep) * (gap_after - p);
+        new_state.spread_priced_gap = q;
+        (p, q)
+    } else {
+        (gap_before, gap_after)
     };
 
     // THE CORPORATE YIELD BETWEEN MEETINGS. It was written only at a
@@ -1373,15 +1559,23 @@ fn close_yields(
         // sides of the change. A VIX pin takes the VIX out, not the index.
         // Guarded, so with both at 0.0 the expressions are the ones that
         // stood.
-        let spread_dials = inputs.yields.spread_vix_cut != 0.0 || equity_gain != 0.0;
+        //
+        // CREDIT'S OWN STATE (`corporate_spread_noise_sd`): its step tonight
+        // is added to the base beside the leverage term, on both sides of
+        // the change, so the level stays on the formula the meeting reads.
+        // Guarded, so with no state the expressions are the ones that stood.
+        let spread_noise = inputs.yields.spread_noise;
+        let spread_dials = inputs.yields.spread_vix_cut != 0.0 || equity_gain != 0.0 || spread_noise.is_some();
+        let base_term = |gap: f64, x: f64| if spread_noise.is_some() { equity_gain * gap + x } else { equity_gain * gap };
+        let (x_before, x_after) = spread_noise.unwrap_or((0.0, 0.0));
         let vix_term = if let Some((m0, m1)) = inputs.yields.spread_multiplier {
             let vix_close = if inputs.yields.vix_pinned { economy.vix } else { new_state.vix };
             if spread_dials {
                 let cut = inputs.yields.spread_vix_cut;
                 crate::economy::central_bank::spread_formula_with(
-                    vix_close, m1, cut, equity_gain * gap_after)
+                    vix_close, m1, cut, base_term(gap_after, x_after))
                     - crate::economy::central_bank::spread_formula_with(
-                        economy.vix, m0, cut, equity_gain * gap_before)
+                        economy.vix, m0, cut, base_term(gap_before, x_before))
             } else {
                 crate::economy::central_bank::spread_formula(vix_close, m1)
                     - crate::economy::central_bank::spread_formula(economy.vix, m0)
@@ -1393,7 +1587,8 @@ fn close_yields(
                 0.02 * (1.0 - inputs.yields.spread_vix_cut)
                     * cycle_spread_multiplier * (new_state.vix - economy.vix)
             };
-            vix_part + equity_gain * cycle_spread_multiplier * (gap_after - gap_before)
+            let own = if spread_noise.is_some() { cycle_spread_multiplier * (x_after - x_before) } else { 0.0 };
+            vix_part + equity_gain * cycle_spread_multiplier * (gap_after - gap_before) + own
         } else if inputs.yields.vix_pinned {
             0.0
         } else {
@@ -1441,6 +1636,98 @@ pub fn inventory_pressure(inventory: f64) -> f64 {
 /// [`inventory_pressure`]'s expectation when inventory is normal with mean
 /// `mean` and sd `sd`; at `sd` 0.0 the push at `mean`. For the forecast
 /// (`forecast_horizon_sessions`).
+/// The oil price's bounds: the standing 35 and 150, or `oil_price_floor`
+/// and `oil_price_ceiling` where set. Branches, so 0.0 is the literal.
+pub fn oil_bounds(floor: f64, ceiling: f64) -> (f64, f64) {
+    (if floor == 0.0 { 35.0 } else { floor }, if ceiling == 0.0 { 150.0 } else { ceiling })
+}
+
+/// The expectation of a normal price `N(mean, sd^2)` truncated at the oil
+/// price's bounds `(lo, hi)`: the clamped variable's mean, in closed form,
+/// `lo P(below) + hi P(above) + mean P(between) + sd (phi(a) - phi(b))`.
+/// `sd` at or under 0 is the clamped mean itself.
+pub fn oil_clamped_expectation(mean: f64, sd: f64, (lo, hi): (f64, f64)) -> f64 {
+    if !(sd > 0.0) {
+        return clamp(mean, lo, hi);
+    }
+    let (a, b) = ((lo - mean) / sd, (hi - mean) / sd);
+    let pdf = |x: f64| mathx::exp(-0.5 * x * x) / mathx::sqrt(2.0 * std::f64::consts::PI);
+    let cdf = |x: f64| 0.5 * mathx::erfc(-x / std::f64::consts::SQRT_2);
+    let (fa, fb) = (cdf(a), cdf(b));
+    lo * fa + hi * (1.0 - fb) + mean * (fb - fa) + sd * (pdf(a) - pdf(b))
+}
+
+/// The oil price's spread is right-skewed (the long factor, the premium and
+/// the dollar each multiply its level), so the forecast reads it as
+/// LOGNORMAL with mean `mean` and log variance `log_var`: ln S ~ N(m, v),
+/// m = ln mean - v/2. Its expectation censored at the bounds, in closed form:
+/// `lo P(S < lo) + hi P(S > hi) + e^{m + v/2} [Phi(c_hi) - Phi(c_lo)]`,
+/// `c = (ln b - m - v) / sqrt v`.
+pub fn oil_lognormal_censored(mean: f64, log_var: f64, (lo, hi): (f64, f64)) -> f64 {
+    if !(log_var > 0.0) || !(mean > 0.0) {
+        return clamp(mean, lo, hi);
+    }
+    let cdf = |x: f64| 0.5 * mathx::erfc(-x / std::f64::consts::SQRT_2);
+    let sd = mathx::sqrt(log_var);
+    let m = mathx::log(mean) - 0.5 * log_var;
+    let (l_lo, l_hi) = (mathx::log(lo), mathx::log(hi));
+    let p_lo = cdf((l_lo - m) / sd);
+    let p_hi = 1.0 - cdf((l_hi - m) / sd);
+    let inside = mean * (cdf((l_hi - m - log_var) / sd) - cdf((l_lo - m - log_var) / sd));
+    lo * p_lo + hi * p_hi + inside
+}
+
+/// The same lognormal price's expected log truncation at the bounds,
+/// `E[ln(clamp(S) / S)] = -E[(Y - ln hi)^+] + E[(ln lo - Y)^+]`, Y = ln S, in
+/// closed form: the normal's partial expectations in log space.
+pub fn oil_lognormal_log_truncation(mean: f64, log_var: f64, (lo, hi): (f64, f64)) -> f64 {
+    if !(log_var > 0.0) || !(mean > 0.0) {
+        return 0.0;
+    }
+    let pdf = |x: f64| mathx::exp(-0.5 * x * x) / mathx::sqrt(2.0 * std::f64::consts::PI);
+    let cdf = |x: f64| 0.5 * mathx::erfc(-x / std::f64::consts::SQRT_2);
+    let sd = mathx::sqrt(log_var);
+    let m = mathx::log(mean) - 0.5 * log_var;
+    let (a, b) = (mathx::log(hi), mathx::log(lo));
+    let za = (a - m) / sd;
+    let zb = (b - m) / sd;
+    let over = sd * pdf(za) + (m - a) * (1.0 - cdf(za));
+    let under = sd * pdf(zb) + (b - m) * cdf(zb);
+    under - over
+}
+
+/// The expected log truncation of a normal price `N(mean, sd^2)` at the
+/// oil price's bounds, `E[ln(clamp(S) / S)]`: negative where the ceiling is in
+/// reach, positive where the floor is. Under the long factor the close adds
+/// each session's truncation to the factor (`EconomyState::oil_bound_log_ratio`),
+/// so the forecast adds this expectation to the factor's expected path. A
+/// trapezoid sum over six standard deviations at a tenth of one, the price
+/// read at no lower than a hundredth of its mean.
+pub fn oil_expected_log_truncation(mean: f64, sd: f64, (lo, hi): (f64, f64)) -> f64 {
+    if !(sd > 0.0) || !(mean > 0.0) {
+        return 0.0;
+    }
+    let (mut total, mut mass) = (0.0, 0.0);
+    for i in -60..=60 {
+        let z = i as f64 / 10.0;
+        let w = mathx::exp(-0.5 * z * z);
+        let x = mathx::max(mean + sd * z, 0.01 * mean);
+        total += w * mathx::log(clamp(x, lo, hi) / x);
+        mass += w;
+    }
+    total / mass
+}
+
+/// Oil inventory's daily noise sd at a volatility of 1.0: the standing 0.5,
+/// or `oil_inventory_noise_sd` where set. A branch, so 0.0 is the literal.
+pub fn inventory_noise(inputs: &DailyInputs) -> f64 {
+    if inputs.oil_inventory_noise_sd == 0.0 {
+        0.5
+    } else {
+        inputs.oil_inventory_noise_sd
+    }
+}
+
 pub fn inventory_pressure_expected(mean: f64, sd: f64) -> f64 {
     if !(sd > 0.0) {
         return inventory_pressure(mean);
@@ -1457,6 +1744,17 @@ pub fn inventory_pressure_expected(mean: f64, sd: f64) -> f64 {
 
 /// The dollar's daily drift per VIX point above `usd_crisis_vix_threshold`.
 pub const USD_SAFE_HAVEN_GAIN: f64 = 0.05;
+
+/// The safe-haven gain the dollar's step and the forecast read: the standing
+/// [`USD_SAFE_HAVEN_GAIN`] at 0.0, or `usd_safe_haven_gain` where set. A
+/// branch, so 0.0 is the literal.
+pub fn usd_safe_haven_gain(dial: f64) -> f64 {
+    if dial == 0.0 {
+        USD_SAFE_HAVEN_GAIN
+    } else {
+        dial
+    }
+}
 
 /// The oil price OPEC's rule defends, and the distance from it past which
 /// a decision is a cut or a raise rather than a small adjustment.
@@ -1747,7 +2045,14 @@ pub fn update_economy_daily(
         );
 
         // ── Inflation ─────────────────────────────────────────────────────
-        let inflation_target = INFLATION_TARGET;
+        // CORE INFLATION'S TREND (`core_trend_sd`): headline closes its gap
+        // to the target plus the slow trend, the level a tape-fitted AR(1)
+        // carries core's persistence at. A branch: at 0.0 the target stood.
+        let inflation_target = if inputs.core_trend != 0.0 {
+            INFLATION_TARGET + inputs.core_trend
+        } else {
+            INFLATION_TARGET
+        };
         let inflation_mean_rev_coeff = inputs.inflation_reversion;
 
         // Positive real rates are contractionary.
@@ -1820,6 +2125,15 @@ pub fn update_economy_daily(
             inputs.inflation_floor,
             inputs.inflation_ceiling,
         );
+        // THE OIL PASS-THROUGH'S PART OF HEADLINE (`fed_core_inflation`,
+        // `treasury_core_inflation`): the term headline took from oil this
+        // month, on the part's own gap to 0.0 closed at headline's reversion.
+        // Headline less it is core. No draw; nothing runs with both off.
+        if inputs.oil_inflation_tracked {
+            new_state.oil_inflation_level = economy.oil_inflation_level
+                + (0.0 - economy.oil_inflation_level) * inflation_mean_rev_coeff
+                + oil_inflation_effect;
+        }
         new_state.core_inflation = clamp(
             economy.core_inflation + (new_state.inflation_rate - economy.core_inflation) * 0.3,
             -1.0,
@@ -1998,7 +2312,7 @@ pub fn update_economy_daily(
         oil_demand_factor * inputs.oil_supply_response
     };
     let inventory_change =
-        oil_demand_factor - oil_supply_factor + random_normal(rng, 0.0, 0.5 * volatility);
+        oil_demand_factor - oil_supply_factor + random_normal(rng, 0.0, inventory_noise(inputs) * volatility);
     // `oil_inventory_reversion`: production and storage close this share of
     // inventory's gap to its normal level each day, so inventory has a
     // stationary distribution and the pressure below cannot saturate for
@@ -2044,7 +2358,14 @@ pub fn update_economy_daily(
         * mathx::sin(2.0 * std::f64::consts::PI
             * (day_of_year as f64 - cal.scale_days(90) as f64) / year as f64);
 
-    let oil_usd_drag = -(economy.usd_index - 100.0) * 0.08;
+    // `oil_dollar_elasticity`: the dollar is a level the price carries
+    // (below) rather than a daily drag, so the drag is dropped. A branch, so
+    // 0.0 is the drag as it stood.
+    let oil_usd_drag = if inputs.oil_dollar_elasticity == 0.0 {
+        -(economy.usd_index - 100.0) * 0.08
+    } else {
+        0.0
+    };
 
     // ── OPEC ──────────────────────────────────────────────────────────────
     // A state-dependent draw site: 0 draws on an ordinary day, 1 to 3 on a
@@ -2103,26 +2424,113 @@ pub fn update_economy_daily(
             1.0 + (1.0 - g) * oil_seasonal_amplitude,
         )
     };
+    // `oil_convenience_yield`: the premium low stocks put on the price's
+    // LEVEL, `S = X f(I)` with `X` the premium-free price that reverts to
+    // the target. The step reverts toward the target carrying the premium
+    // the session opened with, `f(I)`, and then moves the level by the
+    // premium's change to the inventory the step leaves, `f(I') / f(I)`. So
+    // a shortage raises the price at once and the premium unwinds as stocks
+    // refill: the expected path falls, backwardation. A premium on the
+    // target alone, which the price reaches only at its own slow reversion,
+    // made the expected path RISE while stocks were low: contango, the
+    // wrong sign. A branch, so 0.0 is the step that stood.
+    //
+    // `oil_target_drift_sd`: the long factor rides on the level the same
+    // way, `S = X e^D f(I)`, so its change moves spot and the whole curve
+    // alike while `X` reverts to the target.
+    let (oil_reversion_target, oil_premium_ratio) = if inputs.oil_convenience_yield == 0.0
+        && inputs.oil_target_drift.is_none()
+        && inputs.oil_dollar_elasticity == 0.0
+    {
+            (oil_target, None)
+        } else {
+            let (mut opened, mut left) = (1.0, 1.0);
+            if inputs.oil_convenience_yield != 0.0 {
+                let k = inputs.oil_convenience_yield;
+                opened = oil_convenience_factor(k, oil_inventory, inputs.oil_convenience_inventory_var_before);
+                left = oil_convenience_factor(k, new_oil_inventory, inputs.oil_convenience_inventory_var);
+            }
+            if let Some((d, d_next)) = inputs.oil_target_drift {
+                opened *= mathx::exp(d);
+                left *= mathx::exp(d_next);
+            }
+            // The dollar as it stood at the session's start, in both: its
+            // change tonight is applied once the dollar's step has run.
+            if inputs.oil_dollar_elasticity != 0.0 {
+                let g = mathx::pow(economy.usd_index / 100.0, -inputs.oil_dollar_elasticity);
+                opened *= g;
+                left *= g;
+            }
+            (oil_target * opened, Some(left / opened))
+        };
     // `oil_mean_reversion` and `oil_noise_sd`: branches, so 0.0 multiplies
     // by the standing 0.03 and 2.0 as the reference always did.
-    let oil_mean_rev = if inputs.oil_mean_reversion == 0.0 {
-        (oil_target - economy.oil_price) * 0.03
+    // `oil_pushes_in_target`: the part of the price the pushes made decays
+    // at the shipped 0.03 on its own, and the rest reverts. A branch, so off
+    // it the whole price reverts as it stood.
+    let oil_reverting = if inputs.oil_pushes_in_target {
+        economy.oil_price - economy.oil_push_level
     } else {
-        (oil_target - economy.oil_price) * inputs.oil_mean_reversion
+        economy.oil_price
+    };
+    let oil_mean_rev = if inputs.oil_mean_reversion == 0.0 {
+        (oil_reversion_target - oil_reverting) * 0.03
+    } else {
+        (oil_reversion_target - oil_reverting) * inputs.oil_mean_reversion
     };
     let oil_volatility = if inputs.oil_noise_sd == 0.0 { 2.0 * volatility } else { inputs.oil_noise_sd * volatility };
-    new_state.oil_price = clamp(
-        (economy.oil_price
+    // `oil_noise_log_sd`: a share of the price, a branch so 0.0 is the
+    // dollar noise above.
+    let oil_volatility = if inputs.oil_noise_log_sd == 0.0 {
+        oil_volatility
+    } else {
+        inputs.oil_noise_log_sd * volatility * economy.oil_price
+    };
+    // The oil price's reverting part and the pushes' part before the clamp,
+    // which `oil_dollar_elasticity` rescales once the dollar has stepped.
+    let oil_dollar_parts: (f64, f64);
+    let oil_level = if inputs.oil_pushes_in_target {
+        // The reverting part carries the noise and the level's carriers;
+        // the pushes' part decays at 0.03 and takes this session's pushes.
+        // At a reversion of 0.03 their sum is the step below exactly.
+        let noise = random_normal(rng, 0.0, oil_volatility);
+        let pushes = oil_inventory_pressure + oil_usd_drag + opec_impact + shock_oil_impact * 0.1;
+        let reverting = (oil_reverting + oil_mean_rev + noise) * oil_level_seasonality;
+        let reverting = match oil_premium_ratio {
+            None => reverting,
+            Some(ratio) => reverting * ratio,
+        };
+        let pushed = (0.97 * economy.oil_push_level + pushes) * oil_level_seasonality;
+        new_state.oil_push_level = pushed;
+        oil_dollar_parts = (reverting, pushed);
+        reverting + pushed
+    } else {
+        let oil_level = (economy.oil_price
             + oil_mean_rev
             + oil_inventory_pressure
             + oil_usd_drag
             + opec_impact
             + random_normal(rng, 0.0, oil_volatility)
             + shock_oil_impact * 0.1)
-            * oil_level_seasonality,
-        35.0,
-        150.0,
-    );
+            * oil_level_seasonality;
+        let oil_level = match oil_premium_ratio {
+            None => oil_level,
+            Some(ratio) => oil_level * ratio,
+        };
+        oil_dollar_parts = (oil_level, 0.0);
+        oil_level
+    };
+    let (oil_lo, oil_hi) = oil_bounds(inputs.oil_price_floor, inputs.oil_price_ceiling);
+    new_state.oil_price = clamp(oil_level, oil_lo, oil_hi);
+    // Under the long factor, the bound's truncation goes to the long-run
+    // level (the close adds it to the factor), not to the short gap.
+    if inputs.oil_target_drift.is_some() {
+        new_state.oil_bound_log_ratio = if oil_level > 0.0 {
+            mathx::log(new_state.oil_price / oil_level)
+        } else {
+            0.0
+        };
+    }
 
     // ── Gold ──────────────────────────────────────────────────────────────
     let real_rate = economy.federal_funds_rate - economy.inflation_rate;
@@ -2179,7 +2587,10 @@ pub fn update_economy_daily(
 
     // ── USD ───────────────────────────────────────────────────────────────
     let usd_target = 100.0 + (economy.federal_funds_rate - 2.5) * 3.0;
+    // `usd_mean_reversion` and `usd_noise_sd`: branches, so 0.0 is the
+    // standing 0.02 and 0.3.
     let usd_mean_reversion = (usd_target - economy.usd_index) * 0.02;
+    let usd_noise = if inputs.usd_noise_sd == 0.0 { 0.3 * volatility } else { inputs.usd_noise_sd * volatility };
     // Reference: `vix > 30` — dead for the same reason as the gold crisis
     // premium above; re-sited with it. See `CRISIS_VIX_THRESHOLD`.
     //
@@ -2189,13 +2600,40 @@ pub fn update_economy_daily(
     // regime: a crisis is the same crisis whether you watch gold or the
     // dollar. No behaviour changes at the default, where the two agree.
     let safe_haven_drift = if economy.vix > inputs.usd_crisis_vix_threshold {
-        (economy.vix - inputs.usd_crisis_vix_threshold) * USD_SAFE_HAVEN_GAIN
+        (economy.vix - inputs.usd_crisis_vix_threshold) * usd_safe_haven_gain(inputs.usd_safe_haven_gain)
     } else {
         0.0
     };
-    let usd_change =
-        usd_mean_reversion + safe_haven_drift + random_normal(rng, 0.0, 0.3 * volatility);
-    new_state.usd_index = clamp(economy.usd_index + usd_change, 80.0, 130.0);
+    if inputs.usd_mean_reversion == 0.0 {
+        let usd_change =
+            usd_mean_reversion + safe_haven_drift + random_normal(rng, 0.0, usd_noise);
+        new_state.usd_index = clamp(economy.usd_index + usd_change, 80.0, 130.0);
+    } else {
+        // The base reverts at the measured rate; the safe-haven bid takes the
+        // drift and decays at the shipped 0.02. The same one draw.
+        let base = economy.usd_index - economy.usd_haven_level;
+        let base_next = base + (usd_target - base) * inputs.usd_mean_reversion
+            + random_normal(rng, 0.0, usd_noise);
+        let haven_next = 0.98 * economy.usd_haven_level + safe_haven_drift;
+        new_state.usd_haven_level = haven_next;
+        new_state.usd_index = clamp(base_next + haven_next, 80.0, 130.0);
+    }
+    // `oil_dollar_elasticity`: tonight's dollar move carries the oil price's
+    // reverting part, before its clamp, and nothing between the oil step
+    // and here reads the new oil price.
+    if inputs.oil_dollar_elasticity != 0.0 {
+        let (reverting, pushed) = oil_dollar_parts;
+        let ratio = mathx::pow(new_state.usd_index / economy.usd_index, -inputs.oil_dollar_elasticity);
+        let unclamped = reverting * ratio + pushed;
+        new_state.oil_price = clamp(unclamped, oil_lo, oil_hi);
+        if inputs.oil_target_drift.is_some() {
+            new_state.oil_bound_log_ratio = if unclamped > 0.0 {
+                mathx::log(new_state.oil_price / unclamped)
+            } else {
+                0.0
+            };
+        }
+    }
 
     // ── Trade balance ─────────────────────────────────────────────────────
     let tariff_effect = economy.tariff_rate * 0.5;
@@ -4326,6 +4764,156 @@ mod macro_anchors {
         assert!((ratio - 1.0).abs() <= 0.031, "{ratio}");
     }
 
+    /// The convenience premium raises the price when stocks are low and
+    /// lowers it when they are high, by `1 - k ln(I / 50)` on its level;
+    /// inventory at its normal level moves nothing, and an expectation over
+    /// a spread stays near the value at its centre.
+    #[test]
+    fn the_convenience_premium_moves_the_target_with_inventory() {
+        let mut e = economy();
+        e.oil_price = 80.0;
+        let day = DailyInputs { game_day: MONTH + 3, oil_inventory_reversion: 0.002, ..Default::default() };
+        // At 50 after the step's own move the factor is near 1 and the price
+        // near the premium-free one.
+        e.oil_inventory_level = 50.0;
+        let off = step(&e, day);
+        let on = step(&e, DailyInputs { oil_convenience_yield: 2.0, ..day });
+        let f = oil_convenience_factor(2.0, off.oil_inventory_level, 0.0);
+        assert!((f - 1.0).abs() < 0.05, "{f}");
+        // Low stocks: a premium, so the price rises against the premium-free
+        // step; high stocks: a discount. Two standard deviations either side
+        // at EIA's inventory scale (oil_inventory_noise_sd 0.35).
+        e.oil_inventory_level = 42.0;
+        let low_off = step(&e, day);
+        let low_on = step(&e, DailyInputs { oil_convenience_yield: 2.0, ..day });
+        e.oil_inventory_level = 58.0;
+        let high_off = step(&e, day);
+        let high_on = step(&e, DailyInputs { oil_convenience_yield: 2.0, ..day });
+        // The same draws and the same inventory move at both levels, so the
+        // premium's effect on the step is larger with stocks low than high:
+        // the reversion pulls toward a higher target, `T (1 - k ln(I / 50))`.
+        assert!(low_on.oil_price - low_off.oil_price > high_on.oil_price - high_off.oil_price,
+                "{} {} {} {}", low_on.oil_price, low_off.oil_price, high_on.oil_price, high_off.oil_price);
+        // The same draws either way: the premium moves no draw count.
+        assert_eq!(on.oil_inventory_level.to_bits(), off.oil_inventory_level.to_bits());
+        // The factor itself, its inventory floor at 25 and its own floor.
+        assert!((oil_convenience_factor(2.0, 25.0, 0.0) - (1.0 + 2.0 * 2f64.ln())).abs() < 1e-12);
+        assert_eq!(oil_convenience_factor(2.0, 5.0, 0.0), oil_convenience_factor(2.0, 25.0, 0.0));
+        assert!((oil_convenience_factor(1.0, 100.0, 0.0) - (1.0 - 2f64.ln())).abs() < 1e-12);
+        assert_eq!(oil_convenience_factor(4.0, 100.0, 0.0), OIL_CONVENIENCE_MIN);
+        // The expectation over a spread, against a fine sum over the normal.
+        // At EIA's inventory scale (oil_inventory_noise_sd 0.35: sd about 4).
+        let (k, m, sd) = (3.6, 45.0, 4.0);
+        let mut fine = 0.0;
+        let mut mass = 0.0;
+        for i in -4000..=4000 {
+            let z = i as f64 / 500.0;
+            let w = mathx::exp(-0.5 * z * z);
+            fine += w * oil_convenience_factor(k, m + z * sd, 0.0);
+            mass += w;
+        }
+        let quad = oil_convenience_factor(k, m, sd * sd);
+        assert!((quad / (fine / mass) - 1.0).abs() < 1e-4, "{quad} {}", fine / mass);
+        // Linear in log inventory, so the spread moves it only through the
+        // log's own small curvature, not by a convex premium's tilt.
+        assert!((quad / oil_convenience_factor(k, m, 0.0) - 1.0).abs() < 0.02);
+    }
+
+    /// The clamped expectation the forecast publishes under
+    /// `oil_forecast_clamp`: a fine sum of `clamp(x, 35, 150)` over the
+    /// normal agrees with the closed form, and far from the clamps it is the
+    /// mean.
+    #[test]
+    fn the_clamped_oil_expectation_is_the_truncated_mean() {
+        for &(mean, sd) in &[(90.0, 5.0), (140.0, 20.0), (45.0, 15.0), (150.0, 30.0)] {
+            let (mut total, mut mass) = (0.0, 0.0);
+            for i in -8000..=8000 {
+                let z = i as f64 / 1000.0;
+                let w = mathx::exp(-0.5 * z * z);
+                total += w * clamp(mean + sd * z, 35.0, 150.0);
+                mass += w;
+            }
+            let want = total / mass;
+            let got = oil_clamped_expectation(mean, sd, (35.0, 150.0));
+            assert!((got - want).abs() < 1e-6, "{mean} {sd}: {got} {want}");
+        }
+        assert!((oil_clamped_expectation(90.0, 1.0, (35.0, 150.0)) - 90.0).abs() < 1e-12);
+        assert_eq!(oil_clamped_expectation(160.0, 0.0, (35.0, 150.0)), 150.0);
+        assert_eq!(oil_bounds(0.0, 0.0), (35.0, 150.0));
+        // The expected log truncation: nothing far from the bounds, negative
+        // near the ceiling, positive near the floor.
+        assert!(oil_expected_log_truncation(90.0, 5.0, (35.0, 150.0)).abs() < 1e-12);
+        assert!(oil_expected_log_truncation(145.0, 15.0, (35.0, 150.0)) < 0.0);
+        assert!(oil_expected_log_truncation(38.0, 8.0, (35.0, 150.0)) > 0.0);
+        // The lognormal forms against fine sums in log space.
+        for &(mean, v) in &[(140.0, 0.04), (45.0, 0.09), (90.0, 0.003)] {
+            let (m, sd) = (f64::ln(mean) - 0.5 * v, f64::sqrt(v));
+            let (mut cens, mut trunc, mut mass) = (0.0, 0.0, 0.0);
+            for i in -8000..=8000 {
+                let z = i as f64 / 1000.0;
+                let w = mathx::exp(-0.5 * z * z);
+                let x = mathx::exp(m + sd * z);
+                cens += w * clamp(x, 35.0, 150.0);
+                trunc += w * mathx::log(clamp(x, 35.0, 150.0) / x);
+                mass += w;
+            }
+            assert!((oil_lognormal_censored(mean, v, (35.0, 150.0)) - cens / mass).abs() < 1e-5);
+            assert!((oil_lognormal_log_truncation(mean, v, (35.0, 150.0)) - trunc / mass).abs() < 1e-6);
+        }
+        assert_eq!(oil_bounds(16.4, 279.0), (16.4, 279.0));
+    }
+
+    /// `usd_safe_haven_gain`: 0.0 is the standing 0.05 to the bit, and off
+    /// zero the dollar's crisis drift is the dial times the VIX's excess over
+    /// the threshold, on either dollar law, with the same draws.
+    #[test]
+    fn the_safe_haven_gain_sets_the_dollars_crisis_drift() {
+        let mut e = economy();
+        e.vix = 35.0;
+        e.usd_index = 100.0;
+        let day = |g: f64, r: f64| DailyInputs {
+            game_day: MONTH + 3, usd_safe_haven_gain: g, usd_mean_reversion: r, ..Default::default() };
+        let excess = 35.0 - day(0.0, 0.0).usd_crisis_vix_threshold;
+        assert!(excess > 0.0);
+        for r in [0.0, 0.00095] {
+            let shipped = step(&e, day(0.0, r));
+            assert_eq!(shipped.usd_index.to_bits(), step(&e, day(USD_SAFE_HAVEN_GAIN, r)).usd_index.to_bits());
+            let measured = step(&e, day(0.001, r));
+            let gap = shipped.usd_index - measured.usd_index;
+            assert!((gap - (USD_SAFE_HAVEN_GAIN - 0.001) * excess).abs() < 1e-9, "{gap}");
+            if r != 0.0 {
+                assert!((measured.usd_haven_level - 0.001 * excess).abs() < 1e-12);
+            }
+        }
+        // Below the threshold the gain is never read.
+        e.vix = 15.0;
+        assert_eq!(step(&e, day(0.0, 0.0)).usd_index.to_bits(), step(&e, day(0.001, 0.0)).usd_index.to_bits());
+    }
+
+    /// Under `oil_dollar_elasticity` a stronger dollar lowers the oil price
+    /// by `(usd' / usd)^-e` on the step that moves it: two economies that
+    /// differ only in the policy rate, which the oil step does not read and
+    /// the dollar's target does, take the same draws and the same oil step,
+    /// and their oil prices differ by the ratio of their dollars' carriers.
+    #[test]
+    fn a_stronger_dollar_lowers_oil_under_the_elasticity() {
+        let mut a = economy();
+        a.oil_price = 80.0;
+        a.usd_index = 100.0;
+        let mut b = a.clone();
+        b.federal_funds_rate = a.federal_funds_rate + 4.0;
+        let day = DailyInputs { game_day: MONTH + 3, oil_dollar_elasticity: 1.2, ..Default::default() };
+        let (sa, sb) = (step(&a, day), step(&b, day));
+        assert!(sb.usd_index > sa.usd_index, "{} {}", sb.usd_index, sa.usd_index);
+        assert!(sb.oil_price < sa.oil_price, "{} {}", sb.oil_price, sa.oil_price);
+        let want = mathx::pow(sb.usd_index / sa.usd_index, -1.2);
+        assert!((sb.oil_price / sa.oil_price - want).abs() < 1e-12, "{} {want}", sb.oil_price / sa.oil_price);
+        // At 0.0 the same pair moves oil by the drag alone, which reads the
+        // dollar at the session's start: equal here, so the prices match.
+        let off = DailyInputs { game_day: MONTH + 3, ..Default::default() };
+        assert_eq!(step(&a, off).oil_price.to_bits(), step(&b, off).oil_price.to_bits());
+    }
+
     /// The shipped pass-through pays a rise from 75 and not the matching
     /// fall; off zero a rise and a fall about the anchor pay equal and
     /// opposite amounts.
@@ -4345,5 +4933,77 @@ mod macro_anchors {
         let down = at(66.0, 1.0) - at(81.0, 1.0);
         assert!((up - 0.15).abs() < 1e-9, "{up}");
         assert!((up + down).abs() < 1e-9, "{up} {down}");
+    }
+
+    /// `oil_inflation_level` (`fed_core_inflation`): untouched with the
+    /// tracker off; on, the month's pass-through term plus the part's own
+    /// gap to 0.0 closed at headline's reversion, and headline itself is the
+    /// headline the step takes either way.
+    #[test]
+    fn the_oil_part_of_headline_carries_the_pass_through_at_headlines_reversion() {
+        let mut e = economy();
+        e.oil_price = 121.0;
+        e.oil_inflation_level = 0.5;
+        let off = DailyInputs { oil_inflation_passthrough: 1.0, ..release() };
+        let on = DailyInputs { oil_inflation_tracked: true, ..off };
+        let (a, b) = (step(&e, off), step(&e, on));
+        assert_eq!(a.oil_inflation_level.to_bits(), 0.5f64.to_bits());
+        assert_eq!(a.inflation_rate.to_bits(), b.inflation_rate.to_bits());
+        let k = on.inflation_reversion;
+        let want = 0.5 + (0.0 - 0.5) * k + (121.0 - OIL_PASSTHROUGH_ANCHOR) * 0.01;
+        assert!((b.oil_inflation_level - want).abs() < 1e-12, "{} {want}", b.oil_inflation_level);
+    }
+
+    /// `treasury_zlb_path` and `treasury_zlb_haven_gain`: the unmet put
+    /// lowers the 10-year's anchor whole, so the close moves the yield by the
+    /// 5% pull's share of it; the zero bound's compression acts only with
+    /// the funds rate at or below 0.25.
+    #[test]
+    fn the_zero_bound_pieces_lower_the_ten_year() {
+        let mut e = economy();
+        e.federal_funds_rate = 0.0;
+        e.vix = 40.0;
+        let ten = |e: &EconomyState, z: f64, g: f64| {
+            let mut i = DailyInputs::default();
+            i.yields.zlb_path = z;
+            i.yields.zlb_haven_gain = g;
+            step(e, i).treasury_yield_10y
+        };
+        let base = ten(&e, 0.0, 0.0);
+        assert!(((base - ten(&e, 1.0, 0.0)) - 0.05).abs() < 1e-9, "{}", base - ten(&e, 1.0, 0.0));
+        assert!(ten(&e, 0.0, 0.05) < base - 1e-6);
+        let mut off = e.clone();
+        off.federal_funds_rate = 2.0;
+        assert_eq!(ten(&off, 0.0, 0.05).to_bits(), ten(&off, 0.0, 0.0).to_bits());
+    }
+
+    /// `treasury_core_inflation`: the flight to quality's sign reads core.
+    /// Headline at 3.5 with 1.0 of it oil: off, the 3-4 band takes no shift;
+    /// on, core 2.5 takes the flight to quality, the 10-year falling with
+    /// the index.
+    #[test]
+    fn the_curve_reads_core_under_its_switch() {
+        let mut e = economy();
+        e.inflation_rate = 3.5;
+        e.oil_inflation_level = 1.0;
+        let y = |core: f64| {
+            let mut i = DailyInputs { market_day_return_pct: -3.0, ..Default::default() };
+            i.yields.flight_to_quality_gain = 0.05;
+            i.yields.flight_to_quality_day = 1.0;
+            i.yields.core_inflation = core;
+            step(&e, i).treasury_yield_10y
+        };
+        let mut f = e.clone();
+        f.oil_inflation_level = 0.0;
+        f.inflation_rate = 2.5;
+        let y_core_headline = {
+            let mut i = DailyInputs { market_day_return_pct: -3.0, ..Default::default() };
+            i.yields.flight_to_quality_gain = 0.05;
+            i.yields.flight_to_quality_day = 1.0;
+            step(&f, i).treasury_yield_10y
+        };
+        assert!(y(1.0) < y(0.0) - 0.1, "{} {}", y(1.0), y(0.0));
+        // On, the curve's arithmetic is headline-off's at core.
+        assert_eq!(y(1.0).to_bits(), y_core_headline.to_bits());
     }
 }

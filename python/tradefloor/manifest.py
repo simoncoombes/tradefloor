@@ -529,6 +529,8 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         {"vix_anchor_slow", "vix_anchor", "vix_stress_memory", "market_vol_leverage_memory",
          "market_vol_cycle_log", "rates", "book", "fair_value_offset", "opening_z",
          "buyback_log_shares", "opening_carry",
+         # The valuation multiples, only with `valuation_multiple_share` set.
+         "valuation_multiple",
          # Carried only while set: a forced close pending tonight, today's
          # macro pins the corporate yield reads, and a jump's fair-value
          # shift waiting for its tape row.
@@ -593,6 +595,12 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          "oil_futures", "oil_futures_book",
          # The contracts' margin, only while `margin_scan_coverage` is set.
          "margin",
+         # Oil's long factor, only while `oil_target_drift_sd` is set.
+         "oil_target_drift",
+         # Core inflation's trend, only while `core_trend_sd` is set; the
+         # eve's decision, only while `fed_eve_decision` is; credit's own
+         # state, only while `corporate_spread_noise_sd` is.
+         "core_trend", "eve_decision", "spread_noise",
          # The dividend states, on a model that pays dividends, and an
          # ex-date's move in `s` waiting for its tape row.
          "dividend", "pending_dividend",
@@ -791,6 +799,12 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         raw = snapshot["buyback_log_shares"]
         for value in _column(raw, n, "buyback_log_shares"):
             _f64(buf, value)
+    # The valuation multiples, only with `valuation_multiple_share` set, one
+    # per name in roster order, after the buyback reductions.
+    if "valuation_multiple" in snapshot:
+        raw = snapshot["valuation_multiple"]
+        for value in _column(raw, n, "valuation_multiple"):
+            _f64(buf, value)
     # The earnings calendar's key, only with `earnings_surprise_sigma` set.
     if "earnings_key" in snapshot:
         _u64(buf, snapshot["earnings_key"])
@@ -811,6 +825,9 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # Credit's leverage gap, only on a model with `corporate_spread_equity_gain` set.
     if "spread_equity_gap" in snapshot["economy"]:
         _f64(buf, snapshot["economy"]["spread_equity_gap"])
+    # The gap credit has priced, only with `corporate_spread_equity_lag` set too.
+    if "spread_priced_gap" in snapshot["economy"]:
+        _f64(buf, snapshot["economy"]["spread_priced_gap"])
     if "fair_value_offset" in snapshot:
         for name in ("fair_value_offset", "opening_z"):
             if len(snapshot[name]) % 8:
@@ -1057,6 +1074,19 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         _u32(buf, len(values))
         for value in values:
             _f64(buf, value)
+    # Oil's long factor, only while `oil_target_drift_sd` is set, behind its
+    # own tag: its log level and its key's two words.
+    if "oil_target_drift" in snapshot:
+        _f64(buf, 55.0)
+        for value in _column(snapshot["oil_target_drift"], 3, "oil_target_drift"):
+            _f64(buf, value)
+    # Core inflation's trend (57), the eve's decision (58) and credit's own
+    # state (59), each only while its dial is set, behind its own tag.
+    for name, tag, width in (("core_trend", 57.0, 3), ("eve_decision", 58.0, 2), ("spread_noise", 59.0, 3)):
+        if name in snapshot:
+            _f64(buf, tag)
+            for value in _column(snapshot[name], width, name):
+                _f64(buf, value)
     # LENGTH-PREFIXED, because these two are empty between the tape row that
     # consumes them and the close that fills them again -- unlike every
     # per-slot array above, which always follows the roster. An empty buffer
@@ -1110,7 +1140,8 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # after `earnings_cycle`. The Fed put's four fields only with
     # `fed_put_gain` set, together; hashed after the night's market draw.
     # `spread_equity_gap` only with `corporate_spread_equity_gain` set;
-    # hashed after the Fed put's fields.
+    # hashed after the Fed put's fields. `spread_priced_gap` only with
+    # `corporate_spread_equity_lag` set as well; hashed after the gap.
     # `cycle_nowcast` only on a model with `cycle_nowcast_accuracy` set,
     # together with the snapshot's `cycle_nowcast_rng`; hashed after the
     # phase, before the history.
@@ -1125,7 +1156,8 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         {"earnings_cycle", "cycle_history", "gdp_publication",
          "unemployment_impulse", "vix_feedback", "qe_assets_ratio",
          "cycle_nowcast", "cycle_publication", "anticipation_drift",
-         "anticipation_raw", "spread_equity_gap"}
+         "anticipation_raw", "spread_equity_gap", "spread_priced_gap", "oil_push_level",
+         "usd_haven_level"}
         & set(economy))
     if "fed_put" in economy:
         economy_expected |= {"intermeeting_return", "fed_put", "fed_put_owed",
@@ -1192,6 +1224,13 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # is set: `Engine::state_hash`'s order and rule.
     if "unemployment_impulse" in economy:
         _f64(buf, economy["unemployment_impulse"])
+    # The oil pushes' part of the price, only while `oil_pushes_in_target`
+    # is set: `Engine::state_hash`'s order and rule.
+    if "oil_push_level" in economy:
+        _f64(buf, economy["oil_push_level"])
+    # The dollar's safe-haven bid, only while `usd_mean_reversion` is set.
+    if "usd_haven_level" in economy:
+        _f64(buf, economy["usd_haven_level"])
     # The published GDP growth figure's state, only while
     # `gdp_publication_lag` is set: `Engine::state_hash`'s order and rule,
     # the pending releases LENGTH-PREFIXED, each its day then its figure.
@@ -1694,13 +1733,16 @@ _LEDGER_BUFFERS = ("attribution", "tick_components", "tick_fundamental",
 #: present and left out where not. The ``fundamentals`` block's three
 #: buffers and the book's consumed depth are encoded beside them.
 _LEDGER_OPTIONAL_BUFFERS = ("fair_value_offset", "opening_z", "pending_fair_value",
-                            "garch_cascade", "buyback_log_shares", "earnings_withheld",
+                            "garch_cascade", "buyback_log_shares", "valuation_multiple",
+                            "earnings_withheld",
                             "idio_variance", "idio_jump_pending",
                             "idio_jump_var_pending", "opening_carry", "dividend",
                             "pending_dividend", "fed_drawdown_returns",
                             "innovation_day", "forecast", "futures",
                             "night_bridge", "vix_futures", "rate_futures",
-                            "oil_futures", "margin", "shares_outstanding")
+                            "oil_futures", "margin", "shares_outstanding",
+                            "oil_target_drift", "core_trend", "eve_decision",
+                            "spread_noise")
 
 #: The ``fundamentals`` block's buffers, one per company each.
 _LEDGER_FUNDAMENTALS = ("eps", "book_value_per_share", "revenue_growth")

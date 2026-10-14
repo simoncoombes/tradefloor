@@ -1658,6 +1658,22 @@ impl Engine {
         if let Some(words) = self.margin_words() {
             out.put("margin", V::from_f64s(&words));
         }
+        // Oil's long factor (`oil_target_drift_sd`).
+        if let Some(words) = self.oil_drift_words() {
+            out.put("oil_target_drift", V::from_f64s(&words));
+        }
+        // Core inflation's trend (`core_trend_sd`).
+        if let Some(words) = self.core_trend_words() {
+            out.put("core_trend", V::from_f64s(&words));
+        }
+        // Credit's own state (`corporate_spread_noise_sd`).
+        if let Some(words) = self.spread_noise_words() {
+            out.put("spread_noise", V::from_f64s(&words));
+        }
+        // The eve's decision (`fed_eve_decision`).
+        if let Some(words) = self.eve_decision_words() {
+            out.put("eve_decision", V::from_f64s(&words));
+        }
         // The spread a `corporate_spread` pin holds tonight, only while its
         // mark stands.
         if let Some(spread) = self.pinned_corporate_spread() {
@@ -1677,6 +1693,11 @@ impl Engine {
         // every preset's snapshot is the one it was.
         if self.carries_buyback_log_shares() {
             out.put("buyback_log_shares", V::from_f64s(&self.buyback_log_shares()));
+        }
+        // The valuation multiples: their own key, only while
+        // `valuation_multiple_share` is set.
+        if self.carries_valuation_multiples() {
+            out.put("valuation_multiple", V::from_f64s(&self.valuation_multiples()));
         }
         // The fair-value levels and the opening draws, only when the model
         // can move a level.
@@ -1780,6 +1801,18 @@ impl Engine {
         if p.unemployment_adjustment_half_life != 0.0 {
             econ.put("unemployment_impulse", V::Float(economy.unemployment_impulse));
         }
+        if p.oil_pushes_in_target != 0.0 {
+            econ.put("oil_push_level", V::Float(economy.oil_push_level));
+        }
+        if p.usd_mean_reversion != 0.0 {
+            econ.put("usd_haven_level", V::Float(economy.usd_haven_level));
+        }
+        if self.carries_oil_inflation_level() {
+            econ.put("oil_inflation_level", V::Float(economy.oil_inflation_level));
+        }
+        if p.treasury_zlb_path != 0.0 {
+            econ.put("zlb_unmet", V::Float(economy.zlb_unmet));
+        }
         if p.gdp_publication_lag != 0.0 {
             let g = self.gdp_publication();
             let mut block = SnapshotMap::new();
@@ -1836,6 +1869,10 @@ impl Engine {
         // `corporate_spread_equity_gain` set.
         if self.carries_spread_equity_gap() {
             econ.put("spread_equity_gap", V::Float(economy.spread_equity_gap));
+        }
+        // The gap credit has priced (`corporate_spread_equity_lag`).
+        if self.carries_spread_priced_gap() {
+            econ.put("spread_priced_gap", V::Float(economy.spread_priced_gap));
         }
         out.put("economy", V::Map(econ));
 
@@ -2021,6 +2058,11 @@ impl Engine {
             Gated::dial("oil_futures", "futures_oil_listed", p.futures_oil_listed),
             Gated::held("oil_futures_book", "futures_oil_listed", p.futures_oil_listed),
             Gated::dial("margin", "margin_scan_coverage", p.margin_scan_coverage),
+            Gated::dial("oil_target_drift", "oil_target_drift_sd", p.oil_target_drift_sd),
+            Gated::dial("core_trend", "core_trend_sd", p.core_trend_sd),
+            Gated::dial("spread_noise", "corporate_spread_noise_sd", p.corporate_spread_noise_sd),
+            Gated::dial("eve_decision", "fed_eve_decision", p.fed_eve_decision),
+            Gated::dial("valuation_multiple", "valuation_multiple_share", p.valuation_multiple_share),
             Gated::when(
                 "buyback_log_shares",
                 self.carries_buyback_log_shares(),
@@ -2153,12 +2195,33 @@ impl Engine {
                     p.corporate_spread_equity_gain, p.cycle_equity_hazard
                 ),
             ),
+            Gated::when(
+                "spread_priced_gap",
+                self.carries_spread_priced_gap(),
+                format!(
+                    "corporate_spread_equity_lag and corporate_spread_equity_gain are both \
+                     not 0, and this engine's are {} and {}",
+                    p.corporate_spread_equity_lag, p.corporate_spread_equity_gain
+                ),
+            ),
             Gated::dial(
                 "unemployment_impulse",
                 "unemployment_adjustment_half_life",
                 p.unemployment_adjustment_half_life,
             ),
             Gated::dial("gdp_publication", "gdp_publication_lag", p.gdp_publication_lag),
+            Gated::dial("oil_push_level", "oil_pushes_in_target", p.oil_pushes_in_target),
+            Gated::dial("usd_haven_level", "usd_mean_reversion", p.usd_mean_reversion),
+            Gated::dial("zlb_unmet", "treasury_zlb_path", p.treasury_zlb_path),
+            Gated::when(
+                "oil_inflation_level",
+                self.carries_oil_inflation_level(),
+                format!(
+                    "fed_core_inflation or treasury_core_inflation is not 0, and this \
+                     engine's are {} and {}",
+                    p.fed_core_inflation, p.treasury_core_inflation
+                ),
+            ),
         ];
         if let Some(message) = key_mismatch("this snapshot's economy", economy, &required, &gated, &[]) {
             return Err(refuse(message));
@@ -2424,6 +2487,11 @@ impl Engine {
         if inner.carries_buyback_log_shares() {
             inner
                 .set_buyback_log_shares(&read_buffer(snapshot, "", "buyback_log_shares")?)
+                .map_err(core)?;
+        }
+        if inner.carries_valuation_multiples() {
+            inner
+                .set_valuation_multiples(&read_buffer(snapshot, "", "valuation_multiple")?)
                 .map_err(core)?;
         }
         if inner.carries_earnings() {
@@ -2734,6 +2802,38 @@ impl Engine {
             };
             inner.set_margin_state(words.as_deref()).map_err(core)?;
         }
+        // Oil's long factor (`oil_target_drift_sd`).
+        {
+            let words = match snapshot.get("oil_target_drift") {
+                Some(_) => Some(read_buffer(snapshot, "", "oil_target_drift")?),
+                None => None,
+            };
+            inner.set_oil_drift_state(words.as_deref()).map_err(core)?;
+        }
+        // Core inflation's trend (`core_trend_sd`).
+        {
+            let words = match snapshot.get("core_trend") {
+                Some(_) => Some(read_buffer(snapshot, "", "core_trend")?),
+                None => None,
+            };
+            inner.set_core_trend_state(words.as_deref()).map_err(core)?;
+        }
+        // Credit's own state (`corporate_spread_noise_sd`).
+        {
+            let words = match snapshot.get("spread_noise") {
+                Some(_) => Some(read_buffer(snapshot, "", "spread_noise")?),
+                None => None,
+            };
+            inner.set_spread_noise_state(words.as_deref()).map_err(core)?;
+        }
+        // The eve's decision (`fed_eve_decision`).
+        {
+            let words = match snapshot.get("eve_decision") {
+                Some(_) => Some(read_buffer(snapshot, "", "eve_decision")?),
+                None => None,
+            };
+            inner.set_eve_decision_state(words.as_deref()).map_err(core)?;
+        }
         inner.set_nominal_output_base(read_finite(snapshot, "", "nominal_output_base")?);
         let variance = read_numbers(snapshot, "", "market_variance")?;
         if variance.len() != 6 || variance.iter().any(|v| !v.is_finite()) {
@@ -2795,6 +2895,9 @@ impl Engine {
         }
         if inner.carries_spread_equity_gap() {
             inner.economy_mut().spread_equity_gap = read_finite(d, "economy.", "spread_equity_gap")?;
+        }
+        if inner.carries_spread_priced_gap() {
+            inner.economy_mut().spread_priced_gap = read_finite(d, "economy.", "spread_priced_gap")?;
         }
         // The market's cycle nowcast (`cycle_nowcast_accuracy`), before the
         // anticipation that reads it: the belief, and its generator as
@@ -2866,6 +2969,18 @@ impl Engine {
         if params.unemployment_adjustment_half_life != 0.0 {
             inner.economy_mut().unemployment_impulse =
                 read_finite(d, "economy.", "unemployment_impulse")?;
+        }
+        if params.oil_pushes_in_target != 0.0 {
+            inner.economy_mut().oil_push_level = read_finite(d, "economy.", "oil_push_level")?;
+        }
+        if params.treasury_zlb_path != 0.0 {
+            inner.economy_mut().zlb_unmet = read_finite(d, "economy.", "zlb_unmet")?;
+        }
+        if params.fed_core_inflation != 0.0 || params.treasury_core_inflation != 0.0 {
+            inner.economy_mut().oil_inflation_level = read_finite(d, "economy.", "oil_inflation_level")?;
+        }
+        if params.usd_mean_reversion != 0.0 {
+            inner.economy_mut().usd_haven_level = read_finite(d, "economy.", "usd_haven_level")?;
         }
         let gdp_publication = if params.gdp_publication_lag != 0.0 {
             let block = read_map(d, "economy.", "gdp_publication")?;

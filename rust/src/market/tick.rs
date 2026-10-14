@@ -171,6 +171,13 @@ pub struct TickStock {
     /// `exp(L)`. None is 0.0, which every name holds while the switch or
     /// `buyback_payout_share` is off, and which a new listing starts at.
     pub buyback_log_shares: Option<f64>,
+    /// The name's log valuation multiple `m` under
+    /// `ModelParams::valuation_multiple_share`: the part of its permanent
+    /// market moves that its multiple carries rather than its earnings.
+    /// Fair value reads `exp(m)`; the earnings the valuation, the market P/E
+    /// and the payouts read do not. Each close pulls it toward zero. `None`
+    /// (and 0.0) on every shipped preset, which a new listing starts at.
+    pub valuation_multiple: Option<f64>,
     /// The name's dividend state (`ModelParams::dividend_payout_share`).
     /// `None` on every preset, which pays no dividend; see
     /// [`crate::market::dividends`].
@@ -220,6 +227,7 @@ impl TickStock {
             mispricing_momentum: None,
             fair_value_offset: None,
             buyback_log_shares: None,
+            valuation_multiple: None,
             dividend: None,
             maker_inventory: None,
             garch_variance: 0.0,
@@ -1432,6 +1440,9 @@ pub fn simulate_market_tick(
             &valuation, &econ_view, p.fair_value_book_floor,
             p.qe_pe_gain, p.qe_pe_stock_gain, p.neutral_discount_rate, p.rate_pe_sensitivity);
         let fv = with_vix_discount(p, breakdown.fair_value, vix_exposure, companies[idx].stock.beta);
+        // The name's valuation multiple (`valuation_multiple_share`), on the
+        // valuation and not on the cash accrued below. A branch inside.
+        let fv = with_valuation_multiple(fv, companies[idx].stock.valuation_multiple);
         // The dividend accrued since the last ex-date, in price units. A
         // branch inside: no state, or no accrual, is `fv` bit for bit.
         let fv = crate::market::dividends::with_accrual(fv, &companies[idx]);
@@ -1561,8 +1572,12 @@ pub fn simulate_market_tick(
             // The market-wide part, on its own share: the name's loading on
             // the market factor's draw and the market-wide news. A branch at
             // zero, so the stock-level share alone is the arithmetic above.
-            let dv = if p.fair_value_market_share == 0.0 {
-                own_noise + own_news
+            //
+            // Under `valuation_multiple_share` that market part `q` is split:
+            // `(1 - share) q` joins `v` and `share q` (`dm`) joins the name's
+            // valuation multiple `m`. A branch at 0.0, the line that stood.
+            let (dv, dm) = if p.fair_value_market_share == 0.0 {
+                (own_noise + own_news, 0.0)
             } else {
                 let psim = market_permanent_share(
                     p, inputs.market_sigma_daily, inputs.market_permanent_ceiling_scale);
@@ -1574,9 +1589,16 @@ pub fn simulate_market_tick(
                 } else {
                     raw.noise_market_linear
                 };
-                own_noise + own_news
-                    + psim * (market_draw * noise_scale)
-                    + psim * (raw.company_news_market * scale)
+                if p.valuation_multiple_share == 0.0 {
+                    (own_noise + own_news
+                        + psim * (market_draw * noise_scale)
+                        + psim * (raw.company_news_market * scale), 0.0)
+                } else {
+                    let q = psim * (market_draw * noise_scale)
+                        + psim * (raw.company_news_market * scale);
+                    let share = p.valuation_multiple_share;
+                    (own_noise + own_news + (1.0 - share) * q, share * q)
+                }
             };
             // The component slots keep the WHOLE shock, deliberately: they
             // report what moved the PRICE (the attribution an agent's
@@ -1585,13 +1607,29 @@ pub fn simulate_market_tick(
             // move whichever of `s` and `v` carries it. `fair_value_shift`
             // books what left `s` for `v`, so all the slots together sum to
             // the change in `s`, and all but that one to the change in `s + v`.
-            if dv != 0.0 {
+            if dm == 0.0 {
+                if dv != 0.0 {
+                    let before = s_val;
+                    s_val -= dv;
+                    s_components[i][crate::market::factors::TICK_FAIR_VALUE] += s_val - before;
+                    let step = dv - 0.5 * dv * dv;
+                    companies[idx].stock.fair_value_offset = Some(v_level + step);
+                    fv_moved = fv * mathx::exp(step);
+                }
+            } else {
+                // Both levels leave `s`, and `fair_value_shift` books both.
+                // Each takes its own Ito term.
                 let before = s_val;
-                s_val -= dv;
+                s_val -= dv + dm;
                 s_components[i][crate::market::factors::TICK_FAIR_VALUE] += s_val - before;
                 let step = dv - 0.5 * dv * dv;
-                companies[idx].stock.fair_value_offset = Some(v_level + step);
-                fv_moved = fv * mathx::exp(step);
+                if dv != 0.0 {
+                    companies[idx].stock.fair_value_offset = Some(v_level + step);
+                }
+                let step_m = dm - 0.5 * dm * dm;
+                let m_level = companies[idx].stock.valuation_multiple.unwrap_or(0.0);
+                companies[idx].stock.valuation_multiple = Some(m_level + step_m);
+                fv_moved = fv * mathx::exp(step + step_m);
             }
         }
         s_val = clamp_s(p, s_val);
@@ -2067,6 +2105,16 @@ pub fn with_vix_discount(p: &ModelParams, fv: f64, exposure: f64, beta: Option<f
     }
 }
 
+/// A fair value scaled by the name's valuation multiple `exp(m)`
+/// (`valuation_multiple_share`): the value itself, bit for bit, while the
+/// name carries none (`None` or 0.0, every shipped preset).
+pub fn with_valuation_multiple(fv: f64, m: Option<f64>) -> f64 {
+    match m {
+        Some(m) if m != 0.0 => fv * mathx::exp(m),
+        _ => fv,
+    }
+}
+
 /// A name's fair value on its PUBLISHED fundamentals, as the tick's phase 2
 /// computes it for a name whose fair-value level is zero: the nominal
 /// restatement, the buyback term at the current price, then the valuation.
@@ -2144,6 +2192,7 @@ pub fn tick_fair_value(
         p.qe_pe_gain, p.qe_pe_stock_gain, p.neutral_discount_rate, p.rate_pe_sensitivity)
     .fair_value;
     let fv = with_vix_discount(p, fv, vix_feedback_exposure(p, economy), company.stock.beta);
+    let fv = with_valuation_multiple(fv, company.stock.valuation_multiple);
     crate::market::dividends::with_accrual(fv, company)
 }
 
@@ -2481,5 +2530,19 @@ mod tests {
         }, 1.25);
         assert_eq!(empty.eps, None);
         assert_eq!(empty.book_value_per_share, None);
+    }
+
+    #[test]
+    fn the_valuation_multiple_is_the_value_itself_until_a_name_carries_one() {
+        // `None` and 0.0 are every shipped preset's state: the value bit for
+        // bit, not a multiply by exp(0).
+        for fv in [0.01, 1.0, 123.456789, 1e9] {
+            assert_eq!(with_valuation_multiple(fv, None).to_bits(), fv.to_bits());
+            assert_eq!(with_valuation_multiple(fv, Some(0.0)).to_bits(), fv.to_bits());
+            assert_eq!(with_valuation_multiple(fv, Some(-0.0)).to_bits(), fv.to_bits());
+        }
+        // Off zero it scales the value by exp(m), either way.
+        assert_eq!(with_valuation_multiple(50.0, Some(0.2)), 50.0 * mathx::exp(0.2));
+        assert_eq!(with_valuation_multiple(50.0, Some(-0.3)), 50.0 * mathx::exp(-0.3));
     }
 }
