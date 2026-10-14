@@ -293,6 +293,13 @@ same with them on as off.
   no longer leaves the forecast's VIX high.
 - `forecast_vix_level_path` makes the forecast's VIX step read the VIX's slow level (`vix_level_sigma`) at its expected
   path, as the close does.
+- `vix_quote_transient_share` and `vix_quote_transient_persistence` are new dials, 0.0 on every preset and left out of
+  the digest there.
+  - Off zero, each free close splits the VIX's own innovation. The state keeps `(1 - share)` of it, and the published
+    quote alone takes the rest, which decays at the persistence.
+  - The news reads the state's part. A pinned VIX clears the quote's part. The live mark and the forecast read its
+    expected decay.
+  - The quote's part is snapshotted and hashed only with the share set.
 - Every known-answer digest is where it was.
 
 ### The VIX's own innovation as variance news

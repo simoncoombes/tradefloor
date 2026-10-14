@@ -1394,6 +1394,11 @@ PERTURBATIONS = [
     ("forecast_readback_dispersion_first", 0.18, False),
     ("forecast_readback_correlation", 0.8, False),
     ("forecast_vix_level_path", 1.0, False),
+    # LIVE on the probe: the state VIX keeps only the persistent part of each
+    # free close's innovation, so the market the VIX drives moves.
+    ("vix_quote_transient_share", 0.81, True),
+    # INERT: read only with vix_quote_transient_share non-zero.
+    ("vix_quote_transient_persistence", 0.942, False),
     # INERT: read only with vix_stress_premium non-zero.
     ("vix_stress_premium_undo", 1.0, False),
     # INERT on this probe, measured: the put reads the index's fall since

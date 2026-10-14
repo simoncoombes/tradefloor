@@ -3017,6 +3017,31 @@ pub struct ModelParams {
     /// On, the step reads its expectation `c` closes on,
     /// `exp(phi^c l - phi^(2c) v / 2)`.
     pub forecast_vix_level_path: f64,
+    /// The share of the VIX's own innovation that enters the published quote
+    /// alone. 0.0, which every preset carries, is off: the quote is the
+    /// state's, no state is kept, and the dial is left out of the model's
+    /// digest. In [0, 1).
+    ///
+    /// Off zero, at each close whose VIX nobody pinned, the innovation
+    /// `u = ln(VIX / VIX at the same close with its draws at their means)`
+    /// splits. The state takes `(1 - share) u`. A quote state `q` takes
+    /// `share u` and decays at `vix_quote_transient_persistence`. The
+    /// published VIX is the state's quote times `exp(q)`, never above
+    /// `vix_ceiling`. Every internal reader reads the state. The news
+    /// (`market_vol_vix_news`) reads the state's part. A pinned VIX clears
+    /// `q`. The live mark and the forecast read `q`'s expected decay.
+    ///
+    /// The tape's log VIX has two poles: 0.942 with 21% of the level's
+    /// variance and 0.9965 with 79% (1990-2025). Their innovations split
+    /// 81/19, so the projection of an innovation on its transient part is
+    /// 0.81 of it.
+    pub vix_quote_transient_share: f64,
+    /// The per-session persistence of the quote's transient part
+    /// (`vix_quote_transient_share`). Read only with the share set; 0.0,
+    /// which every preset carries, lets it last one session, and a value of
+    /// 0.0 is left out of the model's digest. The tape's fast pole is 0.942.
+    /// In [0, 1).
+    pub vix_quote_transient_persistence: f64,
     /// The stress premium as the anchor's own pull, undone above the knee.
     /// 0.0, which every preset carries, is the shipped form, the capped hinge
     /// `cap * (1 - exp(-g * max(0, m - knee) / cap))`. Off zero (a switch, in
@@ -8461,6 +8486,8 @@ impl ModelParams {
             forecast_readback_dispersion_first: 0.0,
             forecast_readback_correlation: 0.0,
             forecast_vix_level_path: 0.0,
+            vix_quote_transient_share: 0.0,
+            vix_quote_transient_persistence: 0.0,
             vix_stress_premium_undo: 0.0,
             vix_fear_uptake: 0.0,
             vix_fear_half_life: 0.0,
@@ -11112,6 +11139,8 @@ impl ModelParams {
             "forecast_readback_dispersion_half_life" => self.forecast_readback_dispersion_half_life,
             "forecast_readback_dispersion_first" => self.forecast_readback_dispersion_first,
             "forecast_vix_level_path" => self.forecast_vix_level_path,
+            "vix_quote_transient_share" => self.vix_quote_transient_share,
+            "vix_quote_transient_persistence" => self.vix_quote_transient_persistence,
             "forecast_readback_correlation" => self.forecast_readback_correlation,
             "vix_stress_premium_undo" => self.vix_stress_premium_undo,
             "vix_fear_uptake" => self.vix_fear_uptake,
@@ -11529,6 +11558,8 @@ impl ModelParams {
             "forecast_readback_dispersion_half_life" => out.forecast_readback_dispersion_half_life = value,
             "forecast_readback_dispersion_first" => out.forecast_readback_dispersion_first = value,
             "forecast_vix_level_path" => out.forecast_vix_level_path = value,
+            "vix_quote_transient_share" => out.vix_quote_transient_share = value,
+            "vix_quote_transient_persistence" => out.vix_quote_transient_persistence = value,
             "forecast_readback_correlation" => out.forecast_readback_correlation = value,
             "vix_stress_premium_undo" => out.vix_stress_premium_undo = value,
             "vix_fear_uptake" => out.vix_fear_uptake = value,
@@ -12435,6 +12466,16 @@ impl ModelParams {
             if !(value >= lo && value <= hi) {
                 return Err(format!(
                     "{name} is {value}. It is {unit}, in [{lo}, {hi}]; 0 is off."));
+            }
+        }
+        for (name, value, unit) in [
+            ("vix_quote_transient_share", self.vix_quote_transient_share,
+             "the share of the VIX's own innovation that enters the quote alone"),
+            ("vix_quote_transient_persistence", self.vix_quote_transient_persistence,
+             "the quote's transient part's per-session persistence"),
+        ] {
+            if !(value >= 0.0 && value < 1.0) {
+                return Err(format!("{name} is {value}. It is {unit}, in [0, 1); 0 is off."));
             }
         }
         if !(self.vix_stress_premium_memory >= 0.0 && self.vix_stress_premium_memory <= 1.0) {
@@ -13678,6 +13719,8 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "forecast_readback_correlation",
     "forecast_readback_dispersion_first",
     "forecast_vix_level_path",
+    "vix_quote_transient_share",
+    "vix_quote_transient_persistence",
     "vix_fear_uptake",
     "vix_fear_half_life",
     "unemployment_natural_pull",
@@ -14044,6 +14087,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "forecast_readback_correlation",
         "forecast_readback_dispersion_first",
         "forecast_vix_level_path",
+        "vix_quote_transient_share",
+        "vix_quote_transient_persistence",
         "vix_fear_uptake",
         "vix_fear_half_life",
         "fed_put_gain",

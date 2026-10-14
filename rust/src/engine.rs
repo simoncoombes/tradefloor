@@ -939,6 +939,11 @@ pub struct Engine {
     /// the snapshot and the state hash only then. See
     /// `ModelParams::vix_fear_uptake`.
     vix_fear: f64,
+    /// The quote's transient part of the VIX's own innovation, in log units
+    /// (`vix_quote_transient_share`): the published VIX is the state's quote
+    /// times `exp` of it. Moves only with the share non-zero, which no preset
+    /// sets, and is carried by the snapshot and the state hash only then.
+    vix_quote_transient: f64,
     /// The host's premium on the VIX target, in VIX points, and the
     /// half-life in sessions it fades at (0.0 holds it). 0.0 with nothing
     /// written, where the target reads no term. See
@@ -2320,6 +2325,7 @@ impl Engine {
             market_vol_cycle_log: None,
             vix_stress_memory: 0.0,
             vix_fear: 0.0,
+            vix_quote_transient: 0.0,
             vix_target_premium: 0.0,
             vix_target_premium_half_life: 0.0,
             vix_target_floor: None,
@@ -2585,6 +2591,7 @@ impl Engine {
         self.vix_anchor_slow = pre.vix_anchor_slow;
         self.vix_stress_memory = pre.vix_stress_memory;
         self.vix_fear = pre.vix_fear;
+        self.vix_quote_transient = pre.vix_quote_transient;
         self.market_vol_cycle_log = pre.market_vol_cycle_log;
         self.sector_variance = pre.sector_variance.clone();
         self.idio_variance = pre.idio_variance.clone();
@@ -9232,7 +9239,12 @@ impl Engine {
         // THE VIX'S OWN INNOVATION AS VARIANCE NEWS (`market_vol_vix_news`):
         // tonight's VIX with its draws at their means, before the step draws.
         // Arithmetic on a copy, no draw; nothing at 0.0 or on a pinned VIX.
-        let news_mean_vix = if self.params.market_vol_vix_news != 0.0 && pins_today & PIN_VIX == 0 {
+        // THE TRANSIENT QUOTE (`vix_quote_transient_share`) reads the same
+        // projection.
+        let quote_share = self.params.vix_quote_transient_share;
+        let news_mean_vix = if (self.params.market_vol_vix_news != 0.0 || quote_share != 0.0)
+            && pins_today & PIN_VIX == 0
+        {
             Some(crate::economy::daily::project_close_state(&self.economy, &inputs).vix)
         } else {
             None
@@ -9242,8 +9254,24 @@ impl Engine {
             let vix = self.economy.vix;
             if vix > 0.0 && mean_vix > 0.0 {
                 let u = crate::mathx::log(vix / mean_vix);
-                let m = crate::mathx::exp(2.0 * self.params.market_vol_vix_news * u);
-                self.market_vol.scale_variance(&self.params, m);
+                // Under the transient quote the state keeps the persistent
+                // part of the innovation and the quote takes the rest, which
+                // decays at its own persistence; the news reads the state's.
+                let u_state = if quote_share != 0.0 {
+                    let kept = (1.0 - quote_share) * u;
+                    self.economy.vix = crate::mathx::max(
+                        crate::params::VIX_STATE_FLOOR,
+                        crate::mathx::min(self.params.vix_ceiling, mean_vix * crate::mathx::exp(kept)));
+                    self.vix_quote_transient = self.params.vix_quote_transient_persistence
+                        * self.vix_quote_transient + quote_share * u;
+                    kept
+                } else {
+                    u
+                };
+                if self.params.market_vol_vix_news != 0.0 {
+                    let m = crate::mathx::exp(2.0 * self.params.market_vol_vix_news * u_state);
+                    self.market_vol.scale_variance(&self.params, m);
+                }
             }
         }
         // The host's premium on the target (`set_vix_target_premium`), read
@@ -9258,6 +9286,11 @@ impl Engine {
         if let Some(h) = &held {
             let e = &mut self.economy;
             if pins_today & PIN_VIX != 0 { e.vix = h.vix; }
+            // A pinned VIX is the quote itself: nothing transient stands on
+            // it (`vix_quote_transient_share`).
+            if pins_today & PIN_VIX != 0 && self.params.vix_quote_transient_share != 0.0 {
+                self.vix_quote_transient = 0.0;
+            }
             if pins_today & PIN_POLICY != 0 { e.federal_funds_rate = h.federal_funds_rate; }
             if pins_today & PIN_INFLATION != 0 { e.inflation_rate = h.inflation_rate; }
             if pins_today & PIN_GROWTH != 0 { e.gdp_growth = h.gdp_growth; }
@@ -10487,7 +10520,41 @@ impl Engine {
     /// `vix_stress_premium` and never above `vix_ceiling`; the state itself,
     /// bit for bit, with the dial at 0.0, which every preset carries.
     pub fn published_vix(&self) -> f64 {
-        self.published_vix_at(self.economy.vix, self.vix_stress_memory)
+        let quote = self.published_vix_at(self.economy.vix, self.vix_stress_memory);
+        if self.params.vix_quote_transient_share == 0.0 {
+            quote
+        } else {
+            self.vix_quote_transient_at(quote, 0)
+        }
+    }
+
+    /// A quote times the transient part's expectation `closes` closes on,
+    /// `exp(rho^closes q)`, never above `vix_ceiling`
+    /// (`vix_quote_transient_share`). Read only with the share set.
+    pub(crate) fn vix_quote_transient_at(&self, quote: f64, closes: usize) -> f64 {
+        let q = if closes == 0 {
+            self.vix_quote_transient
+        } else {
+            self.vix_quote_transient
+                * crate::mathx::pow(self.params.vix_quote_transient_persistence, closes as f64)
+        };
+        crate::mathx::min(self.params.vix_ceiling, quote * crate::mathx::exp(q))
+    }
+
+    /// Whether this engine's model carries the transient quote, which is when
+    /// the snapshot and the state hash carry it: only with
+    /// `vix_quote_transient_share` non-zero, which no preset sets.
+    pub fn carries_vix_quote_transient(&self) -> bool {
+        self.params.vix_quote_transient_share != 0.0
+    }
+
+    /// The quote's transient part in log units; 0.0 with the share off.
+    pub fn vix_quote_transient(&self) -> f64 {
+        self.vix_quote_transient
+    }
+
+    pub fn set_vix_quote_transient(&mut self, value: f64) {
+        self.vix_quote_transient = value;
     }
 
     /// The quote [`Engine::published_vix`] makes of a VIX state `vix` with
@@ -11582,14 +11649,24 @@ impl Engine {
             // same step's VIX half, with the yields left at 0.0.
             let vix = crate::economy::daily::vix_close(
                 &self.economy, &inputs, 0.0, &mut crate::economy::daily::MeanDraws);
-            return [0.0, 0.0, 0.0, self.published_vix_at(vix, stress)];
+            let quote = self.published_vix_at(vix, stress);
+            let quote = if self.params.vix_quote_transient_share == 0.0 {
+                quote
+            } else {
+                self.vix_quote_transient_at(quote, 1)
+            };
+            return [0.0, 0.0, 0.0, quote];
         }
         let next = crate::economy::daily::project_close_state(&self.economy, &inputs);
         [
             next.treasury_yield_2y,
             next.treasury_yield_10y,
             next.corporate_bond_yield,
-            self.published_vix_at(next.vix, stress),
+            if self.params.vix_quote_transient_share == 0.0 {
+                self.published_vix_at(next.vix, stress)
+            } else {
+                self.vix_quote_transient_at(self.published_vix_at(next.vix, stress), 1)
+            },
         ]
     }
 
@@ -13177,6 +13254,12 @@ impl Engine {
             for value in words {
                 hash_f64(&mut buf, value);
             }
+        }
+        // The transient quote, only while `vix_quote_transient_share` is set,
+        // behind its own tag (60).
+        if self.carries_vix_quote_transient() {
+            hash_f64(&mut buf, 60.0);
+            hash_f64(&mut buf, self.vix_quote_transient);
         }
         // Core inflation's trend, only while `core_trend_sd` is set, behind
         // its own tag (57: 56 is the r* process's on ptv22/rstar-process).

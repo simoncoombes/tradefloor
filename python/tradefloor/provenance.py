@@ -684,6 +684,16 @@ OUT_OF_SCOPE = {
     "forecast_readback_correlation":
         "unread while `forecast_readback_dispersion` is 0.0; measured with "
         "it; at 0.0 it is also left out of the model's digest",
+    "vix_quote_transient_share":
+        "inert at 0.0: the close splits nothing, the quote is the state's and "
+        "no state is kept (a branch on the dial in `Engine::advance_day` and "
+        "`Engine::published_vix`), nothing is snapshotted or hashed; off zero "
+        "its value is the tape's two-pole innovation split, no constant "
+        "fitted; at 0.0 it is also left out of the model's digest",
+    "vix_quote_transient_persistence":
+        "unread while `vix_quote_transient_share` is 0.0; off zero the tape's "
+        "fast pole of log VIX; at 0.0 it is also left out of the model's "
+        "digest",
     "forecast_vix_level_path":
         "unread while `forecast_horizon_sessions` is 0.0, as every preset "
         "ships it; off zero a switch whose expectation is the slow level's "

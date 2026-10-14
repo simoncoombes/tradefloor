@@ -280,6 +280,8 @@ PARAM_SPECS: dict[str, dict] = {
     "forecast_readback_dispersion_first": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 2.0), "derived": True},
     "forecast_readback_correlation": {"kind": "abs", "step_unit": 0.05, "hard_range": (-1.0, 1.0), "derived": True},
     "forecast_vix_level_path": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0)},
+    "vix_quote_transient_share": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 0.99)},
+    "vix_quote_transient_persistence": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 0.99)},
     "vix_stress_premium_undo": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0)},
     # The VIX's fear memory: the share of the VIX's excursion over its target
     # taken up each session, and the memory's half-life in sessions. Each hard

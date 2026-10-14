@@ -1190,7 +1190,13 @@ impl Engine {
                 faces_e = (clamp(faces_e.0 * news_e), clamp(faces_e.1 * news_e));
             }
 
-            out.vix.push(self.forecast_published_vix(&shape, econ.vix, stress, stress_sd, step + 1));
+            let quote = self.forecast_published_vix(&shape, econ.vix, stress, stress_sd, step + 1);
+            // The transient quote's expected decay (`vix_quote_transient_share`).
+            out.vix.push(if p.vix_quote_transient_share == 0.0 {
+                quote
+            } else {
+                self.vix_quote_transient_at(quote, step + 1)
+            });
             // `oil_forecast_clamp`: publish the expectation truncated at the
             // clamps over the price's spread; the recursion keeps stepping
             // the unclamped expectation, so the clamp is read once.

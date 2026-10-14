@@ -171,6 +171,9 @@ CASES = {
                       ("futures", "derivatives_rng"), (), ("night_bridge",), {}),
     # The VIX's fear memory, carried whenever its switch is set.
     "vix_fear": (dict(vix_fear_uptake=0.2, vix_fear_half_life=20.0), ("vix_fear",), (), (), {}),
+    # The transient quote, carried whenever its share is set.
+    "vix_quote_transient": (dict(vix_quote_transient_share=0.81, vix_quote_transient_persistence=0.942),
+                            ("vix_quote_transient",), (), (), {}),
     # The VIX futures, carried whenever their switch is set.
     "vix_futures": (dict(forecast_horizon_sessions=126.0, futures_vix_listed=1.0), ("vix_futures",), (), (), {}),
     # The rate futures, carried whenever their switch is set.

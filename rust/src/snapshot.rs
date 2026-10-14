@@ -1631,6 +1631,11 @@ impl Engine {
         if self.carries_vix_fear() {
             out.put("vix_fear", V::Float(self.vix_fear()));
         }
+        // The transient quote, a key only while `vix_quote_transient_share`
+        // is set.
+        if self.carries_vix_quote_transient() {
+            out.put("vix_quote_transient", V::Float(self.vix_quote_transient()));
+        }
         // The VIX futures (`futures_vix_listed`): their numbers, and their
         // book once an agent has traded one.
         if let Some(words) = self.vix_futures_words() {
@@ -2046,6 +2051,7 @@ impl Engine {
             Gated::held("futures_book", "futures_index_listed", p.futures_index_listed),
             Gated::held("night_bridge", "night_session_steps", p.night_session_steps),
             Gated::dial("vix_fear", "vix_fear_uptake", p.vix_fear_uptake),
+            Gated::dial("vix_quote_transient", "vix_quote_transient_share", p.vix_quote_transient_share),
             Gated::dial("vix_futures", "futures_vix_listed", p.futures_vix_listed),
             Gated::held("vix_futures_book", "futures_vix_listed", p.futures_vix_listed),
             Gated::dial("rate_futures", "futures_rates_listed", p.futures_rates_listed),
@@ -2745,6 +2751,11 @@ impl Engine {
         // is set, which the key check above has held it to.
         if inner.carries_vix_fear() {
             inner.set_vix_fear(read_finite(snapshot, "", "vix_fear")?);
+        }
+        // The transient quote (`vix_quote_transient_share`): required while the
+        // share is set.
+        if inner.carries_vix_quote_transient() {
+            inner.set_vix_quote_transient(read_finite(snapshot, "", "vix_quote_transient")?);
         }
         // The VIX futures (`futures_vix_listed`): required while the switch
         // is set, which the key check above has held them to.
