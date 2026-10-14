@@ -1441,6 +1441,8 @@ PERTURBATIONS = [
     # Credit's own state: its opening draw moves the meeting's corporate
     # re-anchor, and with it the discount rate.
     ("corporate_spread_noise_sd", 0.025, True),
+    # INERT: read only by a VIX pin; the probe pins nothing.
+    ("pinned_vix_sets_variance", 1.0, False),
     # INERT: the half-life alone is read by nothing (the sd is 0).
     ("corporate_spread_noise_half_life", 16.0, False),
     # The market's fall in the cycle's hazard (sim/r17-b12). Carries its

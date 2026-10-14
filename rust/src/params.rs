@@ -2256,6 +2256,32 @@ pub struct ModelParams {
     /// r17sf1s1). Read only with `pinned_vix_feedback` on and below 1.0. In [0,
     /// 1]. pt-v21 ships 1.0.
     pub pinned_vix_priced_cap: f64,
+    /// A switch: every VIX a caller pins sets the market factor's variance,
+    /// as a scenario's `vix_sets_variance` does. 0.0, on every shipped
+    /// preset, leaves a pin to reach the variance one GARCH step a close,
+    /// as it stood, and a value of 0.0 is left out of the model's digest.
+    ///
+    /// Off zero, `pin_macro(vix=...)` marks tonight's close FORCED whatever
+    /// its `vix_sets_variance` argument says, so the close sets both
+    /// variance components to the law's fixed point at the pinned VIX
+    /// (`MarketVarianceState::close_day_forced`) and the next session trades
+    /// at it. Free sessions are untouched, and the first free close after a
+    /// pin starts from the level the last pin left. No draw is taken and no
+    /// state is added. In [0, 1].
+    ///
+    /// Why. Stepped one session at a time, a pinned path's variance lags the
+    /// VIX it states by weeks: the slow component (a half-life near 80
+    /// sessions) holds a crash's variance after the pinned VIX has come
+    /// down, and it reaches a spike late. On the driven 2020-21 replay (the
+    /// real VIX pinned every session, 12 held-out seeds) realized
+    /// volatility ran 29, 39 and 47 per cent at pinned VIX levels of 20-25,
+    /// 25-30 and 30-40, against the S&P 500's 13, 23 and 29 over the same
+    /// months, and 49 per cent at 60-100 against 80. Set by every pin it
+    /// read 18, 24, 35, 67 and 75 per cent across the five levels (S&P 500
+    /// 13, 23, 29, 74 and 80); the index's fall within 60 sessions of the
+    /// February high read 0.32 (S&P 500 0.34, stepped 0.27) and its
+    /// drawdown over the path 0.33 (0.34, stepped 0.38).
+    pub pinned_vix_sets_variance: f64,
     /// A ceiling on the annual buyback yield `buyback_payout_share * eps /
     /// price` that the buyback term compounds over the elapsed years. In
     /// [0, 1], and 0.0 means no ceiling.
@@ -8305,6 +8331,7 @@ impl ModelParams {
             pinned_vix_calm_knee: 0.0,
             pinned_vix_calm_share: 0.0,
             pinned_vix_priced_cap: 0.0,
+            pinned_vix_sets_variance: 0.0,
             buyback_yield_cap: 0.0,
             buyback_accrual: 0.0,
             rate_close_remark: 0.0,
@@ -10950,6 +10977,7 @@ impl ModelParams {
             "pinned_vix_calm_knee" => self.pinned_vix_calm_knee,
             "pinned_vix_calm_share" => self.pinned_vix_calm_share,
             "pinned_vix_priced_cap" => self.pinned_vix_priced_cap,
+            "pinned_vix_sets_variance" => self.pinned_vix_sets_variance,
             "buyback_yield_cap" => self.buyback_yield_cap,
             "buyback_accrual" => self.buyback_accrual,
             "rate_close_remark" => self.rate_close_remark,
@@ -11360,6 +11388,7 @@ impl ModelParams {
             "pinned_vix_calm_knee" => out.pinned_vix_calm_knee = value,
             "pinned_vix_calm_share" => out.pinned_vix_calm_share = value,
             "pinned_vix_priced_cap" => out.pinned_vix_priced_cap = value,
+            "pinned_vix_sets_variance" => out.pinned_vix_sets_variance = value,
             "buyback_yield_cap" => out.buyback_yield_cap = value,
             "buyback_accrual" => out.buyback_accrual = value,
             "rate_close_remark" => out.rate_close_remark = value,
@@ -12085,6 +12114,12 @@ impl ModelParams {
             return Err(format!(
                 "pinned_vix_priced_cap is {}. It is a switch, in [0, 1].",
                 self.pinned_vix_priced_cap));
+        }
+        if !(self.pinned_vix_sets_variance == 0.0 || self.pinned_vix_sets_variance == 1.0) {
+            return Err(format!(
+                "pinned_vix_sets_variance is {}. It is a switch: 0 (a pin reaches the variance one \
+                 step a close) or 1 (every pin sets it, as vix_sets_variance does).",
+                self.pinned_vix_sets_variance));
         }
         if !(self.market_vol_slow_gamma >= 0.0 && self.market_vol_slow_gamma <= 1.0) {
             return Err(format!(
@@ -13498,6 +13533,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "pinned_vix_calm_share",
     "pinned_vix_feedback",
     "pinned_vix_priced_cap",
+    "pinned_vix_sets_variance",
     "pinned_vix_variance_share",
     "policy_anticipation",
     "policy_anticipation_cut_share",
@@ -13834,6 +13870,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "pinned_vix_calm_knee",
         "pinned_vix_calm_share",
         "pinned_vix_priced_cap",
+        "pinned_vix_sets_variance",
         "buyback_yield_cap",
         "buyback_accrual",
         "rate_close_remark",

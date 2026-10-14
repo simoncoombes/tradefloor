@@ -125,6 +125,14 @@ same with them on as off.
   `usd_crisis_vix_threshold` (0.0 the standing 0.05), read by the dollar's
   step and by the forecast's expected bid. FRED DTWEXM against CBOE's VIX
   measures 0.001.
+- `pinned_vix_sets_variance` is a new switch, 0.0 on every preset and left
+  out of the digest there: under it every VIX a caller pins sets the market
+  factor's variance to the law's level at that VIX, as a scenario's
+  `vix_sets_variance` already could, instead of stepping one session toward
+  it. Free sessions are unchanged. Stepped, a pinned path's variance lagged
+  the VIX it stated by weeks: replaying the real 2020-21 VIX, realized
+  volatility ran about twice the S&P 500's once the VIX was back at 20-40,
+  and short of it at the March peak.
 - `corporate_spread_noise_sd` and `corporate_spread_noise_half_life` are new
   dials, 0.0 on every preset and left out of the digest there: off zero
   credit carries its own state, an AR(1) stepped every session on its own

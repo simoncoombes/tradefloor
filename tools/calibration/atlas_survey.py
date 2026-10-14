@@ -707,6 +707,8 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "corporate_spread_equity_lag": (0.0, 21.0),
     # Credit's own state: off to twice addendum L's sd; half-life off to a year.
     "corporate_spread_noise_sd": (0.0, 0.05),
+    # Every pin sets the variance: a switch.
+    "pinned_vix_sets_variance": (0.0, 1.0),
     "corporate_spread_noise_half_life": (0.0, 252.0),
     "cycle_rate_hazard": (0.0, 0.1),
     "core_trend_persistence": (0.0, 0.998),
