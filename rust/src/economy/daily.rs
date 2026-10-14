@@ -360,6 +360,15 @@ pub struct DailyInputs<'a> {
     /// `usd_crisis_vix_threshold`; 0.0 is the standing
     /// [`USD_SAFE_HAVEN_GAIN`]. See `ModelParams::usd_safe_haven_gain`.
     pub usd_safe_haven_gain: f64,
+    /// Whether the month-start step keeps the oil pass-through's part of
+    /// headline (`EconomyState::oil_inflation_level`): true while
+    /// `fed_core_inflation` or `treasury_core_inflation` is set.
+    pub oil_inflation_tracked: bool,
+    /// Core inflation's slow trend (`ModelParams::core_trend_sd`), points
+    /// over the 2.0 target: the month-start step closes headline's gap to
+    /// `2.0 + core_trend` instead of 2.0. 0.0, with the dial off, is the
+    /// target that stood.
+    pub core_trend: f64,
     /// The oil price's bounds, dollars; 0.0 is the standing 35 and 150. See
     /// `ModelParams::oil_price_floor`.
     pub oil_price_floor: f64,
@@ -442,6 +451,18 @@ pub struct YieldDials {
     /// 20 while inflation is under 4. See
     /// [`crate::params::ModelParams::treasury_haven_gain`].
     pub haven_gain: f64,
+    /// A switch: 1.0 has the term premium, the haven's gate and the flight
+    /// to quality's sign read core inflation, headline less
+    /// `EconomyState::oil_inflation_level`. See
+    /// [`crate::params::ModelParams::treasury_core_inflation`].
+    pub core_inflation: f64,
+    /// The unmet Fed put the curve prices at the zero bound, percentage
+    /// points off the 10-year's anchor and the 2-year's formula
+    /// (`treasury_zlb_path`); 0.0 is none.
+    pub zlb_path: f64,
+    /// The term premium's fall per VIX point above 20 at the zero bound
+    /// (`treasury_zlb_haven_gain`); 0.0 is none.
+    pub zlb_haven_gain: f64,
     /// The share of the VIX slope taken out of the corporate spread's
     /// formula. See [`crate::params::ModelParams::corporate_spread_vix_cut`].
     pub spread_vix_cut: f64,
@@ -453,6 +474,15 @@ pub struct YieldDials {
     /// [`crate::params::ModelParams::corporate_spread_equity_half_life`].
     /// Read only with `spread_equity_gain` set.
     pub spread_equity_decay: f64,
+    /// The priced gap's one-session keep, `0.5^(1/H)` with H
+    /// [`crate::params::ModelParams::corporate_spread_equity_lag`]; 0.0 is
+    /// off, the spread reading the gap itself. Read only with
+    /// `spread_equity_gain` set.
+    pub spread_priced_keep: f64,
+    /// Credit's own state before and after tonight's step, points of the
+    /// spread formula's base ([`crate::params::ModelParams::corporate_spread_noise_sd`]);
+    /// `None`, on every preset, is no state.
+    pub spread_noise: Option<(f64, f64)>,
 }
 
 /// The largest move the corporate yield takes in one session under
@@ -482,6 +512,10 @@ pub const TREASURY_NEUTRAL_RATE: f64 = 2.5;
 /// The Treasury haven's cut to the 10-year's term premium: `gain` points per
 /// VIX point above [`TREASURY_HAVEN_VIX`]. Read by the daily anchor and by
 /// the meeting's 10-year target, only with `treasury_haven_gain` set.
+/// The funds rate at or below which the economy is at the zero bound for
+/// `treasury_zlb_haven_gain`: the QE condition's 0.25.
+pub const ZLB_RATE: f64 = 0.25;
+
 pub fn haven_term_cut(gain: f64, vix: f64) -> f64 {
     gain * mathx::max(0.0, vix - TREASURY_HAVEN_VIX)
 }
@@ -504,9 +538,14 @@ impl Default for YieldDials {
             priced_anticipation: 0.0,
             rate_damping: 0.0,
             haven_gain: 0.0,
+            core_inflation: 0.0,
+            zlb_path: 0.0,
+            zlb_haven_gain: 0.0,
             spread_vix_cut: 0.0,
             spread_equity_gain: 0.0,
             spread_equity_decay: 0.0,
+            spread_priced_keep: 0.0,
+            spread_noise: None,
         }
     }
 }
@@ -539,6 +578,8 @@ impl<'a> Default for DailyInputs<'a> {
             usd_mean_reversion: 0.0,
             usd_noise_sd: 0.0,
             usd_safe_haven_gain: 0.0,
+            oil_inflation_tracked: false,
+            core_trend: 0.0,
             oil_price_floor: 0.0,
             oil_price_ceiling: 0.0,
             oil_inflation_passthrough: 0.0,
@@ -1272,9 +1313,18 @@ fn close_yields(
     rng: &mut impl Rng,
 ) {
     // ── Treasury yields ───────────────────────────────────────────────────
+    // THE CURVE'S INFLATION (`treasury_core_inflation`): core, headline less
+    // the oil pass-through's part, for the term premium, the haven's gate
+    // and the flight to quality's sign. A branch: off, it is headline, the
+    // value every read below took.
+    let curve_inflation = if inputs.yields.core_inflation != 0.0 {
+        economy.inflation_rate - economy.oil_inflation_level
+    } else {
+        economy.inflation_rate
+    };
     let debt_premium = mathx::max(0.0, (economy.government_debt_to_gdp - 100.0) * 0.002);
     let term_premium_10y =
-        1.0 + mathx::max(0.0, (economy.inflation_rate - 2.0) * 0.3) + debt_premium;
+        1.0 + mathx::max(0.0, (curve_inflation - 2.0) * 0.3) + debt_premium;
     // THE TREASURY HAVEN (`treasury_haven_gain`): the term premium falls
     // with the VIX above 20 while inflation is under 4, so the 10-year
     // rallies through a stressed month in a low-inflation regime. Guarded,
@@ -1290,9 +1340,21 @@ fn close_yields(
     // (`rate_intraday_live`), so the projection carries the haven and the
     // priced put below.
     let term_premium_10y = if inputs.yields.haven_gain != 0.0
-        && economy.inflation_rate < crate::economy::central_bank::FED_PUT_INFLATION_CEILING
+        && curve_inflation < crate::economy::central_bank::FED_PUT_INFLATION_CEILING
     {
         term_premium_10y - haven_term_cut(inputs.yields.haven_gain, new_state.vix)
+    } else {
+        term_premium_10y
+    };
+    // THE ZERO BOUND'S COMPRESSION (`treasury_zlb_haven_gain`): with the
+    // funds rate at or below 0.25 the term premium falls a further `g` a VIX
+    // point above 20, under the haven's gate. Guarded: off, the premium is
+    // the expression above.
+    let term_premium_10y = if inputs.yields.zlb_haven_gain != 0.0
+        && new_state.federal_funds_rate <= ZLB_RATE
+        && curve_inflation < crate::economy::central_bank::FED_PUT_INFLATION_CEILING
+    {
+        term_premium_10y - haven_term_cut(inputs.yields.zlb_haven_gain, new_state.vix)
     } else {
         term_premium_10y
     };
@@ -1303,6 +1365,14 @@ fn close_yields(
         new_state.federal_funds_rate - inputs.yields.priced_put
     } else {
         new_state.federal_funds_rate
+    };
+    // THE UNMET PUT (`treasury_zlb_path`): the part of the put's ask the rate
+    // cannot deliver, priced too; outside the damped ladder, as the put is.
+    // Guarded, as above.
+    let fed_rate_for_10y = if inputs.yields.zlb_path != 0.0 {
+        fed_rate_for_10y - inputs.yields.zlb_path
+    } else {
+        fed_rate_for_10y
     };
     // THE PRICED PATH (`treasury_path_pricing`): the anchor, and the 2-year's
     // formula, read the rate the market expects the cycle to reach. Guarded,
@@ -1392,10 +1462,10 @@ fn close_yields(
     };
     let ftq_gain = inputs.yields.flight_to_quality_gain;
     if prev_mkt_ret.abs() > ftq_gate {
-        let bond_stock_yield_shift = if economy.inflation_rate > 4.0 {
+        let bond_stock_yield_shift = if curve_inflation > 4.0 {
             // Positive correlation: stocks down, yields up.
             -prev_mkt_ret * ftq_gain
-        } else if economy.inflation_rate < 3.0 {
+        } else if curve_inflation < 3.0 {
             // Flight to quality.
             prev_mkt_ret * ftq_gain
         } else {
@@ -1431,6 +1501,18 @@ fn close_yields(
         (economy.spread_equity_gap, g)
     } else {
         (0.0, 0.0)
+    };
+    // CREDIT'S REPRICING LAG (`corporate_spread_equity_lag`): the spread's
+    // leverage term reads the gap it has priced, which closes a share of
+    // its distance to the gap each session. No draw. Guarded, so with the
+    // lag at 0.0 the pair is the gap's own.
+    let (gap_before, gap_after) = if equity_gain != 0.0 && inputs.yields.spread_priced_keep != 0.0 {
+        let p = economy.spread_priced_gap;
+        let q = p + (1.0 - inputs.yields.spread_priced_keep) * (gap_after - p);
+        new_state.spread_priced_gap = q;
+        (p, q)
+    } else {
+        (gap_before, gap_after)
     };
 
     // THE CORPORATE YIELD BETWEEN MEETINGS. It was written only at a
@@ -1477,15 +1559,23 @@ fn close_yields(
         // sides of the change. A VIX pin takes the VIX out, not the index.
         // Guarded, so with both at 0.0 the expressions are the ones that
         // stood.
-        let spread_dials = inputs.yields.spread_vix_cut != 0.0 || equity_gain != 0.0;
+        //
+        // CREDIT'S OWN STATE (`corporate_spread_noise_sd`): its step tonight
+        // is added to the base beside the leverage term, on both sides of
+        // the change, so the level stays on the formula the meeting reads.
+        // Guarded, so with no state the expressions are the ones that stood.
+        let spread_noise = inputs.yields.spread_noise;
+        let spread_dials = inputs.yields.spread_vix_cut != 0.0 || equity_gain != 0.0 || spread_noise.is_some();
+        let base_term = |gap: f64, x: f64| if spread_noise.is_some() { equity_gain * gap + x } else { equity_gain * gap };
+        let (x_before, x_after) = spread_noise.unwrap_or((0.0, 0.0));
         let vix_term = if let Some((m0, m1)) = inputs.yields.spread_multiplier {
             let vix_close = if inputs.yields.vix_pinned { economy.vix } else { new_state.vix };
             if spread_dials {
                 let cut = inputs.yields.spread_vix_cut;
                 crate::economy::central_bank::spread_formula_with(
-                    vix_close, m1, cut, equity_gain * gap_after)
+                    vix_close, m1, cut, base_term(gap_after, x_after))
                     - crate::economy::central_bank::spread_formula_with(
-                        economy.vix, m0, cut, equity_gain * gap_before)
+                        economy.vix, m0, cut, base_term(gap_before, x_before))
             } else {
                 crate::economy::central_bank::spread_formula(vix_close, m1)
                     - crate::economy::central_bank::spread_formula(economy.vix, m0)
@@ -1497,7 +1587,8 @@ fn close_yields(
                 0.02 * (1.0 - inputs.yields.spread_vix_cut)
                     * cycle_spread_multiplier * (new_state.vix - economy.vix)
             };
-            vix_part + equity_gain * cycle_spread_multiplier * (gap_after - gap_before)
+            let own = if spread_noise.is_some() { cycle_spread_multiplier * (x_after - x_before) } else { 0.0 };
+            vix_part + equity_gain * cycle_spread_multiplier * (gap_after - gap_before) + own
         } else if inputs.yields.vix_pinned {
             0.0
         } else {
@@ -1954,7 +2045,14 @@ pub fn update_economy_daily(
         );
 
         // ── Inflation ─────────────────────────────────────────────────────
-        let inflation_target = INFLATION_TARGET;
+        // CORE INFLATION'S TREND (`core_trend_sd`): headline closes its gap
+        // to the target plus the slow trend, the level a tape-fitted AR(1)
+        // carries core's persistence at. A branch: at 0.0 the target stood.
+        let inflation_target = if inputs.core_trend != 0.0 {
+            INFLATION_TARGET + inputs.core_trend
+        } else {
+            INFLATION_TARGET
+        };
         let inflation_mean_rev_coeff = inputs.inflation_reversion;
 
         // Positive real rates are contractionary.
@@ -2027,6 +2125,15 @@ pub fn update_economy_daily(
             inputs.inflation_floor,
             inputs.inflation_ceiling,
         );
+        // THE OIL PASS-THROUGH'S PART OF HEADLINE (`fed_core_inflation`,
+        // `treasury_core_inflation`): the term headline took from oil this
+        // month, on the part's own gap to 0.0 closed at headline's reversion.
+        // Headline less it is core. No draw; nothing runs with both off.
+        if inputs.oil_inflation_tracked {
+            new_state.oil_inflation_level = economy.oil_inflation_level
+                + (0.0 - economy.oil_inflation_level) * inflation_mean_rev_coeff
+                + oil_inflation_effect;
+        }
         new_state.core_inflation = clamp(
             economy.core_inflation + (new_state.inflation_rate - economy.core_inflation) * 0.3,
             -1.0,
@@ -4826,5 +4933,77 @@ mod macro_anchors {
         let down = at(66.0, 1.0) - at(81.0, 1.0);
         assert!((up - 0.15).abs() < 1e-9, "{up}");
         assert!((up + down).abs() < 1e-9, "{up} {down}");
+    }
+
+    /// `oil_inflation_level` (`fed_core_inflation`): untouched with the
+    /// tracker off; on, the month's pass-through term plus the part's own
+    /// gap to 0.0 closed at headline's reversion, and headline itself is the
+    /// headline the step takes either way.
+    #[test]
+    fn the_oil_part_of_headline_carries_the_pass_through_at_headlines_reversion() {
+        let mut e = economy();
+        e.oil_price = 121.0;
+        e.oil_inflation_level = 0.5;
+        let off = DailyInputs { oil_inflation_passthrough: 1.0, ..release() };
+        let on = DailyInputs { oil_inflation_tracked: true, ..off };
+        let (a, b) = (step(&e, off), step(&e, on));
+        assert_eq!(a.oil_inflation_level.to_bits(), 0.5f64.to_bits());
+        assert_eq!(a.inflation_rate.to_bits(), b.inflation_rate.to_bits());
+        let k = on.inflation_reversion;
+        let want = 0.5 + (0.0 - 0.5) * k + (121.0 - OIL_PASSTHROUGH_ANCHOR) * 0.01;
+        assert!((b.oil_inflation_level - want).abs() < 1e-12, "{} {want}", b.oil_inflation_level);
+    }
+
+    /// `treasury_zlb_path` and `treasury_zlb_haven_gain`: the unmet put
+    /// lowers the 10-year's anchor whole, so the close moves the yield by the
+    /// 5% pull's share of it; the zero bound's compression acts only with
+    /// the funds rate at or below 0.25.
+    #[test]
+    fn the_zero_bound_pieces_lower_the_ten_year() {
+        let mut e = economy();
+        e.federal_funds_rate = 0.0;
+        e.vix = 40.0;
+        let ten = |e: &EconomyState, z: f64, g: f64| {
+            let mut i = DailyInputs::default();
+            i.yields.zlb_path = z;
+            i.yields.zlb_haven_gain = g;
+            step(e, i).treasury_yield_10y
+        };
+        let base = ten(&e, 0.0, 0.0);
+        assert!(((base - ten(&e, 1.0, 0.0)) - 0.05).abs() < 1e-9, "{}", base - ten(&e, 1.0, 0.0));
+        assert!(ten(&e, 0.0, 0.05) < base - 1e-6);
+        let mut off = e.clone();
+        off.federal_funds_rate = 2.0;
+        assert_eq!(ten(&off, 0.0, 0.05).to_bits(), ten(&off, 0.0, 0.0).to_bits());
+    }
+
+    /// `treasury_core_inflation`: the flight to quality's sign reads core.
+    /// Headline at 3.5 with 1.0 of it oil: off, the 3-4 band takes no shift;
+    /// on, core 2.5 takes the flight to quality, the 10-year falling with
+    /// the index.
+    #[test]
+    fn the_curve_reads_core_under_its_switch() {
+        let mut e = economy();
+        e.inflation_rate = 3.5;
+        e.oil_inflation_level = 1.0;
+        let y = |core: f64| {
+            let mut i = DailyInputs { market_day_return_pct: -3.0, ..Default::default() };
+            i.yields.flight_to_quality_gain = 0.05;
+            i.yields.flight_to_quality_day = 1.0;
+            i.yields.core_inflation = core;
+            step(&e, i).treasury_yield_10y
+        };
+        let mut f = e.clone();
+        f.oil_inflation_level = 0.0;
+        f.inflation_rate = 2.5;
+        let y_core_headline = {
+            let mut i = DailyInputs { market_day_return_pct: -3.0, ..Default::default() };
+            i.yields.flight_to_quality_gain = 0.05;
+            i.yields.flight_to_quality_day = 1.0;
+            step(&f, i).treasury_yield_10y
+        };
+        assert!(y(1.0) < y(0.0) - 0.1, "{} {}", y(1.0), y(0.0));
+        // On, the curve's arithmetic is headline-off's at core.
+        assert_eq!(y(1.0).to_bits(), y_core_headline.to_bits());
     }
 }

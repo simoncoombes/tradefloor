@@ -125,6 +125,87 @@ same with them on as off.
   `usd_crisis_vix_threshold` (0.0 the standing 0.05), read by the dollar's
   step and by the forecast's expected bid. FRED DTWEXM against CBOE's VIX
   measures 0.001.
+- `corporate_spread_noise_sd` and `corporate_spread_noise_half_life` are new
+  dials, 0.0 on every preset and left out of the digest there: off zero
+  credit carries its own state, an AR(1) stepped every session on its own
+  keyed draws (no stream moves) and opened from its stationary distribution,
+  added to the spread formula's base beside the leverage term in the close's
+  corporate move, the meeting's re-anchor and the prehistory carry. Without
+  it the spread is nearly an equity echo: the part of its change the index
+  does not explain is half the IG closing-price spread's (LQD less IEF on
+  SPY, 2015-2025) from a session to a quarter.
+- `corporate_spread_equity_lag` is a new dial, 0.0 on every preset and left
+  out of the digest there: a half-life in sessions at which the gap the
+  corporate spread prices follows credit's leverage gap, so the spread
+  reprices an equity move over weeks rather than on the day. Read only with
+  `corporate_spread_equity_gain` set; the cycle's equity hazard keeps the
+  gap itself. The tape's spread beta on the index builds from -0.47 bp per 1%
+  over a session to -2.3 over a month (FRED BAA10Y, 1990-2025); with the gap
+  read whole the model's is -2.2 at every horizon.
+- `fed_eve_decision` is a new switch, 0.0 on every preset and left out of the
+  digest there: at 1 a scheduled meeting delivers the decision the Fed's own
+  reading implied at the eve's close (the decision the market priced), after
+  the ladder's and the put's draws; emergency meetings are untouched. The
+  model's scheduled-decision surprise falls from 9-12 bp to about 5 (tape
+  4.8, Bauer and Swanson 2022).
+- `treasury_path_owed_excluded` is a new switch, 0.0 on every preset and
+  left out of the digest there: under `treasury_path_anticipated` the
+  meeting's path step leaves out the put's owed step, which in the legacy
+  `dff + owed` offsets the put's extra cut and under the anticipated path
+  priced the give-back on the day of the cut.
+- `cycle_inflation_hazard` and `cycle_rate_hazard` are new dials, 0.0 on
+  every preset and left out of the digest there: the monthly peak hazard an
+  expansion adds with inflation above 4 and with the funds rate above 5
+  (0.0 the legacy 0.1 each). NBER peaks 1962-2025 on the two conditions and
+  the ladder's inversion term measure +0.022 and +0.001.
+- `core_trend_sd` and `core_trend_persistence` are new dials, 0.0 on every
+  preset and left out of the digest there: off zero headline inflation's
+  month-start step reverts to 2.0 plus a slow AR(1) trend (monthly
+  persistence and innovation sd, stepped at the month start on its own keyed
+  draws so no stream moves, opened from its stationary distribution), so
+  core carries the tape's persistent regimes. Fitted to FRED CPILFESL
+  year-on-year 1990-2025 about 2.0: 0.993 and 0.170.
+- `policy_anticipation_guidance` is a new dial, 0.0 on every preset and left
+  out of the digest there: the share of the anticipated meeting's priced
+  change taken from the decision the Fed's own reading implies rather than
+  the published economy's. The tape's policy surprise at scheduled FOMC
+  announcements has an sd of 4.8 bp (Bauer and Swanson 2022).
+- `treasury_path_anticipated` is a new switch, 0.0 on every preset and left
+  out of the digest there: at 1 a meeting moves the priced policy path by
+  the further move the anticipated meeting priced, not by the rate's change,
+  so a rate surprise reaches the curve once.
+- `policy_anticipation_half_life` is a new dial, 0.0 on every preset and left
+  out of the digest there: between meetings the anticipated meeting's priced
+  change moves toward the shadow meeting's at this half-life, in sessions,
+  rather than jumping to it each close. DGS2 off the zero bound: FOMC days
+  carry 0.046 of the variance, the other days' sd is 6.16 bp.
+- `treasury_2y_meeting_carry` is a new dial, 0.0 on every preset and left
+  out of the digest there: the share of the 2-year's standing gap to the
+  meeting's formula (`0.85 (ff + path) + 0.15 x 10y`) that a meeting keeps.
+  At 1.0 the meeting moves the 2-year by 0.85 of the decision's news and
+  0.15 of the 10-year's move instead of resetting it. FOMC days carry 0.046
+  of DGS2's daily variance off the zero bound (1994-2025).
+- `fed_neutral_real_rate` is a new dial, 0.0 on every preset and left out of
+  the digest there: points added to the neutral rate of the central bank's
+  Taylor rule, whose neutral at target is a nominal 2.0 (a real rate of 0).
+  The Holston-Laubach-Williams US natural rate averaged 2.0 over 1990-2025.
+- `treasury_zlb_path` and `treasury_zlb_haven_gain` are new dials, 0.0 on
+  every preset and left out of the digest there. At the zero bound the curve
+  prices the part of the Fed put's ask the rate cannot deliver (tonight's and
+  each meeting's, decaying at the priced path's half-life, carried as
+  `zlb_unmet` only with the dial on), and the term premium falls a further
+  amount per VIX point above 20. Kim and Wright's decomposition of the
+  10-year in the 2008-2015 falls that began at the zero bound: expected path
+  -0.35, term premium -0.36, with the funds rate unchanged.
+- `fed_core_inflation` and `treasury_core_inflation` are new switches, 0.0
+  on every preset and left out of the digest there: the central bank, and the
+  Treasury curve (the 10-year's term premium, the haven's gate, the flight to
+  quality's sign), read core inflation in place of headline. Core is headline
+  less the oil pass-through's accumulated part, which the economy carries as
+  `oil_inflation_level` only with either switch on. FRED CPILFESL against
+  CPIAUCSL, 1990 to 2025: the funds rate loads on core and not on the gap,
+  and in index falls with headline at 3 or more and core under 3 the Fed cut
+  and the 10-year rallied as below 3.
 - `oil_price_floor` and `oil_price_ceiling` are new dials, 0.0 on every
   preset and left out of the digest there: oil's bounds, the standing 35
   and 150 at 0.0, read by the step and by the forecast's clamp.

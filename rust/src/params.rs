@@ -1103,6 +1103,274 @@ pub struct ModelParams {
     /// 0.087 (DTWEXM 0.071), and tilted the oil curve on the dollar's
     /// deviation by +0.10 against EIA's +0.014. In [0, 1].
     pub usd_safe_haven_gain: f64,
+    /// A switch: 1.0 has the central bank read core inflation where it read
+    /// headline. 0.0, on every shipped preset, reads headline as it stood,
+    /// and a value of 0.0 is left out of the model's digest.
+    ///
+    /// Core is headline less the oil pass-through's accumulated part
+    /// (`EconomyState::oil_inflation_level`): the monthly term
+    /// `oil_inflation_passthrough` adds to headline, decaying at the
+    /// headline's own `inflation_reversion`. So core keeps the second-round
+    /// effects (wages, the real-rate term), as CPI less food and energy
+    /// does. Read by the meeting (`update_central_bank_with`: the Taylor
+    /// rule, the ladder's cut-offs, the stress cut and hold, the put's
+    /// ceiling, the meeting cadence), the priced put and the intermeeting
+    /// meeting.
+    ///
+    /// FRED, 1990 to 2025: the funds rate's level loads on CPILFESL (0.74,
+    /// Newey-West se 0.38) and not on headline less core (-0.16, se 0.33);
+    /// over six months the gap's loading is -0.10 (0.13). In 63-session
+    /// index falls of 10% with headline at 3 or more and core under 3 (2000,
+    /// 2001, 2007, 2011) the Fed cut 0.85 points; with core at 3 or more
+    /// (1990, 2022) it raised 0.36. With headline read, an oil-driven
+    /// headline of 3 to 4 closed the cut branches in a fall.
+    pub fed_core_inflation: f64,
+    /// A switch: 1.0 has the Treasury curve read core inflation (as
+    /// `fed_core_inflation` defines it) where it read headline: the
+    /// 10-year's term premium, the haven's inflation gate and the flight to
+    /// quality's sign, at the close and at a meeting. 0.0, on every shipped
+    /// preset, reads headline as it stood, and a value of 0.0 is left out
+    /// of the model's digest.
+    ///
+    /// FRED and the S&P 500, 1990 to 2025: the monthly correlation of the
+    /// index's return with the 10-year's change is +0.28 in months with
+    /// headline at 3 to 4 and core under 3, as with both under 3 (+0.22),
+    /// and -0.35 with core at 3 to 4; the 10-year fell 0.65 points in index
+    /// falls with headline at 3 or more and core under 3, and rose 0.39 with
+    /// core at 3 or more; its level loads on neither core nor the gap given
+    /// the funds rate (the gap -0.06, se 0.12).
+    pub treasury_core_inflation: f64,
+    /// The share of the Fed put's unmet ask the curve prices at the zero
+    /// bound. 0.0, on every shipped preset, prices the put only up to the
+    /// rate, as it stood, and a value of 0.0 is left out of the model's
+    /// digest.
+    ///
+    /// The put asks for `fed_put_gain * max(0, -I - fed_put_threshold)` and
+    /// the curve prices it no further than the policy rate, so at the zero
+    /// bound a fall moves no expected easing at all. Off zero the 10-year's
+    /// anchor (and the 2-year's formula) is lowered also by
+    /// `k * treasury_put_pricing * (x + U)`: `x` the part of tonight's ask the
+    /// rate cannot deliver, `U` (`EconomyState::zlb_unmet`) each meeting's
+    /// unmet ask, decaying at `treasury_path_half_life`. It passes through
+    /// whole, as the put does. Kim and Wright's decomposition of the
+    /// 10-year (FRED THREEFY10, THREEFYTP10) in the 2008-2015 falls of 10%
+    /// that began at the zero bound: the expected path fell 0.35 (se 0.12)
+    /// with the funds rate unchanged. Needs `fed_put_gain` and
+    /// `treasury_path_pricing`. In [0, 20].
+    pub treasury_zlb_path: f64,
+    /// The term premium's fall per VIX point above 20 with the funds rate at
+    /// or below 0.25, beside `treasury_haven_gain`, at the close and in the
+    /// meeting's 10-year target, under the haven's inflation gate. 0.0, on
+    /// every shipped preset, is none, and a value of 0.0 is left out of the
+    /// model's digest. It stands for the haven bid and the asset purchases
+    /// when the bank cannot cut: Kim and Wright's term premium fell 0.36 (se
+    /// 0.13) in the 2008-2015 falls of 10% that began at the zero bound. In
+    /// [0, 1].
+    pub treasury_zlb_haven_gain: f64,
+    /// Points added to the neutral rate of the central bank's Taylor rule.
+    /// 0.0, on every shipped preset, is the neutral that stood, and a value
+    /// of 0.0 is left out of the model's digest.
+    ///
+    /// The rule's neutral is `2.0 + 0.5 (pi / pi* - 1)` (the JS formula):
+    /// at target a nominal 2.0, which is Taylor's (1993) r* of 2 without his
+    /// `+ pi` term, so the real rate it sets at target is 0. Off zero the
+    /// dial is added to it, and the meeting and the shadow meeting read the
+    /// result. The anchor is the Holston-Laubach-Williams US natural rate
+    /// (NY Fed, one-sided), whose mean over 1990Q1-2025Q4 is 2.0; through
+    /// the rule on FRED's core CPI and unemployment, DFF sits 1.69 over the
+    /// rule off the zero bound at 0.0 and 0.31 under it at 2.0. The
+    /// economy's own real-rate term (inflation's suppression above a real
+    /// rate of 0) is not moved. In [-2, 5].
+    pub fed_neutral_real_rate: f64,
+    /// The monthly innovation sd of core inflation's slow trend, points.
+    /// 0.0, on every shipped preset, is no trend (headline reverts to the
+    /// 2.0 target), and a value of 0.0 is left out of the model's digest.
+    ///
+    /// Off zero the month-start inflation step closes headline's gap to
+    /// `2.0 + tau` instead of 2.0, where `tau` follows an AR(1) at
+    /// `core_trend_persistence` a month, stepped on the economy's month
+    /// start on its own key (`GameRng::keyed(key, CORE_TREND_TAG, month)`,
+    /// so no stream moves) and opened at a draw from its stationary
+    /// distribution. Every push, the floor, the ceiling and the central
+    /// bank's 2.0 target stand; core is still headline less the oil part.
+    /// `tau` and its key are snapshotted and hashed only with this set.
+    /// Fitted to FRED CPILFESL year-on-year itself, monthly 1990-2025, by
+    /// exact ML about 2.0: phi 0.993, sigma 0.170 a month (a half-life of
+    /// 8.2 years, unconditional sd 1.44 against the series' 1.15; given
+    /// room, ML puts no weight on a fast component). Slower reversion of
+    /// headline itself is not the fit: it would integrate every monthly push
+    /// and the oil part (design PR #9, r22o5czN-B/inflation). In [0, 2].
+    pub core_trend_sd: f64,
+    /// The monthly persistence of core inflation's trend (`core_trend_sd`).
+    /// 0.0, on every shipped preset, is read by nothing, and a value of 0.0
+    /// is left out of the model's digest. In [0, 1].
+    pub core_trend_persistence: f64,
+    /// The monthly peak hazard an expansion adds with inflation above 4.
+    /// 0.0, on every shipped preset, is the legacy 0.1 (the JS ladder), and
+    /// a value of 0.0 is left out of the model's digest.
+    ///
+    /// Anchored on NBER peaks (FRED USREC) in expansion months 1962-2025, a
+    /// linear probability model on 1{headline CPI > 4}, 1{funds rate > 5}
+    /// and the ladder's own inversion term: +0.0219 a month (block-bootstrap
+    /// se 0.0133, 8 peaks); 1976-2025 on the 2-year spread +0.0159 (0.0337).
+    /// The legacy 0.1 rarely fired while inflation sat near 2; with
+    /// `core_trend_sd` it does (design PR #9, r22o5czN-B/inflation addendum
+    /// A). In [0, 0.5].
+    pub cycle_inflation_hazard: f64,
+    /// The monthly peak hazard an expansion adds with the funds rate above
+    /// 5. 0.0, on every shipped preset, is the legacy 0.1, and a value of
+    /// 0.0 is left out of the model's digest. The same fit: +0.0013 a month
+    /// (se 0.0087); 1976-2025 -0.0009 (0.0107). In [0, 0.5].
+    pub cycle_rate_hazard: f64,
+    /// A switch: 1.0 makes a scheduled central-bank meeting deliver the
+    /// decision the Fed's own reading implied at the eve's close, the
+    /// decision the market priced (`policy_anticipation_guidance`'s "own"
+    /// shadow). 0.0, on every shipped preset, is the meeting as it stood,
+    /// re-reading the day's economy, and a value of 0.0 is left out of the
+    /// model's digest.
+    ///
+    /// The eve's shadow equals the delivered decision at 80-87% of meetings;
+    /// the rest are reversals on stressed days that make a surprise sd of
+    /// 9-12 bp (design PR #9, r22o5czN-B/inflation addendum G), against
+    /// 4.8 bp for scheduled FOMC decisions off the zero bound, 1994-2019
+    /// (Bauer and Swanson 2022): scheduled decisions are signalled and the
+    /// blackout ends new input, and the response to a crash comes through
+    /// intermeeting action, which the emergency meeting and the put's
+    /// emergency still give. Applied after the ladder, the stress hold and
+    /// the put, before the announcement's draw, so every draw is taken where
+    /// it stood. The stored decision is snapshotted and hashed only with
+    /// this set. 0 or 1.
+    pub fed_eve_decision: f64,
+    /// A switch: with `treasury_path_anticipated` on, 1.0 leaves the Fed
+    /// put's owed step out of the meeting's path step, so the path moves by
+    /// the anticipation's further move alone. 0.0, on every shipped preset,
+    /// is the step that stood (`(a - 1) E + owed`), and a value of 0.0 is
+    /// left out of the model's digest.
+    ///
+    /// In the legacy step `dff + owed` the owed step offsets the put's extra
+    /// cut, so the path moves by the ladder's change; the anticipated path
+    /// replaced `dff` and kept `owed`, so every put cut raised the path by
+    /// the whole amount owed: on 12 histories the 2-year rose 35 to 48 bp on
+    /// the day of a put cut of 33 to 46 bp (design PR #9, r22o5czN-B/
+    /// inflation addendum H), against the tape's cut-day mean of -1.2 bp
+    /// (DGS2 on scheduled cuts off the zero bound, 1994-2025). Read only
+    /// with `treasury_path_anticipated` on. 0 or 1.
+    pub treasury_path_owed_excluded: f64,
+    /// Credit's repricing lag: the half-life, in sessions, at which the gap
+    /// the corporate spread prices (`EconomyState::spread_priced_gap`)
+    /// follows credit's leverage gap (`EconomyState::spread_equity_gap`).
+    /// Each close steps `P = P + (1 - 0.5^(1/H)) (D - P)`, and the spread's
+    /// equity term reads `P` wherever it read `D`: the close's daily move,
+    /// the meeting's re-anchor and the restore's re-mark. The cycle's equity
+    /// hazard keeps reading `D`. 0.0, on every shipped preset, is the spread
+    /// reading the gap itself, as it stood, and a value of 0.0 is left out of
+    /// the model's digest. Read only with `corporate_spread_equity_gain` set.
+    ///
+    /// The tape's spread reprices an equity move over weeks: the beta of
+    /// FRED BAA10Y's change on the S&P 500's log return, off the zero bound
+    /// 1990-2025, is -0.47 bp per 1% over one session (se 0.16), -0.91 over
+    /// five (0.29), -2.28 over 21 (0.66) and -2.51 over 63 (0.68); ICE BofA
+    /// IG OAS reads -0.65 a session over the 2023-2025 it publishes. With
+    /// the gap read whole the spread moves -2.2 a session at every horizon
+    /// and its daily correlation with the index is 0.89 against the tape's
+    /// 0.17 (design PR #9, r22o5czN-B/inflation addendum K). No draw. The
+    /// priced gap is snapshotted and hashed only with this set. In [0, 252].
+    pub corporate_spread_equity_lag: f64,
+    /// The per-session innovation sd of credit's own state, points of the
+    /// corporate spread's base. 0.0, on every shipped preset, is no state
+    /// (the spread moves only with the VIX, the cycle and the leverage gap),
+    /// and a value of 0.0 is left out of the model's digest.
+    ///
+    /// Off zero credit's state x follows an AR(1), `x' = phi x + sd z` with
+    /// `phi = 0.5^(1/H)`, H `corporate_spread_noise_half_life`, stepped once
+    /// a session on its own key (`GameRng::keyed(key, SPREAD_NOISE_TAG,
+    /// day)`, so no stream moves) and opened at a draw from its stationary
+    /// distribution. x is added to the spread formula's base before the
+    /// cycle multiplier wherever the leverage term is: the close's daily
+    /// move, the meeting's re-anchor and the prehistory carry. The spread
+    /// had almost none of its own movement: off the zero bound, the part of
+    /// its change the index does not explain has an sd of 1.36 bp a session,
+    /// 6.4 over 21 and 11.6 over 63 where the IG closing-price spread
+    /// (LQD's return less 0.913 IEF's at duration 8.5, on SPY, 2015-2025)
+    /// has 2.54, 11.5 and 16.7. The 21- and 63-session pair gives H 16 and
+    /// a stationary sd of 8.8 bp (design PR #9, r22o5czN-B/inflation
+    /// addendum L). x and its key are snapshotted and hashed only with this
+    /// set. In [0, 0.5].
+    pub corporate_spread_noise_sd: f64,
+    /// The half-life, sessions, of credit's own state
+    /// (`corporate_spread_noise_sd`). 0.0, on every shipped preset, is read
+    /// by nothing, and a value of 0.0 is left out of the model's digest.
+    /// With the sd set, 0.0 is no persistence (`phi` 0). In [0, 2520].
+    pub corporate_spread_noise_half_life: f64,
+    /// The share of the 2-year's standing gap to the meeting's formula that a
+    /// central-bank meeting keeps. 0.0, on every shipped preset, is the
+    /// meeting as it stood, and a value of 0.0 is left out of the model's
+    /// digest.
+    ///
+    /// The meeting sets the 2-year to `0.85 (ff + path) + 0.15 x 10y` (the JS
+    /// blend). Between meetings, with `treasury_2y_noise` on, the 2-year is
+    /// its own process pulled toward a formula that also prices the
+    /// anticipated decision, the put and the zero bound's path, so the reset
+    /// throws its standing gap away: off the bound on R22O5czN, meeting days
+    /// are 3% of sessions and carry 41% of the 2-year's variance. Off zero
+    /// the meeting's 2-year is `legacy + c (carried - legacy)`, with
+    /// `carried` the 2-year before the meeting moved by 0.85 of the
+    /// decision's news (the rate change, the put share the curve had priced
+    /// and the priced path's move, undamped) and 0.15 of the 10-year's move,
+    /// and the anticipated meeting's books carry what the 2-year keeps. The
+    /// anchor is the scheduled FOMC days' share of DGS2's daily variance off
+    /// the zero bound, 1994-2025: 0.046 (se 0.006) on 0.031 of sessions. In
+    /// [0, 1].
+    pub treasury_2y_meeting_carry: f64,
+    /// The half-life, in sessions, at which the curve's priced change for the
+    /// next meeting (`policy_anticipation`) moves toward the shadow meeting's
+    /// change between meetings. 0.0, on every shipped preset, is off: the
+    /// priced change is the shadow's every close, as it stood, and a value of
+    /// 0.0 is left out of the model's digest.
+    ///
+    /// The shadow meeting is one decision on thresholds, re-taken each close,
+    /// so it switches from close to close; at `policy_anticipation_cut_share`
+    /// 1 each switch moved the 2-year (other-day sd 9.8 bp against DGS2's 6.2
+    /// off the zero bound) and the meeting's eve priced one draw of it. Off
+    /// zero the priced change `P` moves toward `a w S` at `1 - 0.5^(1/H)` a
+    /// close, an average of the shadow's recent decisions; a meeting's close
+    /// sets it as it stood. No new state: `P` is already snapshotted and
+    /// hashed. Anchored on the scheduled FOMC days' share of DGS2's variance
+    /// (0.046) and its other days' sd (6.16 bp), 1994-2025 off the zero bound
+    /// (design PR #9, rates/RULE.md addendum C). In [0, 252].
+    pub policy_anticipation_half_life: f64,
+    /// A switch: 1.0 moves the priced policy path (`treasury_path_pricing`)
+    /// at a meeting by the further move the anticipated meeting priced
+    /// (`policy_anticipation` a: `P (a - 1) / a` of the eve's priced change
+    /// `P`) instead of by the rate's change. 0.0, on every shipped preset,
+    /// is the step that stood, and a value of 0.0 is left out of the model's
+    /// digest.
+    ///
+    /// The step put a rate surprise into the curve twice, through the rate
+    /// and again through the path (sd 20 bp at the step on R22O5czN, the 2-
+    /// year's meeting-day move 0.99 to 1.35 times the surprise). Off zero the
+    /// path moves with the anticipation and a surprise reaches the curve once.
+    /// Checked on the meeting-day 2-year move against DGS2's on scheduled
+    /// FOMC days off the zero bound, 1994-2025 (sd 7.1 bp). 0 or 1.
+    pub treasury_path_anticipated: f64,
+    /// The share of the anticipated meeting's priced change (`policy_
+    /// anticipation`) the market takes from the decision the Fed's own
+    /// reading implies, rather than from the published economy. 0.0, on
+    /// every shipped preset, prices the published shadow alone, as it stood,
+    /// and a value of 0.0 is left out of the model's digest.
+    ///
+    /// The meeting reads the true phase, growth and VIX; the shadow the
+    /// market prices reads the published ones, which differ on 48% of
+    /// meeting eves on R22O5czN, so the decision's surprise against the eve's
+    /// priced change has an sd of about 21 bp. Since 1994 the FOMC announces
+    /// its decisions and assessment, and the tape's surprise is small: the
+    /// current-quarter Eurodollar futures move in the 30-minute window of a
+    /// scheduled announcement, off the zero bound, has an sd of 4.8 bp
+    /// 1994-2019 (5.0 before 2008, 4.2 after; Bauer and Swanson, NBER
+    /// Macroeconomics Annual 2022). Off zero the shadow's change is
+    /// `(1 - q) S(published) + q S(the meeting's own economy)`, both silent
+    /// shadows. In [0, 1].
+    pub policy_anticipation_guidance: f64,
     /// The oil price's lower and upper bounds, dollars. 0.0, on every shipped
     /// preset, is the standing 35 and 150, and a value of 0.0 is left out of
     /// the model's digest.
@@ -7982,6 +8250,24 @@ impl ModelParams {
             usd_mean_reversion: 0.0,
             usd_noise_sd: 0.0,
             usd_safe_haven_gain: 0.0,
+            fed_core_inflation: 0.0,
+            treasury_core_inflation: 0.0,
+            treasury_zlb_path: 0.0,
+            treasury_zlb_haven_gain: 0.0,
+            fed_neutral_real_rate: 0.0,
+            core_trend_sd: 0.0,
+            core_trend_persistence: 0.0,
+            cycle_inflation_hazard: 0.0,
+            cycle_rate_hazard: 0.0,
+            fed_eve_decision: 0.0,
+            treasury_path_owed_excluded: 0.0,
+            corporate_spread_equity_lag: 0.0,
+            corporate_spread_noise_sd: 0.0,
+            corporate_spread_noise_half_life: 0.0,
+            treasury_2y_meeting_carry: 0.0,
+            policy_anticipation_half_life: 0.0,
+            treasury_path_anticipated: 0.0,
+            policy_anticipation_guidance: 0.0,
             oil_price_floor: 0.0,
             oil_price_ceiling: 0.0,
             oil_target_drift_reversion: 0.0,
@@ -10610,6 +10896,24 @@ impl ModelParams {
             "usd_mean_reversion" => self.usd_mean_reversion,
             "usd_noise_sd" => self.usd_noise_sd,
             "usd_safe_haven_gain" => self.usd_safe_haven_gain,
+            "fed_core_inflation" => self.fed_core_inflation,
+            "treasury_core_inflation" => self.treasury_core_inflation,
+            "treasury_zlb_path" => self.treasury_zlb_path,
+            "treasury_zlb_haven_gain" => self.treasury_zlb_haven_gain,
+            "fed_neutral_real_rate" => self.fed_neutral_real_rate,
+            "core_trend_sd" => self.core_trend_sd,
+            "core_trend_persistence" => self.core_trend_persistence,
+            "cycle_inflation_hazard" => self.cycle_inflation_hazard,
+            "cycle_rate_hazard" => self.cycle_rate_hazard,
+            "fed_eve_decision" => self.fed_eve_decision,
+            "treasury_path_owed_excluded" => self.treasury_path_owed_excluded,
+            "corporate_spread_equity_lag" => self.corporate_spread_equity_lag,
+            "corporate_spread_noise_sd" => self.corporate_spread_noise_sd,
+            "corporate_spread_noise_half_life" => self.corporate_spread_noise_half_life,
+            "treasury_2y_meeting_carry" => self.treasury_2y_meeting_carry,
+            "policy_anticipation_half_life" => self.policy_anticipation_half_life,
+            "treasury_path_anticipated" => self.treasury_path_anticipated,
+            "policy_anticipation_guidance" => self.policy_anticipation_guidance,
             "oil_price_floor" => self.oil_price_floor,
             "oil_price_ceiling" => self.oil_price_ceiling,
             "oil_target_drift_reversion" => self.oil_target_drift_reversion,
@@ -11003,6 +11307,24 @@ impl ModelParams {
             "usd_mean_reversion" => out.usd_mean_reversion = value,
             "usd_noise_sd" => out.usd_noise_sd = value,
             "usd_safe_haven_gain" => out.usd_safe_haven_gain = value,
+            "fed_core_inflation" => out.fed_core_inflation = value,
+            "treasury_core_inflation" => out.treasury_core_inflation = value,
+            "treasury_zlb_path" => out.treasury_zlb_path = value,
+            "treasury_zlb_haven_gain" => out.treasury_zlb_haven_gain = value,
+            "fed_neutral_real_rate" => out.fed_neutral_real_rate = value,
+            "core_trend_sd" => out.core_trend_sd = value,
+            "core_trend_persistence" => out.core_trend_persistence = value,
+            "cycle_inflation_hazard" => out.cycle_inflation_hazard = value,
+            "cycle_rate_hazard" => out.cycle_rate_hazard = value,
+            "fed_eve_decision" => out.fed_eve_decision = value,
+            "treasury_path_owed_excluded" => out.treasury_path_owed_excluded = value,
+            "corporate_spread_equity_lag" => out.corporate_spread_equity_lag = value,
+            "corporate_spread_noise_sd" => out.corporate_spread_noise_sd = value,
+            "corporate_spread_noise_half_life" => out.corporate_spread_noise_half_life = value,
+            "treasury_2y_meeting_carry" => out.treasury_2y_meeting_carry = value,
+            "policy_anticipation_half_life" => out.policy_anticipation_half_life = value,
+            "treasury_path_anticipated" => out.treasury_path_anticipated = value,
+            "policy_anticipation_guidance" => out.policy_anticipation_guidance = value,
             "oil_price_floor" => out.oil_price_floor = value,
             "oil_price_ceiling" => out.oil_price_ceiling = value,
             "oil_target_drift_reversion" => out.oil_target_drift_reversion = value,
@@ -12418,6 +12740,126 @@ impl ModelParams {
                  usd_crisis_vix_threshold, index points, in [0, 1]; 0 is the standing 0.05.",
                 self.usd_safe_haven_gain));
         }
+        if !(self.fed_core_inflation == 0.0 || self.fed_core_inflation == 1.0) {
+            return Err(format!(
+                "fed_core_inflation is {}. It is a switch: 0 (the central bank reads headline \
+                 inflation) or 1 (core: headline less the oil pass-through's accumulated part).",
+                self.fed_core_inflation));
+        }
+        if !(self.treasury_core_inflation == 0.0 || self.treasury_core_inflation == 1.0) {
+            return Err(format!(
+                "treasury_core_inflation is {}. It is a switch: 0 (the Treasury curve reads \
+                 headline inflation) or 1 (core: headline less the oil pass-through's accumulated \
+                 part).",
+                self.treasury_core_inflation));
+        }
+        if !(0.0..=20.0).contains(&self.treasury_zlb_path) {
+            return Err(format!(
+                "treasury_zlb_path is {}. It is the share of the Fed put's unmet ask the curve \
+                 prices at the zero bound, in [0, 20]; 0 prices the put up to the rate.",
+                self.treasury_zlb_path));
+        }
+        if self.treasury_zlb_path != 0.0
+            && (self.fed_put_gain == 0.0 || self.treasury_path_pricing == 0.0)
+        {
+            return Err(format!(
+                "treasury_zlb_path is {} with fed_put_gain {} and treasury_path_pricing {}. It \
+                 prices the put's unmet ask and decays it at the priced path's half-life, so it \
+                 needs both.",
+                self.treasury_zlb_path, self.fed_put_gain, self.treasury_path_pricing));
+        }
+        if !(0.0..=1.0).contains(&self.treasury_zlb_haven_gain) {
+            return Err(format!(
+                "treasury_zlb_haven_gain is {}. It is the term premium's fall per VIX point above \
+                 20 at the zero bound, in [0, 1].",
+                self.treasury_zlb_haven_gain));
+        }
+        if !(0.0..=1.0).contains(&self.policy_anticipation_guidance) {
+            return Err(format!(
+                "policy_anticipation_guidance is {}. It is the share of the priced change the \
+                 market takes from the Fed's own reading, in [0, 1]; 0 prices the published \
+                 shadow alone.",
+                self.policy_anticipation_guidance));
+        }
+        if !(self.treasury_path_anticipated == 0.0 || self.treasury_path_anticipated == 1.0) {
+            return Err(format!(
+                "treasury_path_anticipated is {}. It is a switch: 0 (the meeting steps the priced \
+                 path by the rate's change) or 1 (by the further move the anticipation priced).",
+                self.treasury_path_anticipated));
+        }
+        if !(0.0..=252.0).contains(&self.policy_anticipation_half_life) {
+            return Err(format!(
+                "policy_anticipation_half_life is {}. It is the half-life, in sessions, of the \
+                 priced change for the next meeting between meetings, in [0, 252]; 0 is the \
+                 shadow's change every close, as it stood.",
+                self.policy_anticipation_half_life));
+        }
+        if !(0.0..=1.0).contains(&self.treasury_2y_meeting_carry) {
+            return Err(format!(
+                "treasury_2y_meeting_carry is {}. It is the share of the 2-year's standing gap to \
+                 the meeting's formula a meeting keeps, in [0, 1]; 0 is the reset that stood.",
+                self.treasury_2y_meeting_carry));
+        }
+        if !(-2.0..=5.0).contains(&self.fed_neutral_real_rate) {
+            return Err(format!(
+                "fed_neutral_real_rate is {}. It is the points added to the Taylor rule's neutral \
+                 rate, in [-2, 5]; 0 is the neutral that stood.",
+                self.fed_neutral_real_rate));
+        }
+        if !(0.0..=2.0).contains(&self.core_trend_sd) {
+            return Err(format!(
+                "core_trend_sd is {}. It is the monthly innovation sd of core inflation's trend, \
+                 in [0, 2]; 0 is no trend.",
+                self.core_trend_sd));
+        }
+        if !(0.0..=1.0).contains(&self.core_trend_persistence) {
+            return Err(format!(
+                "core_trend_persistence is {}. It is core inflation's trend's monthly AR(1) \
+                 coefficient, in [0, 1].",
+                self.core_trend_persistence));
+        }
+        if !(0.0..=0.5).contains(&self.cycle_inflation_hazard) {
+            return Err(format!(
+                "cycle_inflation_hazard is {}. It is the monthly peak hazard an expansion adds with \
+                 inflation above 4, in [0, 0.5]; 0 is the legacy 0.1.",
+                self.cycle_inflation_hazard));
+        }
+        if !(0.0..=0.5).contains(&self.cycle_rate_hazard) {
+            return Err(format!(
+                "cycle_rate_hazard is {}. It is the monthly peak hazard an expansion adds with the \
+                 funds rate above 5, in [0, 0.5]; 0 is the legacy 0.1.",
+                self.cycle_rate_hazard));
+        }
+        if !(self.fed_eve_decision == 0.0 || self.fed_eve_decision == 1.0) {
+            return Err(format!(
+                "fed_eve_decision is {}. It is a switch: 0 (the meeting re-reads the day) or 1 \
+                 (a scheduled meeting delivers the eve's decision).",
+                self.fed_eve_decision));
+        }
+        if !(self.treasury_path_owed_excluded == 0.0 || self.treasury_path_owed_excluded == 1.0) {
+            return Err(format!(
+                "treasury_path_owed_excluded is {}. It is a switch: 0 (the anticipated path's step \
+                 carries the put's owed step) or 1 (it leaves it out).",
+                self.treasury_path_owed_excluded));
+        }
+        if !(self.corporate_spread_equity_lag >= 0.0 && self.corporate_spread_equity_lag <= 252.0) {
+            return Err(format!(
+                "corporate_spread_equity_lag is {}. It is a half-life in sessions, in [0, 252]; \
+                 0 is the spread reading the leverage gap itself.",
+                self.corporate_spread_equity_lag));
+        }
+        if !(self.corporate_spread_noise_sd >= 0.0 && self.corporate_spread_noise_sd <= 0.5) {
+            return Err(format!(
+                "corporate_spread_noise_sd is {}. It is the per-session innovation sd of credit's \
+                 own state, points of the spread's base, in [0, 0.5]; 0 is no state.",
+                self.corporate_spread_noise_sd));
+        }
+        if !(self.corporate_spread_noise_half_life >= 0.0 && self.corporate_spread_noise_half_life <= 2520.0) {
+            return Err(format!(
+                "corporate_spread_noise_half_life is {}. It is the half-life in sessions of credit's \
+                 own state, in [0, 2520].",
+                self.corporate_spread_noise_half_life));
+        }
         if !(self.oil_forecast_clamp == 0.0 || self.oil_forecast_clamp == 1.0) {
             return Err(format!(
                 "oil_forecast_clamp is {}. It is a switch: 0 (the forecast publishes the \
@@ -13119,6 +13561,24 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "usd_mean_reversion",
     "usd_noise_sd",
     "usd_safe_haven_gain",
+    "fed_core_inflation",
+    "treasury_core_inflation",
+    "treasury_zlb_path",
+    "treasury_zlb_haven_gain",
+    "fed_neutral_real_rate",
+    "core_trend_sd",
+    "core_trend_persistence",
+    "cycle_inflation_hazard",
+    "cycle_rate_hazard",
+    "fed_eve_decision",
+    "treasury_path_owed_excluded",
+    "corporate_spread_equity_lag",
+    "corporate_spread_noise_sd",
+    "corporate_spread_noise_half_life",
+    "treasury_2y_meeting_carry",
+    "policy_anticipation_half_life",
+    "treasury_path_anticipated",
+    "policy_anticipation_guidance",
     "oil_price_floor",
     "oil_price_ceiling",
     "oil_inflation_passthrough",
@@ -13330,6 +13790,24 @@ pub fn settable_names() -> Vec<&'static str> {
         "usd_mean_reversion",
         "usd_noise_sd",
         "usd_safe_haven_gain",
+        "fed_core_inflation",
+        "treasury_core_inflation",
+        "treasury_zlb_path",
+        "treasury_zlb_haven_gain",
+        "fed_neutral_real_rate",
+        "core_trend_sd",
+        "core_trend_persistence",
+        "cycle_inflation_hazard",
+        "cycle_rate_hazard",
+        "fed_eve_decision",
+        "treasury_path_owed_excluded",
+        "corporate_spread_equity_lag",
+        "corporate_spread_noise_sd",
+        "corporate_spread_noise_half_life",
+        "treasury_2y_meeting_carry",
+        "policy_anticipation_half_life",
+        "treasury_path_anticipated",
+        "policy_anticipation_guidance",
         "oil_price_floor",
         "oil_price_ceiling",
         "oil_inflation_passthrough",

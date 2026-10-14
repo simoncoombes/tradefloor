@@ -971,6 +971,56 @@ PERTURBATIONS = [
     # (`usd_crisis_vix_threshold`), so the bid never fires; a gain of 0.5
     # moves nothing either. It acts only in a crisis. Measured 2026-10-10.
     ("usd_safe_haven_gain", 0.001, False),
+    # Core inflation for the bank (headline less the oil pass-through's
+    # part), LIVE with its companion pass-through: the probe's oil sits at 98,
+    # off the anchor, so the meeting reads a lower inflation and the prices
+    # move. Without the companion the shipped three-way branch pays nothing
+    # in the 50 to 80 band the probe's burn-in mostly holds.
+    ("fed_core_inflation", 1.0, True),
+    # Core inflation for the curve, INERT on the probe's market columns: its
+    # headline closes at 1.1, under the term premium's 2, the flight to
+    # quality's 3 and the haven's 4, so no gate the three sessions read
+    # changes; the 10-year differs from the burn-in's months above 2 by
+    # 1e-17 and no price reads that. Measured 2026-10-11.
+    ("treasury_core_inflation", 1.0, False),
+    # The zero bound's pieces, LIVE: the probe's funds rate closes at 0.0 and
+    # its VIX at 21.6, so the unmet put (with its companion put and path) and
+    # the zero bound's compression both move the 10-year and the prices.
+    # Measured 2026-10-11.
+    ("treasury_zlb_path", 1.0, True),
+    ("treasury_zlb_haven_gain", 0.05, True),
+    # The Taylor rule's neutral real rate: the probe's meetings read the rule.
+    ("fed_neutral_real_rate", 2.0, True),
+    # Core inflation's trend: its opening draw moves the month-start step.
+    ("core_trend_sd", 0.17, True),
+    # The persistence alone is read by nothing (the sd is 0).
+    ("core_trend_persistence", 0.993, False),
+    # The expansion's inflation and rate hazards. INERT on the probe
+    # (measured 2026-10-11): the dials only replace the legacy 0.1 where an
+    # expansion has inflation above 4 or the funds rate above 5, and the
+    # probe's path never does.
+    ("cycle_inflation_hazard", 0.0219, False),
+    ("cycle_rate_hazard", 0.0013, False),
+    # The eve's decision: the probe's meetings deliver the eve's silent
+    # shadow instead of re-reading the day, which moves its rate path.
+    ("fed_eve_decision", 1.0, True),
+    # The owed step left out. INERT on the probe: read only with
+    # treasury_path_anticipated, which pt-v20 leaves off.
+    ("treasury_path_owed_excluded", 1.0, False),
+    # The 2-year's carry through a meeting. INERT on the probe's market: the
+    # burn-in's meetings move the 2-year (pt-v20's own 2-year noise leaves it
+    # a gap to keep: 0.15% against 0.23% after the third close, measured
+    # 2026-10-11), but no column this table reads takes the 2-year.
+    ("treasury_2y_meeting_carry", 1.0, False),
+    # The priced meeting's half-life. INERT on the probe: pt-v20 has
+    # policy_anticipation off, so no change is priced to smooth.
+    ("policy_anticipation_half_life", 10.0, False),
+    # The anticipated path. INERT on the probe: pt-v20 has
+    # treasury_path_pricing off, so there is no path to move.
+    ("treasury_path_anticipated", 1.0, False),
+    # The Fed's guidance. INERT on the probe: pt-v20 has
+    # policy_anticipation off, so no shadow is priced.
+    ("policy_anticipation_guidance", 0.5, False),
     # Oil's bounds from WTI in real terms. INERT on the probe: its burn-in's
     # oil stays inside 35 to 150, so moving the bounds outward moves nothing.
     ("oil_price_floor", 16.4, False),
@@ -1388,6 +1438,14 @@ PERTURBATIONS = [
     ("corporate_spread_equity_gain", 1.5, True),
     # INERT: read only with corporate_spread_equity_gain non-zero.
     ("corporate_spread_equity_half_life", 126.0, False),
+    # INERT: credit's repricing lag is read only with
+    # corporate_spread_equity_gain non-zero, which pt-v20 leaves off.
+    ("corporate_spread_equity_lag", 5.0, False),
+    # Credit's own state: its opening draw moves the meeting's corporate
+    # re-anchor, and with it the discount rate.
+    ("corporate_spread_noise_sd", 0.025, True),
+    # INERT: the half-life alone is read by nothing (the sd is 0).
+    ("corporate_spread_noise_half_life", 16.0, False),
     # The market's fall in the cycle's hazard (sim/r17-b12). Carries its
     # half-life as a companion, without which it is refused. INERT on this
     # probe: the ladder reads the gap only in an expansion or at a peak past
@@ -1910,6 +1968,11 @@ ECONOMY_STREAM_MOVERS = frozenset({
     # burn-in lives through, and with them which state-dependent macro
     # sites fire there, as `cycle_stationary_opening` does.
     "cycle_equity_hazard_opening",
+    # Core inflation's trend: its draws are on its own key (stream positions
+    # identical at a negligible sd, tests/test_core_trend_process.py), but
+    # its opening moves headline through the burn-in, and with it which
+    # state-dependent macro sites fire, as the cycle openings above do.
+    "core_trend_sd",
     # The return-driven arrival rate takes the same arrival draw as
     # `vix_jump_intensity` on every session it is non-zero, for the same
     # reason: the draw IS the mechanism.
@@ -2074,6 +2137,16 @@ def test_the_perturbation_table_covers_the_whole_settable_surface():
 #: carrying the same companions, none of the three moved. The companions
 #: are the default's 0.375 now, and the three rows are re-valued.
 COMPANIONS: dict[str, dict[str, float]] = {
+    # Core differs from headline only where oil pays inflation, which the
+    # symmetric pass-through does either side of 81 (the shipped branch pays
+    # nothing between 50 and 80).
+    "fed_core_inflation": {"oil_inflation_passthrough": 1.0},
+    "core_trend_sd": {"core_trend_persistence": 0.993},
+    "corporate_spread_noise_sd": {"corporate_spread_noise_half_life": 16.0},
+    "treasury_core_inflation": {"oil_inflation_passthrough": 1.0},
+    # The unmet put needs the put and the priced path it decays like.
+    "treasury_zlb_path": {"fed_put_gain": 3.0, "fed_put_half_life": 126.0, "treasury_put_pricing": 1.0,
+                          "treasury_path_pricing": 1.0, "treasury_path_half_life": 63.0},
     # The knee pulls at its half-life, and the pair is refused without it.
     "fair_value_relative_knee": {"fair_value_relative_half_life": 252.0},
     # The valuation is carried from the prehistory, and refused without one.

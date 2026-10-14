@@ -665,6 +665,31 @@ pub fn oil_drift_key(root_seed: u64) -> u64 {
     splitmix64_mix(root_seed ^ (((OIL_DRIFT_TAG as u64) << 32) | 0xFFFF_FFFF))
 }
 
+/// The tag of core inflation's slow trend (`core_trend_sd`), ASCII "CTRD".
+pub const CORE_TREND_TAG: u32 = 0x4354_5244;
+
+/// The key of a root seed's core-trend draws: as [`publication_key`] under
+/// [`CORE_TREND_TAG`]. Each month's normal is the first of
+/// `GameRng::keyed(key, CORE_TREND_TAG, month)`, and the opening's the first
+/// of `GameRng::keyed(key, CORE_TREND_TAG, u64::MAX)`, so it takes nothing
+/// from any stream.
+pub fn core_trend_key(root_seed: u64) -> u64 {
+    splitmix64_mix(root_seed ^ (((CORE_TREND_TAG as u64) << 32) | 0xFFFF_FFFF))
+}
+
+/// The tag of credit's own state (`corporate_spread_noise_sd`), ASCII
+/// "CSPN".
+pub const SPREAD_NOISE_TAG: u32 = 0x4353_504E;
+
+/// The key of a root seed's credit-state draws: as [`publication_key`] under
+/// [`SPREAD_NOISE_TAG`]. Each session's normal is the first of
+/// `GameRng::keyed(key, SPREAD_NOISE_TAG, day)`, and the opening's the first
+/// of `GameRng::keyed(key, SPREAD_NOISE_TAG, u64::MAX)`, so it takes nothing
+/// from any stream.
+pub fn spread_noise_key(root_seed: u64) -> u64 {
+    splitmix64_mix(root_seed ^ (((SPREAD_NOISE_TAG as u64) << 32) | 0xFFFF_FFFF))
+}
+
 pub fn publication_key(root_seed: u64) -> u64 {
     splitmix64_mix(root_seed ^ (((PUBLICATION_TAG as u64) << 32) | 0xFFFF_FFFF))
 }
