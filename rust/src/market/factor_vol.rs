@@ -740,6 +740,17 @@ impl MarketVarianceState {
         self.leverage_memory = phi * self.leverage_memory + (1.0 - phi) * (u - centre);
     }
 
+    /// Multiply the factor's variance by `m`, each component and the mixture
+    /// alike, within the factor's clamps: the VIX's own innovation taken as
+    /// news about variance (`ModelParams::market_vol_vix_news`). Called only
+    /// with that dial set; the components then decay at their own
+    /// persistences.
+    pub fn scale_variance(&mut self, params: &crate::params::ModelParams, m: f64) {
+        self.fast_variance = clamp_variance(params, self.fast_variance * m);
+        self.slow_variance = clamp_variance(params, self.slow_variance * m);
+        self.variance = clamp_variance(params, self.variance * m);
+    }
+
     /// Today's factor sigma at DAILY scale — what the tick multiplies by
     /// `1/√390` to draw at per-tick scale.
     pub fn sigma_daily(&self) -> f64 {

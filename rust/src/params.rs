@@ -942,6 +942,456 @@ pub struct ModelParams {
     /// Finance 17(1), 2013): low stocks, a high spot and a curve in
     /// backwardation (row OF2). In sessions, [0, 2520].
     pub oil_inventory_level_gain: f64,
+    /// The convenience yield of oil inventory, as an elasticity of the oil
+    /// price's target to inventory. 0.0, on every shipped preset, is no
+    /// premium, and a value of 0.0 is left out of the model's digest.
+    ///
+    /// Off zero the price carries a premium on its level,
+    /// `S = X (1 - k ln(I / 50))`, linear in log inventory as the convenience
+    /// yield of Gibson and Schwartz (1990) is (an exponential form's
+    /// convexity tilted the curve into contango), floored at a quarter, with
+    /// `I` read at no lower than 25 and `X` the premium-free price,
+    /// which reverts to the target: each session reverts toward the target
+    /// times the premium it opened with and then moves the level by the
+    /// premium's change to the inventory the step leaves. Low stocks raise
+    /// the price at once and the premium unwinds as inventory refills toward
+    /// 50, so the expected path falls and the curve is in backwardation;
+    /// high stocks put it in contango. A premium on the target alone, which
+    /// the price reaches only at its own reversion, made the expected path
+    /// rise while stocks were low. That is the theory of storage (Working, American Economic
+    /// Review 39(6), 1949; Brennan, American Economic Review 48(1), 1958)
+    /// and Gorton, Hayashi and Rouwenhorst's finding (Review of Finance
+    /// 17(1), 2013) that the curve steepens into backwardation as stocks fall
+    /// (row OF2). The forecast takes the premium's expectation over
+    /// inventory's spread, so the oil futures price it unbiased. Needs
+    /// `oil_inventory_reversion`, without which inventory has no level to
+    /// refill to. In [0, 10].
+    pub oil_convenience_yield: f64,
+    /// The sd, per session, of a random walk on the log of the oil price's
+    /// long-term level: the long factor of Schwartz and Smith (Management
+    /// Science 46(7), 2000), beside the short-term deviation that reverts to
+    /// the target. 0.0, on every shipped preset, is no long factor: the
+    /// price reverts to a fixed target and every move of its level is
+    /// expected to reverse. A value of 0.0 takes no draw and is left out of
+    /// the model's digest.
+    ///
+    /// Off zero each close draws the level's log change, `sigma z - sigma^2
+    /// / 2` (so the level itself is a martingale), on a key of its own, and
+    /// the whole price moves with it: the premium-free price reverts to the
+    /// target times the level, and the level's change moves spot and every
+    /// futures contract alike. The forecast holds the level's expectation,
+    /// so a long-factor move shifts the whole curve. EIA's contracts 1 and 4
+    /// give the long factor a daily sd of 0.018 (the median of seven
+    /// five-year windows, 1987 to 2024). In [0, 0.1].
+    pub oil_target_drift_sd: f64,
+    /// Whether the oil price's daily pushes keep the long-run response they
+    /// had under the shipped reversion. A switch, 0.0 on every shipped
+    /// preset and left out of the model's digest there.
+    ///
+    /// The step adds the dollar's drag (0.08 a dollar-index point), OPEC's
+    /// decision, inventory's push and an oil shock's level term to the price
+    /// each session, and the price reverts at 0.03, so each push's effect on
+    /// the price's level is the push over 0.03: the dollar's is -2.67 a
+    /// point. A slower `oil_mean_reversion` multiplies every one of them by
+    /// 0.03 over the slower rate (five at 0.006), so the curve the forecast
+    /// extends from them was five times as steep, and the price's gap to its
+    /// target three times as wide as the short factor of Schwartz and Smith
+    /// (Management Science 46(7), 2000).
+    ///
+    /// At 1.0 the price is the sum of two parts: one that reverts to the
+    /// target at `oil_mean_reversion`, carrying the noise, the convenience
+    /// premium and the long factor, and one that collects the pushes and
+    /// decays at the shipped 0.03 (`EconomyState::oil_push_level`). At a
+    /// reversion of 0.03 the sum is the shipped step exactly; at any other
+    /// it keeps each push's long-run response and its decay, while the rest
+    /// of the price reverts at the slower rate.
+    pub oil_pushes_in_target: f64,
+    /// The oil price's daily noise as a share of the price, the sd of its log
+    /// change a session at a volatility of 1.0. 0.0, on every shipped preset,
+    /// is the noise in dollars (`oil_noise_sd`, or the standing 2.0), and a
+    /// value of 0.0 is left out of the model's digest.
+    ///
+    /// Dollar noise is a constant amount at any price, 4 per cent of a $35
+    /// price and 0.9 per cent of a $150 one, so once the long factor
+    /// (`oil_target_drift_sd`) carries the price across its range its log
+    /// volatility moves with the level. Off zero the noise is this share of
+    /// the price, the short factor of Schwartz and Smith (Management Science
+    /// 46(7), 2000): EIA's contracts 1 and 4 give it 0.017 a session (the
+    /// median of seven five-year windows, at a reversion of 0.006), and
+    /// Schwartz and Smith's 0.286 a year is 0.018. In [0, 0.1]; it takes the
+    /// same draw the dollar noise does.
+    pub oil_noise_log_sd: f64,
+    /// The oil price's elasticity to the dollar index, as a level the whole
+    /// curve carries. 0.0, on every shipped preset, is the dollar's daily
+    /// drag on the price (0.08 a session a point above 100), and a value of
+    /// 0.0 is left out of the model's digest.
+    ///
+    /// The drag is a push the price takes a session at a time, so a dollar
+    /// move reaches the price over weeks and the forecast prices it as a
+    /// slope of the curve. EIA's contracts 1 and 4 against FRED's
+    /// trade-weighted dollar move together instead: on daily changes over
+    /// 1987 to 2019 the elasticity is -0.69 for contract 1 and -0.66 for
+    /// contract 4, and the slope ln(F4/F1) responds by +0.03; over 21
+    /// sessions it is -1.20 and -1.05. Off zero the dollar's drag is dropped
+    /// and the price carries `(usd / 100)^-e` on its level, the target it
+    /// reverts to included, so a stronger dollar lowers spot and every
+    /// contract at once. In [0, 5].
+    pub oil_dollar_elasticity: f64,
+    /// The sd of oil inventory's daily noise, units at a volatility of 1.0.
+    /// 0.0, on every shipped preset, is the standing 0.5, and a value of 0.0
+    /// is left out of the model's digest. At the shipped 0.5 and
+    /// `oil_inventory_reversion` 0.002 inventory's log deviation from its
+    /// trailing five-year mean has an sd of 0.139 against EIA's 0.087 for US
+    /// crude stocks (WCESTUS1, 1987 to 2024), with a half-life (about 200
+    /// sessions) inside the real 170 to 320; the sd scales with this noise.
+    /// In [0, 5]; the draw is taken either way.
+    pub oil_inventory_noise_sd: f64,
+    /// Whether the forecast's oil sees the price's clamps (35 and 150). A
+    /// switch, 0.0 on every shipped preset and left out of the model's
+    /// digest there: the forecast steps the price's expectation, which the
+    /// clamps never touch, and that is what it publishes.
+    ///
+    /// The clamps are in the law, so a price that reaches one is held there
+    /// and its expectation is lower (or higher) than the unclamped path's.
+    /// Once the long factor and the convenience premium widen the price's
+    /// spread, that gap is a bias the oil futures inherit (row OF4). At 1.0
+    /// the forecast keeps stepping the unclamped expectation and publishes,
+    /// each session, the expectation of the price truncated at the clamps,
+    /// over a normal spread: the short factor's (its reversion and noise)
+    /// plus the level carriers' (the long factor, the premium over
+    /// inventory's spread, the dollar over its own) at the price.
+    pub oil_forecast_clamp: f64,
+    /// The share of the dollar index's gap to its target closed each
+    /// session. 0.0, on every shipped preset, is the standing 0.02, and a
+    /// value of 0.0 is left out of the model's digest.
+    ///
+    /// At 0.02 the dollar's gap has a half-life of 34 sessions. FRED's
+    /// trade-weighted dollar (DTWEXM, 1987 to 2019) has an AR(1) half-life
+    /// of its log level of 729 sessions (0.00095 a session), and 540 to 580
+    /// against its trailing five-year mean. Read with
+    /// `oil_dollar_elasticity`, a dollar that reverts within weeks is one
+    /// the oil forecast expects to unwind, and it prices that as a slope of
+    /// the curve that EIA's contracts do not show.
+    ///
+    /// Off zero the dollar is the sum of a base that reverts at this rate
+    /// and the safe-haven bid (`EconomyState::usd_haven_level`), which takes
+    /// each session's crisis drift and decays at 0.02 (the dollar's standing reversion): a real
+    /// safe-haven bid unwinds within months, and at the slower rate alone
+    /// the one-sided drift accumulated and held the dollar at its 130 cap.
+    /// In [0, 1].
+    pub usd_mean_reversion: f64,
+    /// The sd of the dollar index's daily noise, points at a volatility of
+    /// 1.0. 0.0, on every shipped preset, is the standing 0.3, and a value
+    /// of 0.0 is left out of the model's digest. DTWEXM's daily log change
+    /// has an sd of 0.0043, 0.43 points at 100; with `usd_mean_reversion`
+    /// at 0.00095 that gives a stationary sd of 9.9 points against the
+    /// series' 0.108 in log over 1987 to 2019. In [0, 5]; the draw is taken
+    /// either way.
+    pub usd_noise_sd: f64,
+    /// The dollar's daily drift per VIX point above
+    /// `usd_crisis_vix_threshold`, index points. 0.0, on every shipped
+    /// preset, is the standing 0.05, and a value of 0.0 is left out of the
+    /// model's digest. Read by the dollar's step and by the forecast's
+    /// expected bid.
+    ///
+    /// The standing 0.05 was never measured. FRED's trade-weighted dollar
+    /// against CBOE's VIX, 1990 to 2019, drifts 0.0010 per cent a session
+    /// per VIX point above 25.5 (se 0.0012; DTWEXM, the series the dollar's
+    /// persistence and noise are measured on), 0.003 on DTWEXBGS from 2006,
+    /// and what it gains has unwound within 21 sessions. At 0.05 the bid
+    /// averaged 2.2 points, widened the dollar's log sd within a history to
+    /// 0.087 (DTWEXM 0.071), and tilted the oil curve on the dollar's
+    /// deviation by +0.10 against EIA's +0.014. In [0, 1].
+    pub usd_safe_haven_gain: f64,
+    /// A switch: 1.0 has the central bank read core inflation where it read
+    /// headline. 0.0, on every shipped preset, reads headline as it stood,
+    /// and a value of 0.0 is left out of the model's digest.
+    ///
+    /// Core is headline less the oil pass-through's accumulated part
+    /// (`EconomyState::oil_inflation_level`): the monthly term
+    /// `oil_inflation_passthrough` adds to headline, decaying at the
+    /// headline's own `inflation_reversion`. So core keeps the second-round
+    /// effects (wages, the real-rate term), as CPI less food and energy
+    /// does. Read by the meeting (`update_central_bank_with`: the Taylor
+    /// rule, the ladder's cut-offs, the stress cut and hold, the put's
+    /// ceiling, the meeting cadence), the priced put and the intermeeting
+    /// meeting.
+    ///
+    /// FRED, 1990 to 2025: the funds rate's level loads on CPILFESL (0.74,
+    /// Newey-West se 0.38) and not on headline less core (-0.16, se 0.33);
+    /// over six months the gap's loading is -0.10 (0.13). In 63-session
+    /// index falls of 10% with headline at 3 or more and core under 3 (2000,
+    /// 2001, 2007, 2011) the Fed cut 0.85 points; with core at 3 or more
+    /// (1990, 2022) it raised 0.36. With headline read, an oil-driven
+    /// headline of 3 to 4 closed the cut branches in a fall.
+    pub fed_core_inflation: f64,
+    /// A switch: 1.0 has the Treasury curve read core inflation (as
+    /// `fed_core_inflation` defines it) where it read headline: the
+    /// 10-year's term premium, the haven's inflation gate and the flight to
+    /// quality's sign, at the close and at a meeting. 0.0, on every shipped
+    /// preset, reads headline as it stood, and a value of 0.0 is left out
+    /// of the model's digest.
+    ///
+    /// FRED and the S&P 500, 1990 to 2025: the monthly correlation of the
+    /// index's return with the 10-year's change is +0.28 in months with
+    /// headline at 3 to 4 and core under 3, as with both under 3 (+0.22),
+    /// and -0.35 with core at 3 to 4; the 10-year fell 0.65 points in index
+    /// falls with headline at 3 or more and core under 3, and rose 0.39 with
+    /// core at 3 or more; its level loads on neither core nor the gap given
+    /// the funds rate (the gap -0.06, se 0.12).
+    pub treasury_core_inflation: f64,
+    /// The share of the Fed put's unmet ask the curve prices at the zero
+    /// bound. 0.0, on every shipped preset, prices the put only up to the
+    /// rate, as it stood, and a value of 0.0 is left out of the model's
+    /// digest.
+    ///
+    /// The put asks for `fed_put_gain * max(0, -I - fed_put_threshold)` and
+    /// the curve prices it no further than the policy rate, so at the zero
+    /// bound a fall moves no expected easing at all. Off zero the 10-year's
+    /// anchor (and the 2-year's formula) is lowered also by
+    /// `k * treasury_put_pricing * (x + U)`: `x` the part of tonight's ask the
+    /// rate cannot deliver, `U` (`EconomyState::zlb_unmet`) each meeting's
+    /// unmet ask, decaying at `treasury_path_half_life`. It passes through
+    /// whole, as the put does. Kim and Wright's decomposition of the
+    /// 10-year (FRED THREEFY10, THREEFYTP10) in the 2008-2015 falls of 10%
+    /// that began at the zero bound: the expected path fell 0.35 (se 0.12)
+    /// with the funds rate unchanged. Needs `fed_put_gain` and
+    /// `treasury_path_pricing`. In [0, 20].
+    pub treasury_zlb_path: f64,
+    /// The term premium's fall per VIX point above 20 with the funds rate at
+    /// or below 0.25, beside `treasury_haven_gain`, at the close and in the
+    /// meeting's 10-year target, under the haven's inflation gate. 0.0, on
+    /// every shipped preset, is none, and a value of 0.0 is left out of the
+    /// model's digest. It stands for the haven bid and the asset purchases
+    /// when the bank cannot cut: Kim and Wright's term premium fell 0.36 (se
+    /// 0.13) in the 2008-2015 falls of 10% that began at the zero bound. In
+    /// [0, 1].
+    pub treasury_zlb_haven_gain: f64,
+    /// Points added to the neutral rate of the central bank's Taylor rule.
+    /// 0.0, on every shipped preset, is the neutral that stood, and a value
+    /// of 0.0 is left out of the model's digest.
+    ///
+    /// The rule's neutral is `2.0 + 0.5 (pi / pi* - 1)` (the JS formula):
+    /// at target a nominal 2.0, which is Taylor's (1993) r* of 2 without his
+    /// `+ pi` term, so the real rate it sets at target is 0. Off zero the
+    /// dial is added to it, and the meeting and the shadow meeting read the
+    /// result. The anchor is the Holston-Laubach-Williams US natural rate
+    /// (NY Fed, one-sided), whose mean over 1990Q1-2025Q4 is 2.0; through
+    /// the rule on FRED's core CPI and unemployment, DFF sits 1.69 over the
+    /// rule off the zero bound at 0.0 and 0.31 under it at 2.0. The
+    /// economy's own real-rate term (inflation's suppression above a real
+    /// rate of 0) is not moved. In [-2, 5].
+    pub fed_neutral_real_rate: f64,
+    /// The monthly innovation sd of core inflation's slow trend, points.
+    /// 0.0, on every shipped preset, is no trend (headline reverts to the
+    /// 2.0 target), and a value of 0.0 is left out of the model's digest.
+    ///
+    /// Off zero the month-start inflation step closes headline's gap to
+    /// `2.0 + tau` instead of 2.0, where `tau` follows an AR(1) at
+    /// `core_trend_persistence` a month, stepped on the economy's month
+    /// start on its own key (`GameRng::keyed(key, CORE_TREND_TAG, month)`,
+    /// so no stream moves) and opened at a draw from its stationary
+    /// distribution. Every push, the floor, the ceiling and the central
+    /// bank's 2.0 target stand; core is still headline less the oil part.
+    /// `tau` and its key are snapshotted and hashed only with this set.
+    /// Fitted to FRED CPILFESL year-on-year itself, monthly 1990-2025, by
+    /// exact ML about 2.0: phi 0.993, sigma 0.170 a month (a half-life of
+    /// 8.2 years, unconditional sd 1.44 against the series' 1.15; given
+    /// room, ML puts no weight on a fast component). Slower reversion of
+    /// headline itself is not the fit: it would integrate every monthly push
+    /// and the oil part (design PR #9, r22o5czN-B/inflation). In [0, 2].
+    pub core_trend_sd: f64,
+    /// The monthly persistence of core inflation's trend (`core_trend_sd`).
+    /// 0.0, on every shipped preset, is read by nothing, and a value of 0.0
+    /// is left out of the model's digest. In [0, 1].
+    pub core_trend_persistence: f64,
+    /// The monthly peak hazard an expansion adds with inflation above 4.
+    /// 0.0, on every shipped preset, is the legacy 0.1 (the JS ladder), and
+    /// a value of 0.0 is left out of the model's digest.
+    ///
+    /// Anchored on NBER peaks (FRED USREC) in expansion months 1962-2025, a
+    /// linear probability model on 1{headline CPI > 4}, 1{funds rate > 5}
+    /// and the ladder's own inversion term: +0.0219 a month (block-bootstrap
+    /// se 0.0133, 8 peaks); 1976-2025 on the 2-year spread +0.0159 (0.0337).
+    /// The legacy 0.1 rarely fired while inflation sat near 2; with
+    /// `core_trend_sd` it does (design PR #9, r22o5czN-B/inflation addendum
+    /// A). In [0, 0.5].
+    pub cycle_inflation_hazard: f64,
+    /// The monthly peak hazard an expansion adds with the funds rate above
+    /// 5. 0.0, on every shipped preset, is the legacy 0.1, and a value of
+    /// 0.0 is left out of the model's digest. The same fit: +0.0013 a month
+    /// (se 0.0087); 1976-2025 -0.0009 (0.0107). In [0, 0.5].
+    pub cycle_rate_hazard: f64,
+    /// A switch: 1.0 makes a scheduled central-bank meeting deliver the
+    /// decision the Fed's own reading implied at the eve's close, the
+    /// decision the market priced (`policy_anticipation_guidance`'s "own"
+    /// shadow). 0.0, on every shipped preset, is the meeting as it stood,
+    /// re-reading the day's economy, and a value of 0.0 is left out of the
+    /// model's digest.
+    ///
+    /// The eve's shadow equals the delivered decision at 80-87% of meetings;
+    /// the rest are reversals on stressed days that make a surprise sd of
+    /// 9-12 bp (design PR #9, r22o5czN-B/inflation addendum G), against
+    /// 4.8 bp for scheduled FOMC decisions off the zero bound, 1994-2019
+    /// (Bauer and Swanson 2022): scheduled decisions are signalled and the
+    /// blackout ends new input, and the response to a crash comes through
+    /// intermeeting action, which the emergency meeting and the put's
+    /// emergency still give. Applied after the ladder, the stress hold and
+    /// the put, before the announcement's draw, so every draw is taken where
+    /// it stood. The stored decision is snapshotted and hashed only with
+    /// this set. 0 or 1.
+    pub fed_eve_decision: f64,
+    /// A switch: with `treasury_path_anticipated` on, 1.0 leaves the Fed
+    /// put's owed step out of the meeting's path step, so the path moves by
+    /// the anticipation's further move alone. 0.0, on every shipped preset,
+    /// is the step that stood (`(a - 1) E + owed`), and a value of 0.0 is
+    /// left out of the model's digest.
+    ///
+    /// In the legacy step `dff + owed` the owed step offsets the put's extra
+    /// cut, so the path moves by the ladder's change; the anticipated path
+    /// replaced `dff` and kept `owed`, so every put cut raised the path by
+    /// the whole amount owed: on 12 histories the 2-year rose 35 to 48 bp on
+    /// the day of a put cut of 33 to 46 bp (design PR #9, r22o5czN-B/
+    /// inflation addendum H), against the tape's cut-day mean of -1.2 bp
+    /// (DGS2 on scheduled cuts off the zero bound, 1994-2025). Read only
+    /// with `treasury_path_anticipated` on. 0 or 1.
+    pub treasury_path_owed_excluded: f64,
+    /// Credit's repricing lag: the half-life, in sessions, at which the gap
+    /// the corporate spread prices (`EconomyState::spread_priced_gap`)
+    /// follows credit's leverage gap (`EconomyState::spread_equity_gap`).
+    /// Each close steps `P = P + (1 - 0.5^(1/H)) (D - P)`, and the spread's
+    /// equity term reads `P` wherever it read `D`: the close's daily move,
+    /// the meeting's re-anchor and the restore's re-mark. The cycle's equity
+    /// hazard keeps reading `D`. 0.0, on every shipped preset, is the spread
+    /// reading the gap itself, as it stood, and a value of 0.0 is left out of
+    /// the model's digest. Read only with `corporate_spread_equity_gain` set.
+    ///
+    /// The tape's spread reprices an equity move over weeks: the beta of
+    /// FRED BAA10Y's change on the S&P 500's log return, off the zero bound
+    /// 1990-2025, is -0.47 bp per 1% over one session (se 0.16), -0.91 over
+    /// five (0.29), -2.28 over 21 (0.66) and -2.51 over 63 (0.68); ICE BofA
+    /// IG OAS reads -0.65 a session over the 2023-2025 it publishes. With
+    /// the gap read whole the spread moves -2.2 a session at every horizon
+    /// and its daily correlation with the index is 0.89 against the tape's
+    /// 0.17 (design PR #9, r22o5czN-B/inflation addendum K). No draw. The
+    /// priced gap is snapshotted and hashed only with this set. In [0, 252].
+    pub corporate_spread_equity_lag: f64,
+    /// The per-session innovation sd of credit's own state, points of the
+    /// corporate spread's base. 0.0, on every shipped preset, is no state
+    /// (the spread moves only with the VIX, the cycle and the leverage gap),
+    /// and a value of 0.0 is left out of the model's digest.
+    ///
+    /// Off zero credit's state x follows an AR(1), `x' = phi x + sd z` with
+    /// `phi = 0.5^(1/H)`, H `corporate_spread_noise_half_life`, stepped once
+    /// a session on its own key (`GameRng::keyed(key, SPREAD_NOISE_TAG,
+    /// day)`, so no stream moves) and opened at a draw from its stationary
+    /// distribution. x is added to the spread formula's base before the
+    /// cycle multiplier wherever the leverage term is: the close's daily
+    /// move, the meeting's re-anchor and the prehistory carry. The spread
+    /// had almost none of its own movement: off the zero bound, the part of
+    /// its change the index does not explain has an sd of 1.36 bp a session,
+    /// 6.4 over 21 and 11.6 over 63 where the IG closing-price spread
+    /// (LQD's return less 0.913 IEF's at duration 8.5, on SPY, 2015-2025)
+    /// has 2.54, 11.5 and 16.7. The 21- and 63-session pair gives H 16 and
+    /// a stationary sd of 8.8 bp (design PR #9, r22o5czN-B/inflation
+    /// addendum L). x and its key are snapshotted and hashed only with this
+    /// set. In [0, 0.5].
+    pub corporate_spread_noise_sd: f64,
+    /// The half-life, sessions, of credit's own state
+    /// (`corporate_spread_noise_sd`). 0.0, on every shipped preset, is read
+    /// by nothing, and a value of 0.0 is left out of the model's digest.
+    /// With the sd set, 0.0 is no persistence (`phi` 0). In [0, 2520].
+    pub corporate_spread_noise_half_life: f64,
+    /// The share of the 2-year's standing gap to the meeting's formula that a
+    /// central-bank meeting keeps. 0.0, on every shipped preset, is the
+    /// meeting as it stood, and a value of 0.0 is left out of the model's
+    /// digest.
+    ///
+    /// The meeting sets the 2-year to `0.85 (ff + path) + 0.15 x 10y` (the JS
+    /// blend). Between meetings, with `treasury_2y_noise` on, the 2-year is
+    /// its own process pulled toward a formula that also prices the
+    /// anticipated decision, the put and the zero bound's path, so the reset
+    /// throws its standing gap away: off the bound on R22O5czN, meeting days
+    /// are 3% of sessions and carry 41% of the 2-year's variance. Off zero
+    /// the meeting's 2-year is `legacy + c (carried - legacy)`, with
+    /// `carried` the 2-year before the meeting moved by 0.85 of the
+    /// decision's news (the rate change, the put share the curve had priced
+    /// and the priced path's move, undamped) and 0.15 of the 10-year's move,
+    /// and the anticipated meeting's books carry what the 2-year keeps. The
+    /// anchor is the scheduled FOMC days' share of DGS2's daily variance off
+    /// the zero bound, 1994-2025: 0.046 (se 0.006) on 0.031 of sessions. In
+    /// [0, 1].
+    pub treasury_2y_meeting_carry: f64,
+    /// The half-life, in sessions, at which the curve's priced change for the
+    /// next meeting (`policy_anticipation`) moves toward the shadow meeting's
+    /// change between meetings. 0.0, on every shipped preset, is off: the
+    /// priced change is the shadow's every close, as it stood, and a value of
+    /// 0.0 is left out of the model's digest.
+    ///
+    /// The shadow meeting is one decision on thresholds, re-taken each close,
+    /// so it switches from close to close; at `policy_anticipation_cut_share`
+    /// 1 each switch moved the 2-year (other-day sd 9.8 bp against DGS2's 6.2
+    /// off the zero bound) and the meeting's eve priced one draw of it. Off
+    /// zero the priced change `P` moves toward `a w S` at `1 - 0.5^(1/H)` a
+    /// close, an average of the shadow's recent decisions; a meeting's close
+    /// sets it as it stood. No new state: `P` is already snapshotted and
+    /// hashed. Anchored on the scheduled FOMC days' share of DGS2's variance
+    /// (0.046) and its other days' sd (6.16 bp), 1994-2025 off the zero bound
+    /// (design PR #9, rates/RULE.md addendum C). In [0, 252].
+    pub policy_anticipation_half_life: f64,
+    /// A switch: 1.0 moves the priced policy path (`treasury_path_pricing`)
+    /// at a meeting by the further move the anticipated meeting priced
+    /// (`policy_anticipation` a: `P (a - 1) / a` of the eve's priced change
+    /// `P`) instead of by the rate's change. 0.0, on every shipped preset,
+    /// is the step that stood, and a value of 0.0 is left out of the model's
+    /// digest.
+    ///
+    /// The step put a rate surprise into the curve twice, through the rate
+    /// and again through the path (sd 20 bp at the step on R22O5czN, the 2-
+    /// year's meeting-day move 0.99 to 1.35 times the surprise). Off zero the
+    /// path moves with the anticipation and a surprise reaches the curve once.
+    /// Checked on the meeting-day 2-year move against DGS2's on scheduled
+    /// FOMC days off the zero bound, 1994-2025 (sd 7.1 bp). 0 or 1.
+    pub treasury_path_anticipated: f64,
+    /// The share of the anticipated meeting's priced change (`policy_
+    /// anticipation`) the market takes from the decision the Fed's own
+    /// reading implies, rather than from the published economy. 0.0, on
+    /// every shipped preset, prices the published shadow alone, as it stood,
+    /// and a value of 0.0 is left out of the model's digest.
+    ///
+    /// The meeting reads the true phase, growth and VIX; the shadow the
+    /// market prices reads the published ones, which differ on 48% of
+    /// meeting eves on R22O5czN, so the decision's surprise against the eve's
+    /// priced change has an sd of about 21 bp. Since 1994 the FOMC announces
+    /// its decisions and assessment, and the tape's surprise is small: the
+    /// current-quarter Eurodollar futures move in the 30-minute window of a
+    /// scheduled announcement, off the zero bound, has an sd of 4.8 bp
+    /// 1994-2019 (5.0 before 2008, 4.2 after; Bauer and Swanson, NBER
+    /// Macroeconomics Annual 2022). Off zero the shadow's change is
+    /// `(1 - q) S(published) + q S(the meeting's own economy)`, both silent
+    /// shadows. In [0, 1].
+    pub policy_anticipation_guidance: f64,
+    /// The oil price's lower and upper bounds, dollars. 0.0, on every shipped
+    /// preset, is the standing 35 and 150, and a value of 0.0 is left out of
+    /// the model's digest.
+    ///
+    /// At 35 and 150 the price's log range is 1.46, and once the long factor
+    /// and the convenience premium carry it, months pinned at a bound make
+    /// most of the sessions row O2 reads as near a five-year extreme (85 per
+    /// cent on held-out histories). WTI has no hard bounds: EIA's front
+    /// month over 1987 to 2024, deflated by FRED's CPIAUCSL, ran from 0.203
+    /// to 3.44 times its median (a log range of 2.83). The model's target at
+    /// trend growth, 81, does not inflate, so those ratios give 16.4 and 279.
+    /// The forecast's clamp (`oil_forecast_clamp`) reads the same bounds.
+    /// The floor in (0, 35]: the bounds only widen, so they cannot cross.
+    pub oil_price_floor: f64,
+    /// See `oil_price_floor`. 0.0 is the standing 150; in [150, 1000].
+    pub oil_price_ceiling: f64,
+    /// The share of the long factor's log level returned to 0 each session,
+    /// a weak pull that keeps the random walk off the price's clamps. 0.0,
+    /// on every shipped preset, is none. Read only with
+    /// `oil_target_drift_sd`. In [0, 1].
+    pub oil_target_drift_reversion: f64,
     /// Inflation's monthly response to the oil price, the same either side of
     /// oil's anchor, as a multiple of the 0.01 a dollar the release pays
     /// above 80.
@@ -1806,6 +2256,72 @@ pub struct ModelParams {
     /// r17sf1s1). Read only with `pinned_vix_feedback` on and below 1.0. In [0,
     /// 1]. pt-v21 ships 1.0.
     pub pinned_vix_priced_cap: f64,
+    /// A switch: every VIX a caller pins sets the market factor's variance,
+    /// as a scenario's `vix_sets_variance` does. 0.0, on every shipped
+    /// preset, leaves a pin to reach the variance one GARCH step a close,
+    /// as it stood, and a value of 0.0 is left out of the model's digest.
+    ///
+    /// Off zero, `pin_macro(vix=...)` marks tonight's close FORCED whatever
+    /// its `vix_sets_variance` argument says, so the close sets both
+    /// variance components to the law's fixed point at the pinned VIX
+    /// (`MarketVarianceState::close_day_forced`) and the next session trades
+    /// at it. Free sessions are untouched, and the first free close after a
+    /// pin starts from the level the last pin left. No draw is taken and no
+    /// state is added. In [0, 1].
+    ///
+    /// Why. Stepped one session at a time, a pinned path's variance lags the
+    /// VIX it states by weeks: the slow component (a half-life near 80
+    /// sessions) holds a crash's variance after the pinned VIX has come
+    /// down, and it reaches a spike late. On the driven 2020-21 replay (the
+    /// real VIX pinned every session, 12 held-out seeds) realized
+    /// volatility ran 29, 39 and 47 per cent at pinned VIX levels of 20-25,
+    /// 25-30 and 30-40, against the S&P 500's 13, 23 and 29 over the same
+    /// months, and 49 per cent at 60-100 against 80. Set by every pin it
+    /// read 18, 24, 35, 67 and 75 per cent across the five levels (S&P 500
+    /// 13, 23, 29, 74 and 80); the index's fall within 60 sessions of the
+    /// February high read 0.32 (S&P 500 0.34, stepped 0.27) and its
+    /// drawdown over the path 0.33 (0.34, stepped 0.38).
+    pub pinned_vix_sets_variance: f64,
+    /// The share of each name's permanent market move that its valuation
+    /// multiple carries in place of its earnings level, in [0, 1]. 0.0, on
+    /// every shipped preset, sends the whole of it to the fair-value level
+    /// `v`, which scales the earnings the valuation and the market P/E read,
+    /// as it stood; a value of 0.0 is left out of the model's digest.
+    ///
+    /// Off zero each name carries a log multiple `m`
+    /// (`TickStock::valuation_multiple`). Wherever
+    /// `fair_value_market_share` moves fair value (the session's ticks, the
+    /// night, the close's market jump), the market part `q` is split:
+    /// `(1 - share) q` joins `v` and `share q` joins `m`, each with its own
+    /// Ito term. Fair value is multiplied by `exp(m)`; nothing that reads
+    /// earnings reads `m` (the market P/E, the buyback accrual, dividends),
+    /// so the P/E carries it. Each close pulls `m` toward zero at
+    /// `valuation_multiple_half_life`, and the stationary opening opens it
+    /// at `beta` times a draw from its stationary distribution on its own
+    /// key (`GameRng::keyed(key, VALUATION_MULTIPLE_TAG, u64::MAX)`), so no
+    /// stream moves, with `v` taking the rest of the opening premium so no
+    /// opening price moves. `m` is snapshotted and hashed only with this
+    /// set.
+    ///
+    /// Why. Every permanent market move was an earnings move, so the
+    /// multiple hardly moved: on 270 held-out 21-year histories the market
+    /// P/E's log sd was 0.09 and its 1-, 5- and 10-year changes 0.05, 0.08
+    /// and 0.10, where the S&P 500's CAPE (1881-2023) has 0.42 and 0.19,
+    /// 0.39 and 0.51; the multiple carried 4 to 10 per cent of the index's
+    /// variance at those horizons against all of it on the tape; and the
+    /// next ten years' return on the log P/E had an R^2 of 0.03 against
+    /// the tape's 0.29. Measured value 1.0: CAPE's change carries 1.06 to
+    /// 1.08 of the price change's variance at 1 to 10 years.
+    pub valuation_multiple_share: f64,
+    /// The half-life, sessions, of the valuation multiple's pull back to
+    /// the valuation's target (`valuation_multiple_share`). 0.0, on every
+    /// shipped preset, is read by nothing, and a value of 0.0 is left out
+    /// of the model's digest. With the share set it must be positive: each
+    /// close multiplies `m` by `0.5^(1/H)`, taking no draw. Measured value
+    /// 1779 (7.06 years): log CAPE's annual AR(1), 0.906 on 1881-2023, whose
+    /// implied 10-year return slope (-0.63) matches the tape's own (-0.66).
+    /// In [0, 100000].
+    pub valuation_multiple_half_life: f64,
     /// A ceiling on the annual buyback yield `buyback_payout_share * eps /
     /// price` that the buyback term compounds over the elapsed years. In
     /// [0, 1], and 0.0 means no ceiling.
@@ -2436,6 +2952,213 @@ pub struct ModelParams {
     /// otherwise. In [0, 1].
     /// pt-v21 ships 0.35.
     pub vix_stress_premium_cap: f64,
+    /// The stress memory's own per-session rate: the rate at which the
+    /// published VIX's stress memory `m` (`vix_stress_premium`) takes up the
+    /// read-back's log deviation from the anchor's centre. 0.0, which every
+    /// preset carries, is the anchor's rate (`vix_anchor_memory`), bit for
+    /// bit, so in a free run the stress memory is the anchor's memory, as it
+    /// has been since pt-v20.
+    ///
+    /// The two memories do different jobs. The anchor's pulls a persistent
+    /// deviation of the VIX state back, for the loop's stability and the
+    /// long horizon of the futures curve; the stress memory sets how far the
+    /// quote stands over the state in a stress spell, against the tape's
+    /// VIX over trailing 21-session realised volatility (V2, 0.831). Slowing
+    /// the anchor, as the pt-v22 VIX law does (0.0556 to 0.035), slows the
+    /// premium with it: it arrives later in a spell and the forecast carries
+    /// it further out. Off zero, the stress memory steps at this rate at the
+    /// close, in the projection of tonight's close and in the forecast; the
+    /// anchor's memory is untouched. Read only with `vix_stress_premium`
+    /// non-zero. In [0, 1].
+    pub vix_stress_premium_memory: f64,
+    /// The VIX's own innovation as news about the market factor's variance.
+    /// 0.0, which every preset carries, is off: nothing is projected and no
+    /// state moves, and the dial is left out of the model's digest.
+    ///
+    /// Off zero, at each close whose VIX nobody pinned, the engine reads
+    /// `u = ln(VIX / VIX at the same close with its draws at their means)`
+    /// (`economy::daily::project_close_state`): the VIX's own noise and jumps,
+    /// with no return response, fear memory or target in it. It then
+    /// multiplies both variance components and the mixture by
+    /// `exp(2 * value * u)`, within the clamps, and they decay at their own
+    /// persistences. 1.0 is the identity: a VIX innovation of 1% is a 1% move
+    /// in the factor's volatility. That is what the tape's HAR-X response says
+    /// a VIX move the return does not explain is. Its profile, 0.90 / 0.59 /
+    /// 0.46 / 0.27 over weeks 1, 2-4, months 2-3 and 4-6, is the tape's
+    /// variance impulse response. The forecast carries the news's expectation
+    /// only under `forecast_news_drift`. In [0, 2].
+    pub market_vol_vix_news: f64,
+    /// The forecast's factor variance carries the news's expected drift
+    /// (`market_vol_vix_news`). 0.0, which every preset carries, is off: the
+    /// forecast iterates the factor's variance with no news in it, and the
+    /// dial is left out of the model's digest. A switch in [0, 1]; any value
+    /// above 0.0 is on. Read only with `forecast_horizon_sessions` and
+    /// `market_vol_vix_news` set.
+    ///
+    /// The close multiplies the factor's variance by `(VIX / VIX_m)^(2 l)`,
+    /// `VIX_m` the close with its draws at their means, `l` the news dial.
+    /// The VIX's own noise is zero-mean but its jumps are not, and the
+    /// multiplier is convex, so its expectation is over one: on the
+    /// stabiliser law over 12 histories of 5,292 sessions the forecast's index
+    /// variance read low by 2, 8 and 11 per cent at 5, 21 and 63 sessions with
+    /// the news on, against 1, 4 and 2 with it off. On, each forecast close
+    /// multiplies both tracks' factor variance, within the clamps, by
+    /// `1 + 2 l E[e] + l (2 l - 1) E[e^2]` averaged over the forecast's eight
+    /// return nodes, `e = (noise + jump) / VIX_m` at the node, from the VIX
+    /// law's own dials: the noise's sd `VIX sqrt(s0^2 + (s_r r)^2)`
+    /// (`vix_innovation_sigma`, `vix_innovation_return_sigma`) and the jump's
+    /// probability and exponential mean (`vix_jump_intensity`,
+    /// `vix_jump_return_intensity`, `vix_jump_level_scale`, `vix_jump_scale`).
+    /// The expansion is exact at `l` 1.0 and 0.5. No constant is fitted.
+    pub forecast_news_drift: f64,
+    /// The forecast's measure of how far the VIX's read-back can be from its
+    /// expectation: the sd of the log read-back (half the log of the index's
+    /// one-session variance) about the forecast's at a long horizon, measured
+    /// on the model's own held-out histories as `forecast_vix_dispersion` is.
+    /// Read only with `forecast_horizon_sessions` set and under
+    /// `market_vol_vix_excursion`. 0.0, on every shipped preset, is a branch:
+    /// the excursion coupling's expectation is taken over the VIX's spread at
+    /// the read-back the forecast expects, and a value of 0.0 is left out of
+    /// the model's digest.
+    ///
+    /// Under the excursion the factor's target reads `R(VIX / I)`, `I` the
+    /// read-back of the session's own index variance, and `R` is convex. The
+    /// VIX and `I` move together, so the ratio's spread is narrower than the
+    /// VIX's, and `I`'s own spread lowers its median below the read-back of
+    /// the expected variance. Off zero the expectation track takes the target
+    /// over `x = ln(VIX / I)` lognormal, of log variance
+    /// `s_v^2 + s_i^2 - 2 rho s_v s_i` and with `VIX D / I` of mean
+    /// `vix exp(1.5 s_i^2 - rho s_v s_i)`, `D` the read-back the forecast
+    /// expects, on the VIX spread's own shape; `s_i^2` is this sd's square at
+    /// the horizon, at `forecast_readback_dispersion_half_life`, and `rho` is
+    /// `forecast_readback_correlation`. In [0, 2].
+    pub forecast_readback_dispersion: f64,
+    /// The half-life, in sessions, of the gap between the log read-back's
+    /// spread about the forecast and its long-horizon level
+    /// (`forecast_readback_dispersion`), as `forecast_vix_dispersion_half_life`
+    /// is the VIX's: its variance after `c` closes is
+    /// `sd^2 * (1 - 0.5^(2c / half-life))`. Read only with that dial set; 0.0,
+    /// on every shipped preset, reaches the long-horizon spread from the
+    /// first close, and a value of 0.0 is left out of the model's digest. In
+    /// [0, 2520].
+    pub forecast_readback_dispersion_half_life: f64,
+    /// The sd of the log read-back about the forecast after one close: the
+    /// spread the session's own shock to the variance processes leaves at
+    /// once, measured on the model's own held-out histories as the
+    /// long-horizon sd is. Read only with `forecast_readback_dispersion` set;
+    /// 0.0, on every shipped preset, grows the spread from zero at the
+    /// half-life alone, and a value of 0.0 is left out of the model's digest.
+    /// Off zero the spread after `c >= 1` closes is
+    /// `s1^2 + (sd^2 - s1^2)(1 - 0.5^(2 (c - 1) / half-life))`.
+    ///
+    /// The VIX's target reads the read-back of the variance its own session
+    /// has just moved, and it is concave in it, so the forecast's VIX step
+    /// at the read-back of the expected variance reads high. On the
+    /// stabiliser law over 12 histories of 5,292 sessions the read-back's
+    /// log spread after one close was 0.034 in variance, its mean -0.035
+    /// (the forecast's variance is the mean), and the forecast's VIX read
+    /// 0.075 points high at one close, which is what that spread predicts
+    /// through `I^0.625` at a reversion of 0.27. The same held on R22O5czNW
+    /// (anchor form): spread 0.029, 0.078 high. In [0, 2].
+    pub forecast_readback_dispersion_first: f64,
+    /// The correlation of the log VIX's and the log read-back's errors about
+    /// the forecast, measured with their spreads on the model's own held-out
+    /// histories. Read only with `forecast_readback_dispersion` set; 0.0, on
+    /// every shipped preset, takes the two as uncorrelated, and a value of
+    /// 0.0 is left out of the model's digest. In [-1, 1].
+    pub forecast_readback_correlation: f64,
+    /// The forecast reads the VIX's slow level (`vix_level_sigma`) as the
+    /// close does. 0.0, which every preset carries, is off: the forecast's
+    /// VIX step reads the read-back and the anchor without the level's
+    /// multiplier, and the dial is left out of the model's digest. A switch
+    /// in [0, 1]; any value above 0.0 is on. Read only with
+    /// `forecast_horizon_sessions` set.
+    ///
+    /// The close multiplies the read-back and the anchor level by
+    /// `exp(l - v / 2)`, `l` an AR(1) at `vix_level_persistence` stepped at
+    /// each close and `v` its stationary variance. Without it the forecast's
+    /// VIX reads high in a calm regime (`l` below zero) and low in a stormy
+    /// one: on the stabiliser law over 12 histories of 5,292 sessions, 0.15
+    /// points high at one close with the VIX under 15 and 0.06 low over 30.
+    /// On, the step reads its expectation `c` closes on,
+    /// `exp(phi^c l - phi^(2c) v / 2)`.
+    pub forecast_vix_level_path: f64,
+    /// The share of the VIX's own innovation that enters the published quote
+    /// alone. 0.0, which every preset carries, is off: the quote is the
+    /// state's, no state is kept, and the dial is left out of the model's
+    /// digest. In [0, 1).
+    ///
+    /// Off zero, at each close whose VIX nobody pinned, the innovation
+    /// `u = ln(VIX / VIX at the same close with its draws at their means)`
+    /// splits. The state takes `(1 - share) u`. A quote state `q` takes
+    /// `share u` and decays at `vix_quote_transient_persistence`. The
+    /// published VIX is the state's quote times `exp(q)`, never above
+    /// `vix_ceiling`. Every internal reader reads the state. The news
+    /// (`market_vol_vix_news`) reads the state's part. A pinned VIX clears
+    /// `q`. The live mark and the forecast read `q`'s expected decay.
+    ///
+    /// The tape's log VIX has two poles: 0.942 with 21% of the level's
+    /// variance and 0.9965 with 79% (1990-2025). Their innovations split
+    /// 81/19, so the projection of an innovation on its transient part is
+    /// 0.81 of it.
+    pub vix_quote_transient_share: f64,
+    /// The per-session persistence of the quote's transient part
+    /// (`vix_quote_transient_share`). Read only with the share set; 0.0,
+    /// which every preset carries, lets it last one session, and a value of
+    /// 0.0 is left out of the model's digest. The tape's fast pole is 0.942.
+    /// In [0, 1).
+    pub vix_quote_transient_persistence: f64,
+    /// The VIX coupling a close whose VIX a caller pinned reads: the old
+    /// VIX law kept for pinned closes. 0.0, which every preset carries, is
+    /// off: a pinned close reads the free law, and the dial is left out of
+    /// the model's digest. In [0, 1].
+    ///
+    /// Off zero, on a close whose VIX was pinned that day, the market
+    /// factor's variance target is `level * (1 - c + c * (VIX / anchor)^e)`
+    /// with `c` this dial, `e` `pinned_vix_exponent`, and `anchor` the fixed
+    /// `vix_anchor` the excursion-off law divides by. The excursion
+    /// (`market_vol_vix_excursion`) is not read there, so a forced close
+    /// (a scenario's `vix_sets_variance`, or every pin under
+    /// `pinned_vix_sets_variance` where the engine has it) sets the variance
+    /// to that law's level with no read-back fixed point.
+    /// Free closes and every other reader of the VIX are untouched. No state
+    /// and no draw.
+    ///
+    /// Why. Under the stabilised law (excursion 1, coupling 0.25, exponent
+    /// 1.5) the free VIX follows the variance, and a pinned VIX has no route
+    /// back to it: the excursion's denominator is the read-back, the news
+    /// skips a pinned close, and at 0.25 and 1.5 the fixed anchor's ratio
+    /// barely moves the target. The real 2008 and 2020 VIX, pinned every
+    /// session, then gave peak RV21 of 42 and 44 against the S&P 500's 84
+    /// and 95 (90 seeds). With the whole law back at 0.75 and 4.0, excursion
+    /// off, the replays read 89 and 84 (12 seeds); this dial keeps that law
+    /// for the pinned closes alone.
+    pub pinned_vix_coupling: f64,
+    /// The VIX exponent a pinned close reads under `pinned_vix_coupling`.
+    /// Read only with that dial set; 0.0, which every preset carries, reads
+    /// the free `market_vol_vix_exponent`, and a value of 0.0 is left out of
+    /// the model's digest. In [0, 8].
+    pub pinned_vix_exponent: f64,
+    /// The stress premium as the anchor's own pull, undone above the knee.
+    /// 0.0, which every preset carries, is the shipped form, the capped hinge
+    /// `cap * (1 - exp(-g * max(0, m - knee) / cap))`. Off zero (a switch, in
+    /// [0, 1]; any value above 0.0 is on) the premium is
+    /// `vix_anchor_weight * max(0, m - knee)`, uncapped (the quote still never
+    /// passes `vix_ceiling`), and `vix_stress_premium`'s gain and the cap are
+    /// not read.
+    ///
+    /// The anchor pulls the VIX's target down by `exp(-a s)` against its slow
+    /// memory `s`, which the stress memory `m` equals in a free run. The
+    /// premium exists to give the quote back what that pull takes in stress.
+    /// The hinge saturates at its cap, so in a long spell the state keeps
+    /// falling against realised volatility and the quote falls with it: the
+    /// tape's VIX over trailing 21-session realised volatility is flat in the
+    /// spell's age (0.80 to 0.88 from the first session to the 63rd and
+    /// after, S&P 500 and ^VIX 1990-2025), where the hinge's quote falls
+    /// from 0.95 to 0.59 on the pt-v22 VIX law. This form undoes the pull
+    /// beyond the knee exactly, with the anchor's weight and no fitted
+    /// number. Read only with `vix_stress_premium` non-zero.
+    pub vix_stress_premium_undo: f64,
     /// The VIX's fear memory: the share of the VIX's log excursion over its
     /// target that the target takes up each session. 0.0, which every preset
     /// carries, is off: the target is the anchor's and no state is written.
@@ -7495,6 +8218,18 @@ const PT_V2_BITS: &[(&str, u64)] = &[
 ];
 
 impl ModelParams {
+    /// The published VIX's stress memory's per-session rate:
+    /// `vix_stress_premium_memory`, or the anchor's (`vix_anchor_memory`)
+    /// with it at 0.0, as every preset ships, so the memory steps exactly as
+    /// it did.
+    pub fn vix_stress_memory_rate(&self) -> f64 {
+        if self.vix_stress_premium_memory != 0.0 {
+            self.vix_stress_premium_memory
+        } else {
+            self.vix_anchor_memory
+        }
+    }
+
     /// The shipped preset. `const fn`, so `PT_V1` is a compile-time value
     /// and reading a field is exactly as cheap as reading the const it
     /// mirrors.
@@ -7721,6 +8456,37 @@ impl ModelParams {
             oil_mean_reversion: 0.0,
             oil_noise_sd: 0.0,
             oil_inventory_level_gain: 0.0,
+            oil_convenience_yield: 0.0,
+            oil_target_drift_sd: 0.0,
+            oil_pushes_in_target: 0.0,
+            oil_noise_log_sd: 0.0,
+            oil_dollar_elasticity: 0.0,
+            oil_inventory_noise_sd: 0.0,
+            oil_forecast_clamp: 0.0,
+            usd_mean_reversion: 0.0,
+            usd_noise_sd: 0.0,
+            usd_safe_haven_gain: 0.0,
+            fed_core_inflation: 0.0,
+            treasury_core_inflation: 0.0,
+            treasury_zlb_path: 0.0,
+            treasury_zlb_haven_gain: 0.0,
+            fed_neutral_real_rate: 0.0,
+            core_trend_sd: 0.0,
+            core_trend_persistence: 0.0,
+            cycle_inflation_hazard: 0.0,
+            cycle_rate_hazard: 0.0,
+            fed_eve_decision: 0.0,
+            treasury_path_owed_excluded: 0.0,
+            corporate_spread_equity_lag: 0.0,
+            corporate_spread_noise_sd: 0.0,
+            corporate_spread_noise_half_life: 0.0,
+            treasury_2y_meeting_carry: 0.0,
+            policy_anticipation_half_life: 0.0,
+            treasury_path_anticipated: 0.0,
+            policy_anticipation_guidance: 0.0,
+            oil_price_floor: 0.0,
+            oil_price_ceiling: 0.0,
+            oil_target_drift_reversion: 0.0,
             oil_inflation_passthrough: 0.0,
             index_level_listed: 0.0,
             vix_intraday_live: 0.0,
@@ -7773,6 +8539,9 @@ impl ModelParams {
             pinned_vix_calm_knee: 0.0,
             pinned_vix_calm_share: 0.0,
             pinned_vix_priced_cap: 0.0,
+            pinned_vix_sets_variance: 0.0,
+            valuation_multiple_share: 0.0,
+            valuation_multiple_half_life: 0.0,
             buyback_yield_cap: 0.0,
             buyback_accrual: 0.0,
             rate_close_remark: 0.0,
@@ -7809,6 +8578,19 @@ impl ModelParams {
             vix_stress_premium: 0.0,
             vix_stress_premium_knee: 0.0,
             vix_stress_premium_cap: 0.0,
+            vix_stress_premium_memory: 0.0,
+            market_vol_vix_news: 0.0,
+            forecast_news_drift: 0.0,
+            forecast_readback_dispersion: 0.0,
+            forecast_readback_dispersion_half_life: 0.0,
+            forecast_readback_dispersion_first: 0.0,
+            forecast_readback_correlation: 0.0,
+            forecast_vix_level_path: 0.0,
+            vix_quote_transient_share: 0.0,
+            vix_quote_transient_persistence: 0.0,
+            pinned_vix_coupling: 0.0,
+            pinned_vix_exponent: 0.0,
+            vix_stress_premium_undo: 0.0,
             vix_fear_uptake: 0.0,
             vix_fear_half_life: 0.0,
             fed_put_gain: 0.0,
@@ -10333,6 +11115,37 @@ impl ModelParams {
             "oil_mean_reversion" => self.oil_mean_reversion,
             "oil_noise_sd" => self.oil_noise_sd,
             "oil_inventory_level_gain" => self.oil_inventory_level_gain,
+            "oil_convenience_yield" => self.oil_convenience_yield,
+            "oil_target_drift_sd" => self.oil_target_drift_sd,
+            "oil_pushes_in_target" => self.oil_pushes_in_target,
+            "oil_noise_log_sd" => self.oil_noise_log_sd,
+            "oil_dollar_elasticity" => self.oil_dollar_elasticity,
+            "oil_inventory_noise_sd" => self.oil_inventory_noise_sd,
+            "oil_forecast_clamp" => self.oil_forecast_clamp,
+            "usd_mean_reversion" => self.usd_mean_reversion,
+            "usd_noise_sd" => self.usd_noise_sd,
+            "usd_safe_haven_gain" => self.usd_safe_haven_gain,
+            "fed_core_inflation" => self.fed_core_inflation,
+            "treasury_core_inflation" => self.treasury_core_inflation,
+            "treasury_zlb_path" => self.treasury_zlb_path,
+            "treasury_zlb_haven_gain" => self.treasury_zlb_haven_gain,
+            "fed_neutral_real_rate" => self.fed_neutral_real_rate,
+            "core_trend_sd" => self.core_trend_sd,
+            "core_trend_persistence" => self.core_trend_persistence,
+            "cycle_inflation_hazard" => self.cycle_inflation_hazard,
+            "cycle_rate_hazard" => self.cycle_rate_hazard,
+            "fed_eve_decision" => self.fed_eve_decision,
+            "treasury_path_owed_excluded" => self.treasury_path_owed_excluded,
+            "corporate_spread_equity_lag" => self.corporate_spread_equity_lag,
+            "corporate_spread_noise_sd" => self.corporate_spread_noise_sd,
+            "corporate_spread_noise_half_life" => self.corporate_spread_noise_half_life,
+            "treasury_2y_meeting_carry" => self.treasury_2y_meeting_carry,
+            "policy_anticipation_half_life" => self.policy_anticipation_half_life,
+            "treasury_path_anticipated" => self.treasury_path_anticipated,
+            "policy_anticipation_guidance" => self.policy_anticipation_guidance,
+            "oil_price_floor" => self.oil_price_floor,
+            "oil_price_ceiling" => self.oil_price_ceiling,
+            "oil_target_drift_reversion" => self.oil_target_drift_reversion,
             "oil_inflation_passthrough" => self.oil_inflation_passthrough,
             "index_level_listed" => self.index_level_listed,
             "vix_intraday_live" => self.vix_intraday_live,
@@ -10385,6 +11198,9 @@ impl ModelParams {
             "pinned_vix_calm_knee" => self.pinned_vix_calm_knee,
             "pinned_vix_calm_share" => self.pinned_vix_calm_share,
             "pinned_vix_priced_cap" => self.pinned_vix_priced_cap,
+            "pinned_vix_sets_variance" => self.pinned_vix_sets_variance,
+            "valuation_multiple_share" => self.valuation_multiple_share,
+            "valuation_multiple_half_life" => self.valuation_multiple_half_life,
             "buyback_yield_cap" => self.buyback_yield_cap,
             "buyback_accrual" => self.buyback_accrual,
             "rate_close_remark" => self.rate_close_remark,
@@ -10421,6 +11237,19 @@ impl ModelParams {
             "vix_stress_premium" => self.vix_stress_premium,
             "vix_stress_premium_knee" => self.vix_stress_premium_knee,
             "vix_stress_premium_cap" => self.vix_stress_premium_cap,
+            "vix_stress_premium_memory" => self.vix_stress_premium_memory,
+            "market_vol_vix_news" => self.market_vol_vix_news,
+            "forecast_news_drift" => self.forecast_news_drift,
+            "forecast_readback_dispersion" => self.forecast_readback_dispersion,
+            "forecast_readback_dispersion_half_life" => self.forecast_readback_dispersion_half_life,
+            "forecast_readback_dispersion_first" => self.forecast_readback_dispersion_first,
+            "forecast_vix_level_path" => self.forecast_vix_level_path,
+            "vix_quote_transient_share" => self.vix_quote_transient_share,
+            "vix_quote_transient_persistence" => self.vix_quote_transient_persistence,
+            "pinned_vix_coupling" => self.pinned_vix_coupling,
+            "pinned_vix_exponent" => self.pinned_vix_exponent,
+            "forecast_readback_correlation" => self.forecast_readback_correlation,
+            "vix_stress_premium_undo" => self.vix_stress_premium_undo,
             "vix_fear_uptake" => self.vix_fear_uptake,
             "vix_fear_half_life" => self.vix_fear_half_life,
             "fed_put_gain" => self.fed_put_gain,
@@ -10710,6 +11539,37 @@ impl ModelParams {
             "oil_mean_reversion" => out.oil_mean_reversion = value,
             "oil_noise_sd" => out.oil_noise_sd = value,
             "oil_inventory_level_gain" => out.oil_inventory_level_gain = value,
+            "oil_convenience_yield" => out.oil_convenience_yield = value,
+            "oil_target_drift_sd" => out.oil_target_drift_sd = value,
+            "oil_pushes_in_target" => out.oil_pushes_in_target = value,
+            "oil_noise_log_sd" => out.oil_noise_log_sd = value,
+            "oil_dollar_elasticity" => out.oil_dollar_elasticity = value,
+            "oil_inventory_noise_sd" => out.oil_inventory_noise_sd = value,
+            "oil_forecast_clamp" => out.oil_forecast_clamp = value,
+            "usd_mean_reversion" => out.usd_mean_reversion = value,
+            "usd_noise_sd" => out.usd_noise_sd = value,
+            "usd_safe_haven_gain" => out.usd_safe_haven_gain = value,
+            "fed_core_inflation" => out.fed_core_inflation = value,
+            "treasury_core_inflation" => out.treasury_core_inflation = value,
+            "treasury_zlb_path" => out.treasury_zlb_path = value,
+            "treasury_zlb_haven_gain" => out.treasury_zlb_haven_gain = value,
+            "fed_neutral_real_rate" => out.fed_neutral_real_rate = value,
+            "core_trend_sd" => out.core_trend_sd = value,
+            "core_trend_persistence" => out.core_trend_persistence = value,
+            "cycle_inflation_hazard" => out.cycle_inflation_hazard = value,
+            "cycle_rate_hazard" => out.cycle_rate_hazard = value,
+            "fed_eve_decision" => out.fed_eve_decision = value,
+            "treasury_path_owed_excluded" => out.treasury_path_owed_excluded = value,
+            "corporate_spread_equity_lag" => out.corporate_spread_equity_lag = value,
+            "corporate_spread_noise_sd" => out.corporate_spread_noise_sd = value,
+            "corporate_spread_noise_half_life" => out.corporate_spread_noise_half_life = value,
+            "treasury_2y_meeting_carry" => out.treasury_2y_meeting_carry = value,
+            "policy_anticipation_half_life" => out.policy_anticipation_half_life = value,
+            "treasury_path_anticipated" => out.treasury_path_anticipated = value,
+            "policy_anticipation_guidance" => out.policy_anticipation_guidance = value,
+            "oil_price_floor" => out.oil_price_floor = value,
+            "oil_price_ceiling" => out.oil_price_ceiling = value,
+            "oil_target_drift_reversion" => out.oil_target_drift_reversion = value,
             "oil_inflation_passthrough" => out.oil_inflation_passthrough = value,
             "index_level_listed" => out.index_level_listed = value,
             "vix_intraday_live" => out.vix_intraday_live = value,
@@ -10762,6 +11622,9 @@ impl ModelParams {
             "pinned_vix_calm_knee" => out.pinned_vix_calm_knee = value,
             "pinned_vix_calm_share" => out.pinned_vix_calm_share = value,
             "pinned_vix_priced_cap" => out.pinned_vix_priced_cap = value,
+            "pinned_vix_sets_variance" => out.pinned_vix_sets_variance = value,
+            "valuation_multiple_share" => out.valuation_multiple_share = value,
+            "valuation_multiple_half_life" => out.valuation_multiple_half_life = value,
             "buyback_yield_cap" => out.buyback_yield_cap = value,
             "buyback_accrual" => out.buyback_accrual = value,
             "rate_close_remark" => out.rate_close_remark = value,
@@ -10798,6 +11661,19 @@ impl ModelParams {
             "vix_stress_premium" => out.vix_stress_premium = value,
             "vix_stress_premium_knee" => out.vix_stress_premium_knee = value,
             "vix_stress_premium_cap" => out.vix_stress_premium_cap = value,
+            "vix_stress_premium_memory" => out.vix_stress_premium_memory = value,
+            "market_vol_vix_news" => out.market_vol_vix_news = value,
+            "forecast_news_drift" => out.forecast_news_drift = value,
+            "forecast_readback_dispersion" => out.forecast_readback_dispersion = value,
+            "forecast_readback_dispersion_half_life" => out.forecast_readback_dispersion_half_life = value,
+            "forecast_readback_dispersion_first" => out.forecast_readback_dispersion_first = value,
+            "forecast_vix_level_path" => out.forecast_vix_level_path = value,
+            "vix_quote_transient_share" => out.vix_quote_transient_share = value,
+            "vix_quote_transient_persistence" => out.vix_quote_transient_persistence = value,
+            "pinned_vix_coupling" => out.pinned_vix_coupling = value,
+            "pinned_vix_exponent" => out.pinned_vix_exponent = value,
+            "forecast_readback_correlation" => out.forecast_readback_correlation = value,
+            "vix_stress_premium_undo" => out.vix_stress_premium_undo = value,
             "vix_fear_uptake" => out.vix_fear_uptake = value,
             "vix_fear_half_life" => out.vix_fear_half_life = value,
             "fed_put_gain" => out.fed_put_gain = value,
@@ -11486,6 +12362,30 @@ impl ModelParams {
                 "pinned_vix_priced_cap is {}. It is a switch, in [0, 1].",
                 self.pinned_vix_priced_cap));
         }
+        if !(self.pinned_vix_sets_variance == 0.0 || self.pinned_vix_sets_variance == 1.0) {
+            return Err(format!(
+                "pinned_vix_sets_variance is {}. It is a switch: 0 (a pin reaches the variance one \
+                 step a close) or 1 (every pin sets it, as vix_sets_variance does).",
+                self.pinned_vix_sets_variance));
+        }
+        if !(self.valuation_multiple_share >= 0.0 && self.valuation_multiple_share <= 1.0) {
+            return Err(format!(
+                "valuation_multiple_share is {}. It is the share of each name's permanent market \
+                 move its valuation multiple carries, in [0, 1]; 0 sends it all to earnings.",
+                self.valuation_multiple_share));
+        }
+        if !(self.valuation_multiple_half_life >= 0.0 && self.valuation_multiple_half_life <= 100000.0) {
+            return Err(format!(
+                "valuation_multiple_half_life is {}. It is the half-life in sessions of the valuation \
+                 multiple's pull to its target, in [0, 100000].",
+                self.valuation_multiple_half_life));
+        }
+        if self.valuation_multiple_share != 0.0 && self.valuation_multiple_half_life == 0.0 {
+            return Err(format!(
+                "valuation_multiple_half_life is 0 but valuation_multiple_share is {}. A multiple with \
+                 no pull wanders without bound, so set the half-life (in sessions, above 0).",
+                self.valuation_multiple_share));
+        }
         if !(self.market_vol_slow_gamma >= 0.0 && self.market_vol_slow_gamma <= 1.0) {
             return Err(format!(
                 "market_vol_slow_gamma is {}. It is a GJR loading on the slow component's squared shock, in [0, 1].",
@@ -11678,6 +12578,64 @@ impl ModelParams {
                 "vix_stress_premium_cap is {}. It is the largest log premium of the \
                  published VIX over the state, in [0, 1].",
                 self.vix_stress_premium_cap));
+        }
+        if !(self.market_vol_vix_news >= 0.0 && self.market_vol_vix_news <= 2.0) {
+            return Err(format!(
+                "market_vol_vix_news is {}. It is the loading of the VIX's own \
+                 innovation on the factor's volatility, in [0, 2]; 1 is the identity, 0 is off.",
+                self.market_vol_vix_news));
+        }
+        for (name, value, lo, hi, unit) in [
+            ("forecast_news_drift", self.forecast_news_drift, 0.0, 1.0,
+             "a switch for the news's drift in the forecast's factor variance"),
+            ("forecast_readback_dispersion", self.forecast_readback_dispersion, 0.0, 2.0,
+             "the sd of the log read-back about the forecast at a long horizon"),
+            ("forecast_readback_dispersion_half_life", self.forecast_readback_dispersion_half_life, 0.0, 2520.0,
+             "a half-life in sessions"),
+            ("forecast_readback_correlation", self.forecast_readback_correlation, -1.0, 1.0,
+             "the correlation of the log VIX's and the log read-back's errors about the forecast"),
+            ("forecast_readback_dispersion_first", self.forecast_readback_dispersion_first, 0.0, 2.0,
+             "the sd of the log read-back about the forecast after one close"),
+            ("forecast_vix_level_path", self.forecast_vix_level_path, 0.0, 1.0,
+             "a switch for the VIX's slow level in the forecast's VIX step"),
+        ] {
+            if !(value >= lo && value <= hi) {
+                return Err(format!(
+                    "{name} is {value}. It is {unit}, in [{lo}, {hi}]; 0 is off."));
+            }
+        }
+        for (name, value, unit) in [
+            ("vix_quote_transient_share", self.vix_quote_transient_share,
+             "the share of the VIX's own innovation that enters the quote alone"),
+            ("vix_quote_transient_persistence", self.vix_quote_transient_persistence,
+             "the quote's transient part's per-session persistence"),
+        ] {
+            if !(value >= 0.0 && value < 1.0) {
+                return Err(format!("{name} is {value}. It is {unit}, in [0, 1); 0 is off."));
+            }
+        }
+        if !(self.pinned_vix_coupling >= 0.0 && self.pinned_vix_coupling <= 1.0) {
+            return Err(format!(
+                "pinned_vix_coupling is {}. It is the VIX coupling a pinned close reads, in [0, 1]; 0 is off.",
+                self.pinned_vix_coupling));
+        }
+        if !(self.pinned_vix_exponent >= 0.0 && self.pinned_vix_exponent <= 8.0) {
+            return Err(format!(
+                "pinned_vix_exponent is {}. It is the VIX exponent a pinned close reads, in [0, 8]; 0 reads \
+                 the free exponent.",
+                self.pinned_vix_exponent));
+        }
+        if !(self.vix_stress_premium_memory >= 0.0 && self.vix_stress_premium_memory <= 1.0) {
+            return Err(format!(
+                "vix_stress_premium_memory is {}. It is the stress memory's per-session \
+                 rate, in [0, 1]; 0 is the anchor's rate (vix_anchor_memory).",
+                self.vix_stress_premium_memory));
+        }
+        if !(self.vix_stress_premium_undo >= 0.0 && self.vix_stress_premium_undo <= 1.0) {
+            return Err(format!(
+                "vix_stress_premium_undo is {}. It is a switch in [0, 1]: off at 0, and \
+                 any value above 0 makes the premium the anchor's pull above the knee.",
+                self.vix_stress_premium_undo));
         }
         if self.vix_stress_premium != 0.0 {
             if self.vix_stress_premium_cap == 0.0 {
@@ -12051,6 +13009,218 @@ impl ModelParams {
                  inventory's pressure moves the oil price's level by, in [0, 2520]; 0 is the \
                  standing push.",
                 self.oil_inventory_level_gain));
+        }
+        if !(0.0..=10.0).contains(&self.oil_convenience_yield) {
+            return Err(format!(
+                "oil_convenience_yield is {}. It is the elasticity of the oil price's target to \
+                 inventory, in [0, 10]; 0 is no premium.",
+                self.oil_convenience_yield));
+        }
+        if self.oil_convenience_yield != 0.0 && self.oil_inventory_reversion == 0.0 {
+            return Err(format!(
+                "oil_inventory_reversion is 0 but oil_convenience_yield is {}. The premium unwinds \
+                 as inventory refills to its normal level, which only oil_inventory_reversion \
+                 gives it: set oil_inventory_reversion first.",
+                self.oil_convenience_yield));
+        }
+        if !(self.oil_pushes_in_target == 0.0 || self.oil_pushes_in_target == 1.0) {
+            return Err(format!(
+                "oil_pushes_in_target is {}. It is a switch: 0 (the pushes join the price \
+                 that reverts at oil_mean_reversion) or 1 (they decay at the shipped 0.03).",
+                self.oil_pushes_in_target));
+        }
+        if !(0.0..=1.0).contains(&self.usd_mean_reversion) {
+            return Err(format!(
+                "usd_mean_reversion is {}. It is the share of the dollar index's gap to its \
+                 target closed each session, in [0, 1]; 0 is the standing 0.02.",
+                self.usd_mean_reversion));
+        }
+        if !(self.oil_price_floor == 0.0 || (self.oil_price_floor > 0.0 && self.oil_price_floor <= 35.0)) {
+            return Err(format!(
+                "oil_price_floor is {}. It is the oil price's lower bound in dollars, in (0, 35], \
+                 or 0.0 for the standing 35.",
+                self.oil_price_floor));
+        }
+        if !(self.oil_price_ceiling == 0.0 || (150.0..=1000.0).contains(&self.oil_price_ceiling)) {
+            return Err(format!(
+                "oil_price_ceiling is {}. It is the oil price's upper bound in dollars, in \
+                 [150, 1000], or 0.0 for the standing 150.",
+                self.oil_price_ceiling));
+        }
+        if !(0.0..=5.0).contains(&self.usd_noise_sd) {
+            return Err(format!(
+                "usd_noise_sd is {}. It is the sd of the dollar index's daily noise, points, in \
+                 [0, 5]; 0 is the standing 0.3.",
+                self.usd_noise_sd));
+        }
+        if !(0.0..=1.0).contains(&self.usd_safe_haven_gain) {
+            return Err(format!(
+                "usd_safe_haven_gain is {}. It is the dollar's daily drift per VIX point above \
+                 usd_crisis_vix_threshold, index points, in [0, 1]; 0 is the standing 0.05.",
+                self.usd_safe_haven_gain));
+        }
+        if !(self.fed_core_inflation == 0.0 || self.fed_core_inflation == 1.0) {
+            return Err(format!(
+                "fed_core_inflation is {}. It is a switch: 0 (the central bank reads headline \
+                 inflation) or 1 (core: headline less the oil pass-through's accumulated part).",
+                self.fed_core_inflation));
+        }
+        if !(self.treasury_core_inflation == 0.0 || self.treasury_core_inflation == 1.0) {
+            return Err(format!(
+                "treasury_core_inflation is {}. It is a switch: 0 (the Treasury curve reads \
+                 headline inflation) or 1 (core: headline less the oil pass-through's accumulated \
+                 part).",
+                self.treasury_core_inflation));
+        }
+        if !(0.0..=20.0).contains(&self.treasury_zlb_path) {
+            return Err(format!(
+                "treasury_zlb_path is {}. It is the share of the Fed put's unmet ask the curve \
+                 prices at the zero bound, in [0, 20]; 0 prices the put up to the rate.",
+                self.treasury_zlb_path));
+        }
+        if self.treasury_zlb_path != 0.0
+            && (self.fed_put_gain == 0.0 || self.treasury_path_pricing == 0.0)
+        {
+            return Err(format!(
+                "treasury_zlb_path is {} with fed_put_gain {} and treasury_path_pricing {}. It \
+                 prices the put's unmet ask and decays it at the priced path's half-life, so it \
+                 needs both.",
+                self.treasury_zlb_path, self.fed_put_gain, self.treasury_path_pricing));
+        }
+        if !(0.0..=1.0).contains(&self.treasury_zlb_haven_gain) {
+            return Err(format!(
+                "treasury_zlb_haven_gain is {}. It is the term premium's fall per VIX point above \
+                 20 at the zero bound, in [0, 1].",
+                self.treasury_zlb_haven_gain));
+        }
+        if !(0.0..=1.0).contains(&self.policy_anticipation_guidance) {
+            return Err(format!(
+                "policy_anticipation_guidance is {}. It is the share of the priced change the \
+                 market takes from the Fed's own reading, in [0, 1]; 0 prices the published \
+                 shadow alone.",
+                self.policy_anticipation_guidance));
+        }
+        if !(self.treasury_path_anticipated == 0.0 || self.treasury_path_anticipated == 1.0) {
+            return Err(format!(
+                "treasury_path_anticipated is {}. It is a switch: 0 (the meeting steps the priced \
+                 path by the rate's change) or 1 (by the further move the anticipation priced).",
+                self.treasury_path_anticipated));
+        }
+        if !(0.0..=252.0).contains(&self.policy_anticipation_half_life) {
+            return Err(format!(
+                "policy_anticipation_half_life is {}. It is the half-life, in sessions, of the \
+                 priced change for the next meeting between meetings, in [0, 252]; 0 is the \
+                 shadow's change every close, as it stood.",
+                self.policy_anticipation_half_life));
+        }
+        if !(0.0..=1.0).contains(&self.treasury_2y_meeting_carry) {
+            return Err(format!(
+                "treasury_2y_meeting_carry is {}. It is the share of the 2-year's standing gap to \
+                 the meeting's formula a meeting keeps, in [0, 1]; 0 is the reset that stood.",
+                self.treasury_2y_meeting_carry));
+        }
+        if !(-2.0..=5.0).contains(&self.fed_neutral_real_rate) {
+            return Err(format!(
+                "fed_neutral_real_rate is {}. It is the points added to the Taylor rule's neutral \
+                 rate, in [-2, 5]; 0 is the neutral that stood.",
+                self.fed_neutral_real_rate));
+        }
+        if !(0.0..=2.0).contains(&self.core_trend_sd) {
+            return Err(format!(
+                "core_trend_sd is {}. It is the monthly innovation sd of core inflation's trend, \
+                 in [0, 2]; 0 is no trend.",
+                self.core_trend_sd));
+        }
+        if !(0.0..=1.0).contains(&self.core_trend_persistence) {
+            return Err(format!(
+                "core_trend_persistence is {}. It is core inflation's trend's monthly AR(1) \
+                 coefficient, in [0, 1].",
+                self.core_trend_persistence));
+        }
+        if !(0.0..=0.5).contains(&self.cycle_inflation_hazard) {
+            return Err(format!(
+                "cycle_inflation_hazard is {}. It is the monthly peak hazard an expansion adds with \
+                 inflation above 4, in [0, 0.5]; 0 is the legacy 0.1.",
+                self.cycle_inflation_hazard));
+        }
+        if !(0.0..=0.5).contains(&self.cycle_rate_hazard) {
+            return Err(format!(
+                "cycle_rate_hazard is {}. It is the monthly peak hazard an expansion adds with the \
+                 funds rate above 5, in [0, 0.5]; 0 is the legacy 0.1.",
+                self.cycle_rate_hazard));
+        }
+        if !(self.fed_eve_decision == 0.0 || self.fed_eve_decision == 1.0) {
+            return Err(format!(
+                "fed_eve_decision is {}. It is a switch: 0 (the meeting re-reads the day) or 1 \
+                 (a scheduled meeting delivers the eve's decision).",
+                self.fed_eve_decision));
+        }
+        if !(self.treasury_path_owed_excluded == 0.0 || self.treasury_path_owed_excluded == 1.0) {
+            return Err(format!(
+                "treasury_path_owed_excluded is {}. It is a switch: 0 (the anticipated path's step \
+                 carries the put's owed step) or 1 (it leaves it out).",
+                self.treasury_path_owed_excluded));
+        }
+        if !(self.corporate_spread_equity_lag >= 0.0 && self.corporate_spread_equity_lag <= 252.0) {
+            return Err(format!(
+                "corporate_spread_equity_lag is {}. It is a half-life in sessions, in [0, 252]; \
+                 0 is the spread reading the leverage gap itself.",
+                self.corporate_spread_equity_lag));
+        }
+        if !(self.corporate_spread_noise_sd >= 0.0 && self.corporate_spread_noise_sd <= 0.5) {
+            return Err(format!(
+                "corporate_spread_noise_sd is {}. It is the per-session innovation sd of credit's \
+                 own state, points of the spread's base, in [0, 0.5]; 0 is no state.",
+                self.corporate_spread_noise_sd));
+        }
+        if !(self.corporate_spread_noise_half_life >= 0.0 && self.corporate_spread_noise_half_life <= 2520.0) {
+            return Err(format!(
+                "corporate_spread_noise_half_life is {}. It is the half-life in sessions of credit's \
+                 own state, in [0, 2520].",
+                self.corporate_spread_noise_half_life));
+        }
+        if !(self.oil_forecast_clamp == 0.0 || self.oil_forecast_clamp == 1.0) {
+            return Err(format!(
+                "oil_forecast_clamp is {}. It is a switch: 0 (the forecast publishes the \
+                 unclamped expectation) or 1 (the expectation truncated at the clamps).",
+                self.oil_forecast_clamp));
+        }
+        if !(0.0..=5.0).contains(&self.oil_inventory_noise_sd) {
+            return Err(format!(
+                "oil_inventory_noise_sd is {}. It is the sd of oil inventory's daily noise, in \
+                 [0, 5]; 0 is the standing 0.5.",
+                self.oil_inventory_noise_sd));
+        }
+        if !(0.0..=5.0).contains(&self.oil_dollar_elasticity) {
+            return Err(format!(
+                "oil_dollar_elasticity is {}. It is the oil price's elasticity to the dollar \
+                 index as a level, in [0, 5]; 0 is the dollar's daily drag.",
+                self.oil_dollar_elasticity));
+        }
+        if !(0.0..=0.1).contains(&self.oil_noise_log_sd) {
+            return Err(format!(
+                "oil_noise_log_sd is {}. It is the sd of the oil price's daily log change from \
+                 its noise, in [0, 0.1]; 0 is the noise in dollars.",
+                self.oil_noise_log_sd));
+        }
+        if !(0.0..=0.1).contains(&self.oil_target_drift_sd) {
+            return Err(format!(
+                "oil_target_drift_sd is {}. It is the daily sd of the log of oil's long-term \
+                 level, in [0, 0.1]; 0 is no long factor.",
+                self.oil_target_drift_sd));
+        }
+        if !(0.0..=1.0).contains(&self.oil_target_drift_reversion) {
+            return Err(format!(
+                "oil_target_drift_reversion is {}. It is the share of the long factor's log \
+                 level returned to 0 each session, in [0, 1]; 0 is none.",
+                self.oil_target_drift_reversion));
+        }
+        if self.oil_target_drift_reversion != 0.0 && self.oil_target_drift_sd == 0.0 {
+            return Err(format!(
+                "oil_target_drift_sd is 0 but oil_target_drift_reversion is {}. The pull acts \
+                 on the long factor, which only oil_target_drift_sd makes: set \
+                 oil_target_drift_sd first.",
+                self.oil_target_drift_reversion));
         }
         if !(self.oil_inflation_passthrough >= 0.0 && self.oil_inflation_passthrough <= 3.0) {
             return Err(format!(
@@ -12674,6 +13844,9 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "pinned_vix_calm_share",
     "pinned_vix_feedback",
     "pinned_vix_priced_cap",
+    "pinned_vix_sets_variance",
+    "valuation_multiple_share",
+    "valuation_multiple_half_life",
     "pinned_vix_variance_share",
     "policy_anticipation",
     "policy_anticipation_cut_share",
@@ -12686,7 +13859,20 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "treasury_put_pricing",
     "vix_stress_premium",
     "vix_stress_premium_cap",
+    "vix_stress_premium_memory",
+    "vix_stress_premium_undo",
     "vix_stress_premium_knee",
+    "market_vol_vix_news",
+    "forecast_news_drift",
+    "forecast_readback_dispersion",
+    "forecast_readback_dispersion_half_life",
+    "forecast_readback_correlation",
+    "forecast_readback_dispersion_first",
+    "forecast_vix_level_path",
+    "vix_quote_transient_share",
+    "vix_quote_transient_persistence",
+    "pinned_vix_coupling",
+    "pinned_vix_exponent",
     "vix_fear_uptake",
     "vix_fear_half_life",
     "unemployment_natural_pull",
@@ -12696,6 +13882,37 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "oil_mean_reversion",
     "oil_noise_sd",
     "oil_inventory_level_gain",
+    "oil_convenience_yield",
+    "oil_target_drift_sd",
+    "oil_target_drift_reversion",
+    "oil_pushes_in_target",
+    "oil_noise_log_sd",
+    "oil_dollar_elasticity",
+    "oil_inventory_noise_sd",
+    "oil_forecast_clamp",
+    "usd_mean_reversion",
+    "usd_noise_sd",
+    "usd_safe_haven_gain",
+    "fed_core_inflation",
+    "treasury_core_inflation",
+    "treasury_zlb_path",
+    "treasury_zlb_haven_gain",
+    "fed_neutral_real_rate",
+    "core_trend_sd",
+    "core_trend_persistence",
+    "cycle_inflation_hazard",
+    "cycle_rate_hazard",
+    "fed_eve_decision",
+    "treasury_path_owed_excluded",
+    "corporate_spread_equity_lag",
+    "corporate_spread_noise_sd",
+    "corporate_spread_noise_half_life",
+    "treasury_2y_meeting_carry",
+    "policy_anticipation_half_life",
+    "treasury_path_anticipated",
+    "policy_anticipation_guidance",
+    "oil_price_floor",
+    "oil_price_ceiling",
     "oil_inflation_passthrough",
     "index_level_listed",
     "vix_intraday_live",
@@ -12894,6 +14111,37 @@ pub fn settable_names() -> Vec<&'static str> {
         "oil_mean_reversion",
         "oil_noise_sd",
         "oil_inventory_level_gain",
+        "oil_convenience_yield",
+        "oil_target_drift_sd",
+        "oil_target_drift_reversion",
+        "oil_pushes_in_target",
+        "oil_noise_log_sd",
+        "oil_dollar_elasticity",
+        "oil_inventory_noise_sd",
+        "oil_forecast_clamp",
+        "usd_mean_reversion",
+        "usd_noise_sd",
+        "usd_safe_haven_gain",
+        "fed_core_inflation",
+        "treasury_core_inflation",
+        "treasury_zlb_path",
+        "treasury_zlb_haven_gain",
+        "fed_neutral_real_rate",
+        "core_trend_sd",
+        "core_trend_persistence",
+        "cycle_inflation_hazard",
+        "cycle_rate_hazard",
+        "fed_eve_decision",
+        "treasury_path_owed_excluded",
+        "corporate_spread_equity_lag",
+        "corporate_spread_noise_sd",
+        "corporate_spread_noise_half_life",
+        "treasury_2y_meeting_carry",
+        "policy_anticipation_half_life",
+        "treasury_path_anticipated",
+        "policy_anticipation_guidance",
+        "oil_price_floor",
+        "oil_price_ceiling",
         "oil_inflation_passthrough",
         "index_level_listed",
         "vix_intraday_live",
@@ -12946,6 +14194,9 @@ pub fn settable_names() -> Vec<&'static str> {
         "pinned_vix_calm_knee",
         "pinned_vix_calm_share",
         "pinned_vix_priced_cap",
+        "pinned_vix_sets_variance",
+        "valuation_multiple_share",
+        "valuation_multiple_half_life",
         "buyback_yield_cap",
         "buyback_accrual",
         "rate_close_remark",
@@ -12982,6 +14233,19 @@ pub fn settable_names() -> Vec<&'static str> {
         "vix_stress_premium",
         "vix_stress_premium_knee",
         "vix_stress_premium_cap",
+        "vix_stress_premium_memory",
+        "vix_stress_premium_undo",
+        "market_vol_vix_news",
+        "forecast_news_drift",
+        "forecast_readback_dispersion",
+        "forecast_readback_dispersion_half_life",
+        "forecast_readback_correlation",
+        "forecast_readback_dispersion_first",
+        "forecast_vix_level_path",
+        "vix_quote_transient_share",
+        "vix_quote_transient_persistence",
+        "pinned_vix_coupling",
+        "pinned_vix_exponent",
         "vix_fear_uptake",
         "vix_fear_half_life",
         "fed_put_gain",

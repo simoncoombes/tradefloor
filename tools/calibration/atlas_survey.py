@@ -558,6 +558,11 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "vix_stress_premium_knee": (0.0, 1.5),
     # The largest log premium of the quote over the state; 0.5 is 1.65x.
     "vix_stress_premium_cap": (0.0, 0.5),
+    # The stress memory's own per-session rate: off (the anchor's rate, 0.035 to
+    # 0.056 on the VIX laws) to 0.2, about a three-session half-life.
+    "vix_stress_premium_memory": (0.0, 0.2),
+    # The premium as the anchor's pull undone above the knee: a switch.
+    "vix_stress_premium_undo": (0.0, 1.0),
     # The VIX's fear memory: the uptake up to half the excursion a session,
     # and the half-life from a week to a year of sessions.
     "vix_fear_uptake": (0.0, 0.5),
@@ -655,6 +660,76 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "oil_mean_reversion": (0.0, 0.03),
     "oil_noise_sd": (0.0, 3.0),
     "oil_inventory_level_gain": (0.0, 100.0),
+    # The convenience premium's elasticity to inventory: 4 is the grid's
+    # steepest, a target 16 times higher at the floor of 25. Refused where
+    # the draw puts oil_inventory_reversion at 0.
+    "oil_convenience_yield": (0.0, 4.0),
+    # Oil's long factor: double EIA's 0.018 a session at the top. The pull
+    # is a share a session; 0.002 is a half-life of a year and a half.
+    "oil_target_drift_sd": (0.0, 0.036),
+    "oil_target_drift_reversion": (0.0, 0.002),
+    # A switch, and the short factor's log sd: EIA's 0.017 a session, double
+    # it at the top.
+    "oil_pushes_in_target": (0.0, 1.0),
+    "oil_noise_log_sd": (0.0, 0.034),
+    # The oil curve's elasticity to the dollar as a level: EIA against FRED
+    # gives 0.69 (daily) to 2.3 (broad dollar, 2006 on); 2.4 at the top.
+    "oil_dollar_elasticity": (0.0, 2.4),
+    # Inventory's daily noise: 0.35 matches EIA's deviation sd; the shipped
+    # 0.5 at the top. The forecast's clamp is a switch.
+    "oil_inventory_noise_sd": (0.0, 0.5),
+    # The dollar's reversion: DTWEXM's AR(1) half-life of 729 sessions is
+    # 0.00095; the shipped 0.02 at the top. Its noise: DTWEXM's 0.43 a
+    # session at 100, double it at the top.
+    "usd_mean_reversion": (0.0, 0.02),
+    "usd_noise_sd": (0.0, 0.86),
+    "usd_safe_haven_gain": (0.0, 0.1),
+    # Oil's bounds: WTI deflated by CPIAUCSL, 1987 to 2024, at the model's
+    # centre of 81 gives 16.4 and 279; the standing 35 and 150 inside.
+    "oil_price_floor": (0.0, 35.0),
+    "oil_price_ceiling": (150.0, 300.0),
+    "oil_forecast_clamp": (0.0, 1.0),
+    # Switches: the bank's and the curve's inflation, headline or core.
+    "fed_core_inflation": (0.0, 1.0),
+    "treasury_core_inflation": (0.0, 1.0),
+    # The zero bound's pieces: off at the bottom, about twice the solved
+    # values (design PR #9, zlb/SOLVE.md) at the top.
+    "treasury_zlb_path": (0.0, 2.0),
+    "treasury_zlb_haven_gain": (0.0, 0.1),
+    # The Taylor rule's neutral real rate: off at the bottom, HLW's 1990-2025
+    # high (3.9) at the top.
+    "fed_neutral_real_rate": (0.0, 4.0),
+    # Core inflation's trend: off to twice the CPILFESL fit's sd; persistence
+    # off to 0.998.
+    "core_trend_sd": (0.0, 0.34),
+    # The expansion's inflation and rate hazards: off (the legacy 0.1) to
+    # the legacy value itself.
+    "cycle_inflation_hazard": (0.0, 0.1),
+    # Two switches.
+    "fed_eve_decision": (0.0, 1.0),
+    "treasury_path_owed_excluded": (0.0, 1.0),
+    # Credit's repricing lag, sessions.
+    "corporate_spread_equity_lag": (0.0, 21.0),
+    # Credit's own state: off to twice addendum L's sd; half-life off to a year.
+    "corporate_spread_noise_sd": (0.0, 0.05),
+    # Every pin sets the variance: a switch.
+    "pinned_vix_sets_variance": (0.0, 1.0),
+    # The valuation multiple: off to every market move. Sessions; read only
+    # with the share set, up to twice the tape's (CAPE, 7.1 years). A draw
+    # with the share set and the half-life at 0 is the model's refusal.
+    "valuation_multiple_share": (0.0, 1.0),
+    "valuation_multiple_half_life": (0.0, 3558.0),
+    "corporate_spread_noise_half_life": (0.0, 252.0),
+    "cycle_rate_hazard": (0.0, 0.1),
+    "core_trend_persistence": (0.0, 0.998),
+    # The 2-year's carry through a meeting: a share, so its own bounds.
+    "treasury_2y_meeting_carry": (0.0, 1.0),
+    # The priced meeting's half-life: off at the bottom, a quarter at the top.
+    "policy_anticipation_half_life": (0.0, 63.0),
+    # A switch.
+    "treasury_path_anticipated": (0.0, 1.0),
+    # A share.
+    "policy_anticipation_guidance": (0.0, 1.0),
     # The share of oil demand supply answers on the daily step. Bounded by
     # meaning again: 0.0 is the hardcoded zero the reference writes, 1.0 is
     # the value that makes the inventory random walk driftless, and past 1.0
@@ -1235,6 +1310,14 @@ def vector_to_params(vector: dict[str, float]) -> dict[str, float]:
     return p
 
 
+#: Dials whose 0.0 is a sentinel for a standing value rather than a point on
+#: the axis (`oil_price_floor`: 0.0 is the standing 35; `oil_price_ceiling`:
+#: 0.0 is the standing 150, and (0, 150) is refused). The check that the
+#: preset is on the map reads the sentinel as the value it stands for; the
+#: vector itself keeps 0.0, so the round trip to the preset stays exact.
+STANDING_AT_ZERO = {"oil_price_floor": 35.0, "oil_price_ceiling": 150.0}
+
+
 def params_to_vector(params: dict[str, float]) -> dict[str, float]:
     """The inverse of `vector_to_params`, for placing presets on the map."""
     v = {k: float(v) for k, v in params.items()
@@ -1385,6 +1468,8 @@ def survey_axes() -> list[atlas.Axis]:
     ship_vector = params_to_vector({n: ship[n] for n in settable})
     for a in axes:
         v = ship_vector[a.name]
+        if v == 0.0 and a.name in STANDING_AT_ZERO:
+            v = STANDING_AT_ZERO[a.name]
         if not a.low <= v <= a.high:
             raise RuntimeError(
                 f"{a.name} range ({a.low}, {a.high}) excludes the "

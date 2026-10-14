@@ -168,6 +168,55 @@ fn lognormal_excess(mean: f64, var: f64, k: f64) -> f64 {
     mean * cdf(d1) - k * cdf(d2)
 }
 
+/// The VIX target's log spread in the forecast (`forecast_readback_dispersion`):
+/// the increments of the read-back's and the VIX's log spreads, close by
+/// close, and the fear memory's loading on each. `step` takes one close and
+/// returns the target's log variance at it.
+#[derive(Default)]
+struct TargetSpread {
+    /// Per close `j` (1-based): the read-back's new variance, the VIX's
+    /// (the VIX the fear reads at close `j + 1`), and their covariance.
+    di: Vec<f64>,
+    dv: Vec<f64>,
+    dc: Vec<f64>,
+    /// The fear memory's loading on each close's read-back and VIX increment.
+    g: Vec<f64>,
+    gv: Vec<f64>,
+    last: (f64, f64, f64),
+}
+
+impl TargetSpread {
+    /// One close: `si2` the read-back's log variance at it, `sv2` the VIX's
+    /// the fear reads (one close earlier), `cov` theirs; `w` and `h` the
+    /// anchor memory's weight and rate, `k` and `rho` the fear's uptake and
+    /// its decay net of it. The target's log loads `L(n) = 1 - w (1 - (1 -
+    /// h)^n)` on a read-back increment `n` closes in, plus the fear's
+    /// loading, which takes `-k L(n)` each close and decays at `rho`; on a
+    /// VIX increment the fear alone loads, `+k` a close, decaying alike.
+    #[allow(clippy::too_many_arguments)]
+    fn step(&mut self, si2: f64, sv2: f64, cov: f64, w: f64, h: f64, k: f64, rho: f64) -> f64 {
+        let (pi, pv, pc) = self.last;
+        self.di.push(crate::mathx::max(0.0, si2 - pi));
+        self.dv.push(crate::mathx::max(0.0, sv2 - pv));
+        self.dc.push(cov - pc);
+        self.last = (si2, sv2, cov);
+        self.g.push(0.0);
+        self.gv.push(0.0);
+        let c = self.di.len();
+        let lt = |n: usize| 1.0 - w * (1.0 - crate::mathx::pow(1.0 - h, n as f64));
+        let mut var = 0.0;
+        for j in 0..c {
+            let n = c - j;
+            self.g[j] = rho * self.g[j] - k * lt(n);
+            self.gv[j] = rho * self.gv[j] + k;
+            let li = lt(n) + self.g[j];
+            let lv = self.gv[j];
+            var += li * li * self.di[j] + lv * lv * self.dv[j] + 2.0 * li * lv * self.dc[j];
+        }
+        crate::mathx::max(0.0, var)
+    }
+}
+
 /// A slot the forecast follows: a public, solvent name with a
 /// capitalisation, as the variance identity reads it.
 struct ForecastName {
@@ -741,6 +790,19 @@ impl Engine {
         let mut universe_stress = self.universe_stress;
         let mut down = Some(self.market_vol.prev_day_down());
         let (mut var_oil, mut var_inventory) = (0.0, 0.0);
+        // Oil's long factor (`oil_target_drift_sd`): the mean and variance of
+        // its log level, so the step reads the log of the level's
+        // expectation, `m + v / 2`, which stays where it is with no pull.
+        let (mut drift_mean, mut drift_var) = (self.oil_target_drift, 0.0);
+        // `oil_forecast_clamp`: the level carriers' log variance about the
+        // expected path (the long factor's and the dollar's), and the
+        // dollar's own variance, for the clamped expectation the forecast
+        // publishes. Nothing is read with the switch off.
+        let (mut carry_var, mut usd_var) = (0.0f64, 0.0f64);
+        // Under the long factor a bound's truncation moves the factor, so the
+        // expected truncation at one horizon joins the factor's expected path
+        // at the next (`oil_expected_log_truncation`).
+        let (mut absorb_pending, mut absorb_so_far) = (0.0f64, 0.0f64);
         let policy = self.forecast_policy_path(day, horizon);
         let k_curve = intraday_variance_factor();
         // The spread's shape (`forecast_vix_dispersion_skew`), and the stress
@@ -753,6 +815,10 @@ impl Engine {
         };
         let skewed = p.forecast_vix_dispersion != 0.0 && p.forecast_vix_dispersion_skew != 0.0;
         let mut stress_sd = 0.0;
+        // The VIX target's log spread, propagated through the anchor and fear
+        // memories (`forecast_readback_dispersion`): see
+        // `Engine::forecast_vix_step_spread`. Empty and unread off the dial.
+        let mut spread_load = TargetSpread::default();
 
         let mut out = Forecast {
             day,
@@ -801,8 +867,29 @@ impl Engine {
             // Its close. The factor on both tracks: the expected update over
             // the day's factor (four nodes) and the believed phase's regimes.
             let regimes = self.forecast_regimes(&belief, &phase_regimes);
-            let (next_mv, next_faces) = self.forecast_factor_close(&mv, &regimes, vix, 0.0, &[]);
-            let (next_mv_e, next_faces_e) = self.forecast_factor_close(&mv_e, &regimes, vix, spread, &nodes);
+            // Under `market_vol_vix_excursion` the close's target reads the VIX
+            // against the session's own read-back, so the forecast's does too
+            // (ptv22/vix-stabiliser, local research patch): each track's index
+            // variance gives its read-back. Off the switch the argument is unread.
+            let rb = |v: f64| crate::market::index_var::vix_from_variance(p.vix_variance_premium, v);
+            // Under `forecast_readback_dispersion` the expectation track takes
+            // the excursion coupling over the joint spread of the VIX and its
+            // read-back: x = ln(VIX / I) of log variance s_v^2 + s_i^2 - 2 cov,
+            // and VIX D / I of mean vix exp(1.5 s_i^2 - cov), on the VIX
+            // spread's own shape. Nothing is computed off the dial.
+            let joint = if p.forecast_readback_dispersion != 0.0 && p.market_vol_vix_excursion != 0.0 {
+                let si2 = self.forecast_readback_log_variance(step);
+                let cov = p.forecast_readback_correlation * crate::mathx::sqrt(crate::mathx::max(0.0, spread * si2));
+                let var_x = crate::mathx::max(0.0, spread + si2 - 2.0 * cov);
+                let joint_nodes = if skewed && var_x > 0.0 { spread_at(&shape, var_x) } else { Vec::new() };
+                Some((var_x, joint_nodes, crate::mathx::exp(1.5 * si2 - cov)))
+            } else {
+                None
+            };
+            let (next_mv, next_faces) = self.forecast_factor_close(&mv, &regimes, vix, 0.0, &[], rb(v_session), None);
+            let (next_mv_e, next_faces_e) = self.forecast_factor_close(
+                &mv_e, &regimes, vix, spread, &nodes, rb(v_report),
+                joint.as_ref().map(|(v, n, m)| (*v, n.as_slice(), *m)));
 
             // Each name's GARCH on both tracks: the expected GJR step on the
             // session's noise.
@@ -880,28 +967,6 @@ impl Engine {
             for &(w, _, scale) in &regimes {
                 scale_bar += w * scale;
             }
-            let implied = vix_from_variance(p.vix_variance_premium, v_next);
-            if p.vix_anchor_memory != 0.0 && p.vix_level_identity != 0.0 {
-                let anchor = self.vix_anchor * scale_bar;
-                let anchor = if p.vix_anchor_centre != 0.0 {
-                    anchor * crate::mathx::exp(-p.vix_anchor_centre)
-                } else {
-                    anchor
-                };
-                if implied > 0.0 && anchor > 0.0 {
-                    let h = p.vix_anchor_memory;
-                    let d = crate::mathx::log(implied / anchor);
-                    slow = (1.0 - h) * slow + h * d;
-                    if p.vix_stress_premium != 0.0 {
-                        stress = (1.0 - h) * stress + h * d;
-                        let after = self.forecast_vix_log_variance(step + 1);
-                        stress_sd = (1.0 - h) * stress_sd + h * crate::mathx::sqrt(after);
-                    }
-                }
-            }
-
-            // The VIX: the step on the session's return, integrated by the
-            // eight nodes, with its draws at their means and the jump's mean.
             let next_day = day + step as i64 + 1;
             let request = DayAdvanceRequest {
                 volatility: 1.0,
@@ -910,37 +975,96 @@ impl Engine {
                 game_day: next_day,
                 timestamp: next_day * 24 * 60,
             };
-            let mut inputs = self.daily_inputs(&request, 0.0, v_next, slow, scale_bar);
-            inputs.vix_anchor_level = self.vix_anchor * scale_bar;
-            inputs.vix_target_premium = premium;
-            if premium != 0.0 {
-                premium *= premium_fade;
-                if premium.abs() < crate::engine::VIX_TARGET_PREMIUM_CLEARED_UNDER {
-                    premium = 0.0;
+            let news = p.forecast_news_drift != 0.0 && p.market_vol_vix_news != 0.0;
+            // The VIX's step. Under `forecast_readback_dispersion` or
+            // `forecast_vix_level_path` it is taken over the read-back's spread
+            // and at the VIX's slow level's expected path
+            // (`Engine::forecast_vix_step_spread`); off both, the arithmetic
+            // that stood.
+            let (vix_next, news_first, mut inputs) = if p.forecast_readback_dispersion == 0.0
+                && p.forecast_vix_level_path == 0.0
+            {
+                let implied = vix_from_variance(p.vix_variance_premium, v_next);
+                if p.vix_anchor_memory != 0.0 && p.vix_level_identity != 0.0 {
+                    let anchor = self.vix_anchor * scale_bar;
+                    let anchor = if p.vix_anchor_centre != 0.0 {
+                        anchor * crate::mathx::exp(-p.vix_anchor_centre)
+                    } else {
+                        anchor
+                    };
+                    if implied > 0.0 && anchor > 0.0 {
+                        let h = p.vix_anchor_memory;
+                        let d = crate::mathx::log(implied / anchor);
+                        slow = (1.0 - h) * slow + h * d;
+                        if p.vix_stress_premium != 0.0 {
+                            let hs = p.vix_stress_memory_rate();
+                            stress = (1.0 - hs) * stress + hs * d;
+                            let after = self.forecast_vix_log_variance(step + 1);
+                            stress_sd = (1.0 - hs) * stress_sd + hs * crate::mathx::sqrt(after);
+                        }
+                    }
                 }
-            }
-            inputs.vix_implied_from_market = if p.vix_level_identity != 0.0 {
-                implied
-            } else if p.vix_realised_vol_weight == 0.0 {
-                0.0
+
+                // The VIX: the step on the session's return, integrated by the
+                // eight nodes, with its draws at their means and the jump's mean.
+                let mut inputs = self.daily_inputs(&request, 0.0, v_next, slow, scale_bar);
+                inputs.vix_anchor_level = self.vix_anchor * scale_bar;
+                inputs.vix_target_premium = premium;
+                if premium != 0.0 {
+                    premium *= premium_fade;
+                    if premium.abs() < crate::engine::VIX_TARGET_PREMIUM_CLEARED_UNDER {
+                        premium = 0.0;
+                    }
+                }
+                inputs.vix_implied_from_market = if p.vix_level_identity != 0.0 {
+                    implied
+                } else if p.vix_realised_vol_weight == 0.0 {
+                    0.0
+                } else {
+                    p.market_vol_vix_anchor * mv.sigma_daily() / p.market_factor_sigma
+                };
+                // The fear memory, advanced on the step's inputs at the expected
+                // VIX, as the close advances it (`vix_fear_uptake`).
+                if p.vix_fear_uptake != 0.0 {
+                    fear = crate::economy::daily::advance_vix_fear(fear, &inputs, vix, p.vix_fear_half_life);
+                    inputs.vix_fear = fear;
+                }
+                let sd_ret = 100.0 * crate::mathx::sqrt(crate::mathx::max(0.0, v_session));
+                let mut vix_next = 0.0;
+                let mut news_first = 0.0;
+                for &z in live_mark_nodes().iter() {
+                    let mut node = inputs;
+                    node.market_day_return_pct = z * sd_ret;
+                    let stepped = crate::economy::daily::vix_close(
+                        &econ, &node, 0.0, &mut crate::economy::daily::MeanDraws);
+                    vix_next += stepped / 8.0 + self.forecast_vix_jump_mean(&econ, &node) / 8.0;
+                    if news {
+                        news_first += self.forecast_news_multiplier(&econ, &node, stepped) / 8.0;
+                    }
+                }
+                (vix_next, news_first, inputs)
             } else {
-                p.market_vol_vix_anchor * mv.sigma_daily() / p.market_factor_sigma
+                self.forecast_vix_step_spread(
+                    &econ, &request, v_next, v_session, vix, step, scale_bar, news, mv.sigma_daily(),
+                    (&mut slow, &mut stress, &mut stress_sd, &mut fear), (&mut premium, premium_fade),
+                    &mut spread_load)
             };
-            // The fear memory, advanced on the step's inputs at the expected
-            // VIX, as the close advances it (`vix_fear_uptake`).
-            if p.vix_fear_uptake != 0.0 {
-                fear = crate::economy::daily::advance_vix_fear(fear, &inputs, vix, p.vix_fear_half_life);
-                inputs.vix_fear = fear;
-            }
-            let sd_ret = 100.0 * crate::mathx::sqrt(crate::mathx::max(0.0, v_session));
-            let mut vix_next = 0.0;
-            for &z in live_mark_nodes().iter() {
-                let mut node = inputs;
-                node.market_day_return_pct = z * sd_ret;
-                let stepped = crate::economy::daily::vix_close(
-                    &econ, &node, 0.0, &mut crate::economy::daily::MeanDraws);
-                vix_next += stepped / 8.0 + self.forecast_vix_jump_mean(&econ, &node) / 8.0;
-            }
+            // `forecast_news_drift`: the expectation track's own multiplier,
+            // on its session's spread of returns.
+            let news_e = if news {
+                let sd_e = 100.0 * crate::mathx::sqrt(crate::mathx::max(0.0, v_report));
+                let mut total = 0.0;
+                for &z in live_mark_nodes().iter() {
+                    let mut node = inputs;
+                    node.market_day_return_pct = z * sd_e;
+                    let stepped = crate::economy::daily::vix_close(
+                        &econ, &node, 0.0, &mut crate::economy::daily::MeanDraws);
+                    total += self.forecast_news_multiplier(&econ, &node, stepped) / 8.0;
+                }
+                total
+            } else {
+                1.0
+            };
 
             // The rest of the economy: the step itself with its draws at
             // their means, then the VIX above, the policy path, and oil's
@@ -948,10 +1072,37 @@ impl Engine {
             // expected safe-haven drift over the VIX's spread.
             let opec_day = econ.oil_last_opec_day;
             let oil_before = econ.oil_price;
-            let mut next = update_economy_daily(&econ, &inputs, &mut crate::economy::daily::MeanDraws);
             let kappa = p.oil_inventory_reversion;
             let sd_before = crate::mathx::sqrt(var_inventory);
-            var_inventory = (1.0 - kappa) * (1.0 - kappa) * var_inventory + 0.25;
+            // Inventory's noise variance a session: the standing 0.25, or
+            // `oil_inventory_noise_sd` squared. A branch, so the shipped
+            // arithmetic is kept to the bit.
+            let inventory_var = if p.oil_inventory_noise_sd == 0.0 {
+                0.25
+            } else {
+                p.oil_inventory_noise_sd * p.oil_inventory_noise_sd
+            };
+            let var_after = (1.0 - kappa) * (1.0 - kappa) * var_inventory + inventory_var;
+            // The convenience premium (`oil_convenience_yield`) is convex in
+            // inventory, so the step reads its expectation over the
+            // inventory's spread, before the step and after it, rather than
+            // its value on the expected path: the expected price is then the
+            // premium-free path times the premium's expectation.
+            if p.oil_convenience_yield != 0.0 {
+                inputs.oil_convenience_inventory_var_before = var_inventory;
+                inputs.oil_convenience_inventory_var = var_after;
+            }
+            if p.oil_target_drift_sd != 0.0 {
+                let sigma = p.oil_target_drift_sd;
+                let pull = 1.0 - p.oil_target_drift_reversion;
+                let before = drift_mean + 0.5 * drift_var;
+                drift_mean = pull * drift_mean - 0.5 * sigma * sigma + absorb_pending;
+                absorb_pending = 0.0;
+                drift_var = pull * pull * drift_var + sigma * sigma;
+                inputs.oil_target_drift = Some((before, drift_mean + 0.5 * drift_var));
+            }
+            let mut next = update_economy_daily(&econ, &inputs, &mut crate::economy::daily::MeanDraws);
+            var_inventory = var_after;
             let sd_inv = crate::mathx::sqrt(var_inventory);
             let gap = |level: f64, sd: f64| {
                 crate::economy::daily::inventory_pressure_expected(level, sd)
@@ -961,24 +1112,40 @@ impl Engine {
             // its expectation over inventory's spread is what the price
             // expects. Under `oil_inventory_level_gain` the step read the
             // change in the pressure, so the gap is the change in the gaps.
-            next.oil_price += if p.oil_inventory_level_gain == 0.0 {
+            let mut pushed = if p.oil_inventory_level_gain == 0.0 {
                 gap(next.oil_inventory_level, sd_inv)
             } else {
                 p.oil_inventory_level_gain
                     * (gap(next.oil_inventory_level, sd_inv) - gap(econ.oil_inventory_level, sd_before))
             };
+            next.oil_price += pushed;
             if next.oil_last_opec_day != opec_day {
-                next.oil_price += crate::economy::daily::opec_expected_impact(
+                let opec = crate::economy::daily::opec_expected_impact(
                     oil_before, crate::mathx::sqrt(var_oil), p.oil_opec_symmetry);
+                next.oil_price += opec;
+                pushed += opec;
+            }
+            // Under `oil_pushes_in_target` the expected pushes join the part
+            // of the price that decays at 0.03, as the step's own do.
+            if p.oil_pushes_in_target != 0.0 {
+                next.oil_push_level += pushed;
             }
             // Oil's own spread about its expectation, for the OPEC rule's
             // expected decision: the law's reversion and noise.
             // A branch, so the standing law keeps its arithmetic to the bit.
-            var_oil = if p.oil_mean_reversion == 0.0 && p.oil_noise_sd == 0.0 {
+            var_oil = if p.oil_mean_reversion == 0.0 && p.oil_noise_sd == 0.0 && p.oil_noise_log_sd == 0.0 {
                 0.97 * 0.97 * var_oil + 4.0
             } else {
                 let keep = if p.oil_mean_reversion == 0.0 { 0.97 } else { 1.0 - p.oil_mean_reversion };
-                let noise = if p.oil_noise_sd == 0.0 { 2.0 } else { p.oil_noise_sd };
+                // Under `oil_noise_log_sd` the noise is a share of the
+                // price, read at the price the step started from.
+                let noise = if p.oil_noise_log_sd != 0.0 {
+                    p.oil_noise_log_sd * oil_before
+                } else if p.oil_noise_sd == 0.0 {
+                    2.0
+                } else {
+                    p.oil_noise_sd
+                };
                 keep * keep * var_oil + noise * noise
             };
             if spread > 0.0 {
@@ -989,14 +1156,84 @@ impl Engine {
                 } else {
                     lognormal_excess(vix, spread, k)
                 };
-                next.usd_index += crate::economy::daily::USD_SAFE_HAVEN_GAIN * (excess - at_mean);
+                let haven = crate::economy::daily::usd_safe_haven_gain(p.usd_safe_haven_gain) * (excess - at_mean);
+                // Under `oil_dollar_elasticity` the law rescales the oil
+                // price's reverting part by the day's whole dollar move, the
+                // bid included, so the expected bid's excess over the bid at
+                // the expected VIX moves oil by the same ratio.
+                if p.oil_dollar_elasticity != 0.0 && next.usd_index > 0.0 {
+                    let push = if p.oil_pushes_in_target != 0.0 { next.oil_push_level } else { 0.0 };
+                    let ratio = crate::mathx::pow((next.usd_index + haven) / next.usd_index, -p.oil_dollar_elasticity);
+                    next.oil_price = (next.oil_price - push) * ratio + push;
+                }
+                next.usd_index += haven;
+                // Under `usd_mean_reversion` the expected bid joins the part of
+                // the dollar that decays at 0.02, as the step's own does.
+                if p.usd_mean_reversion != 0.0 {
+                    next.usd_haven_level += haven;
+                }
             }
             next.vix = vix_next;
             next.federal_funds_rate = rate;
             econ = next;
+            // The close's news, after its VIX step, on the variance the next
+            // session draws with (`forecast_news_drift`).
+            if news {
+                let clamp = |v: f64| {
+                    let base = p.market_factor_sigma * p.market_factor_sigma;
+                    crate::mathx::max(crate::mathx::min(v, base * p.market_vol_ceiling_multiple),
+                                      base * p.market_vol_floor_multiple)
+                };
+                mv.scale_variance(p, news_first);
+                mv_e.scale_variance(p, news_e);
+                faces = (clamp(faces.0 * news_first), clamp(faces.1 * news_first));
+                faces_e = (clamp(faces_e.0 * news_e), clamp(faces_e.1 * news_e));
+            }
 
-            out.vix.push(self.forecast_published_vix(&shape, econ.vix, stress, stress_sd, step + 1));
-            out.oil.push(econ.oil_price);
+            let quote = self.forecast_published_vix(&shape, econ.vix, stress, stress_sd, step + 1);
+            // The transient quote's expected decay (`vix_quote_transient_share`).
+            out.vix.push(if p.vix_quote_transient_share == 0.0 {
+                quote
+            } else {
+                self.vix_quote_transient_at(quote, step + 1)
+            });
+            // `oil_forecast_clamp`: publish the expectation truncated at the
+            // clamps over the price's spread; the recursion keeps stepping
+            // the unclamped expectation, so the clamp is read once.
+            if p.oil_forecast_clamp != 0.0 {
+                let sigma = p.oil_target_drift_sd;
+                let pull = 1.0 - p.oil_target_drift_reversion;
+                carry_var = pull * pull * carry_var + sigma * sigma;
+                // The dollar's own spread, on its law: the standing 0.02 and
+                // 0.3, or `usd_mean_reversion` and `usd_noise_sd`.
+                let usd_keep = 1.0 - if p.usd_mean_reversion == 0.0 { 0.02 } else { p.usd_mean_reversion };
+                let usd_noise = if p.usd_noise_sd == 0.0 { 0.3 } else { p.usd_noise_sd };
+                usd_var = usd_keep * usd_keep * usd_var + usd_noise * usd_noise;
+                let s = econ.oil_price;
+                let kappa_c = p.oil_convenience_yield;
+                let inventory_log_var = var_inventory / (50.0 * 50.0);
+                let log_var = carry_var
+                    + kappa_c * kappa_c * inventory_log_var
+                    + p.oil_dollar_elasticity * p.oil_dollar_elasticity * usd_var / (100.0 * 100.0);
+                let bounds = crate::economy::daily::oil_bounds(p.oil_price_floor, p.oil_price_ceiling);
+                // The price at this horizon rests on a bound it reaches; under
+                // the long factor that truncation then moves the factor, which
+                // the next step's expected path carries.
+                // Read as lognormal: the price's spread is right-skewed. Its log
+                // variance is the short factor's (in dollars, over the price)
+                // and the carriers'. The marginal's expected truncation at a
+                // horizon is the whole of it to that horizon, so the factor's
+                // path takes its change.
+                let log_total = if s > 0.0 { var_oil / (s * s) + log_var } else { 0.0 };
+                if p.oil_target_drift_sd != 0.0 {
+                    let to_here = crate::economy::daily::oil_lognormal_log_truncation(s, log_total, bounds);
+                    absorb_pending = to_here - absorb_so_far;
+                    absorb_so_far = to_here;
+                }
+                out.oil.push(crate::economy::daily::oil_lognormal_censored(s, log_total, bounds));
+            } else {
+                out.oil.push(econ.oil_price);
+            }
 
             // The belief, one session on.
             let mut pred = [0.0; 5];
@@ -1054,6 +1291,230 @@ impl Engine {
         sd * sd * share
     }
 
+    /// The forecast's VIX step at one close, `step` closes on, under
+    /// `forecast_readback_dispersion` or `forecast_vix_level_path`: the close
+    /// the first track would take, at the expectations of what it reads.
+    ///
+    /// * The read-back and the VIX. The close's target is `T exp(f)`,
+    ///   `T = I exp(-w s)` with `s` the anchor memory of `ln(I / A)` at rate
+    ///   `h` and `f` the fear memory of `ln(VIX / T)`, so `ln(T exp(f))` is
+    ///   linear in the logs of the read-backs and the VIXes the memories have
+    ///   seen. With the forecast's variance as `E[V]`, `ln I` sits `s_i^2`
+    ///   under the read-back of it (`forecast_readback_log_variance`), and
+    ///   `ln VIX` sits `s_v^2 / 2` under the log of the expected VIX
+    ///   (`forecast_vix_log_variance`). The memories are advanced on those
+    ///   log means, and the target is their exponential times
+    ///   `exp(Var / 2)`. `Var` is the target's log variance: each close's new
+    ///   spread (the increments of `s_i^2`, `s_v^2` and their covariance at
+    ///   `forecast_readback_correlation`) times the target's loading on it.
+    ///   That loading is the law's own, `1 - w (1 - (1 - h)^n)` on a read-back
+    ///   `n` closes in, and what the fear memory has taken back since
+    ///   (`TargetSpread`). At one close it is `(1 - w h)(1 - k)` of the
+    ///   read-back's first spread: the fear takes up `k` of it at once.
+    /// * The VIX's slow level (`vix_level_sigma`) multiplies the read-back
+    ///   and the anchor level by its expectation `step + 1` closes on
+    ///   (`Engine::forecast_vix_level_multiplier`).
+    ///
+    /// Returns the VIX, the news's expected multiplier on the first track
+    /// (`forecast_news_drift`), and the inputs the rest of the economy's
+    /// step reads: at the log means, with the memories advanced.
+    #[allow(clippy::too_many_arguments)]
+    fn forecast_vix_step_spread<'a>(
+        &self,
+        econ: &EconomyState,
+        request: &DayAdvanceRequest<'a>,
+        v_next: f64,
+        v_session: f64,
+        vix: f64,
+        step: usize,
+        scale_bar: f64,
+        news: bool,
+        sigma_daily: f64,
+        memories: (&mut f64, &mut f64, &mut f64, &mut f64),
+        premium: (&mut f64, f64),
+        load: &mut TargetSpread,
+    ) -> (f64, f64, DailyInputs<'a>) {
+        let p = &self.params;
+        let (slow, stress, stress_sd, fear) = memories;
+        let (premium, premium_fade) = premium;
+        let level = if p.forecast_vix_level_path != 0.0 {
+            self.forecast_vix_level_multiplier(step + 1)
+        } else {
+            1.0
+        };
+        let anchor_level = self.vix_anchor * level * scale_bar;
+        let (si2, sv2) = if p.forecast_readback_dispersion != 0.0 {
+            (self.forecast_readback_log_variance(step + 1), self.forecast_vix_log_variance(step))
+        } else {
+            (0.0, 0.0)
+        };
+        // The log means the memories read.
+        let implied = vix_from_variance(p.vix_variance_premium, v_next) * level * crate::mathx::exp(-si2);
+        let vix_log_mean = vix * crate::mathx::exp(-0.5 * sv2);
+        let target_premium = *premium;
+        if *premium != 0.0 {
+            *premium *= premium_fade;
+            if premium.abs() < crate::engine::VIX_TARGET_PREMIUM_CLEARED_UNDER {
+                *premium = 0.0;
+            }
+        }
+        let anchor = if p.vix_anchor_centre != 0.0 {
+            anchor_level * crate::mathx::exp(-p.vix_anchor_centre)
+        } else {
+            anchor_level
+        };
+        if p.vix_anchor_memory != 0.0 && p.vix_level_identity != 0.0 && implied > 0.0 && anchor > 0.0 {
+            let h = p.vix_anchor_memory;
+            let d = crate::mathx::log(implied / anchor);
+            *slow = (1.0 - h) * *slow + h * d;
+            if p.vix_stress_premium != 0.0 {
+                let hs = p.vix_stress_memory_rate();
+                *stress = (1.0 - hs) * *stress + hs * d;
+                let after = self.forecast_vix_log_variance(step + 1);
+                *stress_sd = (1.0 - hs) * *stress_sd + hs * crate::mathx::sqrt(after);
+            }
+        }
+        let mut inputs = self.daily_inputs(request, 0.0, v_next, *slow, scale_bar);
+        inputs.vix_anchor_level = anchor_level;
+        inputs.vix_target_premium = target_premium;
+        inputs.vix_implied_from_market = if p.vix_level_identity != 0.0 {
+            implied
+        } else if p.vix_realised_vol_weight == 0.0 {
+            0.0
+        } else {
+            p.market_vol_vix_anchor * sigma_daily / p.market_factor_sigma
+        };
+        if p.vix_fear_uptake != 0.0 {
+            *fear = crate::economy::daily::advance_vix_fear(*fear, &inputs, vix_log_mean, p.vix_fear_half_life);
+            inputs.vix_fear = *fear;
+        }
+        // The target's log variance at this close, and the VIX step on the
+        // target scaled by exp(Var / 2): the read-back it reads is scaled,
+        // with the memories as advanced, so `T` alone moves.
+        let var_target = if p.forecast_readback_dispersion != 0.0 && p.vix_level_identity != 0.0 {
+            // The anchor memory's weight at this VIX, read off the law itself.
+            let w = {
+                let t0 = crate::economy::daily::identity_target_level(&inputs, vix);
+                let mut bumped = inputs;
+                bumped.vix_anchor_slow += 1e-6;
+                let t1 = crate::economy::daily::identity_target_level(&bumped, vix);
+                if t0 > 0.0 && t1 > 0.0 { -(crate::mathx::log(t1 / t0)) / 1e-6 } else { 0.0 }
+            };
+            let h = if p.vix_anchor_memory != 0.0 { p.vix_anchor_memory } else { 0.0 };
+            let k = if p.vix_fear_uptake != 0.0 { p.vix_fear_uptake } else { 0.0 };
+            let rho = if p.vix_fear_uptake != 0.0 {
+                crate::mathx::pow(0.5, 1.0 / p.vix_fear_half_life) - k
+            } else {
+                0.0
+            };
+            let cov = |c: usize| {
+                p.forecast_readback_correlation * crate::mathx::sqrt(crate::mathx::max(
+                    0.0, self.forecast_vix_log_variance(c) * self.forecast_readback_log_variance(c)))
+            };
+            load.step(si2, sv2, cov(step), w, h, k, rho)
+        } else {
+            0.0
+        };
+        let mut stepped_inputs = inputs;
+        if var_target > 0.0 && p.vix_level_identity != 0.0 {
+            stepped_inputs.vix_implied_from_market = implied * crate::mathx::exp(0.5 * var_target);
+        }
+        let sd_ret = 100.0 * crate::mathx::sqrt(crate::mathx::max(0.0, v_session));
+        let (mut vix_next, mut news_first) = (0.0, 0.0);
+        for &z in live_mark_nodes().iter() {
+            let mut node = stepped_inputs;
+            node.market_day_return_pct = z * sd_ret;
+            let stepped = crate::economy::daily::vix_close(
+                econ, &node, 0.0, &mut crate::economy::daily::MeanDraws);
+            vix_next += stepped / 8.0 + self.forecast_vix_jump_mean(econ, &node) / 8.0;
+            if news {
+                news_first += self.forecast_news_multiplier(econ, &node, stepped) / 8.0;
+            }
+        }
+        (vix_next, news_first, inputs)
+    }
+
+    /// The expected multiplier the VIX's slow level applies `closes` closes
+    /// on (`forecast_vix_level_path`): `exp(phi^c l - phi^(2c) v / 2)`, which
+    /// at 0 closes is `Engine::vix_level_multiplier`; 1.0 with the level off.
+    fn forecast_vix_level_multiplier(&self, closes: usize) -> f64 {
+        let p = &self.params;
+        if p.vix_level_sigma == 0.0 || self.vix_log_level == 0.0 {
+            return 1.0;
+        }
+        let phi = p.vix_level_persistence;
+        let one_minus = 1.0 - phi * phi;
+        let sigma = self.vix_level_sigma_applied();
+        let stationary_var = if one_minus > 0.0 { sigma * sigma / one_minus } else { 0.0 };
+        let pc = crate::mathx::pow(phi, closes as f64);
+        crate::mathx::exp(pc * self.vix_log_level - 0.5 * pc * pc * stationary_var)
+    }
+
+    /// The log read-back's variance about the forecast after `closes` closes:
+    /// `sd^2 * (1 - 0.5^(2 closes / half-life))` under
+    /// `forecast_readback_dispersion`, and 0.0 with the dial off or before
+    /// any close, whose read-back the standing state already gives. Under
+    /// `forecast_readback_dispersion_first` the first close carries its own
+    /// spread `s1^2`, the session's shock to the variance processes, and the
+    /// rest grows from there: `s1^2 + (sd^2 - s1^2)(1 - 0.5^(2 (closes - 1) /
+    /// half-life))`.
+    fn forecast_readback_log_variance(&self, closes: usize) -> f64 {
+        let p = &self.params;
+        let sd = p.forecast_readback_dispersion;
+        if sd == 0.0 || closes == 0 {
+            return 0.0;
+        }
+        let hl = p.forecast_readback_dispersion_half_life;
+        let first = p.forecast_readback_dispersion_first;
+        let grown = |c: f64| if hl == 0.0 { 1.0 } else { 1.0 - crate::mathx::pow(0.5, 2.0 * c / hl) };
+        if first == 0.0 {
+            sd * sd * grown(closes as f64)
+        } else {
+            first * first + (sd * sd - first * first) * grown(closes as f64 - 1.0)
+        }
+    }
+
+    /// The news's expected multiplier on the factor's variance at one return
+    /// node (`forecast_news_drift`): `E[(VIX / VIX_m)^(2 l)]`, `VIX_m` the
+    /// node's close with its draws at their means (`stepped`), to second
+    /// order in `e = (noise + jump) / VIX_m`, which is exact at `l` 1.0 and
+    /// 0.5. The noise and the jump are the VIX law's own, as
+    /// `economy::daily::vix_close` draws them on `inputs`.
+    fn forecast_news_multiplier(&self, economy: &EconomyState, inputs: &DailyInputs, stepped: f64) -> f64 {
+        if !(stepped > 0.0) {
+            return 1.0;
+        }
+        let l = self.params.market_vol_vix_news;
+        let clamp = inputs.vix_return_clamp;
+        let ret = crate::mathx::max(-clamp, crate::mathx::min(clamp, inputs.market_day_return_pct));
+        let innovation_on = inputs.vix_innovation_sigma != 0.0 || inputs.vix_innovation_return_sigma != 0.0;
+        let noise_sd = if innovation_on {
+            let s0 = inputs.vix_innovation_sigma;
+            let sr = inputs.vix_innovation_return_sigma * ret;
+            economy.vix * crate::mathx::sqrt(s0 * s0 + sr * sr)
+        } else {
+            0.15 * inputs.volatility
+        };
+        let (prob, jump_mean) = if inputs.vix_jump_intensity == 0.0 && inputs.vix_jump_return_intensity == 0.0 {
+            (0.0, 0.0)
+        } else {
+            let rate = if inputs.vix_jump_return_intensity != 0.0 {
+                inputs.vix_jump_intensity + inputs.vix_jump_return_intensity * crate::mathx::max(0.0, -ret)
+            } else {
+                inputs.vix_jump_intensity
+            };
+            let mean = if inputs.vix_jump_level_scale != 0.0 {
+                inputs.vix_jump_level_scale * if innovation_on { noise_sd } else { economy.vix }
+            } else {
+                inputs.vix_jump_scale
+            };
+            (crate::mathx::min(1.0, rate / 252.0), mean)
+        };
+        let e1 = prob * jump_mean / stepped;
+        let e2 = (noise_sd * noise_sd + 2.0 * prob * jump_mean * jump_mean) / (stepped * stepped);
+        1.0 + 2.0 * l * e1 + l * (2.0 * l - 1.0) * e2
+    }
+
     /// The expected over the typical multiplier the market factor's return
     /// memory (`market_vol_leverage`) applies `closes` closes on: the memory
     /// is a sum of the days' standardised factors, so its spread about its
@@ -1088,6 +1549,8 @@ impl Engine {
         vix: f64,
         spread: f64,
         nodes: &[(f64, f64)],
+        readback: f64,
+        joint: Option<(f64, &[(f64, f64)], f64)>,
     ) -> (MarketVarianceState, (f64, f64)) {
         let p = &self.params;
         let sd_f = crate::mathx::sqrt(crate::mathx::max(0.0, mv.variance()));
@@ -1108,14 +1571,27 @@ impl Engine {
         let (mut up, mut down) = (0.0, 0.0);
         let mut smoothed_out = -1.0;
         for &(w, level, scale) in regimes {
-            let denominator = self.vix_anchor * scale;
-            let level = if spread > 0.0 && c != 0.0 {
+            let denominator = if p.market_vol_vix_excursion == 0.0 || !(readback > 0.0) {
+                self.vix_anchor * scale
+            } else {
+                readback * scale
+            };
+            let joint_on = matches!(joint, Some((v, _, _)) if v > 0.0);
+            let level = if (spread > 0.0 || joint_on) && c != 0.0 {
                 let at = crate::market::factor_vol::vix_response(p, smoothed / denominator);
                 let response = |x: f64| crate::market::factor_vol::vix_response(p, x / denominator);
-                let expected = if nodes.is_empty() {
-                    lognormal_expect(smoothed, spread, response)
-                } else {
-                    spread_expect(nodes, smoothed, response)
+                let expected = match joint {
+                    // `forecast_readback_dispersion`: over the joint spread of
+                    // the VIX and its read-back (`compute_forecast`).
+                    Some((var_x, joint_nodes, mean)) if joint_on => {
+                        if joint_nodes.is_empty() {
+                            lognormal_expect(smoothed * mean, var_x, response)
+                        } else {
+                            spread_expect(joint_nodes, smoothed * mean, response)
+                        }
+                    }
+                    _ if nodes.is_empty() => lognormal_expect(smoothed, spread, response),
+                    _ => spread_expect(nodes, smoothed, response),
                 };
                 let ratio_fast = (1.0 - c + c * expected) / (1.0 - c + c * at);
                 let ratio_slow = (1.0 - c_slow + c_slow * expected) / (1.0 - c_slow + c_slow * at);
@@ -1236,6 +1712,7 @@ mod tests {
                 mispricing_momentum: None,
                 fair_value_offset: None,
                 buyback_log_shares: None,
+                valuation_multiple: None,
                 dividend: None,
                 maker_inventory: None,
                 garch_variance: 0.015 * 0.015,
