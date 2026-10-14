@@ -189,8 +189,8 @@ same with them on as off.
   year-on-year 1990-2025 about 2.0: 0.993 and 0.170.
 - `policy_anticipation_guidance` is a new dial, 0.0 on every preset and left
   out of the digest there: the share of the anticipated meeting's priced
-  change taken from the decision the Fed's own reading implies rather than
-  the published economy's. The tape's policy surprise at scheduled FOMC
+  change taken from the decision the Fed's own reading implies, with the
+  rest from the published economy. The tape's policy surprise at scheduled FOMC
   announcements has an sd of 4.8 bp (Bauer and Swanson 2022).
 - `treasury_path_anticipated` is a new switch, 0.0 on every preset and left
   out of the digest there: at 1 a meeting moves the priced policy path by
@@ -313,8 +313,8 @@ same with them on as off.
 - `vix_stress_premium_undo` is a new switch, 0.0 on every preset and left
   out of the digest there. On, the published VIX's premium is the anchor's
   pull undone above the knee, `vix_anchor_weight * max(0, m - knee)`, in
-  place of the capped hinge; the gain and the cap are then unread. Only the
-  quote moves.
+  place of the capped hinge; the gain and the cap are then unread, and only
+  the published quote moves.
 
 ### The VIX's fear memory
 
