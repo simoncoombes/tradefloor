@@ -340,6 +340,137 @@ payload, Arrow and WASM show them; agents trade by symbol.
   on its level (the gain times the pressure's change) in place of a daily
   push. The forecast steps the same law. Every known-answer digest is where
   it was.
+- `oil_convenience_yield` is a new dial, 0.0 on every preset and left out of
+  the digest there. Off zero the oil price carries a premium of
+  `(I/50)^-k` on its level, inventory read at no lower than 25, so low
+  stocks raise the price at once, the premium unwinds as inventory refills
+  and the curve is in backwardation. It needs `oil_inventory_reversion`.
+  The forecast takes the premium's expectation over inventory's spread.
+- `oil_target_drift_sd` and `oil_target_drift_reversion` are new dials, 0.0
+  on every preset and left out of the digest there. Off zero the oil price
+  carries a long factor, a random walk on the log of its level drawn on a
+  key of its own (Schwartz and Smith 2000), which moves spot and the whole
+  curve alike; the pull returns it toward 0. A snapshot carries
+  `oil_target_drift` only under the dial, hashed behind tag 55 only then.
+- `oil_pushes_in_target` and `oil_noise_log_sd` are new dials, 0.0 on every
+  preset and left out of the digest there. The switch splits the oil price
+  into a part that reverts at `oil_mean_reversion` and a part the daily
+  pushes make, which decays at the shipped 0.03, so a slower reversion no
+  longer multiplies each push's long-run effect; the economy carries
+  `oil_push_level` only under it. `oil_noise_log_sd` draws the noise as a
+  share of the price.
+- `oil_dollar_elasticity` is a new dial, 0.0 on every preset and left out of
+  the digest there. Off zero the dollar's daily drag on oil is dropped and
+  the oil price carries `(usd/100)^-e` on its level, so a stronger dollar
+  lowers spot and every contract at once, as EIA's contracts do against
+  FRED's trade-weighted dollar.
+- `oil_inventory_noise_sd` and `oil_forecast_clamp` are new dials, 0.0 on
+  every preset and left out of the digest there: the sd of oil inventory's
+  daily noise (0.0 the standing 0.5), and a switch that has the forecast
+  publish oil's expectation truncated at its clamps.
+- `usd_mean_reversion` and `usd_noise_sd` are new dials, 0.0 on every
+  preset and left out of the digest there: the dollar index's daily
+  reversion share (0.0 the standing 0.02) and its daily noise sd (0.0 the
+  standing 0.3), measured on FRED's trade-weighted dollar. Under the
+  reversion the dollar's safe-haven bid decays at the shipped 0.02 on its
+  own; the economy carries `usd_haven_level` only then.
+- `usd_safe_haven_gain` is a new dial, 0.0 on every preset and left out of
+  the digest there: the dollar's daily drift per VIX point above
+  `usd_crisis_vix_threshold` (0.0 the standing 0.05), read by the dollar's
+  step and by the forecast's expected bid. FRED DTWEXM against CBOE's VIX
+  measures 0.001.
+- `pinned_vix_sets_variance` is a new switch, 0.0 on every preset and left
+  out of the digest there: under it every VIX a caller pins sets the market
+  factor's variance to the law's level at that VIX, as a scenario's
+  `vix_sets_variance` already could, instead of stepping one session toward
+  it. Free sessions are unchanged. Stepped, a pinned path's variance lagged
+  the VIX it stated by weeks: replaying the real 2020-21 VIX, realized
+  volatility ran about twice the S&P 500's once the VIX was back at 20-40,
+  and short of it at the March peak.
+- `corporate_spread_noise_sd` and `corporate_spread_noise_half_life` are new
+  dials, 0.0 on every preset and left out of the digest there: off zero
+  credit carries its own state, an AR(1) stepped every session on its own
+  keyed draws (no stream moves) and opened from its stationary distribution,
+  added to the spread formula's base beside the leverage term in the close's
+  corporate move, the meeting's re-anchor and the prehistory carry. Without
+  it the spread is nearly an equity echo: the part of its change the index
+  does not explain is half the IG closing-price spread's (LQD less IEF on
+  SPY, 2015-2025) from a session to a quarter.
+- `corporate_spread_equity_lag` is a new dial, 0.0 on every preset and left
+  out of the digest there: a half-life in sessions at which the gap the
+  corporate spread prices follows credit's leverage gap, so the spread
+  reprices an equity move over weeks rather than on the day. Read only with
+  `corporate_spread_equity_gain` set; the cycle's equity hazard keeps the
+  gap itself. The tape's spread beta on the index builds from -0.47 bp per 1%
+  over a session to -2.3 over a month (FRED BAA10Y, 1990-2025); with the gap
+  read whole the model's is -2.2 at every horizon.
+- `fed_eve_decision` is a new switch, 0.0 on every preset and left out of the
+  digest there: at 1 a scheduled meeting delivers the decision the Fed's own
+  reading implied at the eve's close (the decision the market priced), after
+  the ladder's and the put's draws; emergency meetings are untouched. The
+  model's scheduled-decision surprise falls from 9-12 bp to about 5 (tape
+  4.8, Bauer and Swanson 2022).
+- `treasury_path_owed_excluded` is a new switch, 0.0 on every preset and
+  left out of the digest there: under `treasury_path_anticipated` the
+  meeting's path step leaves out the put's owed step, which in the legacy
+  `dff + owed` offsets the put's extra cut and under the anticipated path
+  priced the give-back on the day of the cut.
+- `cycle_inflation_hazard` and `cycle_rate_hazard` are new dials, 0.0 on
+  every preset and left out of the digest there: the monthly peak hazard an
+  expansion adds with inflation above 4 and with the funds rate above 5
+  (0.0 the legacy 0.1 each). NBER peaks 1962-2025 on the two conditions and
+  the ladder's inversion term measure +0.022 and +0.001.
+- `core_trend_sd` and `core_trend_persistence` are new dials, 0.0 on every
+  preset and left out of the digest there: off zero headline inflation's
+  month-start step reverts to 2.0 plus a slow AR(1) trend (monthly
+  persistence and innovation sd, stepped at the month start on its own keyed
+  draws so no stream moves, opened from its stationary distribution), so
+  core carries the tape's persistent regimes. Fitted to FRED CPILFESL
+  year-on-year 1990-2025 about 2.0: 0.993 and 0.170.
+- `policy_anticipation_guidance` is a new dial, 0.0 on every preset and left
+  out of the digest there: the share of the anticipated meeting's priced
+  change taken from the decision the Fed's own reading implies, with the
+  rest from the published economy. The tape's policy surprise at scheduled FOMC
+  announcements has an sd of 4.8 bp (Bauer and Swanson 2022).
+- `treasury_path_anticipated` is a new switch, 0.0 on every preset and left
+  out of the digest there: at 1 a meeting moves the priced policy path by
+  the further move the anticipated meeting priced, not by the rate's change,
+  so a rate surprise reaches the curve once.
+- `policy_anticipation_half_life` is a new dial, 0.0 on every preset and left
+  out of the digest there: between meetings the anticipated meeting's priced
+  change moves toward the shadow meeting's at this half-life, in sessions,
+  rather than jumping to it each close. DGS2 off the zero bound: FOMC days
+  carry 0.046 of the variance, the other days' sd is 6.16 bp.
+- `treasury_2y_meeting_carry` is a new dial, 0.0 on every preset and left
+  out of the digest there: the share of the 2-year's standing gap to the
+  meeting's formula (`0.85 (ff + path) + 0.15 x 10y`) that a meeting keeps.
+  At 1.0 the meeting moves the 2-year by 0.85 of the decision's news and
+  0.15 of the 10-year's move instead of resetting it. FOMC days carry 0.046
+  of DGS2's daily variance off the zero bound (1994-2025).
+- `fed_neutral_real_rate` is a new dial, 0.0 on every preset and left out of
+  the digest there: points added to the neutral rate of the central bank's
+  Taylor rule, whose neutral at target is a nominal 2.0 (a real rate of 0).
+  The Holston-Laubach-Williams US natural rate averaged 2.0 over 1990-2025.
+- `treasury_zlb_path` and `treasury_zlb_haven_gain` are new dials, 0.0 on
+  every preset and left out of the digest there. At the zero bound the curve
+  prices the part of the Fed put's ask the rate cannot deliver (tonight's and
+  each meeting's, decaying at the priced path's half-life, carried as
+  `zlb_unmet` only with the dial on), and the term premium falls a further
+  amount per VIX point above 20. Kim and Wright's decomposition of the
+  10-year in the 2008-2015 falls that began at the zero bound: expected path
+  -0.35, term premium -0.36, with the funds rate unchanged.
+- `fed_core_inflation` and `treasury_core_inflation` are new switches, 0.0
+  on every preset and left out of the digest there: the central bank, and the
+  Treasury curve (the 10-year's term premium, the haven's gate, the flight to
+  quality's sign), read core inflation in place of headline. Core is headline
+  less the oil pass-through's accumulated part, which the economy carries as
+  `oil_inflation_level` only with either switch on. FRED CPILFESL against
+  CPIAUCSL, 1990 to 2025: the funds rate loads on core and not on the gap,
+  and in index falls with headline at 3 or more and core under 3 the Fed cut
+  and the 10-year rallied as below 3.
+- `oil_price_floor` and `oil_price_ceiling` are new dials, 0.0 on every
+  preset and left out of the digest there: oil's bounds, the standing 35
+  and 150 at 0.0, read by the step and by the forecast's clamp.
 
 ### Oil futures
 
@@ -409,6 +540,21 @@ payload, Arrow and WASM show them; agents trade by symbol.
 - A snapshot carries `vix_futures` and `vix_futures_book` only under the
   switch, and the state hash and `manifest.state_hash` cover them behind tags
   48 and 49 only then. Every known-answer digest is where it was.
+
+### The published VIX's stress memory at its own rate
+
+- `vix_stress_premium_memory` is a new dial, 0.0 on every preset and left
+  out of the digest there. At 0.0 the published VIX's stress memory steps at
+  `vix_anchor_memory`'s rate, as it always has. Off zero it steps at this
+  rate at the close, in the projection of tonight's close and in the
+  forecast; the anchor's memory, the VIX state and every price are
+  untouched, so only the published quote moves. Every known-answer digest is
+  where it was.
+- `vix_stress_premium_undo` is a new switch, 0.0 on every preset and left
+  out of the digest there. On, the published VIX's premium is the anchor's
+  pull undone above the knee, `vix_anchor_weight * max(0, m - knee)`, in
+  place of the capped hinge; the gain and the cap are then unread, and only
+  the published quote moves.
 
 ### The VIX's fear memory
 

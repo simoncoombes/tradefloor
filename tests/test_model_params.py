@@ -943,6 +943,88 @@ PERTURBATIONS = [
     ("oil_mean_reversion", 0.0035, True),
     ("oil_noise_sd", 1.4, True),
     ("oil_inventory_level_gain", 30.0, True),
+    # The convenience premium on oil's target (pt-v22, the oil law's
+    # storage), LIVE: it moves the oil price the burn-in's inflation reads.
+    ("oil_convenience_yield", 2.0, True),
+    # Oil's long factor and its pull (Schwartz and Smith 2000), LIVE: the
+    # random walk moves the oil price the burn-in's inflation reads.
+    ("oil_target_drift_sd", 0.018, True),
+    ("oil_target_drift_reversion", 0.001, True),
+    # The pushes at their shipped long-run response, and the noise as a
+    # share of the price, LIVE: each moves the oil price.
+    # INERT on the probe by construction: at the standing reversion (0.03,
+    # oil_mean_reversion 0.0) the split's two parts recombine to the shipped
+    # step, so the switch moves the price only beside a slower reversion.
+    ("oil_pushes_in_target", 1.0, False),
+    ("oil_noise_log_sd", 0.017, True),
+    # The dollar as a level the oil curve carries, LIVE.
+    ("oil_dollar_elasticity", 1.2, True),
+    # Oil inventory's noise anchored to EIA's stocks, LIVE: it moves the
+    # inventory the oil price reads.
+    ("oil_inventory_noise_sd", 0.35, True),
+    # The dollar's measured persistence and noise (FRED DTWEXM), LIVE: the
+    # dollar reaches oil's drag, and through it inflation and the bank.
+    ("usd_mean_reversion", 0.00095, True),
+    ("usd_noise_sd", 0.43, True),
+    # The dollar's crisis drift at FRED DTWEXM's measured 0.001. INERT on the
+    # probe: its VIX closes at 19.7, 19.3 and 21.6, under the 25.5 threshold
+    # (`usd_crisis_vix_threshold`), so the bid never fires; a gain of 0.5
+    # moves nothing either. It acts only in a crisis. Measured 2026-10-10.
+    ("usd_safe_haven_gain", 0.001, False),
+    # Core inflation for the bank (headline less the oil pass-through's
+    # part), LIVE with its companion pass-through: the probe's oil sits at 98,
+    # off the anchor, so the meeting reads a lower inflation and the prices
+    # move. Without the companion the shipped three-way branch pays nothing
+    # in the 50 to 80 band the probe's burn-in mostly holds.
+    ("fed_core_inflation", 1.0, True),
+    # Core inflation for the curve, INERT on the probe's market columns: its
+    # headline closes at 1.1, under the term premium's 2, the flight to
+    # quality's 3 and the haven's 4, so no gate the three sessions read
+    # changes; the 10-year differs from the burn-in's months above 2 by
+    # 1e-17 and no price reads that. Measured 2026-10-11.
+    ("treasury_core_inflation", 1.0, False),
+    # The zero bound's pieces, LIVE: the probe's funds rate closes at 0.0 and
+    # its VIX at 21.6, so the unmet put (with its companion put and path) and
+    # the zero bound's compression both move the 10-year and the prices.
+    # Measured 2026-10-11.
+    ("treasury_zlb_path", 1.0, True),
+    ("treasury_zlb_haven_gain", 0.05, True),
+    # The Taylor rule's neutral real rate: the probe's meetings read the rule.
+    ("fed_neutral_real_rate", 2.0, True),
+    # Core inflation's trend: its opening draw moves the month-start step.
+    ("core_trend_sd", 0.17, True),
+    # The persistence alone is read by nothing (the sd is 0).
+    ("core_trend_persistence", 0.993, False),
+    # The expansion's inflation and rate hazards. INERT on the probe
+    # (measured 2026-10-11): the dials only replace the legacy 0.1 where an
+    # expansion has inflation above 4 or the funds rate above 5, and the
+    # probe's path never does.
+    ("cycle_inflation_hazard", 0.0219, False),
+    ("cycle_rate_hazard", 0.0013, False),
+    # The eve's decision: the probe's meetings deliver the eve's silent
+    # shadow instead of re-reading the day, which moves its rate path.
+    ("fed_eve_decision", 1.0, True),
+    # The owed step left out. INERT on the probe: read only with
+    # treasury_path_anticipated, which pt-v20 leaves off.
+    ("treasury_path_owed_excluded", 1.0, False),
+    # The 2-year's carry through a meeting. INERT on the probe's market: the
+    # burn-in's meetings move the 2-year (pt-v20's own 2-year noise leaves it
+    # a gap to keep: 0.15% against 0.23% after the third close, measured
+    # 2026-10-11), but no column this table reads takes the 2-year.
+    ("treasury_2y_meeting_carry", 1.0, False),
+    # The priced meeting's half-life. INERT on the probe: pt-v20 has
+    # policy_anticipation off, so no change is priced to smooth.
+    ("policy_anticipation_half_life", 10.0, False),
+    # The anticipated path. INERT on the probe: pt-v20 has
+    # treasury_path_pricing off, so there is no path to move.
+    ("treasury_path_anticipated", 1.0, False),
+    # The Fed's guidance. INERT on the probe: pt-v20 has
+    # policy_anticipation off, so no shadow is priced.
+    ("policy_anticipation_guidance", 0.5, False),
+    # Oil's bounds from WTI in real terms. INERT on the probe: its burn-in's
+    # oil stays inside 35 to 150, so moving the bounds outward moves nothing.
+    ("oil_price_floor", 16.4, False),
+    ("oil_price_ceiling", 279.0, False),
     # INERT by construction: nothing a price reads is downstream of the
     # index (tests/test_fear_greed_published.py). RE-VALUED 2026-09-26: 1.0
     # is pt-v20's own value since its graded arm, so the row perturbs back
@@ -1156,6 +1238,9 @@ PERTURBATIONS = [
     ("index_level_listed", 1.0, False),
     ("vix_intraday_live", 1.0, False),
     ("forecast_horizon_sessions", 21.0, False),
+    # The forecast's clamped oil (`oil_forecast_clamp`): INERT for the same
+    # reason, it changes only what the forecast publishes.
+    ("oil_forecast_clamp", 1.0, False),
     # The forecast's derived dials: INERT for the same reason, and read only
     # with the horizon set.
     ("forecast_vix_dispersion", 0.3, False),
@@ -1317,6 +1402,10 @@ PERTURBATIONS = [
     ("vix_stress_premium_knee", 0.5, False),
     # INERT: read only with vix_stress_premium non-zero.
     ("vix_stress_premium_cap", 0.25, False),
+    # INERT: read only with vix_stress_premium non-zero.
+    ("vix_stress_premium_memory", 0.0556, False),
+    # INERT: read only with vix_stress_premium non-zero.
+    ("vix_stress_premium_undo", 1.0, False),
     # INERT on this probe, measured: the put reads the index's fall since
     # the last meeting, and the burn-in's prices do not move, the probe's
     # three sessions hold no meeting, and no burn-in meeting is at a VIX of
@@ -1367,6 +1456,16 @@ PERTURBATIONS = [
     ("corporate_spread_equity_gain", 1.5, True),
     # INERT: read only with corporate_spread_equity_gain non-zero.
     ("corporate_spread_equity_half_life", 126.0, False),
+    # INERT: credit's repricing lag is read only with
+    # corporate_spread_equity_gain non-zero, which pt-v20 leaves off.
+    ("corporate_spread_equity_lag", 5.0, False),
+    # Credit's own state: its opening draw moves the meeting's corporate
+    # re-anchor, and with it the discount rate.
+    ("corporate_spread_noise_sd", 0.025, True),
+    # INERT: read only by a VIX pin; the probe pins nothing.
+    ("pinned_vix_sets_variance", 1.0, False),
+    # INERT: the half-life alone is read by nothing (the sd is 0).
+    ("corporate_spread_noise_half_life", 16.0, False),
     # The market's fall in the cycle's hazard (sim/r17-b12). Carries its
     # half-life as a companion, without which it is refused. INERT on this
     # probe: the ladder reads the gap only in an expansion or at a peak past
@@ -1889,6 +1988,11 @@ ECONOMY_STREAM_MOVERS = frozenset({
     # burn-in lives through, and with them which state-dependent macro
     # sites fire there, as `cycle_stationary_opening` does.
     "cycle_equity_hazard_opening",
+    # Core inflation's trend: its draws are on its own key (stream positions
+    # identical at a negligible sd, tests/test_core_trend_process.py), but
+    # its opening moves headline through the burn-in, and with it which
+    # state-dependent macro sites fire, as the cycle openings above do.
+    "core_trend_sd",
     # The return-driven arrival rate takes the same arrival draw as
     # `vix_jump_intensity` on every session it is non-zero, for the same
     # reason: the draw IS the mechanism.
@@ -1949,6 +2053,23 @@ ECONOMY_STREAM_MOVERS = frozenset({
     # ordinary day, 1 to 3 on a decision day by the price band) follow the
     # band the price is in. The noise's scale at 1.4 moves no draw count.
     "oil_mean_reversion", "oil_inventory_level_gain",
+    # The convenience premium (2026-10-09), measured on this probe at 2.0:
+    # it moves the burn-in's oil price through its target, and the OPEC
+    # decision's conditional draws follow the band, as the two above.
+    "oil_convenience_yield",
+    # Oil's long factor (2026-10-09): its draws are keyed and take nothing
+    # from the economy stream, but the price it moves sets the OPEC
+    # decision's band, and that decision's conditional draws follow. Its
+    # pull at 0.001, beside the factor at 0.018, keeps the probe's burn-in
+    # in the same OPEC bands, so it is not here.
+    "oil_target_drift_sd",
+    # The dollar as a level and inventory's noise (2026-10-09), measured on
+    # this probe: each moves the burn-in's oil price across OPEC's bands.
+    "oil_dollar_elasticity", "oil_inventory_noise_sd",
+    # The dollar's measured persistence moves the burn-in's dollar, which
+    # the oil drag reads, so OPEC's decisions follow the price band too.
+    # Its noise at 0.43 keeps the probe's burn-in in the same bands.
+    "usd_mean_reversion",
     # The risk-management cut (r13 macro-clock, 2026-09-26), measured on
     # this probe: `fed_growth_cut` 2.0 moves the economy stream by +34 draws
     # (9172 to 9206), the market stream by 0. It acts on the 755-day
@@ -2036,6 +2157,16 @@ def test_the_perturbation_table_covers_the_whole_settable_surface():
 #: carrying the same companions, none of the three moved. The companions
 #: are the default's 0.375 now, and the three rows are re-valued.
 COMPANIONS: dict[str, dict[str, float]] = {
+    # Core differs from headline only where oil pays inflation, which the
+    # symmetric pass-through does either side of 81 (the shipped branch pays
+    # nothing between 50 and 80).
+    "fed_core_inflation": {"oil_inflation_passthrough": 1.0},
+    "core_trend_sd": {"core_trend_persistence": 0.993},
+    "corporate_spread_noise_sd": {"corporate_spread_noise_half_life": 16.0},
+    "treasury_core_inflation": {"oil_inflation_passthrough": 1.0},
+    # The unmet put needs the put and the priced path it decays like.
+    "treasury_zlb_path": {"fed_put_gain": 3.0, "fed_put_half_life": 126.0, "treasury_put_pricing": 1.0,
+                          "treasury_path_pricing": 1.0, "treasury_path_half_life": 63.0},
     # The knee pulls at its half-life, and the pair is refused without it.
     "fair_value_relative_knee": {"fair_value_relative_half_life": 252.0},
     # The valuation is carried from the prehistory, and refused without one.
@@ -2070,6 +2201,11 @@ COMPANIONS: dict[str, dict[str, float]] = {
     **{name: {"index_level_listed": 1.0, "surface_ssvi": 1.0, "forecast_horizon_sessions": 63.0,
               "options_names_listed": 1.0}
        for name in ("surface_name_premium", "surface_name_skew", "option_position_limit")},
+    # The convenience premium unwinds as inventory refills, which only the
+    # inventory's reversion gives it; refused without it.
+    "oil_convenience_yield": {"oil_inventory_reversion": 0.002},
+    # The pull acts on the long factor, and is refused without it.
+    "oil_target_drift_reversion": {"oil_target_drift_sd": 0.018},
     "futures_vix_live_fast_share": {"forecast_horizon_sessions": 126.0, "futures_vix_listed": 1.0},
     "futures_vix_live_fast_half_life": {"forecast_horizon_sessions": 126.0, "futures_vix_listed": 1.0},
     "futures_vix_live_slow_half_life": {"forecast_horizon_sessions": 126.0, "futures_vix_listed": 1.0},

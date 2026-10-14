@@ -465,6 +465,11 @@ pub struct EconomyState {
     /// from the last close, H the dial's half-life. Written only with that
     /// gain set; 0.0, and never written, on every preset.
     pub spread_equity_gap: f64,
+    /// The gap the corporate spread prices, following `spread_equity_gap`
+    /// at the half-life `ModelParams::corporate_spread_equity_lag`. Written
+    /// only with that lag and the credit gain set; 0.0, and never written,
+    /// on every preset.
+    pub spread_priced_gap: f64,
     /// What the valuation reads beyond `earnings_cycle`: the anticipated
     /// level of the earnings cycle over the valuation's horizon minus the
     /// current one (`ModelParams::earnings_anticipation_half_life`). Derived
@@ -477,6 +482,39 @@ pub struct EconomyState {
     /// 0.0, and never read or written, while that dial is 0.0, which every
     /// preset carries; snapshotted and hashed only while it is set.
     pub unemployment_impulse: f64,
+    /// The part of the oil price that the daily pushes made, decaying at the
+    /// shipped 0.03 (`ModelParams::oil_pushes_in_target`). 0.0, and never
+    /// read or written, while that switch is 0.0, which every preset
+    /// carries; snapshotted and hashed only while it is set.
+    pub oil_push_level: f64,
+    /// The dollar's safe-haven bid, decaying at the shipped 0.02
+    /// (`ModelParams::usd_mean_reversion`). 0.0, and never read or written,
+    /// while that dial is 0.0, which every preset carries; snapshotted and
+    /// hashed only while it is set.
+    pub usd_haven_level: f64,
+    /// The oil pass-through's accumulated part of headline inflation,
+    /// percentage points: each month-start step adds the term
+    /// `oil_inflation_passthrough` adds to headline and closes the
+    /// headline's own `inflation_reversion` of the gap to 0.0, so headline
+    /// less it is core (`ModelParams::fed_core_inflation`). 0.0, and never
+    /// read or written, while `fed_core_inflation` and
+    /// `treasury_core_inflation` are both 0.0, which every preset carries;
+    /// snapshotted and hashed only while either is set.
+    pub oil_inflation_level: f64,
+    /// The Fed put's unmet asks, percentage points: each meeting adds the
+    /// part of the put's ask the policy rate could not deliver, and it decays
+    /// at `treasury_path_half_life` (`ModelParams::treasury_zlb_path`). 0.0,
+    /// and never read or written, while that dial is 0.0, which every preset
+    /// carries; snapshotted and hashed only while it is set.
+    pub zlb_unmet: f64,
+    /// The log of the oil price's truncation at its bounds on the last step,
+    /// ln(clamped / unclamped), 0.0 where no bound bound it. TRANSIENT: set
+    /// by every step that runs the long factor (`oil_target_drift_sd`) and
+    /// read by the close straight after it, which adds it to the long
+    /// factor, so a bound limits the long-run level rather than opening a
+    /// gap in the short factor. Never snapshotted or hashed: no reading of
+    /// it outlives the step that wrote it.
+    pub oil_bound_log_ratio: f64,
     /// `economy.marketPE ?? 18` at the cycle-transition sites. Kept optional
     /// because the reference implementation genuinely leaves it unset before the first market
     /// tick, and the `?? 18` there is a real fallback rather than a
@@ -642,8 +680,14 @@ pub fn create_initial_economy_state(options: &InitialEconomyOptions) -> EconomyS
         fed_put_owed: 0.0,
         fed_put_mcap_prev: 0.0,
         spread_equity_gap: 0.0,
+        spread_priced_gap: 0.0,
         earnings_anticipation: 0.0,
         unemployment_impulse: 0.0,
+        oil_push_level: 0.0,
+        usd_haven_level: 0.0,
+        oil_inflation_level: 0.0,
+        zlb_unmet: 0.0,
+        oil_bound_log_ratio: 0.0,
         market_pe: Some(18.0),
 
         qe_pe_boost: 0.0,

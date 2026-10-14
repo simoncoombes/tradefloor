@@ -4045,7 +4045,11 @@ impl PyEngine {
         // turned ON here: `False`, the default, leaves a mark an earlier
         // call made today in place, so a later pin of another field cannot
         // cancel it. See `MarketVarianceState::close_day_forced`.
-        if vix_sets_variance {
+        // `pinned_vix_sets_variance`: under the switch every VIX pin marks it,
+        // whatever the argument says. Nothing with the switch at 0.0.
+        if vix_sets_variance
+            || (vix.is_some() && self.inner.params().pinned_vix_sets_variance != 0.0)
+        {
             self.inner.set_vix_sets_variance_pending(true);
         }
         // A PINNED VIX CHARGES THE CREDIT SPREAD NOTHING TONIGHT: the close's
