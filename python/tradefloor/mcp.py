@@ -3739,6 +3739,11 @@ class _Session:
                 if isinstance(order, tf.Cancel):
                     portfolio.cancel(self.engine, ticker=ticker)
                     continue
+                if isinstance(order, tf.Exercise):
+                    # An instruction for the close: the shares move at
+                    # settle_close (pt-v22 phase 3).
+                    portfolio.exercise(self.engine, ticker, order.quantity)
+                    continue
                 if isinstance(order, tf.Limit):
                     # A new limit on a name replaces the one waiting there.
                     portfolio.cancel(self.engine, ticker=ticker)

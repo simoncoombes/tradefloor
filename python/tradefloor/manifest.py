@@ -597,6 +597,10 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          # `surface_ssvi` is set, and the options' book once an agent has
          # traded one.
          "options", "options_book",
+         # The single-name options, only while `options_names_listed` is
+         # set, their book once an agent has traded one, and their exercise
+         # instructions and exercises once there are any.
+         "name_options", "name_options_book", "name_options_exercise",
          # The dividend states, on a model that pays dividends, and an
          # ex-date's move in `s` waiting for its tape row.
          "dividend", "pending_dividend",
@@ -1078,6 +1082,27 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     if "options_book" in snapshot:
         _f64(buf, 56.0)
         _book(buf, snapshot["options_book"])
+    # The single-name options, only while `options_names_listed` is set,
+    # behind their own tag, length-prefixed; their book behind another once
+    # an agent has traded one; their instructions and exercises behind a
+    # third once there are any.
+    if "name_options" in snapshot:
+        raw = snapshot["name_options"]
+        if len(raw) % 8:
+            raise ValidationError(
+                f"snapshot field 'name_options' carries {len(raw)} bytes, which "
+                "is not a whole number of f64s.")
+        values = _column(raw, len(raw) // 8, "name_options")
+        _f64(buf, 57.0)
+        _u32(buf, len(values))
+        for value in values:
+            _f64(buf, value)
+    if "name_options_book" in snapshot:
+        _f64(buf, 58.0)
+        _book(buf, snapshot["name_options_book"])
+    if "name_options_exercise" in snapshot:
+        _f64(buf, 59.0)
+        _name_exercise(buf, snapshot["name_options_exercise"])
     # LENGTH-PREFIXED, because these two are empty between the tape row that
     # consumes them and the close that fills them again -- unlike every
     # per-slot array above, which always follows the roster. An empty buffer
@@ -1464,6 +1489,33 @@ _MEMORY_WIDTH = 5
 _TAKEN_WIDTH = 5
 
 
+def _name_exercise(buf: bytearray, value: dict[str, Any]) -> None:
+    """The single-name options' exercise instructions and exercises, as the
+    engine hashes them: the instructions ``(agent, symbol, contracts)``, then
+    each row ``(session, event, party, symbol, contracts, shares, cash,
+    value, reference)``."""
+    if not isinstance(value, dict) or set(value) != {"instructions", "events"}:
+        raise ValidationError(
+            "snapshot field 'name_options_exercise' must be a dict with "
+            "'instructions' and 'events'.")
+    _text(buf, "name_options_exercise")
+    instructions = list(value["instructions"])
+    _u32(buf, len(instructions))
+    for agent, symbol, quantity in instructions:
+        _text(buf, agent)
+        _text(buf, symbol)
+        _f64(buf, quantity)
+    events = list(value["events"])
+    _u32(buf, len(events))
+    for session, event, agent, symbol, quantity, shares, cash, settle, reference in events:
+        _i64(buf, session)
+        _text(buf, event)
+        _text(buf, agent)
+        _text(buf, symbol)
+        for x in (quantity, shares, cash, settle, reference):
+            _f64(buf, x)
+
+
 def _book(buf: bytearray, book: dict[str, Any]) -> None:
     """The agent-facing book's entry, as the engine hashes it."""
     if not set(_BOOK_KEYS) <= set(book) <= set(_BOOK_KEYS + _BOOK_OPTIONAL_KEYS):
@@ -1721,7 +1773,8 @@ _LEDGER_OPTIONAL_BUFFERS = ("fair_value_offset", "opening_z", "pending_fair_valu
                             "pending_dividend", "fed_drawdown_returns",
                             "innovation_day", "forecast", "futures",
                             "night_bridge", "vix_futures", "rate_futures",
-                            "oil_futures", "margin", "options", "shares_outstanding")
+                            "oil_futures", "margin", "options", "name_options",
+                            "shares_outstanding")
 
 #: The ``fundamentals`` block's buffers, one per company each.
 _LEDGER_FUNDAMENTALS = ("eps", "book_value_per_share", "revenue_growth")
@@ -2011,7 +2064,7 @@ def _snapshot_to_json(snapshot: dict[str, Any]) -> dict[str, Any]:
         if name in snapshot:
             out[name] = base64.b64encode(snapshot[name]).decode("ascii")
     for name in ("book", "futures_book", "vix_futures_book", "rate_futures_book",
-                 "oil_futures_book", "options_book"):
+                 "oil_futures_book", "options_book", "name_options_book"):
         if name in snapshot:
             book = dict(snapshot[name])
             book["taken"] = base64.b64encode(book["taken"]).decode("ascii")
@@ -2045,7 +2098,7 @@ def _snapshot_from_json(payload: dict[str, Any]) -> dict[str, Any]:
         if name in payload:
             out[name] = base64.b64decode(payload[name])
     for name in ("book", "futures_book", "vix_futures_book", "rate_futures_book",
-                 "oil_futures_book", "options_book"):
+                 "oil_futures_book", "options_book", "name_options_book"):
         if name in payload:
             book = dict(payload[name])
             book["taken"] = base64.b64decode(book["taken"])

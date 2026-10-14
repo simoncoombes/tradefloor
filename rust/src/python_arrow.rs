@@ -825,6 +825,15 @@ pub fn settlements_schema() -> SchemaRef {
         Field::new("kind", DataType::Utf8, false),
         Field::new("value", DataType::Float64, false),
         Field::new("reference", DataType::Float64, false),
+        // A single-name option's exercises and assignments
+        // (`options_names_listed`): the event, the party, the contracts and
+        // what it receives in shares and cash. A contract's settlement reads
+        // "settlement", a null party and zeros.
+        Field::new("event", DataType::Utf8, false),
+        Field::new("agent", DataType::Utf8, true),
+        Field::new("quantity", DataType::Float64, false),
+        Field::new("shares", DataType::Float64, false),
+        Field::new("cash", DataType::Float64, false),
     ])
 }
 
@@ -837,6 +846,11 @@ pub fn settlements_batch(rows: &[crate::derivatives::Settlement]) -> Result<Reco
         Arc::new(StringArray::from(rows.iter().map(|r| r.kind.family()).collect::<Vec<_>>())),
         Arc::new(Float64Array::from(rows.iter().map(|r| r.value).collect::<Vec<_>>())),
         Arc::new(Float64Array::from(rows.iter().map(|r| r.reference).collect::<Vec<_>>())),
+        Arc::new(StringArray::from(rows.iter().map(|r| r.event.as_str()).collect::<Vec<_>>())),
+        Arc::new(StringArray::from(rows.iter().map(|r| r.agent.as_deref()).collect::<Vec<_>>())),
+        Arc::new(Float64Array::from(rows.iter().map(|r| r.quantity).collect::<Vec<_>>())),
+        Arc::new(Float64Array::from(rows.iter().map(|r| r.shares).collect::<Vec<_>>())),
+        Arc::new(Float64Array::from(rows.iter().map(|r| r.cash).collect::<Vec<_>>())),
     ];
     RecordBatch::try_new(settlements_schema(), columns).map_err(|e| e.to_string())
 }

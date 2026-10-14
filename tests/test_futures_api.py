@@ -182,7 +182,8 @@ def test_the_settlements_table_is_the_settlements_list():
     assert listed, "no contract settled in 30 sessions"
     table = pa.table(e.settlements_table())
     assert table.schema.metadata == {b"schema_version": b"1"}
-    assert table.column_names == ["session", "symbol", "root", "kind", "value", "reference"]
+    assert table.column_names == ["session", "symbol", "root", "kind", "value", "reference",
+                                  "event", "agent", "quantity", "shares", "cash"]
     assert table.to_pylist() == [{k: s[k] for k in table.column_names} for s in listed]
     day = listed[0]["session"]
     assert (pa.table(e.settlements_table(day=day)).to_pylist()
