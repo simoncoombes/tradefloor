@@ -1083,9 +1083,9 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         for value in _column(snapshot["oil_target_drift"], 3, "oil_target_drift"):
             _f64(buf, value)
     # The transient quote, only while `vix_quote_transient_share` is set,
-    # behind its own tag (60): `Engine::state_hash`'s order and rule.
+    # behind its own tag (73): `Engine::state_hash`'s order and rule.
     if "vix_quote_transient" in snapshot:
-        _f64(buf, 60.0)
+        _f64(buf, 73.0)
         _f64(buf, float(snapshot["vix_quote_transient"]))
     # Core inflation's trend (57), the eve's decision (58) and credit's own
     # state (59), each only while its dial is set, behind its own tag.
