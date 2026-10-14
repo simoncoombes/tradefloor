@@ -1146,6 +1146,8 @@ def _nothing_dormant():
                    # Core inflation's trend (CPILFESL fit), on its own keyed draws.
                    core_trend_sd=0.17,
                    core_trend_persistence=0.993,
+                   # Every pinned VIX sets the variance: a switch.
+                   pinned_vix_sets_variance=1.0,
                    # Credit's own state (LQD-IEF residual), on its own keyed draws.
                    corporate_spread_noise_sd=0.025,
                    corporate_spread_noise_half_life=16.0,
