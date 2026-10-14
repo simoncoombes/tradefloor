@@ -2256,6 +2256,72 @@ pub struct ModelParams {
     /// r17sf1s1). Read only with `pinned_vix_feedback` on and below 1.0. In [0,
     /// 1]. pt-v21 ships 1.0.
     pub pinned_vix_priced_cap: f64,
+    /// A switch: every VIX a caller pins sets the market factor's variance,
+    /// as a scenario's `vix_sets_variance` does. 0.0, on every shipped
+    /// preset, leaves a pin to reach the variance one GARCH step a close,
+    /// as it stood, and a value of 0.0 is left out of the model's digest.
+    ///
+    /// Off zero, `pin_macro(vix=...)` marks tonight's close FORCED whatever
+    /// its `vix_sets_variance` argument says, so the close sets both
+    /// variance components to the law's fixed point at the pinned VIX
+    /// (`MarketVarianceState::close_day_forced`) and the next session trades
+    /// at it. Free sessions are untouched, and the first free close after a
+    /// pin starts from the level the last pin left. No draw is taken and no
+    /// state is added. In [0, 1].
+    ///
+    /// Why. Stepped one session at a time, a pinned path's variance lags the
+    /// VIX it states by weeks: the slow component (a half-life near 80
+    /// sessions) holds a crash's variance after the pinned VIX has come
+    /// down, and it reaches a spike late. On the driven 2020-21 replay (the
+    /// real VIX pinned every session, 12 held-out seeds) realized
+    /// volatility ran 29, 39 and 47 per cent at pinned VIX levels of 20-25,
+    /// 25-30 and 30-40, against the S&P 500's 13, 23 and 29 over the same
+    /// months, and 49 per cent at 60-100 against 80. Set by every pin it
+    /// read 18, 24, 35, 67 and 75 per cent across the five levels (S&P 500
+    /// 13, 23, 29, 74 and 80); the index's fall within 60 sessions of the
+    /// February high read 0.32 (S&P 500 0.34, stepped 0.27) and its
+    /// drawdown over the path 0.33 (0.34, stepped 0.38).
+    pub pinned_vix_sets_variance: f64,
+    /// The share of each name's permanent market move that its valuation
+    /// multiple carries in place of its earnings level, in [0, 1]. 0.0, on
+    /// every shipped preset, sends the whole of it to the fair-value level
+    /// `v`, which scales the earnings the valuation and the market P/E read,
+    /// as it stood; a value of 0.0 is left out of the model's digest.
+    ///
+    /// Off zero each name carries a log multiple `m`
+    /// (`TickStock::valuation_multiple`). Wherever
+    /// `fair_value_market_share` moves fair value (the session's ticks, the
+    /// night, the close's market jump), the market part `q` is split:
+    /// `(1 - share) q` joins `v` and `share q` joins `m`, each with its own
+    /// Ito term. Fair value is multiplied by `exp(m)`; nothing that reads
+    /// earnings reads `m` (the market P/E, the buyback accrual, dividends),
+    /// so the P/E carries it. Each close pulls `m` toward zero at
+    /// `valuation_multiple_half_life`, and the stationary opening opens it
+    /// at `beta` times a draw from its stationary distribution on its own
+    /// key (`GameRng::keyed(key, VALUATION_MULTIPLE_TAG, u64::MAX)`), so no
+    /// stream moves, with `v` taking the rest of the opening premium so no
+    /// opening price moves. `m` is snapshotted and hashed only with this
+    /// set.
+    ///
+    /// Why. Every permanent market move was an earnings move, so the
+    /// multiple hardly moved: on 270 held-out 21-year histories the market
+    /// P/E's log sd was 0.09 and its 1-, 5- and 10-year changes 0.05, 0.08
+    /// and 0.10, where the S&P 500's CAPE (1881-2023) has 0.42 and 0.19,
+    /// 0.39 and 0.51; the multiple carried 4 to 10 per cent of the index's
+    /// variance at those horizons against all of it on the tape; and the
+    /// next ten years' return on the log P/E had an R^2 of 0.03 against
+    /// the tape's 0.29. Measured value 1.0: CAPE's change carries 1.06 to
+    /// 1.08 of the price change's variance at 1 to 10 years.
+    pub valuation_multiple_share: f64,
+    /// The half-life, sessions, of the valuation multiple's pull back to
+    /// the valuation's target (`valuation_multiple_share`). 0.0, on every
+    /// shipped preset, is read by nothing, and a value of 0.0 is left out
+    /// of the model's digest. With the share set it must be positive: each
+    /// close multiplies `m` by `0.5^(1/H)`, taking no draw. Measured value
+    /// 1779 (7.06 years): log CAPE's annual AR(1), 0.906 on 1881-2023, whose
+    /// implied 10-year return slope (-0.63) matches the tape's own (-0.66).
+    /// In [0, 100000].
+    pub valuation_multiple_half_life: f64,
     /// A ceiling on the annual buyback yield `buyback_payout_share * eps /
     /// price` that the buyback term compounds over the elapsed years. In
     /// [0, 1], and 0.0 means no ceiling.
@@ -8442,6 +8508,9 @@ impl ModelParams {
             pinned_vix_calm_knee: 0.0,
             pinned_vix_calm_share: 0.0,
             pinned_vix_priced_cap: 0.0,
+            pinned_vix_sets_variance: 0.0,
+            valuation_multiple_share: 0.0,
+            valuation_multiple_half_life: 0.0,
             buyback_yield_cap: 0.0,
             buyback_accrual: 0.0,
             rate_close_remark: 0.0,
@@ -11096,6 +11165,9 @@ impl ModelParams {
             "pinned_vix_calm_knee" => self.pinned_vix_calm_knee,
             "pinned_vix_calm_share" => self.pinned_vix_calm_share,
             "pinned_vix_priced_cap" => self.pinned_vix_priced_cap,
+            "pinned_vix_sets_variance" => self.pinned_vix_sets_variance,
+            "valuation_multiple_share" => self.valuation_multiple_share,
+            "valuation_multiple_half_life" => self.valuation_multiple_half_life,
             "buyback_yield_cap" => self.buyback_yield_cap,
             "buyback_accrual" => self.buyback_accrual,
             "rate_close_remark" => self.rate_close_remark,
@@ -11515,6 +11587,9 @@ impl ModelParams {
             "pinned_vix_calm_knee" => out.pinned_vix_calm_knee = value,
             "pinned_vix_calm_share" => out.pinned_vix_calm_share = value,
             "pinned_vix_priced_cap" => out.pinned_vix_priced_cap = value,
+            "pinned_vix_sets_variance" => out.pinned_vix_sets_variance = value,
+            "valuation_multiple_share" => out.valuation_multiple_share = value,
+            "valuation_multiple_half_life" => out.valuation_multiple_half_life = value,
             "buyback_yield_cap" => out.buyback_yield_cap = value,
             "buyback_accrual" => out.buyback_accrual = value,
             "rate_close_remark" => out.rate_close_remark = value,
@@ -12249,6 +12324,30 @@ impl ModelParams {
             return Err(format!(
                 "pinned_vix_priced_cap is {}. It is a switch, in [0, 1].",
                 self.pinned_vix_priced_cap));
+        }
+        if !(self.pinned_vix_sets_variance == 0.0 || self.pinned_vix_sets_variance == 1.0) {
+            return Err(format!(
+                "pinned_vix_sets_variance is {}. It is a switch: 0 (a pin reaches the variance one \
+                 step a close) or 1 (every pin sets it, as vix_sets_variance does).",
+                self.pinned_vix_sets_variance));
+        }
+        if !(self.valuation_multiple_share >= 0.0 && self.valuation_multiple_share <= 1.0) {
+            return Err(format!(
+                "valuation_multiple_share is {}. It is the share of each name's permanent market \
+                 move its valuation multiple carries, in [0, 1]; 0 sends it all to earnings.",
+                self.valuation_multiple_share));
+        }
+        if !(self.valuation_multiple_half_life >= 0.0 && self.valuation_multiple_half_life <= 100000.0) {
+            return Err(format!(
+                "valuation_multiple_half_life is {}. It is the half-life in sessions of the valuation \
+                 multiple's pull to its target, in [0, 100000].",
+                self.valuation_multiple_half_life));
+        }
+        if self.valuation_multiple_share != 0.0 && self.valuation_multiple_half_life == 0.0 {
+            return Err(format!(
+                "valuation_multiple_half_life is 0 but valuation_multiple_share is {}. A multiple with \
+                 no pull wanders without bound, so set the half-life (in sessions, above 0).",
+                self.valuation_multiple_share));
         }
         if !(self.market_vol_slow_gamma >= 0.0 && self.market_vol_slow_gamma <= 1.0) {
             return Err(format!(
@@ -13697,6 +13796,9 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "pinned_vix_calm_share",
     "pinned_vix_feedback",
     "pinned_vix_priced_cap",
+    "pinned_vix_sets_variance",
+    "valuation_multiple_share",
+    "valuation_multiple_half_life",
     "pinned_vix_variance_share",
     "policy_anticipation",
     "policy_anticipation_cut_share",
@@ -14042,6 +14144,9 @@ pub fn settable_names() -> Vec<&'static str> {
         "pinned_vix_calm_knee",
         "pinned_vix_calm_share",
         "pinned_vix_priced_cap",
+        "pinned_vix_sets_variance",
+        "valuation_multiple_share",
+        "valuation_multiple_half_life",
         "buyback_yield_cap",
         "buyback_accrual",
         "rate_close_remark",

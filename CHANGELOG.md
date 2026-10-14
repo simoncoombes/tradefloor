@@ -125,6 +125,28 @@ same with them on as off.
   `usd_crisis_vix_threshold` (0.0 the standing 0.05), read by the dollar's
   step and by the forecast's expected bid. FRED DTWEXM against CBOE's VIX
   measures 0.001.
+- `valuation_multiple_share` and `valuation_multiple_half_life` are new
+  dials, 0.0 on every preset and left out of the digest there. Off zero
+  each name carries a log valuation multiple: that share of its permanent
+  market moves joins the multiple instead of the earnings level, fair value
+  reads it, and each close pulls it back toward the valuation's target at
+  the half-life. The market P/E, dividends and buybacks read earnings
+  without it. The multiple opens at a draw from its stationary distribution
+  on its own keyed draw, so no stream moves and no opening price moves.
+  Without it every permanent market move is an earnings move, and the
+  market P/E barely moves: its log sd over 21-year histories is 0.09
+  against 0.42 for the S&P 500's CAPE since 1881, and the next ten years'
+  return on it has an R^2 of 0.03 against the tape's 0.29. The tape's
+  values are a share of 1.0 and a half-life of 1779 sessions (log CAPE's
+  annual AR(1), 0.906).
+- `pinned_vix_sets_variance` is a new switch, 0.0 on every preset and left
+  out of the digest there: under it every VIX a caller pins sets the market
+  factor's variance to the law's level at that VIX, as a scenario's
+  `vix_sets_variance` already could, instead of stepping one session toward
+  it. Free sessions are unchanged. Stepped, a pinned path's variance lagged
+  the VIX it stated by weeks: replaying the real 2020-21 VIX, realized
+  volatility ran about twice the S&P 500's once the VIX was back at 20-40,
+  and short of it at the March peak.
 - `corporate_spread_noise_sd` and `corporate_spread_noise_half_life` are new
   dials, 0.0 on every preset and left out of the digest there: off zero
   credit carries its own state, an AR(1) stepped every session on its own
@@ -167,8 +189,8 @@ same with them on as off.
   year-on-year 1990-2025 about 2.0: 0.993 and 0.170.
 - `policy_anticipation_guidance` is a new dial, 0.0 on every preset and left
   out of the digest there: the share of the anticipated meeting's priced
-  change taken from the decision the Fed's own reading implies rather than
-  the published economy's. The tape's policy surprise at scheduled FOMC
+  change taken from the decision the Fed's own reading implies, with the
+  rest from the published economy. The tape's policy surprise at scheduled FOMC
   announcements has an sd of 4.8 bp (Bauer and Swanson 2022).
 - `treasury_path_anticipated` is a new switch, 0.0 on every preset and left
   out of the digest there: at 1 a meeting moves the priced policy path by
@@ -324,8 +346,8 @@ same with them on as off.
 - `vix_stress_premium_undo` is a new switch, 0.0 on every preset and left
   out of the digest there. On, the published VIX's premium is the anchor's
   pull undone above the knee, `vix_anchor_weight * max(0, m - knee)`, in
-  place of the capped hinge; the gain and the cap are then unread. Only the
-  quote moves.
+  place of the capped hinge; the gain and the cap are then unread, and only
+  the published quote moves.
 
 ### The VIX's fear memory
 

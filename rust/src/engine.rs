@@ -7368,6 +7368,7 @@ impl Engine {
             )
             .fair_value;
             let fv = crate::market::tick::with_vix_discount(p, fv, night_vix, company.stock.beta);
+            let fv = crate::market::tick::with_valuation_multiple(fv, company.stock.valuation_multiple);
             let price = crate::mathx::min(
                 crate::mathx::max(fv * crate::mathx::exp(after), 0.01),
                 p.price_hard_cap,
@@ -7813,15 +7814,23 @@ impl Engine {
             // market's permanent share.
             if permanent {
                 let market_perm = if p.fair_value_market_linear == 0.0 { market } else { beta * f };
-                let dv = if p.fair_value_market_share == 0.0 {
-                    psi * own
+                // Under `valuation_multiple_share` the market's part splits
+                // between `v` and the name's multiple (`dm`), as the tick's
+                // does. A branch at 0.0, the line that stood.
+                let (dv, dm) = if p.fair_value_market_share == 0.0 {
+                    (psi * own, 0.0)
+                } else if p.valuation_multiple_share == 0.0 {
+                    (psi * own + psim * market_perm, 0.0)
                 } else {
-                    psi * own + psim * market_perm
+                    let q = psim * market_perm;
+                    let share = p.valuation_multiple_share;
+                    (psi * own + (1.0 - share) * q, share * q)
                 };
-                if dv != 0.0 {
-                    let s_new = crate::market::tick::clamp_s(p, after - dv);
+                let out = if dm == 0.0 { dv } else { dv + dm };
+                if out != 0.0 {
+                    let s_new = crate::market::tick::clamp_s(p, after - out);
                     if let Some(prev) = company.stock.mispricing_s_prev_close {
-                        company.stock.mispricing_s_prev_close = Some(prev - dv);
+                        company.stock.mispricing_s_prev_close = Some(prev - out);
                     }
                     if let Some(acc) = self.attribution.get_mut(index) {
                         acc[crate::market::factors::FAIR_VALUE_SLOT] += s_new - after;
@@ -7833,8 +7842,14 @@ impl Engine {
                     if let Some(slot) = self.overnight_fair_value_moves.get_mut(index) {
                         *slot = s_new - after;
                     }
-                    let v = company.stock.fair_value_offset.unwrap_or(0.0);
-                    company.stock.fair_value_offset = Some(v + (dv - 0.5 * dv * dv));
+                    if dm == 0.0 || dv != 0.0 {
+                        let v = company.stock.fair_value_offset.unwrap_or(0.0);
+                        company.stock.fair_value_offset = Some(v + (dv - 0.5 * dv * dv));
+                    }
+                    if dm != 0.0 {
+                        let m = company.stock.valuation_multiple.unwrap_or(0.0);
+                        company.stock.valuation_multiple = Some(m + (dm - 0.5 * dm * dm));
+                    }
                     s_now = s_new;
                 }
             }
@@ -8510,6 +8525,7 @@ impl Engine {
         }
         self.accrue_buybacks();
         self.pull_relative_levels();
+        self.pull_valuation_multiples();
         // The day's market t scale is the session's: the factor's close
         // above read the day it scaled, and the next open draws its own.
         self.market_day_scale = 1.0;
@@ -8544,6 +8560,26 @@ impl Engine {
             let v = c.stock.fair_value_offset.unwrap_or(0.0);
             if v < floor {
                 c.stock.fair_value_offset = Some(v + pull * (floor - v));
+            }
+        }
+    }
+
+    /// `valuation_multiple_share`'s close step, after the relative levels:
+    /// each name's multiple `m` is multiplied by `0.5^(1/H)`, H
+    /// `valuation_multiple_half_life`, its pull back to the valuation's
+    /// target. A branch on the share; no draw. The price follows at the next
+    /// print (fair value reads `exp(m)`), a drift of `(1 - 0.5^(1/H)) m` a
+    /// session.
+    fn pull_valuation_multiples(&mut self) {
+        if !self.carries_valuation_multiples() {
+            return;
+        }
+        let keep = crate::mathx::pow(0.5, 1.0 / self.params.valuation_multiple_half_life);
+        for c in self.companies.iter_mut() {
+            if let Some(m) = c.stock.valuation_multiple {
+                if m != 0.0 {
+                    c.stock.valuation_multiple = Some(m * keep);
+                }
             }
         }
     }
@@ -8605,6 +8641,38 @@ impl Engine {
             c.stock.buyback_log_shares = if v == 0.0 { None } else { Some(v) };
         }
         Ok(())
+    }
+
+    /// Each name's log valuation multiple under `valuation_multiple_share`,
+    /// in roster order, 0.0 where it carries none. For checkpoints and
+    /// forks.
+    pub fn valuation_multiples(&self) -> Vec<f64> {
+        self.companies.iter().map(|c| c.stock.valuation_multiple.unwrap_or(0.0)).collect()
+    }
+
+    /// Put the valuation multiples back. A width mismatch is refused, as the
+    /// fair-value levels' is: they are positional against the roster.
+    pub fn set_valuation_multiples(&mut self, values: &[f64]) -> Result<(), String> {
+        if values.len() != self.companies.len() {
+            return Err(format!(
+                "this snapshot carries {} valuation multiples and the roster holds {} \
+                 companies. They are positional against the roster, so this restore is \
+                 refused rather than padded or truncated.",
+                values.len(),
+                self.companies.len()
+            ));
+        }
+        for (c, &m) in self.companies.iter_mut().zip(values) {
+            c.stock.valuation_multiple = if m == 0.0 { None } else { Some(m) };
+        }
+        Ok(())
+    }
+
+    /// Whether this engine's model carries valuation multiples, which is when
+    /// the snapshot and the state hash carry them: `valuation_multiple_share`
+    /// set. Off on every preset as shipped.
+    pub fn carries_valuation_multiples(&self) -> bool {
+        self.params.valuation_multiple_share != 0.0
     }
 
     /// Whether this engine's model accrues the buyback share count, which is
@@ -8671,6 +8739,10 @@ impl Engine {
             wgap / wsum
         };
         let zbar = wz / wsum;
+        // The market's valuation multiple at the opening
+        // (`valuation_multiple_share`), 0.0 off; each name opens at its beta
+        // times it, and its level `v` takes the rest of its premium.
+        let m0 = self.valuation_multiple_opening();
         for (i, c) in self.companies.iter_mut().enumerate() {
             if gap[i].is_nan() {
                 continue;
@@ -8700,8 +8772,40 @@ impl Engine {
                     gap[i] - s0
                 }
             };
-            c.stock.fair_value_offset = Some(v);
+            // The multiple scales the same fair value `v` does, so the price
+            // `(base exp(v) exp(m) + A) exp(s0)` stands with `v - m` in place
+            // of `v`. A branch: off, the line that stood.
+            let m = if m0 == 0.0 { 0.0 } else { c.stock.beta.unwrap_or(1.0) * m0 };
+            if m == 0.0 {
+                c.stock.fair_value_offset = Some(v);
+            } else {
+                c.stock.valuation_multiple = Some(m);
+                c.stock.fair_value_offset = Some(v - m);
+            }
         }
+    }
+
+    /// The market's valuation multiple at the stationary opening
+    /// (`valuation_multiple_share`): its stationary sd, `share * psi *
+    /// sigma_f / sqrt(1 - a^2)` with psi `fair_value_market_share`, sigma_f
+    /// `market_factor_sigma` and `a = 0.5^(1/H)`, times the first normal of
+    /// `GameRng::keyed(valuation_multiple_key(root), VALUATION_MULTIPLE_TAG,
+    /// u64::MAX)`, so it takes nothing from any stream. A unit-beta name's
+    /// permanent market move has the factor's sigma times psi a session,
+    /// before the volatility ceiling, so this is the multiple's spread once
+    /// it has run. 0.0 with the share at 0.0.
+    fn valuation_multiple_opening(&self) -> f64 {
+        if !self.carries_valuation_multiples() {
+            return 0.0;
+        }
+        let p = &self.params;
+        let a = crate::mathx::pow(0.5, 1.0 / p.valuation_multiple_half_life);
+        let sd = p.valuation_multiple_share * p.fair_value_market_share * p.market_factor_sigma
+            / crate::mathx::sqrt(1.0 - a * a);
+        let z = crate::rng::GameRng::keyed(
+            crate::rng::valuation_multiple_key(self.root_seed),
+            crate::rng::VALUATION_MULTIPLE_TAG as u64, u64::MAX).next_normal();
+        sd * z
     }
 
     /// Endogenous jumps, applied once per name at the day close.
@@ -8883,6 +8987,7 @@ impl Engine {
                 &self.params, self.market_vol.sigma_daily(),
                 self.market_vol_cycle_cap_scale());
             let common = market - compensator;
+            let share = self.params.valuation_multiple_share;
             for (index, company) in self.companies.iter_mut().enumerate() {
                 let (Some(after), Some(&before)) = (company.stock.mispricing_s, s_before.get(index)) else {
                     continue;
@@ -8903,11 +9008,20 @@ impl Engine {
                     }
                 }
                 let taken_common = (after - before) - own;
-                let dv = psi * own + psim * taken_common;
-                if dv == 0.0 {
+                // Under `valuation_multiple_share` the common part splits
+                // between `v` and the name's multiple (`dm`), as the tick's
+                // does. A branch at 0.0, the line that stood.
+                let (dv, dm) = if share == 0.0 {
+                    (psi * own + psim * taken_common, 0.0)
+                } else {
+                    let q = psim * taken_common;
+                    (psi * own + (1.0 - share) * q, share * q)
+                };
+                let out = if dm == 0.0 { dv } else { dv + dm };
+                if out == 0.0 {
                     continue;
                 }
-                let s_new = after - dv;
+                let s_new = after - out;
                 company.stock.mispricing_s = Some(s_new);
                 // What left `s` for `v`, booked where the tape can find it:
                 // the attribution's `fair_value_shift` and, for the tape's
@@ -8919,11 +9033,17 @@ impl Engine {
                     *slot = s_new - after;
                 }
                 if let Some(prev) = company.stock.mispricing_s_prev_close {
-                    let carried = (1.0 - self.params.jump_momentum_share) * dv;
+                    let carried = (1.0 - self.params.jump_momentum_share) * out;
                     company.stock.mispricing_s_prev_close = Some(prev - carried);
                 }
-                let v = company.stock.fair_value_offset.unwrap_or(0.0);
-                company.stock.fair_value_offset = Some(v + dv - 0.5 * dv * dv);
+                if dm == 0.0 || dv != 0.0 {
+                    let v = company.stock.fair_value_offset.unwrap_or(0.0);
+                    company.stock.fair_value_offset = Some(v + dv - 0.5 * dv * dv);
+                }
+                if dm != 0.0 {
+                    let m = company.stock.valuation_multiple.unwrap_or(0.0);
+                    company.stock.valuation_multiple = Some(m + dm - 0.5 * dm * dm);
+                }
             }
         }
     }
@@ -12989,6 +13109,13 @@ impl Engine {
                 hash_f64(&mut buf, c.stock.buyback_log_shares.unwrap_or(0.0));
             }
         }
+        // The valuation multiples, on the same rule: only with
+        // `valuation_multiple_share` set, one per name in roster order.
+        if self.carries_valuation_multiples() {
+            for c in &self.companies {
+                hash_f64(&mut buf, c.stock.valuation_multiple.unwrap_or(0.0));
+            }
+        }
         // The earnings calendar's key, on the same rule: only with the
         // calendar on, so every other engine hashes as it did.
         if self.carries_earnings() {
@@ -14504,6 +14631,7 @@ mod tests {
                 mispricing_momentum: None,
                 fair_value_offset: None,
                 buyback_log_shares: None,
+                valuation_multiple: None,
                 dividend: None,
                 maker_inventory: None,
                 garch_variance: 0.015 * 0.015,

@@ -1457,6 +1457,15 @@ PERTURBATIONS = [
     # Credit's own state: its opening draw moves the meeting's corporate
     # re-anchor, and with it the discount rate.
     ("corporate_spread_noise_sd", 0.025, True),
+    # INERT: read only by a VIX pin; the probe pins nothing.
+    ("pinned_vix_sets_variance", 1.0, False),
+    # The valuation multiple: the market's permanent moves split between the
+    # earnings level and a multiple pulled back at its half-life, opened at a
+    # keyed draw that moves every opening fair value. Carries its half-life
+    # as a companion, without which it is refused. No draw from any stream.
+    ("valuation_multiple_share", 1.0, True),
+    # INERT: the half-life alone is read by nothing (the share is 0).
+    ("valuation_multiple_half_life", 1779.0, False),
     # INERT: the half-life alone is read by nothing (the sd is 0).
     ("corporate_spread_noise_half_life", 16.0, False),
     # The market's fall in the cycle's hazard (sim/r17-b12). Carries its
@@ -2156,6 +2165,7 @@ COMPANIONS: dict[str, dict[str, float]] = {
     "fed_core_inflation": {"oil_inflation_passthrough": 1.0},
     "core_trend_sd": {"core_trend_persistence": 0.993},
     "corporate_spread_noise_sd": {"corporate_spread_noise_half_life": 16.0},
+    "valuation_multiple_share": {"valuation_multiple_half_life": 1779.0},
     "treasury_core_inflation": {"oil_inflation_passthrough": 1.0},
     # The unmet put needs the put and the priced path it decays like.
     "treasury_zlb_path": {"fed_put_gain": 3.0, "fed_put_half_life": 126.0, "treasury_put_pricing": 1.0,

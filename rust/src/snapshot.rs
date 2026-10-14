@@ -1699,6 +1699,11 @@ impl Engine {
         if self.carries_buyback_log_shares() {
             out.put("buyback_log_shares", V::from_f64s(&self.buyback_log_shares()));
         }
+        // The valuation multiples: their own key, only while
+        // `valuation_multiple_share` is set.
+        if self.carries_valuation_multiples() {
+            out.put("valuation_multiple", V::from_f64s(&self.valuation_multiples()));
+        }
         // The fair-value levels and the opening draws, only when the model
         // can move a level.
         if self.carries_fair_value_offsets() {
@@ -2063,6 +2068,7 @@ impl Engine {
             Gated::dial("core_trend", "core_trend_sd", p.core_trend_sd),
             Gated::dial("spread_noise", "corporate_spread_noise_sd", p.corporate_spread_noise_sd),
             Gated::dial("eve_decision", "fed_eve_decision", p.fed_eve_decision),
+            Gated::dial("valuation_multiple", "valuation_multiple_share", p.valuation_multiple_share),
             Gated::when(
                 "buyback_log_shares",
                 self.carries_buyback_log_shares(),
@@ -2487,6 +2493,11 @@ impl Engine {
         if inner.carries_buyback_log_shares() {
             inner
                 .set_buyback_log_shares(&read_buffer(snapshot, "", "buyback_log_shares")?)
+                .map_err(core)?;
+        }
+        if inner.carries_valuation_multiples() {
+            inner
+                .set_valuation_multiples(&read_buffer(snapshot, "", "valuation_multiple")?)
                 .map_err(core)?;
         }
         if inner.carries_earnings() {
