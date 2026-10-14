@@ -13256,9 +13256,10 @@ impl Engine {
             }
         }
         // The transient quote, only while `vix_quote_transient_share` is set,
-        // behind its own tag (60).
+        // behind its own tag (73: 55-72 are taken or reserved across the
+        // ptv22 branches).
         if self.carries_vix_quote_transient() {
-            hash_f64(&mut buf, 60.0);
+            hash_f64(&mut buf, 73.0);
             hash_f64(&mut buf, self.vix_quote_transient);
         }
         // Core inflation's trend, only while `core_trend_sd` is set, behind

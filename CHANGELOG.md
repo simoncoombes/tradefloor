@@ -299,7 +299,7 @@ same with them on as off.
     quote alone takes the rest, which decays at the persistence.
   - The news reads the state's part. A pinned VIX clears the quote's part. The live mark and the forecast read its
     expected decay.
-  - The quote's part is snapshotted and hashed only with the share set.
+  - The quote's part is snapshotted and hashed (tag 73) only with the share set.
 - Every known-answer digest is where it was.
 
 ### The VIX's own innovation as variance news
