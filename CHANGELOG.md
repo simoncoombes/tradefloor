@@ -322,6 +322,11 @@ same with them on as off.
   - The news reads the state's part. A pinned VIX clears the quote's part. The live mark and the forecast read its
     expected decay.
   - The quote's part is snapshotted and hashed (tag 73) only with the share set.
+- `pinned_vix_coupling` and `pinned_vix_exponent` are new dials, 0.0 on every preset and left out of the digest
+  there. They keep the old VIX law for a close whose VIX a caller pinned.
+  - Off zero, that close's factor target reads the pinned VIX over the fixed anchor at this coupling and exponent (the
+    free exponent at 0.0), with the excursion off. A forced close sets the variance to that law's level.
+  - Free closes and every other reader of the VIX are untouched. There is no state and no draw.
 - Every known-answer digest is where it was.
 
 ### The VIX's own innovation as variance news

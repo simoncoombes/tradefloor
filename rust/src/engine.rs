@@ -6620,6 +6620,11 @@ impl Engine {
                 keep |= PIN_CYCLE;
             }
         }
+        // And the factor's close, which keeps the old VIX law on a pinned
+        // close (`pinned_vix_coupling`; `Engine::pinned_vix_law_today`).
+        if self.params.pinned_vix_coupling != 0.0 {
+            keep |= PIN_VIX;
+        }
         self.macro_pins_today |= bits & keep;
     }
 
@@ -6905,6 +6910,29 @@ impl Engine {
         self.macro_pins_today = 0;
         self.pinned_corporate_spread = if bits & PIN_SPREAD != 0 { spread } else { 0.0 };
         self.mark_macro_pins_today(bits);
+    }
+
+    /// Whether tonight's factor close keeps the old VIX law
+    /// (`pinned_vix_coupling`): the dial set and the VIX pinned today. False
+    /// at 0.0, every preset, without reading the pins.
+    fn pinned_vix_law_today(&self) -> bool {
+        self.params.pinned_vix_coupling != 0.0 && self.macro_pins_today & PIN_VIX != 0
+    }
+
+    /// The params a pinned close reads under `pinned_vix_coupling`: the
+    /// engine's own, with the coupling the dial's, the exponent
+    /// `pinned_vix_exponent`'s (the free one at 0.0) and the excursion off,
+    /// so the target is the old law's, the pinned VIX over the fixed anchor.
+    /// Every other term of the close (the level, the cycle, the leverage
+    /// memory, the floor and ceiling) is the engine's own.
+    fn pinned_vix_law_params(&self) -> crate::params::ModelParams {
+        let mut p = self.params.clone();
+        p.market_vol_vix_coupling = self.params.pinned_vix_coupling;
+        if self.params.pinned_vix_exponent != 0.0 {
+            p.market_vol_vix_exponent = self.params.pinned_vix_exponent;
+        }
+        p.market_vol_vix_excursion = 0.0;
+        p
     }
 
     /// The VIX-ratio denominator a FORCED close uses.
@@ -8242,7 +8270,14 @@ impl Engine {
         //
         // See `ModelParams::market_vol_vix_excursion` for why the ratio's
         // denominator is the whole mechanism.
-        let vix_ratio_denominator = if self.params.market_vol_vix_excursion == 0.0 {
+        //
+        // A CLOSE WHOSE VIX A CALLER PINNED keeps the old law under
+        // `pinned_vix_coupling`: the pinned VIX over the fixed anchor, as at
+        // excursion 0. A branch on the dial, so at 0.0 -- every preset --
+        // the condition is false and the expression below is the one that
+        // stood here.
+        let pinned_law = self.pinned_vix_law_today();
+        let vix_ratio_denominator = if self.params.market_vol_vix_excursion == 0.0 || pinned_law {
             self.vix_anchor
         } else {
             let implied = crate::market::index_var::vix_from_variance(
@@ -8475,19 +8510,30 @@ impl Engine {
                 (market_vol_level * m * m, vix_ratio_denominator * self.market_vol_cycle_vix_scale())
             }
         };
+        // Under `pinned_vix_coupling` on a pinned close the close reads the
+        // old law's coupling and exponent, with no excursion (a copy of the
+        // params; see `Engine::pinned_vix_law_params`). `None` otherwise,
+        // which reads `self.params` exactly as before.
+        let pinned_params = if pinned_law { Some(self.pinned_vix_law_params()) } else { None };
+        let close_params = pinned_params.as_ref().unwrap_or(&self.params);
         self.last_market_targets = Some(if self.vix_sets_variance_pending {
             self.vix_sets_variance_pending = false;
-            let denominator =
-                self.forced_vix_denominator(vix_ratio_denominator, market_vol_level);
+            // The old law's level is an explicit function of the VIX, so a
+            // forced close under it takes no read-back fixed point.
+            let denominator = if pinned_law {
+                vix_ratio_denominator
+            } else {
+                self.forced_vix_denominator(vix_ratio_denominator, market_vol_level)
+            };
             self.market_vol.close_day_forced(
-                &self.params,
+                close_params,
                 denominator,
                 self.economy.vix,
                 market_vol_level,
             )
         } else {
             self.market_vol.close_day_scaled(
-                &self.params,
+                close_params,
                 vix_ratio_denominator,
                 self.economy.vix,
                 market_vol_level,

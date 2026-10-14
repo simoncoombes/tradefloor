@@ -3108,6 +3108,37 @@ pub struct ModelParams {
     /// 0.0 is left out of the model's digest. The tape's fast pole is 0.942.
     /// In [0, 1).
     pub vix_quote_transient_persistence: f64,
+    /// The VIX coupling a close whose VIX a caller pinned reads: the old
+    /// VIX law kept for pinned closes. 0.0, which every preset carries, is
+    /// off: a pinned close reads the free law, and the dial is left out of
+    /// the model's digest. In [0, 1].
+    ///
+    /// Off zero, on a close whose VIX was pinned that day, the market
+    /// factor's variance target is `level * (1 - c + c * (VIX / anchor)^e)`
+    /// with `c` this dial, `e` `pinned_vix_exponent`, and `anchor` the fixed
+    /// `vix_anchor` the excursion-off law divides by. The excursion
+    /// (`market_vol_vix_excursion`) is not read there, so a forced close
+    /// (a scenario's `vix_sets_variance`, or every pin under
+    /// `pinned_vix_sets_variance` where the engine has it) sets the variance
+    /// to that law's level with no read-back fixed point.
+    /// Free closes and every other reader of the VIX are untouched. No state
+    /// and no draw.
+    ///
+    /// Why. Under the stabilised law (excursion 1, coupling 0.25, exponent
+    /// 1.5) the free VIX follows the variance, and a pinned VIX has no route
+    /// back to it: the excursion's denominator is the read-back, the news
+    /// skips a pinned close, and at 0.25 and 1.5 the fixed anchor's ratio
+    /// barely moves the target. The real 2008 and 2020 VIX, pinned every
+    /// session, then gave peak RV21 of 42 and 44 against the S&P 500's 84
+    /// and 95 (90 seeds). With the whole law back at 0.75 and 4.0, excursion
+    /// off, the replays read 89 and 84 (12 seeds); this dial keeps that law
+    /// for the pinned closes alone.
+    pub pinned_vix_coupling: f64,
+    /// The VIX exponent a pinned close reads under `pinned_vix_coupling`.
+    /// Read only with that dial set; 0.0, which every preset carries, reads
+    /// the free `market_vol_vix_exponent`, and a value of 0.0 is left out of
+    /// the model's digest. In [0, 8].
+    pub pinned_vix_exponent: f64,
     /// The stress premium as the anchor's own pull, undone above the knee.
     /// 0.0, which every preset carries, is the shipped form, the capped hinge
     /// `cap * (1 - exp(-g * max(0, m - knee) / cap))`. Off zero (a switch, in
@@ -8557,6 +8588,8 @@ impl ModelParams {
             forecast_vix_level_path: 0.0,
             vix_quote_transient_share: 0.0,
             vix_quote_transient_persistence: 0.0,
+            pinned_vix_coupling: 0.0,
+            pinned_vix_exponent: 0.0,
             vix_stress_premium_undo: 0.0,
             vix_fear_uptake: 0.0,
             vix_fear_half_life: 0.0,
@@ -11213,6 +11246,8 @@ impl ModelParams {
             "forecast_vix_level_path" => self.forecast_vix_level_path,
             "vix_quote_transient_share" => self.vix_quote_transient_share,
             "vix_quote_transient_persistence" => self.vix_quote_transient_persistence,
+            "pinned_vix_coupling" => self.pinned_vix_coupling,
+            "pinned_vix_exponent" => self.pinned_vix_exponent,
             "forecast_readback_correlation" => self.forecast_readback_correlation,
             "vix_stress_premium_undo" => self.vix_stress_premium_undo,
             "vix_fear_uptake" => self.vix_fear_uptake,
@@ -11635,6 +11670,8 @@ impl ModelParams {
             "forecast_vix_level_path" => out.forecast_vix_level_path = value,
             "vix_quote_transient_share" => out.vix_quote_transient_share = value,
             "vix_quote_transient_persistence" => out.vix_quote_transient_persistence = value,
+            "pinned_vix_coupling" => out.pinned_vix_coupling = value,
+            "pinned_vix_exponent" => out.pinned_vix_exponent = value,
             "forecast_readback_correlation" => out.forecast_readback_correlation = value,
             "vix_stress_premium_undo" => out.vix_stress_premium_undo = value,
             "vix_fear_uptake" => out.vix_fear_uptake = value,
@@ -12576,6 +12613,17 @@ impl ModelParams {
             if !(value >= 0.0 && value < 1.0) {
                 return Err(format!("{name} is {value}. It is {unit}, in [0, 1); 0 is off."));
             }
+        }
+        if !(self.pinned_vix_coupling >= 0.0 && self.pinned_vix_coupling <= 1.0) {
+            return Err(format!(
+                "pinned_vix_coupling is {}. It is the VIX coupling a pinned close reads, in [0, 1]; 0 is off.",
+                self.pinned_vix_coupling));
+        }
+        if !(self.pinned_vix_exponent >= 0.0 && self.pinned_vix_exponent <= 8.0) {
+            return Err(format!(
+                "pinned_vix_exponent is {}. It is the VIX exponent a pinned close reads, in [0, 8]; 0 reads \
+                 the free exponent.",
+                self.pinned_vix_exponent));
         }
         if !(self.vix_stress_premium_memory >= 0.0 && self.vix_stress_premium_memory <= 1.0) {
             return Err(format!(
@@ -13823,6 +13871,8 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "forecast_vix_level_path",
     "vix_quote_transient_share",
     "vix_quote_transient_persistence",
+    "pinned_vix_coupling",
+    "pinned_vix_exponent",
     "vix_fear_uptake",
     "vix_fear_half_life",
     "unemployment_natural_pull",
@@ -14194,6 +14244,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "forecast_vix_level_path",
         "vix_quote_transient_share",
         "vix_quote_transient_persistence",
+        "pinned_vix_coupling",
+        "pinned_vix_exponent",
         "vix_fear_uptake",
         "vix_fear_half_life",
         "fed_put_gain",
