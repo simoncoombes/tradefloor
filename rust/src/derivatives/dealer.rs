@@ -84,6 +84,22 @@ pub const INDEX_OPTION_DEALER: OptionDealerSpec = OptionDealerSpec {
     inventory_half_life: crate::rates::INVENTORY_HALF_LIFE_TICKS,
 };
 
+/// The single-name options' dealer: the index dealer's quote on the US
+/// equity options' grid (a cent below 3.00, five cents at or above, the
+/// penny programme's), ten levels of 20 contracts a side.
+pub const NAME_OPTION_DEALER: OptionDealerSpec = OptionDealerSpec {
+    tick: 0.01,
+    tick_large: 0.05,
+    tick_switch: 3.0,
+    displayed_size: 20.0,
+    levels: 10,
+    level_step: 0.5,
+    moneyness_slope: 0.25,
+    inventory_skew: 0.5,
+    inventory_cap: 4.0,
+    inventory_half_life: crate::rates::INVENTORY_HALF_LIFE_TICKS,
+};
+
 impl OptionDealerSpec {
     /// The grid at `price`.
     pub fn tick_at(&self, price: f64) -> f64 {
@@ -163,13 +179,45 @@ pub fn ladder(
     vol: f64,
     half_spread: f64,
 ) -> Ladder {
-    let mid = black_price(right, forward, strike, years, vol, discount);
+    ladder_with(spec, |v| black_price(right, forward, strike, years, v, discount), vol, half_spread)
+}
+
+/// The ladder of an American option whose tree prices it at `mid` at the
+/// volatility `vol`: each level is `mid` moved by the European price's
+/// change between `vol` and the level's volatility, Black's on the forward
+/// `forward` (the escrowed price's), so a level costs no tree and the
+/// ladder's steps are the European vega's. The rest is [`ladder`]'s.
+#[allow(clippy::too_many_arguments)]
+pub fn american_ladder(
+    spec: &OptionDealerSpec,
+    right: Right,
+    forward: f64,
+    strike: f64,
+    years: f64,
+    discount: f64,
+    vol: f64,
+    half_spread: f64,
+    mid: f64,
+) -> Ladder {
+    let at_mid = black_price(right, forward, strike, years, vol, discount);
+    ladder_with(
+        spec,
+        |v| if v == vol { mid } else { mid + black_price(right, forward, strike, years, v, discount) - at_mid },
+        vol,
+        half_spread,
+    )
+}
+
+/// The ladder `price_at` gives: its mid at `vol`, each side's levels at the
+/// volatility the half-spread `half_spread` moves it by, best first.
+fn ladder_with(spec: &OptionDealerSpec, price_at: impl Fn(f64) -> f64, vol: f64, half_spread: f64) -> Ladder {
+    let mid = price_at(vol);
     let mut asks: Vec<Level> = Vec::with_capacity(spec.levels);
     let mut bids: Vec<Level> = Vec::with_capacity(spec.levels);
     for j in 0..spec.levels {
         let h = half_spread * (1.0 + j as f64 * spec.level_step);
         let ask_vol = vol + h;
-        let mut ask = on_grid(spec, black_price(right, forward, strike, years, ask_vol, discount), true);
+        let mut ask = on_grid(spec, price_at(ask_vol), true);
         let floor = match asks.last() {
             Some(prev) => prev.price + spec.tick_at(prev.price),
             // Strictly above the mid even where the spread is under a tick.
@@ -183,7 +231,7 @@ pub fn ladder(
     for j in 0..spec.levels {
         let h = half_spread * (1.0 + j as f64 * spec.level_step);
         let bid_vol = mathx::max(1e-4, vol - h);
-        let mut bid = on_grid(spec, black_price(right, forward, strike, years, bid_vol, discount), false);
+        let mut bid = on_grid(spec, price_at(bid_vol), false);
         let cap = match bids.last() {
             Some(prev) => prev.price - spec.tick_at(prev.price - 1e-9),
             // Strictly below the mid.
@@ -259,10 +307,18 @@ pub fn dealer_thetas(expiries: &[(f64, f64)], shifts: &[f64]) -> Vec<f64> {
 
 /// A listed option's quote, as [`crate::engine::Engine::chain`] and
 /// [`crate::engine::Engine::option_quote`] read it.
+///
+/// A single-name option (`options_names_listed`) is American: its `mid` and
+/// `fair` are a Leisen-Reimer tree's values on the escrowed price with the
+/// dividends to expiry (`derivatives::american`), at `iv` and `surface_iv`;
+/// its delta and gamma are the tree's, per share, and its vega and theta
+/// the European's on the escrowed price; `forward` is the escrowed price's
+/// forward, `index` the name's price, `dividends` the dividends' present
+/// value per share, and `multiplier` 100 shares.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct OptionQuote {
-    /// `IDX.O0294.C1050.00`.
+    /// `IDX.O0294.C1050.00`, or `ACME.O0294.C42.50`.
     pub symbol: String,
     pub root: String,
     pub expiry: i64,
@@ -291,7 +347,7 @@ pub struct OptionQuote {
     pub rate: f64,
     pub dividends: f64,
     pub sessions_to_expiry: f64,
-    /// Dollars per index point.
+    /// Dollars per index point, or shares a contract.
     pub multiplier: f64,
     /// The grid at the mid.
     pub tick: f64,

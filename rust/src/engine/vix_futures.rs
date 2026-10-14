@@ -233,7 +233,7 @@ impl VixFuturesState {
 /// The VIX future expiring at `session`, settled on the published VIX `vix`.
 fn vix_settlement(session: i64, vix: f64) -> Settlement {
     let kind = ContractKind::VixFuture;
-    Settlement { symbol: vix_future_symbol(session), kind, root: kind.root().to_string(), session, value: vix, reference: vix }
+    Settlement::new(vix_future_symbol(session), kind, kind.root().to_string(), session, vix, vix)
 }
 
 /// A price on the contract's grid, rounded away from the touch.

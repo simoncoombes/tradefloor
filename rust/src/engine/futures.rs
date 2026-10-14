@@ -337,14 +337,7 @@ impl FuturesState {
 /// The index future expiring at `session`, settled on `reference`.
 fn settlement_of(session: i64, reference: f64) -> Settlement {
     let kind = ContractKind::IndexFuture;
-    Settlement {
-        symbol: index_future_symbol(session),
-        kind,
-        root: kind.root().to_string(),
-        session,
-        value: reference,
-        reference,
-    }
+    Settlement::new(index_future_symbol(session), kind, kind.root().to_string(), session, reference, reference)
 }
 
 /// How far a future's basis has converged: `min(1, sessions to expiry /
@@ -454,6 +447,7 @@ impl Engine {
             || (self.rate_futures_on() && self.rate_futures_slot(symbol).is_some())
             || (self.oil_futures_on() && self.oil_futures_slot(symbol).is_some())
             || self.is_listed_option(symbol)
+            || self.is_listed_name_option(symbol)
     }
 
     /// Whether an order with the id `id` already waits in any book: the
@@ -465,6 +459,7 @@ impl Engine {
             || self.rate_futures_orders().iter().any(|o| o.id == id)
             || self.oil_futures_orders().iter().any(|o| o.id == id)
             || self.option_orders().iter().any(|o| o.id == id)
+            || self.name_option_orders().iter().any(|o| o.id == id)
     }
 
     // ── Pricing ───────────────────────────────────────────────────────────
@@ -693,6 +688,11 @@ impl Engine {
     pub fn contract_book(&self, symbol: &str) -> Option<OrderBook> {
         if self.options_on() {
             if let Some(book) = self.option_book(symbol) {
+                return Some(book);
+            }
+        }
+        if self.names_on() {
+            if let Some(book) = self.name_option_book(symbol) {
                 return Some(book);
             }
         }
@@ -1220,6 +1220,7 @@ impl Engine {
         out.extend(self.rate_futures_contracts());
         out.extend(self.oil_futures_contracts());
         out.extend(self.option_contracts());
+        out.extend(self.name_option_contracts());
         out
     }
 
@@ -1337,6 +1338,7 @@ impl Engine {
         out.extend(self.rate_futures_settlements(session));
         out.extend(self.oil_futures_settlements(session));
         out.extend(self.option_settlements(session));
+        out.extend(self.name_option_settlements(session));
         // Stable, so each family keeps its own order within a session.
         out.sort_by_key(|s| s.session);
         out

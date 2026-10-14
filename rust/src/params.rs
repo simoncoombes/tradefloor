@@ -1424,8 +1424,47 @@ pub struct ModelParams {
     /// each further out by half the half-spread, its quoted volatility moved
     /// by the vega-weighted inventory agents' trades leave it, which decays
     /// at the rate maker's 15-tick half-life. Requires
-    /// `options_index_listed`. In [0, 0.5].
+    /// `options_index_listed` or `options_names_listed`. In [0, 0.5].
     pub option_dealer_spread: f64,
+    /// Whether the engine lists American options on each roster name. 0.0,
+    /// on every shipped preset, lists none: no contract, no state, nothing in
+    /// the snapshot or the state hash, and a value of 0.0 is left out of the
+    /// model's digest.
+    ///
+    /// Off zero the engine lists, from the first close, physically settled
+    /// American calls and puts on every public name (`ACME.Onnnn.Rk.cc`,
+    /// 100 shares a contract) at the next three monthly expiries and the
+    /// three quarterly expiries after them (`derivatives::calendar`: the
+    /// index options' sessions), each settling at its expiry session's close:
+    /// an option in the money by a cent or more on the closing print is
+    /// exercised and delivers its shares at the strike. Strikes sit on the
+    /// name's price tier (`derivatives::NameOptionSpec::strike_step`), ten
+    /// either side of the price, widened at each open and close. The dealer
+    /// (`option_dealer_spread`) quotes each from a Leisen-Reimer tree on the
+    /// name's surface (`surface_name_premium`, `surface_name_skew`) with the
+    /// declared and projected dividends to expiry, priced when asked; it is
+    /// the other side of every trade, exercises the longs this leaves it
+    /// where its tree says exercising beats holding, and assigns its
+    /// exercises and agents' to the short positions pro rata. Agents
+    /// exercise with `Engine::exercise`, at the close. Requires
+    /// `surface_ssvi` and `forecast_horizon_sessions`. An option's price and
+    /// a delivery feed nothing a stock price reads. A switch.
+    pub options_names_listed: f64,
+    /// The single-name volatility premium: a name's implied volatility over
+    /// its expected volatility, less one, so a name's at-the-money total
+    /// variance is `(1 + premium)^2` times the forecast's expected variance
+    /// of the name to the tenor, before the earnings term. Read only with
+    /// `options_names_listed` set; 0.0, on every shipped preset, is no
+    /// premium, and a value of 0.0 is left out of the model's digest. In
+    /// [-0.5, 1].
+    pub surface_name_premium: f64,
+    /// The single-name skew: a name's smile correlation as a share of the
+    /// index surface's fitted correlation, so names carry the index's
+    /// curvature and a flatter skew. Read only with `options_names_listed`
+    /// set; 0.0, on every shipped preset, is a symmetric smile (a
+    /// correlation of 0), and a value of 0.0 is left out of the model's
+    /// digest. In [0, 1].
+    pub surface_name_skew: f64,
     /// Switch that makes the fear/greed index read the business cycle and
     /// GDP growth as published instead of as they are. 0.0, on every preset
     /// through pt-v19, is off; pt-v20 sets 1.0.
@@ -7874,6 +7913,9 @@ impl ModelParams {
             surface_term_premium_long: 0.0,
             surface_earnings_weight: 0.0,
             option_dealer_spread: 0.0,
+            options_names_listed: 0.0,
+            surface_name_premium: 0.0,
+            surface_name_skew: 0.0,
             fear_greed_published_inputs: 0.0,
             macro_publication_repricing: 0.0,
             treasury_10y_noise: 0.03,
@@ -10498,6 +10540,9 @@ impl ModelParams {
             "surface_term_premium_long" => self.surface_term_premium_long,
             "surface_earnings_weight" => self.surface_earnings_weight,
             "option_dealer_spread" => self.option_dealer_spread,
+            "options_names_listed" => self.options_names_listed,
+            "surface_name_premium" => self.surface_name_premium,
+            "surface_name_skew" => self.surface_name_skew,
             "fear_greed_published_inputs" => self.fear_greed_published_inputs,
             "macro_publication_repricing" => self.macro_publication_repricing,
             "treasury_10y_noise" => self.treasury_10y_noise,
@@ -10887,6 +10932,9 @@ impl ModelParams {
             "surface_term_premium_long" => out.surface_term_premium_long = value,
             "surface_earnings_weight" => out.surface_earnings_weight = value,
             "option_dealer_spread" => out.option_dealer_spread = value,
+            "options_names_listed" => out.options_names_listed = value,
+            "surface_name_premium" => out.surface_name_premium = value,
+            "surface_name_skew" => out.surface_name_skew = value,
             "fear_greed_published_inputs" => out.fear_greed_published_inputs = value,
             "macro_publication_repricing" => out.macro_publication_repricing = value,
             "treasury_10y_noise" => out.treasury_10y_noise = value,
@@ -12437,12 +12485,43 @@ impl ModelParams {
                  surface_ssvi is 1.0.",
                 self.options_index_listed));
         }
-        if self.option_dealer_spread != 0.0 && self.options_index_listed == 0.0 {
+        if self.option_dealer_spread != 0.0 && self.options_index_listed == 0.0 && self.options_names_listed == 0.0 {
             return Err(format!(
-                "options_index_listed is 0 but option_dealer_spread is {}. The spread is the options \
-                 dealer's, which quotes only what options_index_listed lists: set \
-                 options_index_listed to 1.0 first.",
+                "options_index_listed and options_names_listed are 0 but option_dealer_spread is {}. \
+                 The spread is the options dealer's, which quotes only what those switches list: set \
+                 one of them to 1.0 first.",
                 self.option_dealer_spread));
+        }
+        if !(self.options_names_listed == 0.0 || self.options_names_listed == 1.0) {
+            return Err(format!(
+                "options_names_listed is {}. It is a switch, 0.0 off or 1.0 on.",
+                self.options_names_listed));
+        }
+        if self.options_names_listed != 0.0 && self.surface_ssvi == 0.0 {
+            return Err(format!(
+                "surface_ssvi is 0 but options_names_listed is {}. A name's smile takes the index \
+                 surface's curvature and its correlation, which only surface_ssvi keeps: with \
+                 options_names_listed on, surface_ssvi is 1.0.",
+                self.options_names_listed));
+        }
+        if self.options_names_listed != 0.0 && self.forecast_horizon_sessions == 0.0 {
+            return Err(format!(
+                "forecast_horizon_sessions is 0 but options_names_listed is {}. A name's surface is \
+                 the forecast's expected variance of the name: set forecast_horizon_sessions first.",
+                self.options_names_listed));
+        }
+        for (name, v, lo, hi) in [
+            ("surface_name_premium", self.surface_name_premium, -0.5, 1.0),
+            ("surface_name_skew", self.surface_name_skew, 0.0, 1.0),
+        ] {
+            if !(lo..=hi).contains(&v) {
+                return Err(format!("{name} is {v}. It is in [{lo}, {hi}]."));
+            }
+            if v != 0.0 && self.options_names_listed == 0.0 {
+                return Err(format!(
+                    "options_names_listed is 0 but {name} is {v}. It shapes the names' surfaces, which \
+                     only options_names_listed keeps: set options_names_listed to 1.0 first."));
+            }
         }
         if !(self.fear_greed_published_inputs == 0.0 || self.fear_greed_published_inputs == 1.0) {
             return Err(format!(
@@ -12954,6 +13033,9 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "surface_term_premium_long",
     "surface_earnings_weight",
     "option_dealer_spread",
+    "options_names_listed",
+    "surface_name_premium",
+    "surface_name_skew",
 ];
 
 #[cfg(test)]
@@ -13165,6 +13247,9 @@ pub fn settable_names() -> Vec<&'static str> {
         "surface_term_premium_long",
         "surface_earnings_weight",
         "option_dealer_spread",
+        "options_names_listed",
+        "surface_name_premium",
+        "surface_name_skew",
         "fear_greed_published_inputs",
         "macro_publication_repricing",
         "treasury_10y_noise",

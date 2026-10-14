@@ -1199,6 +1199,102 @@ fn book_unknown(d: &SnapshotMap, what: &str, known: &[&str]) -> Result<()> {
     ))
 }
 
+/// The single-name options' instructions and exercises
+/// (`name_options_exercise`): `instructions` as `(agent, symbol, contracts)`,
+/// and `events` as `(session, event, party, symbol, contracts, shares, cash,
+/// value, reference)`, each in order.
+fn name_exercise_value(instructions: &[(String, String, f64)], events: &[crate::derivatives::Settlement]) -> SnapshotValue {
+    use SnapshotValue as V;
+    let mut d = SnapshotMap::new();
+    d.put(
+        "instructions",
+        V::List(
+            instructions
+                .iter()
+                .map(|(a, s, q)| V::Tuple(vec![V::Str(a.clone()), V::Str(s.clone()), V::Float(*q)]))
+                .collect(),
+        ),
+    );
+    d.put(
+        "events",
+        V::List(
+            events
+                .iter()
+                .map(|e| {
+                    V::Tuple(vec![
+                        V::Int(e.session),
+                        V::Str(e.event.as_str().into()),
+                        V::Str(e.agent.clone().unwrap_or_default()),
+                        V::Str(e.symbol.clone()),
+                        V::Float(e.quantity),
+                        V::Float(e.shares),
+                        V::Float(e.cash),
+                        V::Float(e.value),
+                        V::Float(e.reference),
+                    ])
+                })
+                .collect(),
+        ),
+    );
+    V::Map(d)
+}
+
+/// The inverse of [`name_exercise_value`].
+#[allow(clippy::type_complexity)]
+fn name_exercise_from(
+    d: &SnapshotMap,
+) -> Result<(Vec<(String, String, f64)>, Vec<crate::derivatives::Settlement>)> {
+    use crate::derivatives::{ContractKind, ContractSymbol, Settlement, SettlementEvent};
+    let top = "the snapshot's name_options_exercise";
+    book_unknown(d, top, &["instructions", "events"])?;
+    let at = "name_options_exercise.";
+    let mut instructions = Vec::new();
+    for item in read_items(d, at, "instructions", "a list of (agent, symbol, contracts)")? {
+        let bad = || SnapshotError::value("snapshot field name_options_exercise.instructions must hold (agent, symbol, contracts)");
+        let parts = item.items().ok_or_else(bad)?;
+        let [SnapshotValue::Str(agent), SnapshotValue::Str(symbol), q] = parts else {
+            return Err(bad());
+        };
+        instructions.push((agent.clone(), symbol.clone(), q.number().ok_or_else(bad)?));
+    }
+    let mut events = Vec::new();
+    for item in read_items(d, at, "events", "a list of exercise rows")? {
+        let bad = || {
+            SnapshotError::value(
+                "snapshot field name_options_exercise.events must hold (session, event, party, symbol, \
+                 contracts, shares, cash, value, reference)",
+            )
+        };
+        let parts = item.items().ok_or_else(bad)?;
+        let [session, SnapshotValue::Str(event), SnapshotValue::Str(agent), SnapshotValue::Str(symbol), q, sh, cash, value, reference] = parts
+        else {
+            return Err(bad());
+        };
+        let event = match event.as_str() {
+            "settlement" => SettlementEvent::Settlement,
+            "exercise" => SettlementEvent::Exercise,
+            "assignment" => SettlementEvent::Assignment,
+            _ => return Err(bad()),
+        };
+        let root = ContractSymbol::parse(symbol).map_err(SnapshotError::value)?.root;
+        let mut s = Settlement::new(
+            symbol.clone(),
+            ContractKind::NameOption,
+            root,
+            session.integer().ok_or_else(bad)?,
+            value.number().ok_or_else(bad)?,
+            reference.number().ok_or_else(bad)?,
+        );
+        s.event = event;
+        s.agent = Some(agent.clone());
+        s.quantity = q.number().ok_or_else(bad)?;
+        s.shares = sh.number().ok_or_else(bad)?;
+        s.cash = cash.number().ok_or_else(bad)?;
+        events.push(s);
+    }
+    Ok((instructions, events))
+}
+
 fn book_from(d: &SnapshotMap) -> Result<crate::agent_book::BookState> {
     use crate::agent_book::*;
     // Every field present before any is read, as a key-by-key read refused
@@ -1666,6 +1762,18 @@ impl Engine {
         if let Some(book) = self.options_book_state() {
             out.put("options_book", book_value(book));
         }
+        // The single-name options (`options_names_listed`), their book once
+        // an agent has traded one, and their instructions and exercises
+        // once there are any.
+        if let Some(words) = self.name_options_words() {
+            out.put("name_options", V::from_f64s(&words));
+        }
+        if let Some(book) = self.name_options_book_state() {
+            out.put("name_options_book", book_value(book));
+        }
+        if let Some((instructions, events)) = self.name_options_exercise_state() {
+            out.put("name_options_exercise", name_exercise_value(&instructions, events));
+        }
         // The spread a `corporate_spread` pin holds tonight, only while its
         // mark stands.
         if let Some(spread) = self.pinned_corporate_spread() {
@@ -2031,6 +2139,9 @@ impl Engine {
             Gated::dial("margin", "margin_scan_coverage", p.margin_scan_coverage),
             Gated::dial("options", "surface_ssvi", p.surface_ssvi),
             Gated::held("options_book", "options_index_listed", p.options_index_listed),
+            Gated::dial("name_options", "options_names_listed", p.options_names_listed),
+            Gated::held("name_options_book", "options_names_listed", p.options_names_listed),
+            Gated::held("name_options_exercise", "options_names_listed", p.options_names_listed),
             Gated::when(
                 "buyback_log_shares",
                 self.carries_buyback_log_shares(),
@@ -2755,6 +2866,22 @@ impl Engine {
                 None => None,
             };
             inner.set_options_state(words.as_deref(), book).map_err(core)?;
+        }
+        // The single-name options (`options_names_listed`).
+        {
+            let words = match snapshot.get("name_options") {
+                Some(_) => Some(read_buffer(snapshot, "", "name_options")?),
+                None => None,
+            };
+            let book = match snapshot.get("name_options_book") {
+                Some(_) => Some(book_from(read_map(snapshot, "", "name_options_book")?)?),
+                None => None,
+            };
+            let exercise = match snapshot.get("name_options_exercise") {
+                Some(_) => Some(name_exercise_from(read_map(snapshot, "", "name_options_exercise")?)?),
+                None => None,
+            };
+            inner.set_name_options_state(words.as_deref(), book, exercise).map_err(core)?;
         }
         inner.set_nominal_output_base(read_finite(snapshot, "", "nominal_output_base")?);
         let variance = read_numbers(snapshot, "", "market_variance")?;

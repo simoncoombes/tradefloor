@@ -10,9 +10,9 @@ use super::symbol::{ContractSymbol, Right, SymbolKind};
 
 /// What kind of contract this is: index futures (`futures_index_listed`),
 /// VIX futures (`futures_vix_listed`), policy-rate and term-rate futures
-/// (`futures_rates_listed`), oil futures (`futures_oil_listed`) and index
-/// options (`options_index_listed`) so far; the enum is non-exhaustive so
-/// the single-stock options of a later release join it.
+/// (`futures_rates_listed`), oil futures (`futures_oil_listed`), index
+/// options (`options_index_listed`) and single-name options
+/// (`options_names_listed`); the enum is non-exhaustive.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum ContractKind {
@@ -36,10 +36,14 @@ pub enum ContractKind {
     /// A European call or put on the engine's price index, cash-settled on
     /// the index of its expiry session's opening prints.
     IndexOption,
+    /// An American call or put on one roster name, 100 shares a contract,
+    /// physically settled: exercise delivers the shares at the strike.
+    NameOption,
 }
 
 impl ContractKind {
-    /// The root its symbols carry.
+    /// The root its symbols carry. A single-name option's root is its
+    /// name's ticker, which is not the kind's: it reads `""` here.
     pub fn root(self) -> &'static str {
         match self {
             ContractKind::IndexFuture => "IDX",
@@ -48,6 +52,7 @@ impl ContractKind {
             ContractKind::TermRateFuture => "TR3",
             ContractKind::OilFuture => "OIL",
             ContractKind::IndexOption => "IDX",
+            ContractKind::NameOption => "",
         }
     }
 
@@ -59,7 +64,7 @@ impl ContractKind {
             | ContractKind::PolicyRateFuture
             | ContractKind::TermRateFuture
             | ContractKind::OilFuture => true,
-            ContractKind::IndexOption => false,
+            ContractKind::IndexOption | ContractKind::NameOption => false,
         }
     }
 
@@ -81,6 +86,7 @@ impl ContractKind {
             ContractKind::TermRateFuture => SettlementRule::CompoundedPolicyRateAtClose,
             ContractKind::OilFuture => SettlementRule::OilPriceAtOpen,
             ContractKind::IndexOption => SettlementRule::OpeningPrintIndex,
+            ContractKind::NameOption => SettlementRule::PhysicalAtClose,
         }
     }
 }
@@ -107,6 +113,10 @@ pub enum SettlementRule {
     /// In cash, on the oil price at the expiry session's open: the previous
     /// close's, since oil moves only at a close.
     OilPriceAtOpen,
+    /// In shares, at the expiry session's close: an option in the money by
+    /// a cent or more on the name's closing print is exercised, the OCC's
+    /// exercise by exception, and delivers its shares at the strike.
+    PhysicalAtClose,
 }
 
 impl SettlementRule {
@@ -118,6 +128,7 @@ impl SettlementRule {
             SettlementRule::AveragePolicyRateAtClose => "average_policy_rate_at_close",
             SettlementRule::CompoundedPolicyRateAtClose => "compounded_policy_rate_at_close",
             SettlementRule::OilPriceAtOpen => "oil_price_at_open",
+            SettlementRule::PhysicalAtClose => "physical_at_close",
         }
     }
 }
@@ -231,8 +242,32 @@ pub struct Quote {
     pub loading: Option<f64>,
 }
 
-/// A contract's final settlement, as [`crate::engine::Engine::settlements`]
-/// lists it.
+/// What a settlement row records: a contract's final settlement, or one
+/// party's side of an option's exercise.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum SettlementEvent {
+    /// A contract's final settlement: its value at expiry.
+    Settlement,
+    /// A holder exercised `quantity` contracts.
+    Exercise,
+    /// A writer was assigned `quantity` contracts of others' exercises.
+    Assignment,
+}
+
+impl SettlementEvent {
+    /// `"settlement"`, `"exercise"` or `"assignment"`.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            SettlementEvent::Settlement => "settlement",
+            SettlementEvent::Exercise => "exercise",
+            SettlementEvent::Assignment => "assignment",
+        }
+    }
+}
+
+/// A contract's final settlement, or one party's side of an option's
+/// exercise, as [`crate::engine::Engine::settlements`] lists them.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct Settlement {
@@ -246,8 +281,44 @@ pub struct Settlement {
     /// What it settles on: for an index future, the index of the expiry
     /// session's opening prints; for a VIX future, the published VIX at the
     /// expiry session's open; for a rate future, 100 less the period's
-    /// realised rate; for an oil future, the oil price at the expiry open. `value` is set from it, so the two agree.
+    /// realised rate; for an oil future, the oil price at the expiry open;
+    /// for a single-name option, the name's closing print at expiry, and at
+    /// an exercise the name's price at the close it was exercised at.
+    /// `value` is set from it, so the two agree.
     pub reference: f64,
+    /// What the row records. Every row but a single-name option's exercise
+    /// and assignment is a [`SettlementEvent::Settlement`].
+    pub event: SettlementEvent,
+    /// Whose exercise or assignment it is: an agent's label, or the
+    /// dealer's (`crate::market_maker::MARKET_MAKER_ID`). `None` on a
+    /// settlement.
+    pub agent: Option<String>,
+    /// Contracts exercised or assigned; 0 on a settlement.
+    pub quantity: f64,
+    /// Shares the party receives (negative: delivers), 100 a contract.
+    pub shares: f64,
+    /// Cash the party receives (negative: pays), the strike times the
+    /// shares, to the cent.
+    pub cash: f64,
+}
+
+impl Settlement {
+    /// A contract's final settlement at `session` on `reference`, at `value`.
+    pub fn new(symbol: String, kind: ContractKind, root: String, session: i64, value: f64, reference: f64) -> Self {
+        Settlement {
+            symbol,
+            kind,
+            root,
+            session,
+            value,
+            reference,
+            event: SettlementEvent::Settlement,
+            agent: None,
+            quantity: 0.0,
+            shares: 0.0,
+            cash: 0.0,
+        }
+    }
 }
 
 /// The index future's specification: constants of the contract, not dials.
@@ -596,4 +667,51 @@ pub fn index_option_symbol(expiry: i64, right: Right, strike: f64) -> String {
         kind: SymbolKind::Option { right, strike_cents: cents },
     }
     .to_string()
+}
+
+/// The single-name option's specification: constants of the contract, not
+/// dials.
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
+pub struct NameOptionSpec {
+    /// Shares a contract: 100, as a listed US equity option.
+    pub multiplier: f64,
+    /// Strikes listed either side of the name's price.
+    pub strikes_each_side: i64,
+    /// The strike grid by price tier: `(below, step)` in ascending order, the
+    /// first tier whose `below` the price is under giving the step, the last
+    /// step above them all.
+    pub tiers: [(f64, f64); 4],
+    /// The step at or above the last tier.
+    pub top_step: f64,
+}
+
+/// The single-name option's specification: a $0.50 grid under $5, $1
+/// under $50, $2.50 under $100, $5 under $200 and $10 above, the US listing
+/// programmes' intervals.
+pub const NAME_OPTION: NameOptionSpec = NameOptionSpec {
+    multiplier: 100.0,
+    strikes_each_side: 10,
+    tiers: [(5.0, 0.5), (50.0, 1.0), (100.0, 2.5), (200.0, 5.0)],
+    top_step: 10.0,
+};
+
+impl NameOptionSpec {
+    /// The strike grid an expiry is listed on at the name's price `price`.
+    pub fn strike_step(&self, price: f64) -> f64 {
+        for (below, step) in self.tiers {
+            if price < below {
+                return step;
+            }
+        }
+        self.top_step
+    }
+}
+
+/// The symbol of `ticker`'s option of right `right` struck at `strike`
+/// (whole cents) expiring at session `expiry`.
+pub fn name_option_symbol(ticker: &str, expiry: i64, right: Right, strike: f64) -> String {
+    let cents = (strike * 100.0).round() as u64;
+    ContractSymbol { root: ticker.to_string(), expiry, kind: SymbolKind::Option { right, strike_cents: cents } }
+        .to_string()
 }

@@ -194,7 +194,7 @@ impl OilFuturesState {
 /// The oil future expiring at `session`, settled on the oil price `price`.
 fn oil_settlement(session: i64, price: f64) -> Settlement {
     let kind = ContractKind::OilFuture;
-    Settlement { symbol: oil_future_symbol(session), kind, root: kind.root().to_string(), session, value: price, reference: price }
+    Settlement::new(oil_future_symbol(session), kind, kind.root().to_string(), session, price, price)
 }
 
 /// What an oil future is worth now, and from what.
