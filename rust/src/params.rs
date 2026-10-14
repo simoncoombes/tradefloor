@@ -1289,7 +1289,7 @@ pub struct ModelParams {
     /// Off zero each listed contract's initial margin, set at each close, is
     /// its multiplier times `z * t * sigma`: `sigma` the contract's own
     /// one-session sd, an exponentially weighted mean of its squared
-    /// close-to-close mark changes at a half-life of 21 sessions (the
+    /// close-to-close mark changes at a half-life of seven sessions (the
     /// historical-volatility scaling clearing houses' value-at-risk margins
     /// use), seeded at listing from its family's front; `z` the standard
     /// normal quantile that leaves `(1 - coverage) / 2` in each tail; and
