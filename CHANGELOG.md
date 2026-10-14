@@ -125,6 +125,74 @@ same with them on as off.
   `usd_crisis_vix_threshold` (0.0 the standing 0.05), read by the dollar's
   step and by the forecast's expected bid. FRED DTWEXM against CBOE's VIX
   measures 0.001.
+- `pinned_vix_sets_variance` is a new switch, 0.0 on every preset and left
+  out of the digest there: under it every VIX a caller pins sets the market
+  factor's variance to the law's level at that VIX, as a scenario's
+  `vix_sets_variance` already could, instead of stepping one session toward
+  it. Free sessions are unchanged. Stepped, a pinned path's variance lagged
+  the VIX it stated by weeks: replaying the real 2020-21 VIX, realized
+  volatility ran about twice the S&P 500's once the VIX was back at 20-40,
+  and short of it at the March peak.
+- `corporate_spread_noise_sd` and `corporate_spread_noise_half_life` are new
+  dials, 0.0 on every preset and left out of the digest there: off zero
+  credit carries its own state, an AR(1) stepped every session on its own
+  keyed draws (no stream moves) and opened from its stationary distribution,
+  added to the spread formula's base beside the leverage term in the close's
+  corporate move, the meeting's re-anchor and the prehistory carry. Without
+  it the spread is nearly an equity echo: the part of its change the index
+  does not explain is half the IG closing-price spread's (LQD less IEF on
+  SPY, 2015-2025) from a session to a quarter.
+- `corporate_spread_equity_lag` is a new dial, 0.0 on every preset and left
+  out of the digest there: a half-life in sessions at which the gap the
+  corporate spread prices follows credit's leverage gap, so the spread
+  reprices an equity move over weeks rather than on the day. Read only with
+  `corporate_spread_equity_gain` set; the cycle's equity hazard keeps the
+  gap itself. The tape's spread beta on the index builds from -0.47 bp per 1%
+  over a session to -2.3 over a month (FRED BAA10Y, 1990-2025); with the gap
+  read whole the model's is -2.2 at every horizon.
+- `fed_eve_decision` is a new switch, 0.0 on every preset and left out of the
+  digest there: at 1 a scheduled meeting delivers the decision the Fed's own
+  reading implied at the eve's close (the decision the market priced), after
+  the ladder's and the put's draws; emergency meetings are untouched. The
+  model's scheduled-decision surprise falls from 9-12 bp to about 5 (tape
+  4.8, Bauer and Swanson 2022).
+- `treasury_path_owed_excluded` is a new switch, 0.0 on every preset and
+  left out of the digest there: under `treasury_path_anticipated` the
+  meeting's path step leaves out the put's owed step, which in the legacy
+  `dff + owed` offsets the put's extra cut and under the anticipated path
+  priced the give-back on the day of the cut.
+- `cycle_inflation_hazard` and `cycle_rate_hazard` are new dials, 0.0 on
+  every preset and left out of the digest there: the monthly peak hazard an
+  expansion adds with inflation above 4 and with the funds rate above 5
+  (0.0 the legacy 0.1 each). NBER peaks 1962-2025 on the two conditions and
+  the ladder's inversion term measure +0.022 and +0.001.
+- `core_trend_sd` and `core_trend_persistence` are new dials, 0.0 on every
+  preset and left out of the digest there: off zero headline inflation's
+  month-start step reverts to 2.0 plus a slow AR(1) trend (monthly
+  persistence and innovation sd, stepped at the month start on its own keyed
+  draws so no stream moves, opened from its stationary distribution), so
+  core carries the tape's persistent regimes. Fitted to FRED CPILFESL
+  year-on-year 1990-2025 about 2.0: 0.993 and 0.170.
+- `policy_anticipation_guidance` is a new dial, 0.0 on every preset and left
+  out of the digest there: the share of the anticipated meeting's priced
+  change taken from the decision the Fed's own reading implies, with the
+  rest from the published economy. The tape's policy surprise at scheduled FOMC
+  announcements has an sd of 4.8 bp (Bauer and Swanson 2022).
+- `treasury_path_anticipated` is a new switch, 0.0 on every preset and left
+  out of the digest there: at 1 a meeting moves the priced policy path by
+  the further move the anticipated meeting priced, not by the rate's change,
+  so a rate surprise reaches the curve once.
+- `policy_anticipation_half_life` is a new dial, 0.0 on every preset and left
+  out of the digest there: between meetings the anticipated meeting's priced
+  change moves toward the shadow meeting's at this half-life, in sessions,
+  rather than jumping to it each close. DGS2 off the zero bound: FOMC days
+  carry 0.046 of the variance, the other days' sd is 6.16 bp.
+- `treasury_2y_meeting_carry` is a new dial, 0.0 on every preset and left
+  out of the digest there: the share of the 2-year's standing gap to the
+  meeting's formula (`0.85 (ff + path) + 0.15 x 10y`) that a meeting keeps.
+  At 1.0 the meeting moves the 2-year by 0.85 of the decision's news and
+  0.15 of the 10-year's move instead of resetting it. FOMC days carry 0.046
+  of DGS2's daily variance off the zero bound (1994-2025).
 - `fed_neutral_real_rate` is a new dial, 0.0 on every preset and left out of
   the digest there: points added to the neutral rate of the central bank's
   Taylor rule, whose neutral at target is a nominal 2.0 (a real rate of 0).
@@ -231,8 +299,8 @@ same with them on as off.
 - `vix_stress_premium_undo` is a new switch, 0.0 on every preset and left
   out of the digest there. On, the published VIX's premium is the anchor's
   pull undone above the knee, `vix_anchor_weight * max(0, m - knee)`, in
-  place of the capped hinge; the gain and the cap are then unread. Only the
-  quote moves.
+  place of the capped hinge; the gain and the cap are then unread, and only
+  the published quote moves.
 
 ### The VIX's fear memory
 

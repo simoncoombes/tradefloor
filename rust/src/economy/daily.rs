@@ -364,6 +364,11 @@ pub struct DailyInputs<'a> {
     /// headline (`EconomyState::oil_inflation_level`): true while
     /// `fed_core_inflation` or `treasury_core_inflation` is set.
     pub oil_inflation_tracked: bool,
+    /// Core inflation's slow trend (`ModelParams::core_trend_sd`), points
+    /// over the 2.0 target: the month-start step closes headline's gap to
+    /// `2.0 + core_trend` instead of 2.0. 0.0, with the dial off, is the
+    /// target that stood.
+    pub core_trend: f64,
     /// The oil price's bounds, dollars; 0.0 is the standing 35 and 150. See
     /// `ModelParams::oil_price_floor`.
     pub oil_price_floor: f64,
@@ -469,6 +474,15 @@ pub struct YieldDials {
     /// [`crate::params::ModelParams::corporate_spread_equity_half_life`].
     /// Read only with `spread_equity_gain` set.
     pub spread_equity_decay: f64,
+    /// The priced gap's one-session keep, `0.5^(1/H)` with H
+    /// [`crate::params::ModelParams::corporate_spread_equity_lag`]; 0.0 is
+    /// off, the spread reading the gap itself. Read only with
+    /// `spread_equity_gain` set.
+    pub spread_priced_keep: f64,
+    /// Credit's own state before and after tonight's step, points of the
+    /// spread formula's base ([`crate::params::ModelParams::corporate_spread_noise_sd`]);
+    /// `None`, on every preset, is no state.
+    pub spread_noise: Option<(f64, f64)>,
 }
 
 /// The largest move the corporate yield takes in one session under
@@ -530,6 +544,8 @@ impl Default for YieldDials {
             spread_vix_cut: 0.0,
             spread_equity_gain: 0.0,
             spread_equity_decay: 0.0,
+            spread_priced_keep: 0.0,
+            spread_noise: None,
         }
     }
 }
@@ -563,6 +579,7 @@ impl<'a> Default for DailyInputs<'a> {
             usd_noise_sd: 0.0,
             usd_safe_haven_gain: 0.0,
             oil_inflation_tracked: false,
+            core_trend: 0.0,
             oil_price_floor: 0.0,
             oil_price_ceiling: 0.0,
             oil_inflation_passthrough: 0.0,
@@ -1485,6 +1502,18 @@ fn close_yields(
     } else {
         (0.0, 0.0)
     };
+    // CREDIT'S REPRICING LAG (`corporate_spread_equity_lag`): the spread's
+    // leverage term reads the gap it has priced, which closes a share of
+    // its distance to the gap each session. No draw. Guarded, so with the
+    // lag at 0.0 the pair is the gap's own.
+    let (gap_before, gap_after) = if equity_gain != 0.0 && inputs.yields.spread_priced_keep != 0.0 {
+        let p = economy.spread_priced_gap;
+        let q = p + (1.0 - inputs.yields.spread_priced_keep) * (gap_after - p);
+        new_state.spread_priced_gap = q;
+        (p, q)
+    } else {
+        (gap_before, gap_after)
+    };
 
     // THE CORPORATE YIELD BETWEEN MEETINGS. It was written only at a
     // central-bank meeting, so fair value's discount rate, and an IG bond
@@ -1530,15 +1559,23 @@ fn close_yields(
         // sides of the change. A VIX pin takes the VIX out, not the index.
         // Guarded, so with both at 0.0 the expressions are the ones that
         // stood.
-        let spread_dials = inputs.yields.spread_vix_cut != 0.0 || equity_gain != 0.0;
+        //
+        // CREDIT'S OWN STATE (`corporate_spread_noise_sd`): its step tonight
+        // is added to the base beside the leverage term, on both sides of
+        // the change, so the level stays on the formula the meeting reads.
+        // Guarded, so with no state the expressions are the ones that stood.
+        let spread_noise = inputs.yields.spread_noise;
+        let spread_dials = inputs.yields.spread_vix_cut != 0.0 || equity_gain != 0.0 || spread_noise.is_some();
+        let base_term = |gap: f64, x: f64| if spread_noise.is_some() { equity_gain * gap + x } else { equity_gain * gap };
+        let (x_before, x_after) = spread_noise.unwrap_or((0.0, 0.0));
         let vix_term = if let Some((m0, m1)) = inputs.yields.spread_multiplier {
             let vix_close = if inputs.yields.vix_pinned { economy.vix } else { new_state.vix };
             if spread_dials {
                 let cut = inputs.yields.spread_vix_cut;
                 crate::economy::central_bank::spread_formula_with(
-                    vix_close, m1, cut, equity_gain * gap_after)
+                    vix_close, m1, cut, base_term(gap_after, x_after))
                     - crate::economy::central_bank::spread_formula_with(
-                        economy.vix, m0, cut, equity_gain * gap_before)
+                        economy.vix, m0, cut, base_term(gap_before, x_before))
             } else {
                 crate::economy::central_bank::spread_formula(vix_close, m1)
                     - crate::economy::central_bank::spread_formula(economy.vix, m0)
@@ -1550,7 +1587,8 @@ fn close_yields(
                 0.02 * (1.0 - inputs.yields.spread_vix_cut)
                     * cycle_spread_multiplier * (new_state.vix - economy.vix)
             };
-            vix_part + equity_gain * cycle_spread_multiplier * (gap_after - gap_before)
+            let own = if spread_noise.is_some() { cycle_spread_multiplier * (x_after - x_before) } else { 0.0 };
+            vix_part + equity_gain * cycle_spread_multiplier * (gap_after - gap_before) + own
         } else if inputs.yields.vix_pinned {
             0.0
         } else {
@@ -2007,7 +2045,14 @@ pub fn update_economy_daily(
         );
 
         // ── Inflation ─────────────────────────────────────────────────────
-        let inflation_target = INFLATION_TARGET;
+        // CORE INFLATION'S TREND (`core_trend_sd`): headline closes its gap
+        // to the target plus the slow trend, the level a tape-fitted AR(1)
+        // carries core's persistence at. A branch: at 0.0 the target stood.
+        let inflation_target = if inputs.core_trend != 0.0 {
+            INFLATION_TARGET + inputs.core_trend
+        } else {
+            INFLATION_TARGET
+        };
         let inflation_mean_rev_coeff = inputs.inflation_reversion;
 
         // Positive real rates are contractionary.

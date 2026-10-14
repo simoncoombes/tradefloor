@@ -206,6 +206,14 @@ pub struct PolicyOptions {
     /// formula's base per unit of `EconomyState::spread_equity_gap`. 0.0 is
     /// none.
     pub spread_equity_gain: f64,
+    /// `corporate_spread_equity_lag`: the formula's leverage term reads
+    /// `EconomyState::spread_priced_gap` in place of `spread_equity_gap`.
+    /// `false`, on every preset, is the gap itself.
+    pub spread_priced_gap: bool,
+    /// `corporate_spread_noise_sd`: credit's own state, points added to the
+    /// formula's base beside the leverage term. `None`, on every preset, is
+    /// no state.
+    pub spread_noise: Option<f64>,
     /// `fed_core_inflation`: the inflation the meeting reads in place of
     /// headline, core (headline less `EconomyState::oil_inflation_level`).
     /// `None`, on every preset, is headline.
@@ -224,6 +232,25 @@ pub struct PolicyOptions {
     /// rate, the real rate it sets at target. 0.0, on every preset, is the
     /// neutral that stood (a nominal 2.0 at target, a real rate of 0).
     pub neutral_real_rate: f64,
+    /// `treasury_2y_meeting_carry`: the share of the 2-year's standing gap
+    /// to the meeting's formula the meeting keeps. 0.0, on every preset, is
+    /// the reset that stood.
+    pub two_year_carry: f64,
+    /// `treasury_path_anticipated`: `Some(c)` moves the priced path at the
+    /// meeting by `c`, the further move the anticipation priced, instead of
+    /// the rate's change. `None`, on every preset, is the step that stood.
+    pub path_carry: Option<f64>,
+    /// `fed_eve_decision`: `Some(c)` makes a scheduled meeting's rate change
+    /// `c`, the decision the Fed's own reading implied at the eve's close,
+    /// after the ladder, the stress hold and the put and before the
+    /// announcement's draw, so every draw is taken where it stood. Not read
+    /// at an emergency meeting. `None`, on every preset, is the meeting that
+    /// stood.
+    pub eve_change: Option<f64>,
+    /// `treasury_path_owed_excluded`: with `path_carry` set, the meeting's
+    /// path step leaves out the put's owed step. false, on every preset, is
+    /// the step that stood.
+    pub path_owed_excluded: bool,
 }
 
 /// [`PolicyOptions::shipped`].
@@ -256,11 +283,17 @@ impl PolicyOptions {
             rate_damping: 0.0,
             spread_vix_cut: 0.0,
             spread_equity_gain: 0.0,
+            spread_priced_gap: false,
+            spread_noise: None,
             policy_inflation: None,
             curve_inflation: None,
             zlb_path: 0.0,
             zlb_haven_gain: 0.0,
             neutral_real_rate: 0.0,
+            two_year_carry: 0.0,
+            path_carry: None,
+            eve_change: None,
+            path_owed_excluded: false,
         }
     }
 }
@@ -621,6 +654,24 @@ pub fn update_central_bank_with(
         }
     }
 
+    // THE EVE'S DECISION (`fed_eve_decision`): a scheduled meeting delivers
+    // what the Fed's own reading implied at the eve's close, the decision the
+    // market priced; scheduled decisions are signalled and the blackout ends
+    // new input. The ladder's and the put's draws above are taken as they
+    // stood. A branch: `None` is the meeting that stood.
+    if let Some(c) = options.eve_change {
+        if !is_emergency_meeting {
+            rate_change = c;
+            decision = if c > 0.0 {
+                Decision::Hike
+            } else if c < 0.0 {
+                Decision::Cut
+            } else {
+                Decision::Hold
+            };
+        }
+    }
+
     // DRAW SITE — always. The announcement text is not built here, but the
     // draw that chooses it is taken at exactly this point.
     let announcement_variant = (rng.next_f64() * ANNOUNCEMENT_VARIANTS).floor() as usize;
@@ -681,11 +732,26 @@ pub fn update_central_bank_with(
     let owed_moved = if put_on { new_economy.fed_put_owed - economy.fed_put_owed } else { 0.0 };
     let path_after = if path_on {
         options.path_before
-            + options.path_gain * (new_economy.federal_funds_rate - current_rate + owed_moved)
+            + options.path_gain * match options.path_carry {
+                // THE ANTICIPATED PATH (`treasury_path_anticipated`): the
+                // forecast moves by what the anticipation priced beyond the
+                // next decision, not by the decision, so a surprise reaches
+                // the curve once, through the rate.
+                // THE OWED STEP LEFT OUT (`treasury_path_owed_excluded`): the
+                // owed step offsets the put's extra cut in `Δff + owed`; with
+                // `Δff` replaced it would price the give-back on the day of
+                // the cut. A branch: off, the step is as it stood.
+                Some(carry) if options.path_owed_excluded => carry,
+                Some(carry) => carry + owed_moved,
+                None => new_economy.federal_funds_rate - current_rate + owed_moved,
+            }
     } else {
         0.0
     };
     let surprise = if path_on { surprise + (path_after - options.path_before) } else { surprise };
+    // The 2-year reads the policy rate undamped, so its news is the surprise
+    // as it stands here, before the 10-year's damping below.
+    let news_2y = surprise;
     // THE DAMPED PASS-THROUGH (`treasury_policy_damping`): the 10-year reads
     // the rate the ladder sets (the policy rate plus what the put owes) and
     // the priced path, pulled toward the neutral rate by the dial; the put's
@@ -751,6 +817,21 @@ pub fn update_central_bank_with(
     } else {
         new_economy.federal_funds_rate * 0.85 + new_economy.treasury_yield_10y * 0.15
     };
+    // THE 2-YEAR'S CARRY (`treasury_2y_meeting_carry`). The line above sets
+    // the level from the rate, which throws away the 2-year's standing gap
+    // to that formula: its own noise's excursion, the anticipated decision
+    // and the priced put. Off zero the meeting keeps `c` of the gap: the
+    // 2-year before the meeting moved by 0.85 of the decision's news and
+    // 0.15 of the 10-year's move. A branch: at 0.0 the level is the reset
+    // that stood.
+    if options.two_year_carry != 0.0 {
+        let legacy = new_economy.treasury_yield_2y;
+        let carried = economy.treasury_yield_2y
+            + 0.85 * news_2y
+            + 0.15 * (new_economy.treasury_yield_10y - economy.treasury_yield_10y);
+        new_economy.treasury_yield_2y =
+            clamp(legacy + options.two_year_carry * (carried - legacy), 0.0, 12.0);
+    }
 
     // ── Mortgage rate: three floors and a cap, applied in order ───────────
     // The order matters — each step reads the result of the last.
@@ -774,10 +855,17 @@ pub fn update_central_bank_with(
     // (`corporate_spread_vix_cut`, `corporate_spread_equity_gain`), as the
     // close's daily move carries them, so the meeting re-anchors the level
     // the daily move keeps. Guarded: with both at 0.0 the base is the
-    // expression that stood.
-    let base_corporate_spread = if options.spread_vix_cut != 0.0 || options.spread_equity_gain != 0.0 {
+    // expression that stood. Under `corporate_spread_equity_lag` the
+    // leverage term reads the gap the spread has priced.
+    let spread_gap = if options.spread_priced_gap { economy.spread_priced_gap } else { economy.spread_equity_gap };
+    // Credit's own state (`corporate_spread_noise_sd`) joins the base the
+    // same way, so the meeting re-anchors the level the close's move made.
+    let base_corporate_spread = if let Some(x) = options.spread_noise {
         1.0 + (economy.vix - 12.0) * 0.02 * (1.0 - options.spread_vix_cut)
-            + options.spread_equity_gain * economy.spread_equity_gap
+            + (options.spread_equity_gain * spread_gap + x)
+    } else if options.spread_vix_cut != 0.0 || options.spread_equity_gain != 0.0 {
+        1.0 + (economy.vix - 12.0) * 0.02 * (1.0 - options.spread_vix_cut)
+            + options.spread_equity_gain * spread_gap
     } else {
         1.0 + (economy.vix - 12.0) * 0.02
     };
@@ -932,6 +1020,38 @@ mod tests {
         let off = PolicyOptions { growth_cut: 2.0, ..PolicyOptions::shipped() };
         let c = update_central_bank_with(&bank, &economy, bank.next_meeting_date, &mut GameRng::new(1, 1), &off);
         assert_ne!(c.decision, Some(Decision::Cut));
+    }
+
+    /// `treasury_2y_meeting_carry`: at 0.0 the meeting sets the 2-year from
+    /// the rate, its gap to the formula gone; at 1.0 a held meeting keeps the
+    /// gap and moves the 2-year by 0.15 of the 10-year's move alone; at 0.5
+    /// it is halfway. The rate, the 10-year and the decision do not move.
+    #[test]
+    fn the_two_year_carry_keeps_the_gap_a_meeting_did_not_announce() {
+        let bank = create_initial_central_bank_state(0);
+        let mut economy = create_initial_economy_state(&InitialEconomyOptions::default());
+        economy.cycle_phase = CyclePhase::Expansion;
+        economy.gdp_growth = 2.5;
+        economy.federal_funds_rate = 2.0;
+        economy.inflation_rate = 2.0;
+        economy.unemployment_rate = bank.target_unemployment;
+        economy.treasury_yield_2y = 0.85 * 2.0 + 0.15 * economy.treasury_yield_10y + 0.4;
+        let run = |c: f64| {
+            let o = PolicyOptions { two_year_carry: c, ..PolicyOptions::shipped() };
+            let mut rng = GameRng::new(1, 1);
+            update_central_bank_with(&bank, &economy, bank.next_meeting_date, &mut rng, &o)
+        };
+        let (off, on, half) = (run(0.0), run(1.0), run(0.5));
+        assert_eq!(off.decision, Some(Decision::Hold));
+        assert_eq!(on.decision, off.decision);
+        assert_eq!(on.economy.federal_funds_rate.to_bits(), off.economy.federal_funds_rate.to_bits());
+        assert_eq!(on.economy.treasury_yield_10y.to_bits(), off.economy.treasury_yield_10y.to_bits());
+        let legacy = off.economy.federal_funds_rate * 0.85 + off.economy.treasury_yield_10y * 0.15;
+        assert_eq!(off.economy.treasury_yield_2y.to_bits(), legacy.to_bits());
+        let carried = economy.treasury_yield_2y
+            + 0.15 * (on.economy.treasury_yield_10y - economy.treasury_yield_10y);
+        assert!((on.economy.treasury_yield_2y - carried).abs() < 1e-12);
+        assert!((half.economy.treasury_yield_2y - 0.5 * (legacy + carried)).abs() < 1e-12);
     }
 
     /// `fed_neutral_real_rate`: at 0.0 the calm meeting at a rate of 2.0

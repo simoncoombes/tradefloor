@@ -1143,6 +1143,30 @@ def _nothing_dormant():
                    treasury_zlb_haven_gain=0.05,
                    # The Taylor rule's neutral real rate (HLW, 1990-2025).
                    fed_neutral_real_rate=2.0,
+                   # Core inflation's trend (CPILFESL fit), on its own keyed draws.
+                   core_trend_sd=0.17,
+                   core_trend_persistence=0.993,
+                   # Every pinned VIX sets the variance: a switch.
+                   pinned_vix_sets_variance=1.0,
+                   # Credit's own state (LQD-IEF residual), on its own keyed draws.
+                   corporate_spread_noise_sd=0.025,
+                   corporate_spread_noise_half_life=16.0,
+                   # The expansion's inflation and rate hazards (NBER fit).
+                   cycle_inflation_hazard=0.0219,
+                   cycle_rate_hazard=0.0013,
+                   # The eve's decision and the anticipated path without the
+                   # owed step (both switches).
+                   fed_eve_decision=1.0,
+                   treasury_path_owed_excluded=1.0,
+                   # The 2-year's carry through a meeting (a share).
+                   treasury_2y_meeting_carry=1.0,
+                   # The priced meeting's half-life (policy_anticipation is
+                   # on above), in sessions.
+                   policy_anticipation_half_life=10.0,
+                   # The anticipated path (a switch; the path is on above).
+                   treasury_path_anticipated=1.0,
+                   # The Fed's guidance (a share; the anticipation is on).
+                   policy_anticipation_guidance=0.5,
                    oil_price_floor=16.4,
                    oil_price_ceiling=279.0,
                    # The contracts' margin (pt-v22 phase 1).
@@ -1435,6 +1459,20 @@ UNREACHED_SNAPSHOT_FIELDS = {
         "tests/test_postcut.py::test_the_hashes_agree_and_a_restore_"
         "reproduces_the_run cuts, carries a non-zero path across a restore "
         "and asserts the state hash reads it.",
+    "core_trend":
+        "core inflation's trend (`core_trend_sd`): its level and its key. A "
+        "fresh engine on the same seed opens at the same trend (the opening "
+        "is a draw on the same key), and the trend moves only on a month's "
+        "first step, so until the split's parent has passed one the blank "
+        "value is the parent's own. tests/test_core_trend_process.py holds "
+        "the process to its own draws and its state in the hash.",
+    "eve_decision":
+        "the decision the Fed's own reading implied at the last close "
+        "(`fed_eve_decision`), which the next scheduled meeting delivers. "
+        "`CRISIS` starts the policy rate at 0.05 in a contraction, where the "
+        "ladder has no cut left and no reason to hike, so the eve's decision "
+        "and the day's agree and a restore that loses it (and re-reads the "
+        "day) reaches the same decision.",
     "earnings_key":
         "the earnings calendar's key. It is derived from the seed the engine "
         "was built with, and this guard restores into an engine built from "

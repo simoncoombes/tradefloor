@@ -558,6 +558,11 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "vix_stress_premium_knee": (0.0, 1.5),
     # The largest log premium of the quote over the state; 0.5 is 1.65x.
     "vix_stress_premium_cap": (0.0, 0.5),
+    # The stress memory's own per-session rate: off (the anchor's rate, 0.035 to
+    # 0.056 on the VIX laws) to 0.2, about a three-session half-life.
+    "vix_stress_premium_memory": (0.0, 0.2),
+    # The premium as the anchor's pull undone above the knee: a switch.
+    "vix_stress_premium_undo": (0.0, 1.0),
     # The VIX's fear memory: the uptake up to half the excursion a session,
     # and the half-life from a week to a year of sessions.
     "vix_fear_uptake": (0.0, 0.5),
@@ -694,6 +699,32 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # The Taylor rule's neutral real rate: off at the bottom, HLW's 1990-2025
     # high (3.9) at the top.
     "fed_neutral_real_rate": (0.0, 4.0),
+    # Core inflation's trend: off to twice the CPILFESL fit's sd; persistence
+    # off to 0.998.
+    "core_trend_sd": (0.0, 0.34),
+    # The expansion's inflation and rate hazards: off (the legacy 0.1) to
+    # the legacy value itself.
+    "cycle_inflation_hazard": (0.0, 0.1),
+    # Two switches.
+    "fed_eve_decision": (0.0, 1.0),
+    "treasury_path_owed_excluded": (0.0, 1.0),
+    # Credit's repricing lag, sessions.
+    "corporate_spread_equity_lag": (0.0, 21.0),
+    # Credit's own state: off to twice addendum L's sd; half-life off to a year.
+    "corporate_spread_noise_sd": (0.0, 0.05),
+    # Every pin sets the variance: a switch.
+    "pinned_vix_sets_variance": (0.0, 1.0),
+    "corporate_spread_noise_half_life": (0.0, 252.0),
+    "cycle_rate_hazard": (0.0, 0.1),
+    "core_trend_persistence": (0.0, 0.998),
+    # The 2-year's carry through a meeting: a share, so its own bounds.
+    "treasury_2y_meeting_carry": (0.0, 1.0),
+    # The priced meeting's half-life: off at the bottom, a quarter at the top.
+    "policy_anticipation_half_life": (0.0, 63.0),
+    # A switch.
+    "treasury_path_anticipated": (0.0, 1.0),
+    # A share.
+    "policy_anticipation_guidance": (0.0, 1.0),
     # The share of oil demand supply answers on the daily step. Bounded by
     # meaning again: 0.0 is the hardcoded zero the reference writes, 1.0 is
     # the value that makes the inventory random walk driftless, and past 1.0
@@ -1274,6 +1305,14 @@ def vector_to_params(vector: dict[str, float]) -> dict[str, float]:
     return p
 
 
+#: Dials whose 0.0 is a sentinel for a standing value rather than a point on
+#: the axis (`oil_price_floor`: 0.0 is the standing 35; `oil_price_ceiling`:
+#: 0.0 is the standing 150, and (0, 150) is refused). The check that the
+#: preset is on the map reads the sentinel as the value it stands for; the
+#: vector itself keeps 0.0, so the round trip to the preset stays exact.
+STANDING_AT_ZERO = {"oil_price_floor": 35.0, "oil_price_ceiling": 150.0}
+
+
 def params_to_vector(params: dict[str, float]) -> dict[str, float]:
     """The inverse of `vector_to_params`, for placing presets on the map."""
     v = {k: float(v) for k, v in params.items()
@@ -1424,6 +1463,8 @@ def survey_axes() -> list[atlas.Axis]:
     ship_vector = params_to_vector({n: ship[n] for n in settable})
     for a in axes:
         v = ship_vector[a.name]
+        if v == 0.0 and a.name in STANDING_AT_ZERO:
+            v = STANDING_AT_ZERO[a.name]
         if not a.low <= v <= a.high:
             raise RuntimeError(
                 f"{a.name} range ({a.low}, {a.high}) excludes the "

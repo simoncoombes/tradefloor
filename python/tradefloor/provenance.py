@@ -563,10 +563,73 @@ OUT_OF_SCOPE = {
         "stood (a branch on `== 0.0` in `close_yields` and the meeting's "
         "target), and `zlb_unmet` is neither written, snapshotted nor hashed; "
         "at 0.0 it is also left out of the model's digest",
+    "core_trend_sd":
+        "inert at 0.0: headline inflation reverts to the 2.0 target as it "
+        "stood (a branch on `== 0.0` in the month-start step); the trend and "
+        "its key are neither stepped, snapshotted nor hashed; at 0.0 it is "
+        "also left out of the model's digest",
+    "fed_eve_decision":
+        "inert at 0.0: a scheduled meeting re-reads the day's economy as it "
+        "stood (a branch in the meeting); the stored decision is neither "
+        "computed, snapshotted nor hashed; at 0.0 it is also left out of the "
+        "model's digest",
+    "treasury_path_owed_excluded":
+        "inert at 0.0 and read only with `treasury_path_anticipated` on: the "
+        "anticipated path's meeting step carries the put's owed step as it "
+        "stood; at 0.0 it is also left out of the model's digest",
+    "corporate_spread_equity_lag":
+        "inert at 0.0 and read only with `corporate_spread_equity_gain` set: "
+        "the spread's leverage term reads the gap itself, as it stood; the "
+        "priced gap is neither stepped, snapshotted nor hashed; at 0.0 it is "
+        "also left out of the model's digest",
+    "pinned_vix_sets_variance":
+        "inert at 0.0: a pinned VIX marks tonight's close forced only when "
+        "the caller asks (`vix_sets_variance`), as it stood (a branch in "
+        "`pin_macro`); no draw is taken and no state is added; at 0.0 it is "
+        "also left out of the model's digest",
+    "corporate_spread_noise_sd":
+        "inert at 0.0: the corporate spread moves with the VIX, the cycle and "
+        "the leverage gap as it stood (a branch on the state's presence in "
+        "the close's corporate move, the meeting's formula and the prehistory "
+        "carry); credit's own state and its key are neither stepped, "
+        "snapshotted nor hashed; at 0.0 it is also left out of the model's "
+        "digest",
+    "corporate_spread_noise_half_life":
+        "inert at 0.0 and read only with `corporate_spread_noise_sd` set; at "
+        "0.0 it is also left out of the model's digest",
+    "cycle_inflation_hazard":
+        "inert at 0.0: an expansion adds the legacy 0.1 a month with "
+        "inflation above 4 (a branch on `== 0.0` in the cycle's ladder); at "
+        "0.0 it is also left out of the model's digest",
+    "cycle_rate_hazard":
+        "inert at 0.0: an expansion adds the legacy 0.1 a month with the "
+        "funds rate above 5 (a branch on `== 0.0` in the cycle's ladder); at "
+        "0.0 it is also left out of the model's digest",
+    "core_trend_persistence":
+        "inert at 0.0 and read only with `core_trend_sd` set; at 0.0 it is "
+        "also left out of the model's digest",
     "fed_neutral_real_rate":
         "inert at 0.0: the Taylor rule's neutral is the one that stood (a "
         "branch on `== 0.0` in the meeting); at 0.0 it is also left out of "
         "the model's digest",
+    "policy_anticipation_guidance":
+        "inert at 0.0: the anticipated meeting prices the published shadow "
+        "alone, as it stood (a branch on `== 0.0` in the shadow meeting); at "
+        "0.0 it is also left out of the model's digest",
+    "treasury_path_anticipated":
+        "inert at 0.0: the meeting steps the priced path by the rate's "
+        "change as it stood (a branch on the switch in the meeting and the "
+        "engine's path update); at 0.0 it is also left out of the model's "
+        "digest",
+    "policy_anticipation_half_life":
+        "inert at 0.0: the anticipated meeting's priced change is the shadow "
+        "meeting's every close, as it stood (a branch on `== 0.0` in "
+        "`reprice_anticipated_meeting`); at 0.0 it is also left out of the "
+        "model's digest",
+    "treasury_2y_meeting_carry":
+        "inert at 0.0: the meeting sets the 2-year from the rate as it stood "
+        "(a branch on `== 0.0` in the meeting and in the anticipated "
+        "meeting's books); at 0.0 it is also left out of the model's digest",
     "treasury_zlb_haven_gain":
         "inert at 0.0: `close_yields` and the meeting's 10-year target branch "
         "on `== 0.0` and take the term premium as it stood; at 0.0 it is also "
