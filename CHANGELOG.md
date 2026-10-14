@@ -125,6 +125,20 @@ same with them on as off.
   `usd_crisis_vix_threshold` (0.0 the standing 0.05), read by the dollar's
   step and by the forecast's expected bid. FRED DTWEXM against CBOE's VIX
   measures 0.001.
+- `valuation_multiple_share` and `valuation_multiple_half_life` are new
+  dials, 0.0 on every preset and left out of the digest there. Off zero
+  each name carries a log valuation multiple: that share of its permanent
+  market moves joins the multiple instead of the earnings level, fair value
+  reads it, and each close pulls it back toward the valuation's target at
+  the half-life. The market P/E, dividends and buybacks read earnings
+  without it. The multiple opens at a draw from its stationary distribution
+  on its own keyed draw, so no stream moves and no opening price moves.
+  Without it every permanent market move is an earnings move, and the
+  market P/E barely moves: its log sd over 21-year histories is 0.09
+  against 0.42 for the S&P 500's CAPE since 1881, and the next ten years'
+  return on it has an R^2 of 0.03 against the tape's 0.29. The tape's
+  values are a share of 1.0 and a half-life of 1779 sessions (log CAPE's
+  annual AR(1), 0.906).
 - `pinned_vix_sets_variance` is a new switch, 0.0 on every preset and left
   out of the digest there: under it every VIX a caller pins sets the market
   factor's variance to the law's level at that VIX, as a scenario's

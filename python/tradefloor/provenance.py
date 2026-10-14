@@ -587,6 +587,16 @@ OUT_OF_SCOPE = {
         "the caller asks (`vix_sets_variance`), as it stood (a branch in "
         "`pin_macro`); no draw is taken and no state is added; at 0.0 it is "
         "also left out of the model's digest",
+    "valuation_multiple_share":
+        "inert at 0.0: every permanent market move joins the fair-value level "
+        "that scales the earnings the valuation and the market P/E read, as "
+        "it stood (a branch at the session's ticks, the night and the "
+        "close's market jump); no multiple is opened, pulled, snapshotted or "
+        "hashed, and its opening draw is not taken; at 0.0 it is also left "
+        "out of the model's digest",
+    "valuation_multiple_half_life":
+        "inert at 0.0 and read only with `valuation_multiple_share` set; at "
+        "0.0 it is also left out of the model's digest",
     "corporate_spread_noise_sd":
         "inert at 0.0: the corporate spread moves with the VIX, the cycle and "
         "the leverage gap as it stood (a branch on the state's presence in "

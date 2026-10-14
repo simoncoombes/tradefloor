@@ -1145,6 +1145,7 @@ mod tests {
                 float: 1e8,
                 fair_value_offset: None,
                 buyback_log_shares: None,
+                valuation_multiple: None,
                 dividend: None,
             },
             sector_volatility: Some(1.0),

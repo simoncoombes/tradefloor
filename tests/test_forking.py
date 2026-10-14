@@ -1148,6 +1148,9 @@ def _nothing_dormant():
                    core_trend_persistence=0.993,
                    # Every pinned VIX sets the variance: a switch.
                    pinned_vix_sets_variance=1.0,
+                   # The valuation multiple (CAPE's half-life), opened on its own keyed draw.
+                   valuation_multiple_share=1.0,
+                   valuation_multiple_half_life=1779.0,
                    # Credit's own state (LQD-IEF residual), on its own keyed draws.
                    corporate_spread_noise_sd=0.025,
                    corporate_spread_noise_half_life=16.0,

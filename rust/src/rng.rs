@@ -690,6 +690,18 @@ pub fn spread_noise_key(root_seed: u64) -> u64 {
     splitmix64_mix(root_seed ^ (((SPREAD_NOISE_TAG as u64) << 32) | 0xFFFF_FFFF))
 }
 
+/// The tag of the valuation multiple's opening draw
+/// (`valuation_multiple_share`), ASCII "VMUL".
+pub const VALUATION_MULTIPLE_TAG: u32 = 0x564D_554C;
+
+/// The key of a root seed's valuation-multiple opening: as
+/// [`publication_key`] under [`VALUATION_MULTIPLE_TAG`]. The opening's
+/// normal is the first of `GameRng::keyed(key, VALUATION_MULTIPLE_TAG,
+/// u64::MAX)`, so it takes nothing from any stream and moves no other draw.
+pub fn valuation_multiple_key(root_seed: u64) -> u64 {
+    splitmix64_mix(root_seed ^ (((VALUATION_MULTIPLE_TAG as u64) << 32) | 0xFFFF_FFFF))
+}
+
 pub fn publication_key(root_seed: u64) -> u64 {
     splitmix64_mix(root_seed ^ (((PUBLICATION_TAG as u64) << 32) | 0xFFFF_FFFF))
 }

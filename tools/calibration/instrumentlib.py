@@ -883,6 +883,8 @@ PARAM_SPECS: dict[str, dict] = {
     "corporate_spread_equity_lag": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 252.0), "derived": False},
     "corporate_spread_noise_sd": {"kind": "abs", "step_unit": 0.001, "hard_range": (0.0, 0.5)},
     "pinned_vix_sets_variance": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0), "derived": False},
+    "valuation_multiple_share": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
+    "valuation_multiple_half_life": {"kind": "abs", "step_unit": 21.0, "hard_range": (0.0, 100000.0)},
     "corporate_spread_noise_half_life": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 2520.0)},
     "cycle_rate_hazard": {"kind": "abs", "step_unit": 0.005, "hard_range": (0.0, 0.5)},
     "core_trend_persistence": {"kind": "abs", "step_unit": 0.001, "hard_range": (0.0, 1.0)},

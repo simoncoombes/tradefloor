@@ -529,6 +529,8 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         {"vix_anchor_slow", "vix_anchor", "vix_stress_memory", "market_vol_leverage_memory",
          "market_vol_cycle_log", "rates", "book", "fair_value_offset", "opening_z",
          "buyback_log_shares", "opening_carry",
+         # The valuation multiples, only with `valuation_multiple_share` set.
+         "valuation_multiple",
          # Carried only while set: a forced close pending tonight, today's
          # macro pins the corporate yield reads, and a jump's fair-value
          # shift waiting for its tape row.
@@ -796,6 +798,12 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     if "buyback_log_shares" in snapshot:
         raw = snapshot["buyback_log_shares"]
         for value in _column(raw, n, "buyback_log_shares"):
+            _f64(buf, value)
+    # The valuation multiples, only with `valuation_multiple_share` set, one
+    # per name in roster order, after the buyback reductions.
+    if "valuation_multiple" in snapshot:
+        raw = snapshot["valuation_multiple"]
+        for value in _column(raw, n, "valuation_multiple"):
             _f64(buf, value)
     # The earnings calendar's key, only with `earnings_surprise_sigma` set.
     if "earnings_key" in snapshot:
@@ -1725,7 +1733,8 @@ _LEDGER_BUFFERS = ("attribution", "tick_components", "tick_fundamental",
 #: present and left out where not. The ``fundamentals`` block's three
 #: buffers and the book's consumed depth are encoded beside them.
 _LEDGER_OPTIONAL_BUFFERS = ("fair_value_offset", "opening_z", "pending_fair_value",
-                            "garch_cascade", "buyback_log_shares", "earnings_withheld",
+                            "garch_cascade", "buyback_log_shares", "valuation_multiple",
+                            "earnings_withheld",
                             "idio_variance", "idio_jump_pending",
                             "idio_jump_var_pending", "opening_carry", "dividend",
                             "pending_dividend", "fed_drawdown_returns",

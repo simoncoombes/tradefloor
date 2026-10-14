@@ -1344,6 +1344,7 @@ mod tests {
                 mispricing_momentum: None,
                 fair_value_offset: None,
                 buyback_log_shares: None,
+                valuation_multiple: None,
                 dividend: None,
                 maker_inventory: None,
                 garch_variance: 0.015 * 0.015,

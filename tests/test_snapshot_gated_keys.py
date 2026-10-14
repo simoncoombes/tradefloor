@@ -183,6 +183,9 @@ CASES = {
     "spread_noise": (dict(corporate_spread_noise_sd=0.025, corporate_spread_noise_half_life=16.0,
                           corporate_yield_daily=1.0),
                      ("spread_noise",), (), (), {}),
+    # The valuation multiples, one per name, carried whenever the share is set.
+    "valuation_multiple": (dict(valuation_multiple_share=1.0, valuation_multiple_half_life=1779.0),
+                           ("valuation_multiple",), (), (), {}),
     "oil_target_drift": (dict(oil_target_drift_sd=0.018, oil_target_drift_reversion=0.001),
                          ("oil_target_drift",), (), (), {}),
     # The oil pushes' part of the price, in the economy, under its switch.
