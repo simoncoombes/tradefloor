@@ -1525,8 +1525,63 @@ With `oil_inventory_level_gain` $G > 0$ inventory's pressure $p(I)$ moves
 the price by $G\,(p(I') - p(I))$ a session in place of $p(I')$, so a
 shortage raises the price at once and the premium unwinds as inventory
 refills: the convenience yield of the theory of storage, low stocks with a
-curve in backwardation. The forecast steps the same law, so its expected
-oil, and the oil futures priced on it, follow each dial.
+curve in backwardation. With `oil_convenience_yield` $k > 0$ the price
+carries a premium on its level, $S = X\,(I/50)^{-k}$ with inventory read at no
+lower than 25 and $X$ the premium-free price reverting to the target: the
+convenience yield of the theory of storage (Working 1949; Brennan 1958),
+which low stocks raise at once and refilling unwinds, so the curve is in backwardation when
+stocks are low and in contango when they are high (Gorton, Hayashi and
+Rouwenhorst 2013, row OF2). It needs `oil_inventory_reversion`, which gives
+inventory the level it refills to. The forecast steps the same law, so its
+expected oil, and the oil futures priced on it, follow each dial; for the
+premium it takes the expectation over inventory's spread, since the
+premium is convex in inventory. With `oil_target_drift_sd` $\sigma > 0$ the
+price also carries a long factor, $S = X\,e^{D} f(I)$, with $D$ a random walk
+on its own key, $D' = (1-r) D - \sigma^2/2 + \sigma z$: the long-term level of
+Schwartz and Smith (Management Science 46(7), 2000), which moves spot and
+every contract alike while $X$ reverts. With no pull ($r = 0$) $e^D$ is a
+martingale and the forecast holds it; `oil_target_drift_reversion` $r$ is a
+weak pull that keeps the walk off the clamps. With `oil_pushes_in_target` at 1
+the price is the sum of a part that reverts at $\lambda$ and a part $P$ that
+collects the daily pushes (the dollar's drag, OPEC, inventory's push, a
+shock's level term) and decays at the shipped 0.03, $P' = 0.97P + $ pushes:
+at $\lambda = 0.03$ the sum is the shipped step, and at a slower $\lambda$
+each push keeps its long-run response (the dollar's $-0.08/0.03 = -2.67$ a
+point) rather than five times it. With `oil_noise_log_sd` $s > 0$ the noise
+is $s$ times the price rather than a dollar amount, the short factor's
+constant log volatility. With `oil_dollar_elasticity` $\varepsilon > 0$ the
+dollar's daily drag is dropped and the reverting part carries
+$(\text{usd}/100)^{-\varepsilon}$ on its level, the target included, so a
+dollar move shifts spot and every contract together, as EIA's contracts 1
+and 4 do against FRED's trade-weighted dollar (elasticities $-0.69$ and
+$-0.66$ on daily changes, 1987 to 2019). `oil_inventory_noise_sd` sets
+inventory's daily noise (0.35 gives EIA's 0.087 sd of the log deviation from
+the trailing five-year mean, with a half-life inside the real 170 to 320
+sessions), and `oil_forecast_clamp` has the forecast publish the oil price's
+expectation truncated at its clamps, 35 and 150, over the spread the short
+factor and the level carriers give it. `usd_mean_reversion` and
+`usd_noise_sd` set the dollar index's law (0.0 the standing 0.02 and 0.3): FRED's
+trade-weighted dollar (DTWEXM, 1987 to 2019) has an AR(1) half-life of 729
+sessions and a daily log change of 0.0043, so the dollar the oil curve carries
+persists as the real one does rather than unwinding within weeks. Under
+`usd_mean_reversion` the dollar's safe-haven bid is a part of its own that
+decays at the shipped 0.02, so a crisis lifts the dollar for months as it did
+and the bid does not accumulate. `usd_safe_haven_gain` sets that bid's daily
+drift per VIX point above the threshold (0.0 the standing 0.05, never
+measured): FRED's trade-weighted dollar gains 0.0010 per cent a session per
+point (DTWEXM against CBOE's VIX, 1990 to 2019, se 0.0012) and gives it back
+within 21 sessions, so at 0.001 a crisis barely moves the dollar and the oil
+curve does not price the bid's unwinding as a slope. Oil reaches the rest of the
+economy through headline inflation. Under `fed_core_inflation` the central
+bank reads core, headline less the pass-through's accumulated part
+(`oil_inflation_level`, the monthly term decaying at headline's own
+reversion), and under `treasury_core_inflation` so do the 10-year's term
+premium, the haven's gate and the flight to quality's sign: on the tape the
+Fed looked through energy, and an oil-driven headline of 3 to 4 neither
+stopped its cuts nor the 10-year's rally in a fall. `oil_price_floor` and `oil_price_ceiling`
+set oil's bounds (0.0 the standing 35 and 150): WTI deflated by CPIAUCSL ran
+0.203 to 3.44 times its median over 1987 to 2024, which at the model's
+centre of 81 is 16.4 and 279.
 
 | Dial | pt-v20 | pt-v21 | Kind | Source |
 |---|---|---|---|---|
@@ -1538,6 +1593,33 @@ oil, and the oil futures priced on it, follow each dial.
 | `oil_mean_reversion` $\lambda$ | 0 (0.03); up to 1 | same | not set | Bessembinder et al. (1995), about 0.0035 a session; Schwartz (1997) |
 | `oil_noise_sd` $\sigma$ | 0 (2.0); up to 10 | same | not set | set with $\lambda$: the stationary spread before the clamps is $\sigma / \sqrt{2\lambda}$ |
 | `oil_inventory_level_gain` $G$ | 0 (the daily push); up to 2520 | same | not set | Gorton, Hayashi and Rouwenhorst (2013): low inventories, a high spot and backwardation |
+| `oil_target_drift_sd` $\sigma$ | 0 (no long factor); up to 0.1 | same | not set | EIA's contracts 1 and 4: the long factor's daily sd, 0.018 (median of seven five-year windows, 1987 to 2024) |
+| `oil_pushes_in_target` | 0 (the pushes revert with the price); 1 | same | not set | at a reversion of 0.03 it is the shipped step; a stated split, not a fit |
+| `usd_mean_reversion` | 0 (0.02); up to 1 | same | not set | FRED DTWEXM, 1987 to 2019: AR(1) half-life of the log level 729 sessions (0.00095); 540 to 580 against the trailing five-year mean |
+| `usd_noise_sd` | 0 (0.3); up to 5 | same | not set | FRED DTWEXM: daily log change sd 0.0043, 0.43 points at 100 |
+| `usd_safe_haven_gain` | 0 (0.05); up to 1 | same | not set | FRED DTWEXM on CBOE VIX, 1990 to 2019: drift 0.0010 per cent a session per VIX point above 25.5 (se 0.0012), unwound within 21 sessions; DTWEXBGS 2006 on: 0.003 |
+| `fed_core_inflation` | 0 (the bank reads headline); 1 (core: headline less `oil_inflation_level`) | same | not set | FRED 1990 to 2025: ff loads on CPILFESL 0.74 (NW se 0.38), on headline less core -0.16 (0.33); in 63-session 10% index falls with headline at 3 or more and core under 3 the funds rate fell 0.85, with core at 3 or more it rose 0.36 |
+| `treasury_zlb_path` | 0 (the put priced up to the rate); up to 20 | same | not set | FRED THREEFY10 less THREEFYTP10 (Kim-Wright expected path), 2008-2015 falls of 10% from the zero bound: -0.35 (se 0.12) with the funds rate unchanged |
+| `fed_eve_decision` | 0 (the meeting re-reads the day); 1 (a scheduled meeting delivers the eve's own-reading decision) | same | not set | scheduled-FOMC surprise sd 4.8 bp off the zero bound 1994-2019 (Bauer and Swanson 2022); the model's eve shadow matches the delivered decision at 80-87% of meetings, the rest stressed-day reversals (surprise 9-12 bp), about 5 bp with the switch |
+| `corporate_spread_noise_sd`, `corporate_spread_noise_half_life` | 0 (no state: the spread moves with the VIX, the cycle and the leverage gap); sd up to 0.5 points a session, half-life up to 2520 sessions | same | not set | the IG closing-price spread (LQD's return less 0.913 IEF's at duration 8.5, on SPY, 2015-2025, off the zero bound): the part of its change the index does not explain has sd 2.54 bp a session, 11.5 over 21 and 16.7 over 63 (model 1.36, 6.4, 11.6); the 21- and 63-session pair gives a half-life of 16 sessions and a stationary sd of 8.8 bp |
+| `corporate_spread_equity_lag` | sessions: the half-life at which the gap the corporate spread prices follows credit's leverage gap; 0 is the gap itself | same | not set | FRED BAA10Y on the S&P 500, off the zero bound 1990-2025: beta -0.47 bp per 1% over one session, -0.91 over five, -2.28 over 21, -2.51 over 63; ICE BofA IG OAS -0.65 a session (2023-2025); read whole, the model's is -2.2 at every horizon |
+| `treasury_path_owed_excluded` | 0 (the anticipated path's step carries the put's owed step); 1 (leaves it out) | same | not set | DGS2 on scheduled cuts off the zero bound 1994-2025: -1.2 bp on the day; with the owed step the model's 2-year rose 35-48 bp on put-cut days |
+| `cycle_inflation_hazard`, `cycle_rate_hazard` | 0 (the legacy 0.1 a month each); up to 0.5 | same | not set | FRED USREC (NBER peaks) in expansion months 1962-2025, linear probability on 1{CPI > 4}, 1{ff > 5} and the ladder's inversion term: +0.0219 (block se 0.0133) and +0.0013 (0.0087), 8 peaks; 1976-2025 on the 2-year spread +0.0159 and -0.0009 |
+| `core_trend_sd`, `core_trend_persistence` | 0 (no trend: headline reverts to 2.0); sd up to 2, persistence in [0, 1] | same | not set | FRED CPILFESL year-on-year, monthly 1990-2025, exact ML AR(1) about 2.0: phi 0.993, sigma 0.170 a month, half-life 8.2 years, unconditional sd 1.44 (series 1.15); a fast component gets zero weight; implied shares >= 3 and >= 4 0.231 and 0.078 (tape 0.241, 0.125) |
+| `fed_neutral_real_rate` | 0 (the neutral that stood: a nominal 2.0 at target); -2 to 5 | same | not set | Holston-Laubach-Williams US r* (NY Fed, one-sided), mean 1990Q1-2025Q4: 2.0; the rule on FRED CPILFESL and UNRATE sits 1.69 under DFF off the zero bound at 0 and 0.31 over it at 2.0 |
+| `policy_anticipation_guidance` | 0 (the market prices the published shadow meeting); up to 1 (the Fed's own reading) | same | not set | Bauer and Swanson (2022) ED1, the current-quarter Eurodollar futures move in the 30-minute window of scheduled FOMC announcements, funds rate over 0.25: sd 4.8 bp 1994-2019 (5.0 to 2007, 4.2 after) |
+| `treasury_path_anticipated` | 0 (the meeting steps the priced path by the rate's change); 1 (by the further move the anticipation priced) | same | not set | FRED DGS2 on the Fed's scheduled FOMC days, 1994-2025 off the zero bound: the day's move sd 7.1 bp (hikes -2.2, cuts -1.2 on average) |
+| `policy_anticipation_half_life` | 0 (the priced change is the shadow meeting's every close); up to 252 sessions | same | not set | FRED DGS2 on the Fed's scheduled FOMC days, 1994-2025 off the zero bound: those days carry 0.046 of the variance and the other days' sd is 6.16 bp; the 2-year moves +14.0 bp over the 20 sessions before a hike and -12.3 before a cut |
+| `treasury_2y_meeting_carry` | 0 (the meeting sets the 2-year from the rate); up to 1 (it keeps the 2-year's gap to that formula and moves it by the decision's news) | same | not set | FRED DGS2 on the Fed's scheduled FOMC decision days, 1994-02-04 to 2025-07-31, funds rate over 0.25: those days carry 0.046 (se 0.006) of the daily-change variance on 0.031 of sessions |
+| `treasury_zlb_haven_gain` | 0 (none); up to 1 | same | not set | FRED THREEFYTP10 (Kim-Wright term premium), the same windows: -0.36 (se 0.13) |
+| `treasury_core_inflation` | 0 (the curve reads headline); 1 (core) | same | not set | FRED DGS10, CPI and the S&P 500, 1990 to 2025: corr(index, 10-year change) +0.28 with headline 3 to 4 and core under 3 (+0.22 both under 3), -0.35 with core 3 to 4; the 10-year's level loads on neither core nor the gap given the funds rate |
+| `oil_price_floor`, `oil_price_ceiling` | 0 (35 and 150); the floor in (0, 35], the ceiling in [150, 1000] | same | not set | EIA RCLC1 deflated by FRED CPIAUCSL, 1987 to 2024: 0.203 and 3.44 times the median, at the model's 81 |
+| `oil_inventory_noise_sd` | 0 (0.5); up to 5 | same | not set | EIA WCESTUS1, 1987 to 2024: sd 0.087 of the log deviation from the trailing 260-week mean |
+| `oil_forecast_clamp` | 0 (unclamped); 1 | same | not set | none: the clamps are in the law |
+| `oil_dollar_elasticity` $\varepsilon$ | 0 (the daily drag); up to 5 | same | not set | EIA RCLC1 and RCLC4 on FRED DTWEXM, 1987 to 2019: 0.69 on daily changes, 1.2 over 21 sessions; DTWEXBGS 2006 on: 2.3 |
+| `oil_noise_log_sd` $s$ | 0 (dollar noise); up to 0.1 | same | not set | EIA's contracts 1 and 4 at a reversion of 0.006: the short factor's daily sd, 0.017 (median of seven windows); Schwartz and Smith (2000) 0.018 |
+| `oil_target_drift_reversion` $r$ | 0 (no pull); up to 1 | same | not set | none: a stated guard against the clamps |
+| `oil_convenience_yield` $k$ | 0 (no premium); up to 10 | same | not set | Working (1949), Brennan (1958); EIA's US crude stocks: the curve's slope on stocks' deviation from their 5-year mean, correlation 0.557 and slope 0.33, 1987 to 2024 |
 
 ### The fear and greed index
 

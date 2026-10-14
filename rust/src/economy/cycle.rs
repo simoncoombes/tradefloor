@@ -82,6 +82,10 @@ fn per_day(monthly: f64, spec: &CycleSpec) -> f64 {
 /// the macro burn-in, and 0.0 in every session): monthly hazard added in an
 /// expansion and at a peak, by the ladder and by the hazard-only law the
 /// opening is drawn from. 0.0 adds nothing.
+///
+/// `inflation_hazard` and `rate_hazard` are `cycle_inflation_hazard` and
+/// `cycle_rate_hazard`: the monthly hazard an expansion adds with inflation
+/// above 4 and with the funds rate above 5. 0.0 is the legacy 0.1 each.
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[non_exhaustive]
 pub struct CycleSpec {
@@ -91,6 +95,8 @@ pub struct CycleSpec {
     pub equity_hazard: f64,
     pub equity_knee: f64,
     pub equity_opening: f64,
+    pub inflation_hazard: f64,
+    pub rate_hazard: f64,
 }
 
 impl CycleSpec {
@@ -98,6 +104,7 @@ impl CycleSpec {
         CycleSpec {
             per_month, month_days: 30.0, us: false,
             equity_hazard: 0.0, equity_knee: 0.0, equity_opening: 0.0,
+            inflation_hazard: 0.0, rate_hazard: 0.0,
         }
     }
 }
@@ -194,11 +201,16 @@ fn adjust_transition_probability(economy: &EconomyState, mut p: f64, spec: &Cycl
     }
     match economy.cycle_phase {
         CyclePhase::Expansion => {
+            // THE INFLATION AND RATE HAZARDS (`cycle_inflation_hazard`,
+            // `cycle_rate_hazard`): the legacy 0.1 a month each, or off zero
+            // the dial's. NBER peaks 1962-2025 on these two conditions and
+            // the inversion term below: +0.022 and +0.001. Branches: at 0.0
+            // the ladder is the one that stood, operation for operation.
             if economy.inflation_rate > 4.0 {
-                p += 0.1;
+                p += if spec.inflation_hazard != 0.0 { spec.inflation_hazard } else { 0.1 };
             }
             if economy.federal_funds_rate > 5.0 {
-                p += 0.1;
+                p += if spec.rate_hazard != 0.0 { spec.rate_hazard } else { 0.1 };
             }
             // Curve inversion has preceded every US recession since 1955.
             if economy.treasury_yield_2y > economy.treasury_yield_10y {
@@ -810,7 +822,8 @@ mod stationary_law {
     #[test]
     fn the_equity_hazard_adds_in_an_expansion_and_at_a_peak_above_the_knee() {
         let base = CycleSpec { per_month: 1.0, month_days: 21.0, us: true,
-                               equity_hazard: 0.0, equity_knee: 0.0, equity_opening: 0.0 };
+                               equity_hazard: 0.0, equity_knee: 0.0, equity_opening: 0.0,
+                               inflation_hazard: 0.0, rate_hazard: 0.0 };
         let on = CycleSpec { equity_hazard: 4.0, equity_knee: 0.05, ..base };
         for phase in phase_cycle() {
             let mut e = ladder_free_economy();
@@ -841,7 +854,8 @@ mod stationary_law {
     #[test]
     fn the_expansion_guard_still_applies_to_the_equity_hazard() {
         let base = CycleSpec { per_month: 1.0, month_days: 21.0, us: true,
-                               equity_hazard: 0.0, equity_knee: 0.0, equity_opening: 0.0 };
+                               equity_hazard: 0.0, equity_knee: 0.0, equity_opening: 0.0,
+                               inflation_hazard: 0.0, rate_hazard: 0.0 };
         let on = CycleSpec { equity_hazard: 1.0, equity_knee: 0.0, ..base };
         let mut e = ladder_free_economy();
         e.cycle_phase = CyclePhase::Expansion;
@@ -862,7 +876,8 @@ mod stationary_law {
     #[test]
     fn the_opening_stand_in_adds_to_the_law_and_the_ladder() {
         let base = CycleSpec { per_month: 1.0, month_days: 21.0, us: true,
-                               equity_hazard: 0.0, equity_knee: 0.0, equity_opening: 0.0 };
+                               equity_hazard: 0.0, equity_knee: 0.0, equity_opening: 0.0,
+                               inflation_hazard: 0.0, rate_hazard: 0.0 };
         let on = CycleSpec { equity_opening: 0.01, ..base };
         for phase in phase_cycle() {
             let mut e = ladder_free_economy();

@@ -143,6 +143,11 @@ CASES = {
     "spread_equity_gain": (dict(corporate_spread_equity_gain=1.8,
                                 corporate_spread_equity_half_life=126.0),
                            (), ("spread_equity_gap",), (), {}),
+    # Credit's repricing lag: the priced gap beside the gap.
+    "spread_equity_lag": (dict(corporate_spread_equity_gain=1.8,
+                               corporate_spread_equity_half_life=126.0,
+                               corporate_spread_equity_lag=5.0),
+                          (), ("spread_equity_gap", "spread_priced_gap"), (), {}),
     "cycle_equity_hazard": (dict(cycle_equity_hazard=5.0, cycle_equity_hazard_knee=0.1,
                                  cycle_equity_hazard_opening=0.007,
                                  corporate_spread_equity_half_life=126.0),
@@ -166,6 +171,9 @@ CASES = {
                       ("futures", "derivatives_rng"), (), ("night_bridge",), {}),
     # The VIX's fear memory, carried whenever its switch is set.
     "vix_fear": (dict(vix_fear_uptake=0.2, vix_fear_half_life=20.0), ("vix_fear",), (), (), {}),
+    # The transient quote, carried whenever its share is set.
+    "vix_quote_transient": (dict(vix_quote_transient_share=0.81, vix_quote_transient_persistence=0.942),
+                            ("vix_quote_transient",), (), (), {}),
     # The VIX futures, carried whenever their switch is set.
     "vix_futures": (dict(forecast_horizon_sessions=126.0, futures_vix_listed=1.0), ("vix_futures",), (), (), {}),
     # The rate futures, carried whenever their switch is set.
@@ -174,6 +182,18 @@ CASES = {
     "oil_futures": (dict(futures_oil_listed=1.0), ("oil_futures",), (), (), {}),
     # The contracts' margin, carried whenever its dial is set.
     "margin": (dict(futures_oil_listed=1.0, margin_scan_coverage=0.99), ("oil_futures", "margin"), (), (), {}),
+    # Credit's own state and its key, stepped every session on its own draws.
+    "spread_noise": (dict(corporate_spread_noise_sd=0.025, corporate_spread_noise_half_life=16.0,
+                          corporate_yield_daily=1.0),
+                     ("spread_noise",), (), (), {}),
+    "oil_target_drift": (dict(oil_target_drift_sd=0.018, oil_target_drift_reversion=0.001),
+                         ("oil_target_drift",), (), (), {}),
+    # The oil pushes' part of the price, in the economy, under its switch.
+    "oil_push_level": (dict(oil_pushes_in_target=1.0, oil_noise_log_sd=0.017),
+                       (), ("oil_push_level",), (), {}),
+    # The dollar's safe-haven bid, in the economy, under the measured dollar.
+    "usd_haven_level": (dict(usd_mean_reversion=0.00095, usd_noise_sd=0.43),
+                        (), ("usd_haven_level",), (), {}),
     "every_r21_dial": (dict(EVERY_R21_DIAL, **MACRO),
                        ("market_vol_leverage_memory", "vix_stress_memory",
                         "cycle_nowcast_rng", "fed_stress_vix_max", "fed_stress_hold_age",
