@@ -181,7 +181,7 @@ from ..render import Renderer, TextRenderer, _sector_rows, check_renderer
 from .common import (OBSERVATION_SCHEMA_VERSION, AdapterInfo,
                      FrameworkError, IntegrationError, MissingDependencyError)
 from .common import SIDES as _COMMON_SIDES
-from .common import _dividends_paid, _next_reports
+from .common import _dividends_paid, _next_reports, derivatives_payload
 from .common import Action as _CommonAction
 from .common import Decision as _CommonDecision
 from .common import DecisionError as _CommonDecisionError
@@ -481,6 +481,10 @@ def observe(obs: Any, *, history: Sequence[Sequence[float]] = (),
             # The agent's limit orders still waiting in the book.
             "open_orders": open_orders_of(obs),
         },
+        # The listed futures, the price index and the margin, on a model
+        # that lists futures (observation schema 3), read as the shared
+        # serializer reads them; nothing on any other model.
+        **derivatives_payload(obs, max_participation=max_participation),
     }
     if detail is not None:
         listed = {asset["symbol"] for asset in assets}

@@ -436,6 +436,16 @@ impl Engine {
         self.futures.contracts.iter().position(|c| c.expiry == parsed.expiry)
     }
 
+    /// Whether this model lists futures of any family: one of
+    /// `futures_index_listed`, `futures_vix_listed`, `futures_rates_listed`
+    /// and `futures_oil_listed` set. A property of the model, not of the
+    /// moment: a model that lists VIX futures says so before its first
+    /// close, when [`Engine::contracts`] is still empty. False on every
+    /// shipped preset.
+    pub fn lists_futures(&self) -> bool {
+        self.futures_on() || self.vix_futures_on() || self.rate_futures_on() || self.oil_futures_on()
+    }
+
     /// Whether `symbol` names a listed contract: an index, VIX, rate or oil
     /// future under its family's switch.
     pub fn is_listed_contract(&self, symbol: &str) -> bool {

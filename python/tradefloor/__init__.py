@@ -31,6 +31,7 @@ from .records import preset_record, available as preset_records
 from . import atlas
 from . import baselines
 from . import tca
+from . import contracts
 from . import scenario as _scenario_mod
 from . import facts
 from . import loss

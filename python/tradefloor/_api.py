@@ -59,6 +59,8 @@ ADVANCED: tuple[str, ...] = (
     "GameRng", "fair_value", "market_status", "sectors",
     # rate indices
     "RATE_SECTOR", "RATE_TICKERS", "bonds", "rate_specs",
+    # listed derivatives (pt-v22): contract symbols
+    "contracts",
     # evaluation detail
     "AgentRecord", "HiddenState", "MarketView", "PortfolioView", "Position",
     "capture_withheld", "oracle_is_ceiling", "preset_records", "sandbox",

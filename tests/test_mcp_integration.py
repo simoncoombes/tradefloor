@@ -78,6 +78,10 @@ CALLS = {
     "open_session": {"universe_size": 8},
     "session_step": {"session_id": "OPENED", "steps": 2,
                      "orders": {"AAA": 100}},
+    # No shipped preset lists futures, so these read an empty list over
+    # the wire; tests/test_mcp_futures.py reads a market that lists them.
+    "list_contracts": {"session_id": "OPENED"},
+    "quote_contracts": {"session_id": "OPENED"},
     "session_fork": {"session_id": "OPENED"},
     "session_rewind": {"session_id": "OPENED", "step": 0},
     "session_state": {"session_id": "FORKED", "tickers": ["AAA"]},

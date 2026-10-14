@@ -87,6 +87,7 @@ capture_withheld advanced
 checkpoint advanced
 commit stable
 compare stable
+contracts advanced
 counterfactual stable
 edgar advanced
 envelope stable

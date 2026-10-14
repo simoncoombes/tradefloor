@@ -186,6 +186,24 @@ impl Sim {
         self.inner.published_vix()
     }
 
+    /// The price index's level (`index_level_listed`), on the prices as they
+    /// stand: `undefined` with the switch off, which it is on every shipped
+    /// preset. A page reaches the switch only through a preset, as it
+    /// reaches every dial.
+    #[wasm_bindgen(getter, js_name = indexLevel)]
+    pub fn index_level(&self) -> Option<f64> {
+        self.inner.index_level().map(|i| i.level)
+    }
+
+    /// The front contract of each listed futures family, in the order
+    /// `Engine::contracts` lists the families (index, VIX, policy rate, term
+    /// rate, oil), each quoted as `Engine::quote` quotes it. Empty on a
+    /// model that lists none, which is every shipped preset.
+    #[wasm_bindgen(getter, js_name = frontFutures)]
+    pub fn front_futures(&self) -> Vec<FutureQuote> {
+        front_future_quotes(&self.inner)
+    }
+
     /// Advance one trading day: number it, open, trade, close, step the
     /// macro chain.
     ///
@@ -215,6 +233,121 @@ impl Sim {
         }
         Ok(())
     }
+}
+
+/// One front future's quote, as `Sim.frontFutures` lists it: a read of
+/// [`Engine::quote`] and nothing decided here.
+#[wasm_bindgen]
+#[derive(Debug, Clone)]
+pub struct FutureQuote {
+    symbol: String,
+    root: String,
+    expiry: i64,
+    price: f64,
+    fair: f64,
+    bid: Option<f64>,
+    ask: Option<f64>,
+    mark: Option<f64>,
+    basis_bp: f64,
+    sessions_to_expiry: f64,
+    multiplier: f64,
+}
+
+#[wasm_bindgen]
+impl FutureQuote {
+    /// The canonical symbol, `IDX.F0119` for the index future expiring at
+    /// session 119.
+    #[wasm_bindgen(getter)]
+    pub fn symbol(&self) -> String {
+        self.symbol.clone()
+    }
+
+    /// The family's root: `IDX`, `VIX`, `FF`, `TR3` or `OIL`.
+    #[wasm_bindgen(getter)]
+    pub fn root(&self) -> String {
+        self.root.clone()
+    }
+
+    /// The session it expires at, counted from 0.
+    #[wasm_bindgen(getter)]
+    pub fn expiry(&self) -> f64 {
+        self.expiry as f64
+    }
+
+    /// The futures price now.
+    #[wasm_bindgen(getter)]
+    pub fn price(&self) -> f64 {
+        self.price
+    }
+
+    /// The fair value the price is quoted around.
+    #[wasm_bindgen(getter)]
+    pub fn fair(&self) -> f64 {
+        self.fair
+    }
+
+    /// The book's best bid, `undefined` on an empty side.
+    #[wasm_bindgen(getter)]
+    pub fn bid(&self) -> Option<f64> {
+        self.bid
+    }
+
+    /// The book's best ask, `undefined` on an empty side.
+    #[wasm_bindgen(getter)]
+    pub fn ask(&self) -> Option<f64> {
+        self.ask
+    }
+
+    /// The last close's settlement mark, `undefined` before the contract's
+    /// first close.
+    #[wasm_bindgen(getter)]
+    pub fn mark(&self) -> Option<f64> {
+        self.mark
+    }
+
+    /// `price - fair` in basis points.
+    #[wasm_bindgen(getter, js_name = basisBp)]
+    pub fn basis_bp(&self) -> f64 {
+        self.basis_bp
+    }
+
+    /// Sessions from now to the expiry.
+    #[wasm_bindgen(getter, js_name = sessionsToExpiry)]
+    pub fn sessions_to_expiry(&self) -> f64 {
+        self.sessions_to_expiry
+    }
+
+    /// Dollars per point.
+    #[wasm_bindgen(getter)]
+    pub fn multiplier(&self) -> f64 {
+        self.multiplier
+    }
+}
+
+/// The front contract of each listed family, quoted. A family whose
+/// contracts carry no front flag yet has none here.
+fn front_future_quotes(engine: &Engine) -> Vec<FutureQuote> {
+    engine
+        .contracts()
+        .into_iter()
+        .filter(|c| c.front)
+        .filter_map(|c| {
+            let q = engine.quote(&c.symbol)?;
+            Some(FutureQuote {
+                symbol: c.symbol,
+                root: c.root,
+                expiry: q.expiry,
+                price: q.price,
+                fair: q.fair,
+                bid: q.bid,
+                ask: q.ask,
+                mark: q.mark,
+                basis_bp: q.basis_bp,
+                sessions_to_expiry: q.sessions_to_expiry,
+                multiplier: q.multiplier,
+            })
+        })
+        .collect()
 }
 
 /// The cross-binding determinism probe.
@@ -251,7 +384,13 @@ impl Sim {
                 crate::params::ModelParams::preset_names()
             )
         })?;
+        Ok(Sim::with_params(size, universe_seed, seed, params))
+    }
 
+    /// A `Sim` on any coefficient vector. Not exported: a page names a
+    /// shipped preset, and only a native test builds one off a preset, to
+    /// reach the switches no shipped preset sets yet.
+    fn with_params(size: usize, universe_seed: u64, seed: u64, params: crate::params::ModelParams) -> Sim {
         let generated = crate::universe::random_universe(size, universe_seed);
         let tickers: Vec<String> =
             generated.iter().map(|g| g.ticker.clone()).collect();
@@ -261,7 +400,7 @@ impl Sim {
             .map(|(i, g)| g.to_init().to_tick_company(i))
             .collect();
 
-        Ok(Sim {
+        Sim {
             inner: Engine::with_params(
                 seed,
                 companies,
@@ -273,7 +412,7 @@ impl Sim {
             buffer: SessionBuffer::new(),
             tickers,
             day_count: 0,
-        })
+        }
     }
 }
 
@@ -319,6 +458,53 @@ mod tests {
         assert!(ex.iter().any(|&k| k > 0), "{ex:?}");
         assert!(ex.iter().all(|&k| k <= 3), "{ex:?}");
         assert!(ex_days.len() > 5, "{ex_days:?}");
+    }
+
+    /// Every shipped preset lists no futures and keeps no index, so a page
+    /// sees `undefined` and an empty list; the getters change nothing.
+    #[test]
+    fn on_a_shipped_preset_there_is_no_index_and_no_future() {
+        let mut sim = Sim::build(12, 7, 3, "pt-v21").unwrap();
+        sim.run_days(2, 65).unwrap();
+        let before = sim.inner.state_hash(2, false);
+        assert_eq!(sim.index_level(), None);
+        assert!(sim.front_futures().is_empty());
+        assert_eq!(sim.inner.state_hash(2, false), before);
+    }
+
+    /// With the phase 1 switches on, the index and each family's front
+    /// contract read through, as `Engine::index_level` and `Engine::quote`
+    /// give them, and reading them moves nothing.
+    #[test]
+    fn with_the_switches_on_the_index_and_each_front_future_read_through() {
+        let mut p = crate::params::PT_V21;
+        for (name, value) in [
+            ("index_level_listed", 1.0),
+            ("vix_intraday_live", 1.0),
+            ("forecast_horizon_sessions", 252.0),
+            ("futures_index_listed", 1.0),
+            ("futures_vix_listed", 1.0),
+            ("futures_rates_listed", 1.0),
+            ("futures_oil_listed", 1.0),
+        ] {
+            p = p.with_override(name, value).unwrap();
+        }
+        let mut sim = Sim::with_params(12, 7, 3, p);
+        sim.run_days(2, 65).unwrap();
+        let before = sim.inner.state_hash(2, false);
+        let level = sim.index_level().unwrap();
+        assert_eq!(level, sim.inner.index_level().unwrap().level);
+        let fronts = sim.front_futures();
+        let roots: Vec<String> = fronts.iter().map(|q| q.root()).collect();
+        assert_eq!(roots, ["IDX", "VIX", "FF", "TR3", "OIL"]);
+        for q in &fronts {
+            let quoted = sim.inner.quote(&q.symbol()).unwrap();
+            assert_eq!(q.price(), quoted.price);
+            assert_eq!(q.fair(), quoted.fair);
+            assert_eq!(q.mark(), quoted.mark);
+            assert_eq!(q.expiry(), quoted.expiry as f64);
+        }
+        assert_eq!(sim.inner.state_hash(2, false), before);
     }
 
     /// The day the core numbers is the one the digest probe numbers, so the
