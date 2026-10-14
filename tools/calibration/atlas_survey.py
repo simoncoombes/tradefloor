@@ -558,6 +558,11 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "vix_stress_premium_knee": (0.0, 1.5),
     # The largest log premium of the quote over the state; 0.5 is 1.65x.
     "vix_stress_premium_cap": (0.0, 0.5),
+    # The stress memory's own per-session rate: off (the anchor's rate, 0.035 to
+    # 0.056 on the VIX laws) to 0.2, about a three-session half-life.
+    "vix_stress_premium_memory": (0.0, 0.2),
+    # The premium as the anchor's pull undone above the knee: a switch.
+    "vix_stress_premium_undo": (0.0, 1.0),
     # The VIX's fear memory: the uptake up to half the excursion a session,
     # and the half-life from a week to a year of sessions.
     "vix_fear_uptake": (0.0, 0.5),
@@ -1300,6 +1305,14 @@ def vector_to_params(vector: dict[str, float]) -> dict[str, float]:
     return p
 
 
+#: Dials whose 0.0 is a sentinel for a standing value rather than a point on
+#: the axis (`oil_price_floor`: 0.0 is the standing 35; `oil_price_ceiling`:
+#: 0.0 is the standing 150, and (0, 150) is refused). The check that the
+#: preset is on the map reads the sentinel as the value it stands for; the
+#: vector itself keeps 0.0, so the round trip to the preset stays exact.
+STANDING_AT_ZERO = {"oil_price_floor": 35.0, "oil_price_ceiling": 150.0}
+
+
 def params_to_vector(params: dict[str, float]) -> dict[str, float]:
     """The inverse of `vector_to_params`, for placing presets on the map."""
     v = {k: float(v) for k, v in params.items()
@@ -1450,6 +1463,8 @@ def survey_axes() -> list[atlas.Axis]:
     ship_vector = params_to_vector({n: ship[n] for n in settable})
     for a in axes:
         v = ship_vector[a.name]
+        if v == 0.0 and a.name in STANDING_AT_ZERO:
+            v = STANDING_AT_ZERO[a.name]
         if not a.low <= v <= a.high:
             raise RuntimeError(
                 f"{a.name} range ({a.low}, {a.high}) excludes the "
