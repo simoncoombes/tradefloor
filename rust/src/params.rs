@@ -12180,10 +12180,10 @@ impl ModelParams {
                 self.valuation_multiple_half_life));
         }
         if self.valuation_multiple_share != 0.0 && self.valuation_multiple_half_life == 0.0 {
-            return Err(
-                "valuation_multiple_share is set and valuation_multiple_half_life is 0. A multiple with \
-                 no pull wanders without bound; give the half-life in sessions (the tape's is 1779)."
-                    .to_string());
+            return Err(format!(
+                "valuation_multiple_half_life is 0 but valuation_multiple_share is {}. A multiple with \
+                 no pull wanders without bound, so set the half-life (in sessions, above 0).",
+                self.valuation_multiple_share));
         }
         if !(self.market_vol_slow_gamma >= 0.0 && self.market_vol_slow_gamma <= 1.0) {
             return Err(format!(
