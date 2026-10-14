@@ -1399,6 +1399,11 @@ PERTURBATIONS = [
     ("vix_quote_transient_share", 0.81, True),
     # INERT: read only with vix_quote_transient_share non-zero.
     ("vix_quote_transient_persistence", 0.942, False),
+    # INERT on this probe: it pins no VIX, and the dial reads only a close
+    # whose VIX a caller pinned.
+    ("pinned_vix_coupling", 0.75, False),
+    # INERT: read only with pinned_vix_coupling non-zero.
+    ("pinned_vix_exponent", 4.0, False),
     # INERT: read only with vix_stress_premium non-zero.
     ("vix_stress_premium_undo", 1.0, False),
     # INERT on this probe, measured: the put reads the index's fall since

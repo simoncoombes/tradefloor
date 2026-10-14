@@ -694,6 +694,16 @@ OUT_OF_SCOPE = {
         "unread while `vix_quote_transient_share` is 0.0; off zero the tape's "
         "fast pole of log VIX; at 0.0 it is also left out of the model's "
         "digest",
+    "pinned_vix_coupling":
+        "inert at 0.0: a pinned close reads the free law (a branch on the dial "
+        "in `Engine::pinned_vix_law_today`); off zero the old VIX law's "
+        "coupling, kept for pinned closes, its value the law the replays and "
+        "driven paths were graded on, no constant fitted; at 0.0 it is also "
+        "left out of the model's digest",
+    "pinned_vix_exponent":
+        "unread while `pinned_vix_coupling` is 0.0; off zero the old VIX "
+        "law's exponent for pinned closes (0.0 reads the free one); at 0.0 it "
+        "is also left out of the model's digest",
     "forecast_vix_level_path":
         "unread while `forecast_horizon_sessions` is 0.0, as every preset "
         "ships it; off zero a switch whose expectation is the slow level's "

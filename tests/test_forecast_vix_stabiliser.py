@@ -129,3 +129,81 @@ def test_a_restore_reproduces_the_quote():
 def test_the_quote_out_of_range_is_refused(name, bad):
     with pytest.raises(Exception):
         tf.ModelParams.from_preset("pt-v21", **{name: bad})
+
+
+# ---- the old VIX law on a pinned close (`pinned_vix_coupling`, `pinned_vix_exponent`) ----
+
+PINNED = dict(pinned_vix_coupling=0.75, pinned_vix_exponent=4.0)
+#: The stabilised law the dials are for: the excursion on, a weak coupling and a low exponent.
+STAB = dict(LAW, market_vol_vix_coupling=0.25, market_vol_vix_exponent=1.5)
+
+
+@pytest.mark.parametrize("preset", PRESETS)
+@pytest.mark.parametrize("name", sorted(PINNED))
+def test_every_preset_ships_the_pinned_law_off(preset, name):
+    assert tf.ModelParams.from_preset(preset).to_dict()[name] == 0.0
+
+
+@pytest.mark.parametrize("name", sorted(PINNED))
+def test_the_pinned_law_is_silent_in_the_digest_at_zero(name):
+    assert name in set(tf.ModelParams.digest_silent_at_zero())
+    assert tf.ModelParams.from_preset("pt-v21", **{name: 0.0}).fingerprint == \
+        tf.ModelParams.from_preset("pt-v21").fingerprint
+
+
+def _pinned_run(free=20, pinned=10, pin=60.0, forced=False, law=STAB, **dials):
+    e = tf.Engine(seed=17, universe=tf.Universe.random(12, seed=111),
+                  model=tf.ModelParams.from_preset("pt-v21", **law, **dials))
+    out = []
+    for d in range(free + pinned):
+        if d >= free:
+            e.pin_macro(vix=pin, vix_sets_variance=forced)
+        e.run_days(1)
+        out.append((e.macro_fields["vix"], tuple(e.prices()), e.state_snapshot()["market_variance"][0]))
+    return e, out
+
+
+def test_free_closes_are_untouched():
+    e_off, off = _pinned_run(pinned=0)
+    e_on, on = _pinned_run(pinned=0, **PINNED)
+    assert on == off
+    # Every piece of state but the model's own fingerprint is the same (repr: the RNG's words read as floats
+    # include NaN payloads, which compare unequal to themselves).
+    a, b = e_off.state_snapshot(), e_on.state_snapshot()
+    assert set(a) == set(b)
+    assert all(repr(a[k]) == repr(b[k]) for k in a if k != "model_fingerprint")
+
+
+@pytest.mark.parametrize("forced", [False, True])
+def test_a_pinned_vix_reaches_the_variance(forced):
+    _, off = _pinned_run(forced=forced)
+    _, on = _pinned_run(forced=forced, **PINNED)
+    assert on[:20] == off[:20]
+    # The stabilised law barely moves the variance at a pinned 60; the old law's coupling and exponent do.
+    assert on[-1][2] > 2.0 * off[-1][2]
+
+
+def test_a_forced_close_sets_the_old_laws_level():
+    # From the same state, one forced close under the dials sets the variance the excursion-off law at the old
+    # coupling and exponent sets.
+    e, _ = _pinned_run(pinned=0, **PINNED)
+    snap = e.state_snapshot()
+    old_model = tf.ModelParams.from_preset("pt-v21", **dict(STAB, market_vol_vix_excursion=0.0,
+                                                            market_vol_vix_coupling=0.75, market_vol_vix_exponent=4.0))
+    old = tf.Engine(seed=17, universe=tf.Universe.random(12, seed=111), model=old_model)
+    # A restore refuses another model's snapshot; here the point is one close's arithmetic from the same state under
+    # two sets of coefficients, so the snapshot is relabelled.
+    snap["model_fingerprint"] = old_model.fingerprint
+    old.restore_state(snap)
+    for x in (e, old):
+        x.pin_macro(vix=60.0, vix_sets_variance=True)
+        x.run_days(1)
+    assert e.state_snapshot()["market_variance"][0] == pytest.approx(old.state_snapshot()["market_variance"][0],
+                                                                     rel=1e-12)
+
+
+@pytest.mark.parametrize("name,bad", [("pinned_vix_coupling", 1.5), ("pinned_vix_coupling", -0.1),
+                                      ("pinned_vix_exponent", 9.0), ("pinned_vix_exponent", -1.0)])
+def test_the_pinned_law_out_of_range_is_refused(name, bad):
+    with pytest.raises(Exception):
+        tf.ModelParams.from_preset("pt-v21", **{name: bad})
