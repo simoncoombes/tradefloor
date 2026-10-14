@@ -252,6 +252,7 @@ PARAM_SPECS: dict[str, dict] = {
     "surface_skew_physical": {"kind": "abs", "step_unit": 0.05, "hard_range": (-10.0, 10.0), "derived": True},
     "surface_skew_physical_slope": {"kind": "abs", "step_unit": 0.05, "hard_range": (-10.0, 10.0), "derived": True},
     "surface_skew_premium": {"kind": "abs", "step_unit": 0.05, "hard_range": (-10.0, 10.0), "derived": True},
+    "surface_skew_premium_slope": {"kind": "abs", "step_unit": 0.05, "hard_range": (-10.0, 10.0), "derived": True},
     "surface_curvature": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.99), "derived": True},
     "surface_curvature_exponent": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 0.5), "derived": True},
     "surface_term_premium_short": {"kind": "abs", "step_unit": 0.01, "hard_range": (-2.0, 2.0), "derived": True},
