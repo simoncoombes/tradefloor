@@ -1386,6 +1386,14 @@ PERTURBATIONS = [
     # LIVE on the probe: every free close's VIX innovation scales the factor's
     # variance, so the next session's draws move.
     ("market_vol_vix_news", 1.0, True),
+    # INERT: the forecast's model of the stabiliser law, read only with the
+    # horizon set; the forecast feeds nothing back.
+    ("forecast_news_drift", 1.0, False),
+    ("forecast_readback_dispersion", 0.3, False),
+    ("forecast_readback_dispersion_half_life", 36.0, False),
+    ("forecast_readback_dispersion_first", 0.18, False),
+    ("forecast_readback_correlation", 0.8, False),
+    ("forecast_vix_level_path", 1.0, False),
     # INERT: read only with vix_stress_premium non-zero.
     ("vix_stress_premium_undo", 1.0, False),
     # INERT on this probe, measured: the put reads the index's fall since

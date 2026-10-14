@@ -2919,10 +2919,104 @@ pub struct ModelParams {
     /// in the factor's volatility. That is what the tape's HAR-X response says
     /// a VIX move the return does not explain is. Its profile, 0.90 / 0.59 /
     /// 0.46 / 0.27 over weeks 1, 2-4, months 2-3 and 4-6, is the tape's
-    /// variance impulse response (design `ptv22/vix-stabiliser`,
-    /// stabiliser/news/RULE.md). The forecast does not carry the news's
-    /// expectation. In [0, 2].
+    /// variance impulse response. The forecast carries the news's expectation
+    /// only under `forecast_news_drift`. In [0, 2].
     pub market_vol_vix_news: f64,
+    /// The forecast's factor variance carries the news's expected drift
+    /// (`market_vol_vix_news`). 0.0, which every preset carries, is off: the
+    /// forecast iterates the factor's variance with no news in it, and the
+    /// dial is left out of the model's digest. A switch in [0, 1]; any value
+    /// above 0.0 is on. Read only with `forecast_horizon_sessions` and
+    /// `market_vol_vix_news` set.
+    ///
+    /// The close multiplies the factor's variance by `(VIX / VIX_m)^(2 l)`,
+    /// `VIX_m` the close with its draws at their means, `l` the news dial.
+    /// The VIX's own noise is zero-mean but its jumps are not, and the
+    /// multiplier is convex, so its expectation is over one: on the
+    /// stabiliser law over 12 histories of 5,292 sessions the forecast's index
+    /// variance read low by 2, 8 and 11 per cent at 5, 21 and 63 sessions with
+    /// the news on, against 1, 4 and 2 with it off. On, each forecast close
+    /// multiplies both tracks' factor variance, within the clamps, by
+    /// `1 + 2 l E[e] + l (2 l - 1) E[e^2]` averaged over the forecast's eight
+    /// return nodes, `e = (noise + jump) / VIX_m` at the node, from the VIX
+    /// law's own dials: the noise's sd `VIX sqrt(s0^2 + (s_r r)^2)`
+    /// (`vix_innovation_sigma`, `vix_innovation_return_sigma`) and the jump's
+    /// probability and exponential mean (`vix_jump_intensity`,
+    /// `vix_jump_return_intensity`, `vix_jump_level_scale`, `vix_jump_scale`).
+    /// The expansion is exact at `l` 1.0 and 0.5. No constant is fitted.
+    pub forecast_news_drift: f64,
+    /// The forecast's measure of how far the VIX's read-back can be from its
+    /// expectation: the sd of the log read-back (half the log of the index's
+    /// one-session variance) about the forecast's at a long horizon, measured
+    /// on the model's own held-out histories as `forecast_vix_dispersion` is.
+    /// Read only with `forecast_horizon_sessions` set and under
+    /// `market_vol_vix_excursion`. 0.0, on every shipped preset, is a branch:
+    /// the excursion coupling's expectation is taken over the VIX's spread at
+    /// the read-back the forecast expects, and a value of 0.0 is left out of
+    /// the model's digest.
+    ///
+    /// Under the excursion the factor's target reads `R(VIX / I)`, `I` the
+    /// read-back of the session's own index variance, and `R` is convex. The
+    /// VIX and `I` move together, so the ratio's spread is narrower than the
+    /// VIX's, and `I`'s own spread lowers its median below the read-back of
+    /// the expected variance. Off zero the expectation track takes the target
+    /// over `x = ln(VIX / I)` lognormal, of log variance
+    /// `s_v^2 + s_i^2 - 2 rho s_v s_i` and with `VIX D / I` of mean
+    /// `vix exp(1.5 s_i^2 - rho s_v s_i)`, `D` the read-back the forecast
+    /// expects, on the VIX spread's own shape; `s_i^2` is this sd's square at
+    /// the horizon, at `forecast_readback_dispersion_half_life`, and `rho` is
+    /// `forecast_readback_correlation`. In [0, 2].
+    pub forecast_readback_dispersion: f64,
+    /// The half-life, in sessions, of the gap between the log read-back's
+    /// spread about the forecast and its long-horizon level
+    /// (`forecast_readback_dispersion`), as `forecast_vix_dispersion_half_life`
+    /// is the VIX's: its variance after `c` closes is
+    /// `sd^2 * (1 - 0.5^(2c / half-life))`. Read only with that dial set; 0.0,
+    /// on every shipped preset, reaches the long-horizon spread from the
+    /// first close, and a value of 0.0 is left out of the model's digest. In
+    /// [0, 2520].
+    pub forecast_readback_dispersion_half_life: f64,
+    /// The sd of the log read-back about the forecast after one close: the
+    /// spread the session's own shock to the variance processes leaves at
+    /// once, measured on the model's own held-out histories as the
+    /// long-horizon sd is. Read only with `forecast_readback_dispersion` set;
+    /// 0.0, on every shipped preset, grows the spread from zero at the
+    /// half-life alone, and a value of 0.0 is left out of the model's digest.
+    /// Off zero the spread after `c >= 1` closes is
+    /// `s1^2 + (sd^2 - s1^2)(1 - 0.5^(2 (c - 1) / half-life))`.
+    ///
+    /// The VIX's target reads the read-back of the variance its own session
+    /// has just moved, and it is concave in it, so the forecast's VIX step
+    /// at the read-back of the expected variance reads high. On the
+    /// stabiliser law over 12 histories of 5,292 sessions the read-back's
+    /// log spread after one close was 0.034 in variance, its mean -0.035
+    /// (the forecast's variance is the mean), and the forecast's VIX read
+    /// 0.075 points high at one close, which is what that spread predicts
+    /// through `I^0.625` at a reversion of 0.27. The same held on R22O5czNW
+    /// (anchor form): spread 0.029, 0.078 high. In [0, 2].
+    pub forecast_readback_dispersion_first: f64,
+    /// The correlation of the log VIX's and the log read-back's errors about
+    /// the forecast, measured with their spreads on the model's own held-out
+    /// histories. Read only with `forecast_readback_dispersion` set; 0.0, on
+    /// every shipped preset, takes the two as uncorrelated, and a value of
+    /// 0.0 is left out of the model's digest. In [-1, 1].
+    pub forecast_readback_correlation: f64,
+    /// The forecast reads the VIX's slow level (`vix_level_sigma`) as the
+    /// close does. 0.0, which every preset carries, is off: the forecast's
+    /// VIX step reads the read-back and the anchor without the level's
+    /// multiplier, and the dial is left out of the model's digest. A switch
+    /// in [0, 1]; any value above 0.0 is on. Read only with
+    /// `forecast_horizon_sessions` set.
+    ///
+    /// The close multiplies the read-back and the anchor level by
+    /// `exp(l - v / 2)`, `l` an AR(1) at `vix_level_persistence` stepped at
+    /// each close and `v` its stationary variance. Without it the forecast's
+    /// VIX reads high in a calm regime (`l` below zero) and low in a stormy
+    /// one: on the stabiliser law over 12 histories of 5,292 sessions, 0.15
+    /// points high at one close with the VIX under 15 and 0.06 low over 30.
+    /// On, the step reads its expectation `c` closes on,
+    /// `exp(phi^c l - phi^(2c) v / 2)`.
+    pub forecast_vix_level_path: f64,
     /// The stress premium as the anchor's own pull, undone above the knee.
     /// 0.0, which every preset carries, is the shipped form, the capped hinge
     /// `cap * (1 - exp(-g * max(0, m - knee) / cap))`. Off zero (a switch, in
@@ -8361,6 +8455,12 @@ impl ModelParams {
             vix_stress_premium_cap: 0.0,
             vix_stress_premium_memory: 0.0,
             market_vol_vix_news: 0.0,
+            forecast_news_drift: 0.0,
+            forecast_readback_dispersion: 0.0,
+            forecast_readback_dispersion_half_life: 0.0,
+            forecast_readback_dispersion_first: 0.0,
+            forecast_readback_correlation: 0.0,
+            forecast_vix_level_path: 0.0,
             vix_stress_premium_undo: 0.0,
             vix_fear_uptake: 0.0,
             vix_fear_half_life: 0.0,
@@ -11007,6 +11107,12 @@ impl ModelParams {
             "vix_stress_premium_cap" => self.vix_stress_premium_cap,
             "vix_stress_premium_memory" => self.vix_stress_premium_memory,
             "market_vol_vix_news" => self.market_vol_vix_news,
+            "forecast_news_drift" => self.forecast_news_drift,
+            "forecast_readback_dispersion" => self.forecast_readback_dispersion,
+            "forecast_readback_dispersion_half_life" => self.forecast_readback_dispersion_half_life,
+            "forecast_readback_dispersion_first" => self.forecast_readback_dispersion_first,
+            "forecast_vix_level_path" => self.forecast_vix_level_path,
+            "forecast_readback_correlation" => self.forecast_readback_correlation,
             "vix_stress_premium_undo" => self.vix_stress_premium_undo,
             "vix_fear_uptake" => self.vix_fear_uptake,
             "vix_fear_half_life" => self.vix_fear_half_life,
@@ -11418,6 +11524,12 @@ impl ModelParams {
             "vix_stress_premium_cap" => out.vix_stress_premium_cap = value,
             "vix_stress_premium_memory" => out.vix_stress_premium_memory = value,
             "market_vol_vix_news" => out.market_vol_vix_news = value,
+            "forecast_news_drift" => out.forecast_news_drift = value,
+            "forecast_readback_dispersion" => out.forecast_readback_dispersion = value,
+            "forecast_readback_dispersion_half_life" => out.forecast_readback_dispersion_half_life = value,
+            "forecast_readback_dispersion_first" => out.forecast_readback_dispersion_first = value,
+            "forecast_vix_level_path" => out.forecast_vix_level_path = value,
+            "forecast_readback_correlation" => out.forecast_readback_correlation = value,
             "vix_stress_premium_undo" => out.vix_stress_premium_undo = value,
             "vix_fear_uptake" => out.vix_fear_uptake = value,
             "vix_fear_half_life" => out.vix_fear_half_life = value,
@@ -12305,6 +12417,25 @@ impl ModelParams {
                 "market_vol_vix_news is {}. It is the loading of the VIX's own \
                  innovation on the factor's volatility, in [0, 2]; 1 is the identity, 0 is off.",
                 self.market_vol_vix_news));
+        }
+        for (name, value, lo, hi, unit) in [
+            ("forecast_news_drift", self.forecast_news_drift, 0.0, 1.0,
+             "a switch for the news's drift in the forecast's factor variance"),
+            ("forecast_readback_dispersion", self.forecast_readback_dispersion, 0.0, 2.0,
+             "the sd of the log read-back about the forecast at a long horizon"),
+            ("forecast_readback_dispersion_half_life", self.forecast_readback_dispersion_half_life, 0.0, 2520.0,
+             "a half-life in sessions"),
+            ("forecast_readback_correlation", self.forecast_readback_correlation, -1.0, 1.0,
+             "the correlation of the log VIX's and the log read-back's errors about the forecast"),
+            ("forecast_readback_dispersion_first", self.forecast_readback_dispersion_first, 0.0, 2.0,
+             "the sd of the log read-back about the forecast after one close"),
+            ("forecast_vix_level_path", self.forecast_vix_level_path, 0.0, 1.0,
+             "a switch for the VIX's slow level in the forecast's VIX step"),
+        ] {
+            if !(value >= lo && value <= hi) {
+                return Err(format!(
+                    "{name} is {value}. It is {unit}, in [{lo}, {hi}]; 0 is off."));
+            }
         }
         if !(self.vix_stress_premium_memory >= 0.0 && self.vix_stress_premium_memory <= 1.0) {
             return Err(format!(
@@ -13541,6 +13672,12 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "vix_stress_premium_undo",
     "vix_stress_premium_knee",
     "market_vol_vix_news",
+    "forecast_news_drift",
+    "forecast_readback_dispersion",
+    "forecast_readback_dispersion_half_life",
+    "forecast_readback_correlation",
+    "forecast_readback_dispersion_first",
+    "forecast_vix_level_path",
     "vix_fear_uptake",
     "vix_fear_half_life",
     "unemployment_natural_pull",
@@ -13901,6 +14038,12 @@ pub fn settable_names() -> Vec<&'static str> {
         "vix_stress_premium_memory",
         "vix_stress_premium_undo",
         "market_vol_vix_news",
+        "forecast_news_drift",
+        "forecast_readback_dispersion",
+        "forecast_readback_dispersion_half_life",
+        "forecast_readback_correlation",
+        "forecast_readback_dispersion_first",
+        "forecast_vix_level_path",
         "vix_fear_uptake",
         "vix_fear_half_life",
         "fed_put_gain",

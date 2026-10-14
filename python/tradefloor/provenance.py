@@ -662,6 +662,33 @@ OUT_OF_SCOPE = {
         "(a branch on the dial in `Engine::advance_day`), nothing is "
         "snapshotted or hashed; at 0.0 it is also left out of the model's "
         "digest",
+    # The forecast's model of the stabiliser law, read only by
+    # `Engine::compute_forecast`, which runs only with
+    # `forecast_horizon_sessions` set; the forecast feeds nothing back.
+    "forecast_news_drift":
+        "unread while `forecast_horizon_sessions` or `market_vol_vix_news` "
+        "is 0.0, as every preset ships them; off zero a switch whose "
+        "multiplier is a closed form in the VIX law's own dials, no constant "
+        "fitted; at 0.0 it is also left out of the model's digest",
+    "forecast_readback_dispersion":
+        "unread while `forecast_horizon_sessions` is 0.0, as every preset "
+        "ships it. Off zero it is the log read-back's sd about the forecast, "
+        "measured on held-out histories as `forecast_vix_dispersion` is; at "
+        "0.0 it is also left out of the model's digest",
+    "forecast_readback_dispersion_half_life":
+        "unread while `forecast_readback_dispersion` is 0.0; measured with "
+        "it; at 0.0 it is also left out of the model's digest",
+    "forecast_readback_dispersion_first":
+        "unread while `forecast_readback_dispersion` is 0.0; the measured sd "
+        "after one close; at 0.0 it is also left out of the model's digest",
+    "forecast_readback_correlation":
+        "unread while `forecast_readback_dispersion` is 0.0; measured with "
+        "it; at 0.0 it is also left out of the model's digest",
+    "forecast_vix_level_path":
+        "unread while `forecast_horizon_sessions` is 0.0, as every preset "
+        "ships it; off zero a switch whose expectation is the slow level's "
+        "own AR(1), no constant fitted; at 0.0 it is also left out of the "
+        "model's digest",
     "vix_stress_premium_memory":
         "unread while `vix_stress_premium` is 0.0; at 0.0 the stress memory "
         "steps at `vix_anchor_memory`'s rate exactly (`vix_stress_memory_rate`), "

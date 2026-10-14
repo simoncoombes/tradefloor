@@ -279,6 +279,22 @@ same with them on as off.
   switch, and the state hash and `manifest.state_hash` cover them behind tags
   48 and 49 only then. Every known-answer digest is where it was.
 
+### The forecast's model of the stabilised VIX law
+
+- `forecast_news_drift`, `forecast_readback_dispersion`, `forecast_readback_dispersion_half_life`,
+  `forecast_readback_dispersion_first`, `forecast_readback_correlation` and `forecast_vix_level_path` are new dials,
+  0.0 on every preset and left out of the digest there. Each is read only by the forecast, which feeds nothing back,
+  so no price moves with any of them.
+- `forecast_news_drift` makes the forecast's factor variance carry the expected drift of the VIX's news
+  (`market_vol_vix_news`). The multiplier is a closed form in the VIX law's own noise and jump dials.
+- The read-back dials are the log read-back's spread about the forecast, measured as `forecast_vix_dispersion` is. The
+  forecast takes the excursion coupling over the joint spread of the VIX and its read-back. Its VIX step reads the
+  target's log mean and log variance through the anchor and fear memories, so the target's concavity in the read-back
+  no longer leaves the forecast's VIX high.
+- `forecast_vix_level_path` makes the forecast's VIX step read the VIX's slow level (`vix_level_sigma`) at its expected
+  path, as the close does.
+- Every known-answer digest is where it was.
+
 ### The VIX's own innovation as variance news
 
 - `market_vol_vix_news` is a new dial. It is 0.0 on every preset and left out of the digest there. Off zero, each
