@@ -493,6 +493,7 @@ def name_sessions(monkeypatch):
     """MCP sessions opened from here on run pt-v21 with the phase 3 switch
     on: what a library caller gets from `tf.Engine(model=...)`, which the
     server's preset argument cannot name."""
+    pytest.importorskip("mcp", reason="the MCP server is an opt-in extra")
     mcp = pytest.importorskip("tradefloor.mcp")
     params = model(**ON)
 
@@ -540,6 +541,7 @@ def test_mcp_reads_a_names_chain_trades_it_and_exercises_it(name_sessions):
 
 
 def test_describe_simulator_names_the_single_name_options():
+    pytest.importorskip("mcp", reason="the MCP server is an opt-in extra")
     mcp = pytest.importorskip("tradefloor.mcp")
     names_family = mcp.describe_simulator()["instruments"]["name_options"]
     assert names_family["listed_by"] == "options_names_listed"
