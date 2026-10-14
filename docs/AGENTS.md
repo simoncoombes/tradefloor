@@ -58,12 +58,35 @@ expiry's chain, `quote_contracts` quotes an option, and `session_step`
 trades one by its symbol. `Engine.chain_table()` gives the chains now as an
 Arrow table.
 
+On a model that lists single-name options (`options_names_listed`, off on
+every shipped preset), every name lists American calls and puts from the
+first close, 100 shares a contract, each settling at its expiry session's
+close: `obs.engine.name_option_roots()` names them, and
+`obs.engine.option_expiries("ACME")`, `obs.engine.chain("ACME", expiry)` and
+`obs.engine.surface("ACME")` read one name's, the dealer's quote being a
+tree's value with the dividends to expiry. `act` trades one by its symbol,
+`ACME.O0035.C42.50` being the 42.50 call, and returning
+`{"ACME.O0035.C42.50": tf.Exercise(5)}` exercises 5 contracts held at the
+close: a call's holder pays the strike for the shares, a put's delivers
+them for it. The dealer exercises the longs agents' writing leaves it
+(calls on the eve of an ex-date whose dividend beats the time value, deep
+puts), and at expiry everything a cent in the money is exercised; both are
+assigned to short positions pro rata. So an account can be handed stock,
+or go short, without an order. That stock is a holding like any other,
+valued at the price and traded by the next order; it is not a trade, and
+`obs.portfolio.deliveries` lists what moved. The payload's `options` adds
+`names` (each name's 30-day at-the-money volatility) and an action may name
+a name's option, with the side `EXERCISE` to exercise. The MCP server's
+`option_chain` reads a name's chain with `root` set to its ticker, and
+`session_step` takes `{"exercise": q}`.
+
 In the mapping `act` returns, a plain number is a market order for that many
 shares, negative to sell. A native Python agent can also return
 `tf.Limit(quantity, price)`, which waits in the book for what does not fill,
-and `tf.Cancel()`. The framework adapters can send all three: an LLM's action
-with a `limit_price` becomes a `tf.Limit`, and `side: "CANCEL"` becomes a
-`tf.Cancel()`. There are no stop, stop-limit or bracket orders, so a stop has
+`tf.Cancel()`, and on a single-name option held `tf.Exercise(contracts)`.
+The framework adapters can send all four: an LLM's action with a
+`limit_price` becomes a `tf.Limit`, `side: "CANCEL"` becomes a
+`tf.Cancel()` and `side: "EXERCISE"` a `tf.Exercise`. There are no stop, stop-limit or bracket orders, so a stop has
 to be checked at each step: at six steps a day an emulated stop filled a
 median 26.5 bp past its level, 9 bp at 5-minute steps, and 540 bp at the 90th
 percentile in the packaged recession. A trade costs the spread and its impact

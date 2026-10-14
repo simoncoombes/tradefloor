@@ -137,8 +137,11 @@ OBSERVABLE_MACRO = MACRO_FIELDS
 #: The sides a decision may name. HOLD carries no quantity and produces no
 #: order, so the agent can decline a decision period. CANCEL carries no
 #: quantity either: it withdraws every limit order still waiting on the
-#: symbol, the :class:`tradefloor.Cancel` a Python agent returns.
-SIDES = ("BUY", "SELL", "HOLD", "CANCEL")
+#: symbol, the :class:`tradefloor.Cancel` a Python agent returns. EXERCISE
+#: (decision schema 3, pt-v22 phase 3) exercises ``quantity`` contracts of a
+#: single-name option held, at the session's close, the
+#: :class:`tradefloor.Exercise` a Python agent returns.
+SIDES = ("BUY", "SELL", "HOLD", "CANCEL", "EXERCISE")
 
 #: The order types an action may name. ``"market"`` sweeps the book now;
 #: ``"limit"`` is a :class:`tradefloor.Limit` and needs a ``limit_price``.
@@ -180,7 +183,10 @@ MAX_PARTICIPATION = 0.02
 #: From pt-v22 phase 2 a symbol may also name a listed index option
 #: (``IDX.O0035.C1050.00``), counted in contracts. An option has no daily
 #: volume to cap it at: its dealer fills at most the ladder it shows, ten
-#: levels of 50 contracts a side, and the leverage limit applies.
+#: levels of 50 contracts a side, and the leverage limit applies. From
+#: phase 3 it may name a listed single-name option (``ACME.O0035.C42.50``),
+#: and the side ``EXERCISE`` exercises ``quantity`` contracts of one held at
+#: the close. A decision valid under version 2 is valid and means the same.
 DECISION_SCHEMA_VERSION = "3"
 
 #: Version of the observation payload :func:`serialize_observation` builds
@@ -549,7 +555,8 @@ class Action:
         return out
 
     def signed(self) -> float:
-        """The share delta this action asks for. HOLD and CANCEL are zero."""
+        """The share delta this action asks for. HOLD, CANCEL and EXERCISE
+        are zero: an exercise trades nothing now."""
         if self.side == "BUY":
             return self.quantity
         if self.side == "SELL":
@@ -562,6 +569,8 @@ class Action:
     def __repr__(self) -> str:
         if self.side in ("HOLD", "CANCEL"):
             return f"{self.side} {self.symbol}"
+        if self.side == "EXERCISE":
+            return f"EXERCISE {self.quantity:,.0f} {self.symbol}"
         if self.limit_price is not None:
             return (f"{self.side} {self.quantity:,.0f} {self.symbol} "
                     f"limit {self.limit_price:g}")
@@ -669,7 +678,8 @@ def decision_schema() -> dict[str, Any]:
                                            "symbol, ROOT.Onnnn.Rk.cc, such "
                                            "as IDX.O0035.C1050.00 (the "
                                            "1050 call settling at session "
-                                           "35).",
+                                           "35) or ACME.O0035.C42.50 (an "
+                                           "option on the name ACME).",
                         },
                         "side": {"enum": list(SIDES)},
                         "quantity": {
@@ -679,7 +689,10 @@ def decision_schema() -> dict[str, Any]:
                                            "future or an option; "
                                            "non-negative. The side "
                                            "carries the direction. Omit or "
-                                           "zero for HOLD and CANCEL.",
+                                           "zero for HOLD and CANCEL. For "
+                                           "EXERCISE, the contracts of a "
+                                           "single-name option held to "
+                                           "exercise at the close.",
                         },
                         "order_type": {
                             "enum": list(ORDER_TYPES),
@@ -1040,10 +1053,11 @@ def _action_from_item(i: int, item: Any, action_type: type) -> Action:
         raise DecisionError(
             f"action {i} has no usable 'symbol': {item.get('symbol')!r}")
     side = item.get("side")
-    if not isinstance(side, str) or side.upper() not in SIDES:
+    sides = getattr(action_type, "_sides", SIDES)
+    if not isinstance(side, str) or side.upper() not in sides:
         raise DecisionError(
             f"action {i} names side {side!r}, which is not one of "
-            f"{', '.join(SIDES)}")
+            f"{', '.join(sides)}")
     side = side.upper()
 
     # Refused, never dropped. A stop loss, a take profit or a time in force
@@ -1076,6 +1090,11 @@ def _action_from_item(i: int, item: Any, action_type: type) -> Action:
             "side carries the direction, so a sell is SELL with a positive "
             "quantity. A negative one is ambiguous about which of the two "
             "the model meant.")
+    if side == "EXERCISE" and not quantity:
+        raise DecisionError(
+            f"action {i} is an EXERCISE with no quantity. EXERCISE names the "
+            "contracts of a single-name option held to exercise at the close, "
+            "a positive number.")
     if side in ("HOLD", "CANCEL") and quantity:
         what = ("means no trade" if side == "HOLD"
                 else "withdraws the limit orders waiting on the symbol")
@@ -1110,6 +1129,10 @@ def _action_from_item(i: int, item: Any, action_type: type) -> Action:
                 f"action {i} has order_type 'market' and a limit_price. The "
                 "two fields ask for different orders, and executing either "
                 "would ignore the other.")
+    elif side == "EXERCISE" and order_type is not None:
+        raise DecisionError(
+            f"action {i} is an EXERCISE with order_type {order_type!r}. An "
+            "exercise is not an order: it takes no order type.")
     elif order_type == "limit":
         raise DecisionError(
             f"action {i} has order_type 'limit' and no limit_price. A limit "
@@ -1152,16 +1175,17 @@ def _orders_from(decision: Decision, obs: Any, *, max_participation: float,
                  ) -> tuple[dict[str, Any], list[str]]:
     """:func:`orders_from`, with the class an unlisted symbol raises as a
     parameter, so the FinRobot adapter raises its own."""
-    from ..portfolio import Cancel, Limit
+    from ..portfolio import Cancel, Exercise, Limit, is_name_option
 
     listed = list(obs.tickers)
     # The futures listed now, by symbol, with the daily volume each one's
     # book is sized to (decision schema 3); empty, asking the engine
     # nothing, on a model that lists none.
     contracts = _listed_contracts(obs.engine)
-    # Whether index options are listed (pt-v22 phase 2): a symbol then may
-    # name one, which the engine is asked about only when one is named.
-    options = _lists_options(obs.engine)
+    # Whether index or single-name options are listed (pt-v22 phases 2 and
+    # 3): a symbol then may name one, which the engine is asked about only
+    # when one is named.
+    options = _lists_options(obs.engine) or _lists_name_options(obs.engine)
     orders: dict[str, Any] = {}
     notes: list[str] = []
 
@@ -1174,9 +1198,9 @@ def _orders_from(decision: Decision, obs: Any, *, max_participation: float,
                        f"universe is {', '.join(listed)}."
                        + (f" The futures listed are {', '.join(contracts)}."
                           if contracts else "")
-                       + (" The index options listed are each expiry's "
-                          "strikes in the payload's options, named "
-                          "ROOT.Onnnn.Rk.cc (IDX.O0035.C1050.00)."
+                       + (" The options listed are each expiry's strikes in "
+                          "the payload's options, named ROOT.Onnnn.Rk.cc "
+                          "(IDX.O0035.C1050.00)."
                           if options else ""))
             if refused is None:
                 raise unlisted(message)
@@ -1184,6 +1208,18 @@ def _orders_from(decision: Decision, obs: Any, *, max_participation: float,
             continue
         if action.side == "CANCEL":
             orders[action.symbol] = Cancel()
+            continue
+        if action.side == "EXERCISE":
+            if not (option and is_name_option(action.symbol)):
+                message = (f"{action.symbol!r} cannot be exercised: EXERCISE "
+                           "names a listed single-name option held, such as "
+                           "ACME.O0035.C42.50. An index option is European "
+                           "and settles in cash at expiry.")
+                if refused is None:
+                    raise unlisted(message)
+                refused.append({"action": action.as_dict(), "reason": message})
+                continue
+            orders[action.symbol] = Exercise(action.quantity)
             continue
         delta = action.signed()
         if not delta:
@@ -1224,10 +1260,11 @@ def recorded_orders(orders: dict[str, Any]) -> dict[str, Any]:
 
     A market order stays a signed share count, as every record before
     decision schema 2 holds it. A limit order becomes
-    ``{"quantity": <signed shares>, "limit_price": <price>}`` and a cancel
-    becomes ``{"cancel": True}``.
+    ``{"quantity": <signed shares>, "limit_price": <price>}``, a cancel
+    becomes ``{"cancel": True}`` and an exercise ``{"exercise":
+    <contracts>}``.
     """
-    from ..portfolio import Cancel, Limit
+    from ..portfolio import Cancel, Exercise, Limit
 
     out: dict[str, Any] = {}
     for symbol, order in orders.items():
@@ -1236,6 +1273,8 @@ def recorded_orders(orders: dict[str, Any]) -> dict[str, Any]:
                            "limit_price": order.price}
         elif isinstance(order, Cancel):
             out[symbol] = {"cancel": True}
+        elif isinstance(order, Exercise):
+            out[symbol] = {"exercise": order.quantity}
         else:
             out[symbol] = order
     return out
@@ -1283,8 +1322,20 @@ def _lists_options(engine: Any) -> bool:
         return False
 
 
+def _lists_name_options(engine: Any) -> bool:
+    """Whether the model lists single-name options
+    (``Engine.lists_name_options``), from a
+    :class:`~tradefloor.sandbox.MarketView` or a live engine; False on an
+    engine without the property."""
+    try:
+        return bool(engine.lists_name_options)
+    except AttributeError:
+        return False
+
+
 def _listed_option(engine: Any, symbol: str) -> bool:
-    """Whether ``symbol`` names an index option the engine lists now."""
+    """Whether ``symbol`` names an index or single-name option the engine
+    lists now."""
     from ..contracts import is_contract, parse
 
     if not is_contract(symbol) or parse(symbol)["kind"] != "option":
@@ -1355,12 +1406,22 @@ def derivatives_payload(obs: Any, *,
     quote. An option is named ``ROOT.Onnnn.Rk.cc``: ``IDX.O0035.C1050.00``
     is the 1050 call settling at session 35 (``tf.contracts.format``).
 
+    On a model that lists single-name options (pt-v22 phase 3) ``options``
+    is there whether or not the index's are (``expiries`` then empty), its
+    ``positions`` hold the name options too, and ``names`` says what the
+    names list: ``expiries``, the sessions their options settle at the
+    close of, and ``iv_30d``, each listed name's at-the-money implied
+    volatility 21 sessions out on its surface, a fraction a year, by
+    ticker. ``ACME.O0035.C42.50`` is the 42.50 call on ACME, American, 100
+    shares a contract, exercised with the side ``EXERCISE``.
+
     Shared by :func:`serialize_observation` and the FinRobot adapter's own
     serializer, so both payloads carry the same keys on every model.
     """
     engine = obs.engine
     lists_futures, lists_options = _lists_futures(engine), _lists_options(engine)
-    if not lists_futures and not lists_options:
+    lists_names = _lists_name_options(engine)
+    if not lists_futures and not lists_options and not lists_names:
         return {}
     level = engine.index_level
     futures = []
@@ -1410,12 +1471,19 @@ def derivatives_payload(obs: Any, *,
     if lists_futures:
         out["futures"] = futures
     out["margin"] = margin
-    if lists_options:
-        out["options"] = _options_payload(obs)
+    if lists_options or lists_names:
+        out["options"] = _options_payload(obs, index=lists_options,
+                                          names=lists_names)
     return out
 
 
-def _options_payload(obs: Any) -> dict[str, Any]:
+#: The tenor, in sessions, of the at-the-money volatility the payload shows
+#: for each name: the 30 days of Cboe's single-stock volatility indices.
+NAME_IV_SESSIONS = 21.0
+
+
+def _options_payload(obs: Any, *, index: bool = True,
+                     names: bool = False) -> dict[str, Any]:
     """The payload's ``options`` key (:func:`derivatives_payload`)."""
     engine = obs.engine
     positions = []
@@ -1441,7 +1509,16 @@ def _options_payload(obs: Any) -> dict[str, Any]:
             "delta": q["delta"],
             "sessions_to_expiry": q["sessions_to_expiry"],
         })
-    return {"expiries": engine.option_expiries(), "positions": positions}
+    out: dict[str, Any] = {"expiries": engine.option_expiries() if index else [],
+                           "positions": positions}
+    if names:
+        roots = list(engine.name_option_roots())
+        out["names"] = {
+            "expiries": ([e["expiry"] for e in engine.option_expiries(roots[0])]
+                         if roots else []),
+            "iv_30d": {t: engine.surface(t).iv(0.0, NAME_IV_SESSIONS) for t in roots},
+        }
+    return out
 
 
 def serialize_observation(obs: Any, *,

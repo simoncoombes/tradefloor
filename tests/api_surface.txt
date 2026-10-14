@@ -18,6 +18,7 @@ Divergence advanced
 Engine stable
 EngineBatch advanced
 Execution advanced
+Exercise advanced
 Explanation advanced
 Externality advanced
 FairValue advanced

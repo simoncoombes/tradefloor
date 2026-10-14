@@ -15,6 +15,7 @@ fork and a replay.
 from __future__ import annotations
 
 import math
+import pathlib
 import struct
 
 import pytest
@@ -22,6 +23,7 @@ import pytest
 import tradefloor as tf
 from tradefloor.manifest import state_hash
 from tradefloor.portfolio import Portfolio, is_name_option
+from tradefloor.render import TextRenderer
 from tradefloor.replay import replay
 
 SMALL = tf.Universe.random(10, seed=5)
@@ -461,3 +463,141 @@ def test_a_delisted_names_options_are_paid_in_cash():
     assert names(engine, ticker) == []
     day(engine)
     assert engine.exercise_violations() == []
+
+
+# -- the MCP server -----------------------------------------------------------
+
+
+@pytest.fixture
+def name_sessions(monkeypatch):
+    """MCP sessions opened from here on run pt-v21 with the phase 3 switch
+    on: what a library caller gets from `tf.Engine(model=...)`, which the
+    server's preset argument cannot name."""
+    mcp = pytest.importorskip("tradefloor.mcp")
+    params = model(**ON)
+
+    def fresh(self, *, to_restore=False):
+        opening = {"macro_state": tf.Macro()} if to_restore else {}
+        return tf.Engine(seed=self.seed, universe=self.roster, model=params, **opening)
+
+    monkeypatch.setattr(mcp._Session, "_fresh_engine", fresh)
+    yield mcp
+    for sid in list(mcp._sessions):
+        mcp.close_session(sid)
+
+
+def test_mcp_reads_a_names_chain_trades_it_and_exercises_it(name_sessions):
+    mcp = name_sessions
+    r = mcp.open_session(universe_size=8)
+    assert r["ok"], r.get("error")
+    sid = r["session_id"]
+    mcp.session_step(sid, days=1)
+    engine = mcp._sessions[sid].engine
+    ticker = engine.tickers[2]
+    chain = mcp.option_chain(sid, root=ticker, strikes=3)
+    assert chain["ok"] and chain["root"] == ticker
+    assert chain["name_options"] == engine.name_option_roots()
+    assert [e["expiry"] for e in chain["expiries"]] == [e["expiry"] for e in engine.option_expiries(ticker)]
+    assert chain["multiplier"] == 100.0 and len(chain["chain"]) == 12
+    refused = mcp.option_chain(sid, root="NOPE")
+    assert refused["ok"] is False and ticker in refused["error"]
+    call = min((row for row in chain["chain"] if row["right"] == "C"), key=lambda row: row["strike"])["symbol"]
+    bought = mcp.session_step(sid, orders={call: 2})
+    assert bought["ok"], bought.get("error")
+    me = bought["agents"]["me"]
+    assert me["options"][call]["quantity"] == 2.0
+    assert bought["market"]["name_options_listed"] == len(engine.name_option_roots())
+    asked = mcp.session_step(sid, orders={call: {"exercise": 2}})
+    assert asked["ok"], asked.get("error")
+    assert asked["agents"]["me"]["orders_sent"] == {call: {"exercise": 2.0}}
+    done = mcp.session_step(sid, days=1)
+    me = done["agents"]["me"]
+    assert call not in me["options"]
+    assert me["positions"][ticker]["quantity"] == 200.0
+    assert me["deliveries"][0]["event"] == "exercise"
+    bad = mcp.session_step(sid, orders={call: {"exercise": 0}})
+    assert bad["ok"] is False
+
+
+def test_describe_simulator_names_the_single_name_options():
+    mcp = pytest.importorskip("tradefloor.mcp")
+    names_family = mcp.describe_simulator()["instruments"]["name_options"]
+    assert names_family["listed_by"] == "options_names_listed"
+    assert "exercise" in names_family["how"]
+
+
+# -- the framework payload and decision ---------------------------------------
+
+
+class _Capture:
+    """Records the payloads it is shown; trades what `decide` says."""
+
+    def __init__(self, decide=None):
+        self.payloads = []
+        self.decide = decide
+
+    def __call__(self, payload):
+        self.payloads.append(payload)
+        return self.decide(payload) if self.decide else {"actions": []}
+
+
+def _buy_then_exercise(payload):
+    """Day 1: buy two of the first name's second-expiry call two strikes
+    below the money. Day 2: exercise them, and try to exercise an index
+    symbol that is no name's."""
+    if payload["step"] % payload["steps_per_day"]:
+        return {"actions": []}
+    names = payload["options"]["names"]
+    if not names["expiries"]:
+        return {"actions": []}  # nothing lists before the first close
+    ticker = sorted(names["iv_30d"])[0]
+    price = next(a["price"] for a in payload["assets"] if a["symbol"] == ticker)
+    step = 1.0 if price < 50 else 2.5
+    strike = max(step, (round(price / step) - 2) * step)
+    symbol = tf.contracts.format(ticker, names["expiries"][1], "C", strike)
+    if payload["day"] == 1:
+        return {"actions": [{"symbol": symbol, "side": "BUY", "quantity": 2}]}
+    if payload["day"] == 2:
+        return {"actions": [{"symbol": symbol, "side": "EXERCISE", "quantity": 2},
+                            {"symbol": "IDX.O0035.C1000.00", "side": "EXERCISE", "quantity": 1}]}
+    return {"actions": []}
+
+
+def test_a_framework_sees_the_names_and_exercises_through_a_decision():
+    from tradefloor.integrations.callable import CallableAgentAdapter
+
+    seen = _Capture(_buy_then_exercise)
+    cards = tf.evaluate({"a": CallableAgentAdapter(seen, every=6)}, seed=3, universe=SMALL,
+                        model=model(**ON), days=4)
+    card = cards["a"]
+    assert card.trades == 1, card.errors
+    refused, = card.errors
+    assert "IDX.O0035.C1000.00" in refused and "not listed" in refused
+    later = seen.payloads[-1]
+    options = later["options"]
+    assert options["expiries"] == []
+    assert set(options["names"]) == {"expiries", "iv_30d"}
+    assert sorted(options["names"]["iv_30d"]) == sorted(a["symbol"] for a in later["assets"])
+    assert all(0.0 < v < 3.0 for v in options["names"]["iv_30d"].values())
+    assert options["positions"] == [], "exercised: the call is gone"
+    support = (pathlib.Path(__file__).resolve().parent.parent / "docs" / "SUPPORT.md").read_text(encoding="utf-8")
+    for key in ("names", "iv_30d", "EXERCISE"):
+        assert f"`{key}`" in support, key
+    text = TextRenderer().render(later)
+    assert "Single-name options" in text and "EXERCISE" in text
+
+
+def test_the_decision_contract_takes_exercise():
+    from tradefloor.integrations import common as ci
+
+    assert "EXERCISE" in ci.SIDES
+    assert ci.decision_schema()["properties"]["actions"]["items"]["properties"]["side"]["enum"] == list(ci.SIDES)
+    ok = ci.parse_decision({"actions": [{"symbol": "AAA.O0035.C5.00", "side": "exercise", "quantity": 3}]})
+    action, = ok.actions
+    assert (action.side, action.quantity, action.signed()) == ("EXERCISE", 3.0, 0.0)
+    assert repr(action) == "EXERCISE 3 AAA.O0035.C5.00"
+    for bad in ({"symbol": "AAA.O0035.C5.00", "side": "EXERCISE"},
+                {"symbol": "AAA.O0035.C5.00", "side": "EXERCISE", "quantity": 1, "order_type": "market"},
+                {"symbol": "AAA.O0035.C5.00", "side": "EXERCISE", "quantity": 1, "limit_price": 2.0}):
+        assert ci.parse_decision({"actions": [bad]}).refused, bad
+    assert ci.recorded_orders({"X": tf.Exercise(2)}) == {"X": {"exercise": 2.0}}

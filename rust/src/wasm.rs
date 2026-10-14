@@ -213,6 +213,26 @@ impl Sim {
         self.inner.option_expiries("IDX").into_iter().map(OptionExpiry::from).collect()
     }
 
+    /// The tickers whose American options are listed now
+    /// (`options_names_listed`), in roster order. Empty on a model that lists
+    /// none, which is every shipped preset, and before the first close.
+    #[wasm_bindgen(getter, js_name = nameOptionRoots)]
+    pub fn name_option_roots(&self) -> Vec<String> {
+        self.inner.name_option_roots()
+    }
+
+    /// Every listed expiry of `ticker`'s options, in expiry order, as
+    /// `Engine::option_expiries` reads them for a name: the strike grid, the
+    /// escrowed price's forward, the at-the-money volatility and the
+    /// 25-delta skew. Empty for a name without listed options.
+    #[wasm_bindgen(js_name = nameOptionExpiries)]
+    pub fn name_option_expiries(&self, ticker: &str) -> Vec<OptionExpiry> {
+        if ticker == "IDX" {
+            return Vec::new();
+        }
+        self.inner.option_expiries(ticker).into_iter().map(OptionExpiry::from).collect()
+    }
+
     /// Advance one trading day: number it, open, trade, close, step the
     /// macro chain.
     ///
@@ -334,7 +354,8 @@ impl FutureQuote {
 }
 
 /// One listed expiry of the index options, as `Sim.optionExpiries` lists
-/// it: a read of [`Engine::option_expiries`] and nothing decided here.
+/// it, or of a name's, as `Sim.nameOptionExpiries` does: a read of
+/// [`Engine::option_expiries`] and nothing decided here.
 /// Volatilities are fractions a year, `undefined` where the strike grid does
 /// not reach the point or the expiry has no time left.
 #[wasm_bindgen]
@@ -658,6 +679,43 @@ mod tests {
             assert!(w.skew_25d().unwrap() > 0.0, "the put side is dearer");
             assert!(w.strike_low() < w.forward() && w.forward() < w.strike_high());
         }
+        assert_eq!(sim.inner.state_hash(2, false), before);
+    }
+
+    /// With the phase 3 switch on, every name lists its options from the
+    /// first close, each name's expiries read through, and reading moves
+    /// nothing; on a shipped preset there are none.
+    #[test]
+    fn with_the_name_options_on_each_names_expiries_read_through() {
+        let mut shipped = Sim::build(12, 7, 3, "pt-v21").unwrap();
+        shipped.run_days(1, 65).unwrap();
+        assert!(shipped.name_option_roots().is_empty());
+        let mut p = crate::params::PT_V21;
+        for (name, value) in [
+            ("index_level_listed", 1.0),
+            ("vix_intraday_live", 1.0),
+            ("forecast_horizon_sessions", 252.0),
+            ("surface_ssvi", 1.0),
+            ("surface_curvature", 1.0),
+            ("surface_curvature_exponent", 0.5),
+            ("options_names_listed", 1.0),
+            ("surface_name_skew", 0.5),
+        ] {
+            p = p.with_override(name, value).unwrap();
+        }
+        let mut sim = Sim::with_params(12, 7, 3, p);
+        sim.run_days(2, 65).unwrap();
+        let before = sim.inner.state_hash(2, false);
+        let roots = sim.name_option_roots();
+        assert_eq!(roots.len(), 12);
+        let read = sim.name_option_expiries(&roots[0]);
+        let core = sim.inner.option_expiries(&roots[0]);
+        assert_eq!(read.len(), 6);
+        for (w, e) in read.iter().zip(&core) {
+            assert_eq!(w.expiry(), e.expiry as f64);
+            assert_eq!(w.atm_iv(), e.atm_iv);
+        }
+        assert!(sim.name_option_expiries("IDX").is_empty());
         assert_eq!(sim.inner.state_hash(2, false), before);
     }
 

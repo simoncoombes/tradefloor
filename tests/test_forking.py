@@ -1138,6 +1138,9 @@ def _nothing_dormant():
                    # dealer's spread take the blanket 0.05.
                    surface_ssvi=1.0,
                    options_index_listed=1.0,
+                   # The single-name options (pt-v22 phase 3): a switch; the
+                   # names' premium and skew take the blanket 0.05.
+                   options_names_listed=1.0,
                    # Two switches read only under a macro pin (r13).
                    macro_pins_hold=1.0,
                    pinned_vix_feedback=1.0,

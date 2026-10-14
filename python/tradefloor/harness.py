@@ -533,6 +533,12 @@ class Scorecard:
     read it: the share of steps that ended holding any position, and the
     mean multiple over the steps with a finite one.
 
+    Shares an agent did not order, handed over or taken by a single-name
+    option's exercise or assignment (pt-v22 phase 3), are holdings like any
+    other: valued at the price in the equity curve and counted in the
+    exposure. They are not trades, so ``trades``, ``turnover`` and
+    ``impact_bps`` leave them out.
+
     ``rejected`` counts the orders the market refused and the actions an
     LLM adapter refused on its own (its ``refusals()``, such as a ticker
     the roster does not have), each with its line in ``errors``.

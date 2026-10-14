@@ -393,6 +393,12 @@ class Engine:
     # on every shipped preset.
     @property
     def lists_options(self) -> bool: ...
+    # Whether the model lists American options on its names
+    # (`options_names_listed`). False on every shipped preset.
+    @property
+    def lists_name_options(self) -> bool: ...
+    # The tickers whose options are listed now, in roster order.
+    def name_option_roots(self) -> list[str]: ...
     # The forecast the last close computed (`forecast_horizon_sessions`):
     # `day`, `horizon`, and per horizon `vix`, `index_variance`,
     # `policy_rate` (fractional), `oil`, and `name_variance` by ticker. None
@@ -415,21 +421,39 @@ class Engine:
     # future's). An index option's is a `chain` row with its scan margin.
     # Raises for a symbol not listed.
     def quote(self, symbol: str) -> dict[str, Any]: ...
-    # The final settlements at session `day`'s open, or all with None:
-    # `symbol`, `root`, `kind`, `session`, `value`, `reference`.
+    # The final settlements at session `day`, or all with None: `symbol`,
+    # `root`, `kind`, `session`, `value`, `reference`, `event`
+    # ("settlement", or a single-name option's "exercise" or "assignment"),
+    # `agent`, `quantity`, `shares` and `cash` (the party's side of an
+    # exercise; None and zeros on a settlement).
     def settlements(self, day: int | None = ...) -> list[dict[str, Any]]: ...
+    # Instruct the exercise of contracts of a single-name option held long
+    # at the next close (`options_names_listed`); returns the contracts
+    # instructed for it. Raises OrderError where it cannot be made.
+    def exercise(self, agent: str, symbol: str, quantity: float) -> float: ...
+    # Withdraw an agent's exercise instructions on a symbol; returns the
+    # contracts withdrawn.
+    def cancel_exercise(self, agent: str, symbol: str) -> float: ...
+    # The exercise instructions waiting for the close: `agent`, `symbol`,
+    # `quantity`.
+    def exercise_instructions(self, agent: str | None = ...) -> list[dict[str, Any]]: ...
+    # Rows AX1 and AX2 at the last close, as sentences; empty when they hold.
+    def exercise_violations(self) -> list[str]: ...
     # Steps of the night session for index futures (`night_session_steps`),
     # the rest of the night with None; returns the steps walked.
     def run_night(self, steps: int | None = ...) -> int: ...
-    # The index options at one expiry (`options_index_listed`), by strike,
+    # The options at one expiry, the index's (`options_index_listed`) or a
+    # listed name's (`options_names_listed`, a tree's quotes), by strike,
     # the call before the put: the dealer's `bid`, `ask`, sizes, `mid`, `iv`,
     # the surface's `fair` and `surface_iv`, `delta`, `gamma`, `vega`,
     # `theta`, the carry, `multiplier`, `tick` and `open_interest`.
     def chain(self, root: str, expiry: int) -> list[dict[str, Any]]: ...
-    # The implied-volatility surface on the index (`surface_ssvi`).
+    # The implied-volatility surface on the index (`surface_ssvi`), or on a
+    # listed name (`options_names_listed`).
     def surface(self, root: str = ...) -> VolSurface: ...
     # The scan's initial margin on `(symbol, signed contracts)` pairs of
-    # index options, dollars; None with margin or options off.
+    # options, and `(ticker, signed shares)` of the stock beside a name's
+    # options, dollars; None with margin or options off.
     def option_margin(self, positions: list[tuple[str, float]]) -> float | None: ...
     # Static-arbitrage violations on every listed chain (row SV2).
     def option_arbitrage(self, root: str = ...) -> list[str]: ...

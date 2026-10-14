@@ -382,14 +382,28 @@ class MarketView:
         a property of the model. False on every shipped preset."""
         return _WRAPPED[self].lists_options
 
+    @property
+    def lists_name_options(self) -> bool:
+        """Whether the model lists American options on its names, as
+        ``Engine.lists_name_options`` (pt-v22 phase 3). False on every
+        shipped preset."""
+        return _WRAPPED[self].lists_name_options
+
+    def name_option_roots(self) -> list[str]:
+        """The tickers whose options are listed now, as
+        ``Engine.name_option_roots``."""
+        return _WRAPPED[self].name_option_roots()
+
     def option_expiries(self, root: str = "IDX") -> list[dict[str, Any]]:
         """Every listed expiry with its strike grid, at-the-money volatility
-        and 25-delta skew, as ``Engine.option_expiries`` reads them. Empty on
-        a model that lists no options."""
+        and 25-delta skew, as ``Engine.option_expiries`` reads them; a
+        listed name's ticker reads its options. Empty on a model that lists
+        no options."""
         return _WRAPPED[self].option_expiries(root)
 
     def chain(self, root: str, expiry: int) -> list[dict[str, Any]]:
-        """One expiry's index options, as ``Engine.chain`` quotes them."""
+        """One expiry's options, the index's or a listed name's, as
+        ``Engine.chain`` quotes them."""
         return _WRAPPED[self].chain(root, expiry)
 
     def surface(self, root: str = "IDX") -> Any:
@@ -734,7 +748,7 @@ class PortfolioView:
 
     @property
     def options(self) -> dict[str, Any]:
-        """The index options held (pt-v22 phase 2), by symbol, as copies of
+        """The options held (pt-v22 phases 2 and 3), by symbol, as copies of
         the portfolio's :class:`~tradefloor.portfolio.OptionPosition`. Empty
         without options."""
         from .portfolio import OptionPosition
@@ -762,6 +776,13 @@ class PortfolioView:
     @property
     def margin_calls(self) -> list[dict]:
         return [dict(c) for c in _WRAPPED[self][0].margin_calls]
+
+    @property
+    def deliveries(self) -> list[dict]:
+        """The single-name options exercised and assigned so far (pt-v22
+        phase 3), as copies of :attr:`Portfolio.deliveries
+        <tradefloor.Portfolio.deliveries>`: the shares and cash each moved."""
+        return [dict(d) for d in _WRAPPED[self][0].deliveries]
 
     def __getattr__(self, name: str) -> Any:
         raise SandboxError(

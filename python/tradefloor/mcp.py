@@ -1580,6 +1580,23 @@ def describe_simulator() -> dict[str, Any]:
                        "shipped preset lists any yet: a library Engine "
                        "built with the switches on lists them.",
             },
+            "name_options": {
+                "listed_by": tf.contracts.NAME_OPTIONS,
+                "symbols": "TICKER.Onnnn.Rk.cc: ACME.O0035.C42.50 is the "
+                           "42.50 call on ACME settling at the close of "
+                           "session 35.",
+                "how": "American, 100 shares a contract, on every name, "
+                       "quoted by the dealer from a tree on the name's "
+                       "surface. option_chain with root set to a ticker "
+                       "reads them; session_step trades one by its symbol "
+                       "and {\"exercise\": q} exercises q contracts held "
+                       "at the close, when the shares and the strike change "
+                       "hands. The dealer exercises where its tree says to "
+                       "and its exercises are assigned to short positions "
+                       "pro rata, so an account can be handed stock, or go "
+                       "short, without an order. No shipped preset lists "
+                       "any yet.",
+            },
             "options": {
                 "families": [
                     {"root": root, "listed_by": dial}
@@ -3936,8 +3953,9 @@ def _orders_from(orders: Any, tickers: list[str],
 
     The grammar is the harness's: a number is a market order of that many
     shares, positive to buy; {"quantity": q, "limit_price": p} is a
-    `tf.Limit`; "cancel" is a `tf.Cancel`. Checked whole before anything
-    runs, so a step never advances on half an instruction.
+    `tf.Limit`; "cancel" is a `tf.Cancel`; {"exercise": q} is a
+    `tf.Exercise` of a single-name option held. Checked whole before
+    anything runs, so a step never advances on half an instruction.
 
     `contracts` are the futures and the index options the session's
     market lists now (pt-v22 phases 1 and 2), which trade by symbol in the
@@ -3960,7 +3978,7 @@ def _orders_from(orders: Any, tickers: list[str],
                 message += (f" The futures listed now, which trade by "
                             f"symbol, are {futures} (list_contracts).")
             if len(futures) < len(contracts):
-                message += (" The index options listed now trade by symbol "
+                message += (" The options listed now trade by symbol "
                             "too: option_chain lists each expiry's.")
             elif not contracts and tf.contracts.is_contract(ticker):
                 message += (" It is spelled as a contract symbol, and this "
@@ -3970,6 +3988,15 @@ def _orders_from(orders: Any, tickers: list[str],
             raise ValueError(message)
         if isinstance(value, str) and value.strip().lower() == _CANCEL:
             mapping[ticker], echo[ticker] = tf.Cancel(), _CANCEL
+            continue
+        if isinstance(value, dict) and set(value) == {"exercise"}:
+            # An exercise of a single-name option held, at the close
+            # (pt-v22 phase 3).
+            try:
+                mapping[ticker] = tf.Exercise(value["exercise"])
+            except (tf.ValidationError, TypeError) as exc:
+                raise ValueError(f"order for {ticker!r}: {exc}") from exc
+            echo[ticker] = {"exercise": mapping[ticker].quantity}
             continue
         if isinstance(value, dict):
             unknown = sorted(set(value) - {"quantity", "limit_price"})
@@ -4083,6 +4110,10 @@ def _portfolio_view(view: Any, futures: bool = False,
         **(_futures_view(view) if futures else {}),
         **(_options_view(view, option_market)
            if option_market is not None else {}),
+        # The shares and cash single-name options delivered (pt-v22 phase
+        # 3), only once there are any.
+        **({"deliveries": view.deliveries[-10:]}
+           if option_market is not None and view.deliveries else {}),
         **(_margin_view(view)
            if futures or option_market is not None else {}),
     }
@@ -4157,13 +4188,18 @@ def _session_view(sess: "_Session", tickers: list[str] | None = None
     # how many options it lists; option_chain reads them. Nothing on any
     # shipped preset, whose view is the one it was.
     lists_futures, lists_options = view.lists_futures, view.lists_options
-    if lists_futures or lists_options:
+    lists_names = view.lists_name_options
+    if lists_futures or lists_options or lists_names:
         market["index_level"] = _index_view(view)
-        kinds = [c["kind"] for c in view.contracts()]
+        kinds = [(c["kind"], c["root"]) for c in view.contracts()]
         if lists_futures:
-            market["contracts_listed"] = kinds.count("future")
+            market["contracts_listed"] = sum(k == "future" for k, _ in kinds)
         if lists_options:
-            market["options_listed"] = kinds.count("option")
+            market["options_listed"] = sum(k == "option" and r == "IDX" for k, r in kinds)
+        # The names with options listed (pt-v22 phase 3); option_chain with
+        # a ticker as root reads one.
+        if lists_names:
+            market["name_options_listed"] = len(view.name_option_roots())
     if tickers:
         detail = {}
         columns = {field: _f64(view.column(field))
@@ -4186,7 +4222,8 @@ def _session_view(sess: "_Session", tickers: list[str] | None = None
             **_portfolio_view(PortfolioView(sess.live["portfolios"][label],
                                             sess.engine),
                               futures=lists_futures,
-                              option_market=view if lists_options else None),
+                              option_market=(view if lists_options or lists_names
+                                             else None)),
             "trades": ledger["trades"],
             "rejected": ledger["rejected"],
             **({"errors": list(ledger["errors"][-10:])}
@@ -4371,9 +4408,11 @@ def session_step(
         "signed share count for a market order (positive buys), "
         "{\"quantity\": q, \"limit_price\": p} for a limit order that waits "
         "in the book, or \"cancel\" to withdraw the agent's waiting orders "
-        "on that ticker. A listed future's symbol (list_contracts) or index "
+        "on that ticker. A listed future's symbol (list_contracts) or "
         "option's (option_chain) takes the same three forms, counted in "
-        "contracts; an option trades in the session only."))] = None,
+        "contracts; an option trades in the session only. On a single-name "
+        "option held, {\"exercise\": q} exercises q contracts at the "
+        "close."))] = None,
 ) -> dict[str, Any]:
     """Step a session, with the caller's orders at the first step."""
     sess, refused = _session(session_id)
@@ -4790,9 +4829,13 @@ MAX_CHAIN_STRIKES = 100
         "list, or omit it for the nearest; strikes sets how many listed "
         "strikes either side of the forward to show. An option trades in "
         "session_step by its symbol, counted in contracts of $100 a point, "
-        "and quote_contracts gives one option's margin. Empty on a preset "
-        "that lists none, which is every shipped preset so far. Runs no "
-        "market."),
+        "and quote_contracts gives one option's margin. On a market that "
+        "lists single-name options, root names a ticker to read that "
+        "name's American options (100 shares a contract, settling at the "
+        "expiry session's close, exercised with session_step's "
+        "{\"exercise\": q}); name_options lists the tickers. Empty on a "
+        "preset that lists none, which is every shipped preset so far. "
+        "Runs no market."),
     annotations=_READ_ONLY,
 )
 @_guarded
@@ -4805,6 +4848,10 @@ def option_chain(
         f"How many listed strikes either side of the forward to show, 1 to "
         f"{MAX_CHAIN_STRIKES}; each strike is a call and a put. Default "
         f"10."))] = 10,
+    root: Annotated[str | None, Field(description=(
+        "IDX for the index options, or a ticker for that name's options on "
+        "a market that lists them. Omit for the index's, or for the first "
+        "name's where only names list options."))] = None,
 ) -> dict[str, Any]:
     """A session's listed option expiries and one expiry's chain."""
     sess, refused = _session(session_id)
@@ -4819,6 +4866,18 @@ def option_chain(
             return _fail(f"strikes is a whole number from 1 to "
                          f"{MAX_CHAIN_STRIKES}, got {strikes!r}")
         view = MarketView(sess.engine)
+        names = view.name_option_roots() if view.lists_name_options else []
+        if root is None:
+            root = "IDX" if view.lists_options or not names else names[0]
+        if root != "IDX" and root not in names:
+            if not view.lists_name_options:
+                return _fail(f"{root!r} lists no options: this session's "
+                             "preset lists no single-name options "
+                             "(options_names_listed is off on every shipped "
+                             "preset).")
+            return _fail(f"{root!r} lists no options. The names that do are "
+                         f"{names}.")
+        lists = view.lists_options if root == "IDX" else True
         out: dict[str, Any] = {
             "ok": True,
             "session_id": sess.id,
@@ -4826,10 +4885,13 @@ def option_chain(
             "lists_options": view.lists_options,
             "index_level": _index_view(view),
         }
-        expiries = view.option_expiries() if view.lists_options else []
+        if view.lists_name_options:
+            out["root"] = root
+            out["name_options"] = names
+        expiries = view.option_expiries(root) if lists else []
         listed = [e["expiry"] for e in expiries]
         if expiry is not None and expiry not in listed:
-            if not view.lists_options:
+            if not lists:
                 return _fail(f"no expiry {expiry!r} is listed. "
                              + _no_options_note(sess))
             return _fail(f"{expiry!r} is not a listed expiry. The expiries "
@@ -4837,7 +4899,7 @@ def option_chain(
         out["expiries"] = [_expiry_row(e) for e in expiries]
         if not expiries:
             out["chain"] = []
-            out["note"] = (_no_options_note(sess) if not view.lists_options
+            out["note"] = (_no_options_note(sess) if not lists
                            else "No expiry is priced yet.")
             out["provenance"] = _session_provenance(sess, orders=False)
             return out

@@ -220,6 +220,13 @@ _LABELS: dict[str, dict[str, str]] = {
         "options_held": "Options held:",
         "cost": "cost",
         "mid": "mid",
+        "name_options": "Single-name options",
+        "name_options_intro": ("American, 100 shares a contract, settling "
+                               "at the close of each expiry session: {expiries}. "
+                               "ACME.O0035.C42.50 is the 42.50 call on ACME. "
+                               "Side EXERCISE with a quantity exercises "
+                               "contracts held at the close. At-the-money "
+                               "volatility 21 sessions out, per year:"),
     },
     "fr": {
         "title": "MARCHE SIMULE",
@@ -291,6 +298,14 @@ _LABELS: dict[str, dict[str, str]] = {
         "options_held": "Options detenues :",
         "cost": "cout",
         "mid": "milieu",
+        "name_options": "Options sur actions",
+        "name_options_intro": ("Americaines, 100 actions par contrat, "
+                               "reglees a la cloture de chaque seance "
+                               "d'echeance : {expiries}. ACME.O0035.C42.50 "
+                               "est le call 42,50 sur ACME. Le cote EXERCISE "
+                               "avec une quantite exerce des contrats detenus "
+                               "a la cloture. Volatilite a la monnaie a 21 "
+                               "seances, annuelle :"),
     },
 }
 
@@ -683,10 +698,18 @@ class TextRenderer:
         if alone and index is not None:
             out.append(f"{L['index_level']:<23}{_num(index['level'])}")
         options = payload["options"]
-        out += ["", L["options_intro"], "",
-                _OPTION_ROW.format(**dict(zip(
-                    ("expiry", "sessions", "forward", "strikes", "atm",
-                     "put", "call", "skew"), L["options_head"].split("|"))))]
+        names = options.get("names")
+        # The index's table on a model that lists index options; a model
+        # that lists only the names' shows theirs alone.
+        if options["expiries"] or names is None:
+            out += ["", L["options_intro"], "",
+                    _OPTION_ROW.format(**dict(zip(
+                        ("expiry", "sessions", "forward", "strikes", "atm",
+                         "put", "call", "skew"), L["options_head"].split("|"))))]
+        else:
+            out = ["", L["name_options"], "-" * len(L["name_options"])]
+            if alone and index is not None:
+                out.append(f"{L['index_level']:<23}{_num(index['level'])}")
         for e in options["expiries"]:
             out.append(_OPTION_ROW.format(
                 expiry=e["expiry"],
@@ -696,6 +719,14 @@ class TextRenderer:
                          f"/{e['strike_step']:g}"),
                 atm=_vol(e["atm_iv"]), put=_vol(e["put_25d_iv"]),
                 call=_vol(e["call_25d_iv"]), skew=_vol(e["skew_25d"])))
+        if names is not None:
+            if options["expiries"]:
+                out += ["", L["name_options"]]
+            out += ["", L["name_options_intro"].format(
+                expiries=", ".join(str(x) for x in names["expiries"]))]
+            items = list(names["iv_30d"].items())
+            for k in range(0, len(items), 6):
+                out.append("  " + "  ".join(f"{t} {_vol(v)}" for t, v in items[k:k + 6]))
         out += ["", L["options_held"]]
         if not options["positions"]:
             out.append(f"  {L['none']}")

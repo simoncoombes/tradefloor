@@ -39,8 +39,10 @@ const sim = new pt.Sim(12, 7, 3, 'pt-v21');
 sim.runDay(65);
 const fronts = sim.frontFutures;
 const expiries = sim.optionExpiries;
+const names = sim.nameOptionRoots;
 const getters = sim.indexLevel === undefined && Array.isArray(fronts) && fronts.length === 0
-  && Array.isArray(expiries) && expiries.length === 0;
+  && Array.isArray(expiries) && expiries.length === 0
+  && Array.isArray(names) && names.length === 0;
 
 console.log(`  tradefloor ${pt.version()}, fixed simulation v${FIXED_SIMULATION_KAT_VERSION}`);
 console.log(`  presets   ${pt.preset_names().join(', ')}`);
@@ -61,7 +63,7 @@ if (!sameAsNumber || !refusedUnsafe) {
 }
 if (!getters) {
   console.error('\nGETTERS: on a shipped preset Sim.indexLevel is undefined, ' +
-                'and Sim.frontFutures and Sim.optionExpiries empty arrays.');
+                'and Sim.frontFutures, Sim.optionExpiries and Sim.nameOptionRoots empty arrays.');
   process.exit(1);
 }
 console.log('\n  bit-identical with the native build.');
