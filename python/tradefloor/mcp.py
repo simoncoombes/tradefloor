@@ -4193,9 +4193,9 @@ def _session_view(sess: "_Session", tickers: list[str] | None = None
         market["index_level"] = _index_view(view)
         kinds = [(c["kind"], c["root"]) for c in view.contracts()]
         if lists_futures:
-            market["contracts_listed"] = sum(k == "future" for k, _ in kinds)
+            market["contracts_listed"] = [k for k, _ in kinds].count("future")
         if lists_options:
-            market["options_listed"] = sum(k == "option" and r == "IDX" for k, r in kinds)
+            market["options_listed"] = kinds.count(("option", "IDX"))
         # The names with options listed (pt-v22 phase 3); option_chain with
         # a ticker as root reads one.
         if lists_names:

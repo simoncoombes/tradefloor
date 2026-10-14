@@ -12487,9 +12487,9 @@ impl ModelParams {
         }
         if self.option_dealer_spread != 0.0 && self.options_index_listed == 0.0 && self.options_names_listed == 0.0 {
             return Err(format!(
-                "options_index_listed and options_names_listed are 0 but option_dealer_spread is {}. \
-                 The spread is the options dealer's, which quotes only what those switches list: set \
-                 one of them to 1.0 first.",
+                "options_index_listed is 0 but option_dealer_spread is {}, and options_names_listed \
+                 is 0 too. The spread is the options dealer's, which quotes only what those switches \
+                 list: set one of them to 1.0 first.",
                 self.option_dealer_spread));
         }
         if !(self.options_names_listed == 0.0 || self.options_names_listed == 1.0) {
