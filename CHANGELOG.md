@@ -68,6 +68,12 @@ payload, Arrow and WASM show them; agents trade by symbol.
   the close; `evaluate`, `World` and the MCP session take it and
   `tca.analyse` refuses it. The scan margin nets a name's options against
   the stock held in it, so a covered call asks nothing a naked one does.
+- `option_position_limit`, 0.0 on every preset and left out of the digest
+  there, caps each agent's position in each listed option at the dial times
+  the dealer's displayed depth on one side (500 contracts of an index
+  option, 200 of a name's), waiting orders counted as filled; an order back
+  toward zero always passes. `Engine.position_limit(symbol)` reads it, and
+  an option's quote carries `position_limit` while it is set.
 - `Engine.exercise_violations()` reads rows AX1 (the dealer exercises only
   where its tree says, calls only on an ex-date's eve, every option held is
   worth at least the European on the same tree) and AX2 (each delivery
@@ -75,7 +81,7 @@ payload, Arrow and WASM show them; agents trade by symbol.
   close's rows sum to nothing).
 - A snapshot carries `name_options` under the switch, `name_options_book`
   once an agent has traded one and `name_options_exercise` once there is an
-  instruction or an exercise, hashed behind tags 57 to 59 only then, as
+  instruction or an exercise, hashed behind tags 70 to 72 only then, as
   `manifest.state_hash` does. Exercises join the order log and `replay`
   runs them. Every known-answer digest is where it was.
 

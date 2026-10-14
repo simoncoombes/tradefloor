@@ -4929,6 +4929,10 @@ impl PyEngine {
             let d = option_quote_dict(py, &q)?;
             d.set_item("initial_margin", q.initial_margin)?;
             d.set_item("maintenance_margin", q.maintenance_margin)?;
+            // The position limit (`option_position_limit`), only where one is set.
+            if let Some(limit) = self.inner.option_position_limit(symbol) {
+                d.set_item("position_limit", limit)?;
+            }
             return Ok(d);
         }
         let q = self.inner.quote(symbol).ok_or_else(|| {
@@ -5029,6 +5033,16 @@ impl PyEngine {
             quantity,
         });
         Ok(out)
+    }
+
+    /// The position limit on a listed option, contracts per agent
+    /// (`option_position_limit` times the dealer's displayed depth on one
+    /// side: 500 contracts of an index option, 200 of a name's): None with
+    /// the dial at 0.0 and for a symbol not listed. An order that would take
+    /// an agent's position, its waiting orders counted as filled, past it is
+    /// refused, unless it brings the position toward zero. A read.
+    fn position_limit(&self, symbol: &str) -> Option<f64> {
+        self.inner.option_position_limit(symbol)
     }
 
     /// Withdraw `agent`'s exercise instructions on `symbol` that wait for

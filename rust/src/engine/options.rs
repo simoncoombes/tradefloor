@@ -965,6 +965,8 @@ impl Engine {
         if self.options.phase != OptionsPhase::Session {
             return Err(format!("{symbol} is an index option, which trades in the session only"));
         }
+        let depth = INDEX_OPTION_DEALER.levels as f64 * INDEX_OPTION_DEALER.displayed_size;
+        self.option_limit_check(&self.options.book, depth, agent, symbol, side, quantity)?;
         let id = match order_id {
             Some(id) => {
                 if id.is_empty() {
@@ -1022,6 +1024,70 @@ impl Engine {
             mode,
             fills,
         })
+    }
+
+    /// Refuse an order that would take `agent`'s position in `symbol`, with
+    /// its waiting orders on it counted as filled, past the position limit
+    /// (`option_position_limit` times `depth`, the dealer's displayed depth
+    /// on one side). An order that brings the position toward zero passes.
+    /// Nothing with the dial at 0.0.
+    pub(super) fn option_limit_check(
+        &self,
+        book: &BookState,
+        depth: f64,
+        agent: &str,
+        symbol: &str,
+        side: Side,
+        quantity: f64,
+    ) -> Result<(), String> {
+        let dial = self.params.option_position_limit;
+        if dial == 0.0 {
+            return Ok(());
+        }
+        let limit = dial * depth;
+        let held = book
+            .flow
+            .iter()
+            .filter(|(a, t, _, _)| a == agent && t == symbol)
+            .fold(0.0, |acc, (_, _, b, s)| acc + (b - s));
+        let waiting = book.orders.iter().filter(|o| o.agent == agent && o.ticker == symbol).fold(0.0, |acc, o| {
+            acc + match o.side {
+                Side::Buy => o.remaining,
+                Side::Sell => -o.remaining,
+            }
+        });
+        let before = held + waiting;
+        let after = before
+            + match side {
+                Side::Buy => quantity,
+                Side::Sell => -quantity,
+            };
+        if after.abs() > limit + 1e-9 && after.abs() > before.abs() {
+            return Err(format!(
+                "position limit: {agent} would hold {after} contracts of {symbol} with its waiting orders \
+                 filled, past the limit of {limit} (option_position_limit {dial} times the dealer's \
+                 displayed depth of {depth})"
+            ));
+        }
+        Ok(())
+    }
+
+    /// The position limit on the listed option `symbol`, contracts per agent
+    /// (`option_position_limit` times the dealer's displayed depth on one
+    /// side): `None` with the dial at 0.0 and for a symbol not listed.
+    pub fn option_position_limit(&self, symbol: &str) -> Option<f64> {
+        let dial = self.params.option_position_limit;
+        if dial == 0.0 {
+            return None;
+        }
+        let spec = if self.is_listed_option(symbol) {
+            &INDEX_OPTION_DEALER
+        } else if self.is_listed_name_option(symbol) {
+            &crate::derivatives::NAME_OPTION_DEALER
+        } else {
+            return None;
+        };
+        Some(dial * spec.levels as f64 * spec.displayed_size)
     }
 
     pub(super) fn cancel_option_order(&mut self, order_id: &str, agent: Option<&str>) -> bool {

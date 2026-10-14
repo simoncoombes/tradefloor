@@ -28,7 +28,7 @@ from tradefloor.replay import replay
 
 SMALL = tf.Universe.random(10, seed=5)
 UNIVERSE = tf.Universe.random(30, seed=111)
-DIALS = ("options_names_listed", "surface_name_premium", "surface_name_skew")
+DIALS = ("options_names_listed", "surface_name_premium", "surface_name_skew", "option_position_limit")
 BASE = dict(index_level_listed=1.0, vix_intraday_live=1.0, forecast_horizon_sessions=252.0,
             forecast_vix_dispersion=0.3, forecast_vix_dispersion_half_life=31.5,
             forecast_vix_dispersion_skew=0.81)
@@ -355,6 +355,26 @@ def test_an_exercise_is_refused_where_it_cannot_be_made():
     engine.exercise("a", call, 2.0)
     assert engine.cancel_exercise("a", call) == 2.0
     assert engine.exercise_instructions() == []
+
+
+def test_the_position_limit_refuses_a_position_past_the_dealers_depth():
+    engine = tf.Engine(seed=43, universe=SMALL, model=model(**dict(ON, option_position_limit=0.1)))
+    day(engine)
+    engine.open_market()
+    ticker = engine.tickers[0]
+    call = strike_near(engine, ticker, 14, "C")["symbol"]
+    assert engine.position_limit(call) == 20.0 and engine.quote(call)["position_limit"] == 20.0
+    engine.submit("a", call, 20.0)
+    with pytest.raises(tf.OrderError, match="position limit"):
+        engine.submit("a", call, 1.0)
+    engine.submit("a", call, -40.0)
+    with pytest.raises(tf.OrderError, match="position limit"):
+        engine.submit("a", call, -1.0)
+    off = tf.Engine(seed=43, universe=SMALL, model=model(**ON))
+    day(off)
+    assert off.position_limit(call) is None and "position_limit" not in off.quote(call)
+    with pytest.raises(tf.ValidationError, match="option_position_limit"):
+        model(**dict(BASE, option_position_limit=1.0))
 
 
 def test_the_settlements_table_carries_the_exercises():

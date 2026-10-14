@@ -1038,6 +1038,8 @@ impl Engine {
         if self.options.phase != OptionsPhase::Session {
             return Err(format!("{symbol} is an option, which trades in the session only"));
         }
+        let depth = NAME_OPTION_DEALER.levels as f64 * NAME_OPTION_DEALER.displayed_size;
+        self.option_limit_check(&self.name_options.book, depth, agent, symbol, side, quantity)?;
         let id = match order_id {
             Some(id) => {
                 if id.is_empty() {
@@ -2198,6 +2200,43 @@ mod tests {
         assert!(off.set_name_options_state(Some(&words), None, None).is_err());
         let mut short = NameOptionsState::default();
         assert!(short.set_words(&words[..words.len() - 1]).is_err());
+    }
+
+    #[test]
+    fn the_position_limit_caps_a_position_and_its_waiting_orders() {
+        let mut p = crate::params::PT_V21;
+        for (name, value) in super::super::options::tests::ON.iter().chain(NAMES) {
+            p = p.with_override(name, *value).unwrap();
+        }
+        p = p.with_override("option_position_limit", 0.1).unwrap();
+        let mut e = Engine::with_params(
+            31,
+            roster(),
+            create_initial_economy_state(&InitialEconomyOptions::default()),
+            create_initial_central_bank_state(0),
+            crate::sectors::keys().iter().map(|s| s.to_string()).collect(),
+            p,
+        );
+        let mut buffer = SessionBuffer::new();
+        day(&mut e, 0, &mut buffer);
+        let call = sym(&e, 0, 1, Right::Call, atm(&e, 0, 1));
+        assert_eq!(e.option_position_limit(&call), Some(20.0));
+        let index = e.option_contracts()[0].symbol.clone();
+        assert_eq!(e.option_position_limit(&index), Some(50.0));
+        assert_eq!(e.option_position_limit("IDX.O0014.C1.00"), None);
+        trading_day(&mut e, 1, &mut buffer, |e| {
+            assert!(e.submit_order("a", &call, Side::Buy, 15.0, None, None).is_ok());
+            let refused = e.submit_order("a", &call, Side::Buy, 6.0, None, None).unwrap_err();
+            assert!(refused.contains("position limit"), "{refused}");
+            // A waiting order counts as filled.
+            let q = e.option_quote(&call).unwrap();
+            assert!(e.submit_order("a", &call, Side::Buy, 5.0, Some(q.bid.unwrap_or(0.01)), None).is_ok());
+            assert!(e.submit_order("a", &call, Side::Buy, 1.0, None, None).is_err());
+            // Selling back toward zero always passes; another agent has its own limit.
+            assert!(e.submit_order("a", &call, Side::Sell, 30.0, None, None).is_ok());
+            assert!(e.submit_order("b", &call, Side::Sell, 20.0, None, None).is_ok());
+            assert!(e.submit_order("b", &call, Side::Sell, 1.0, None, None).is_err());
+        });
     }
 
     #[test]

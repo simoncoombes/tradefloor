@@ -580,6 +580,12 @@ OUT_OF_SCOPE = {
         "unread while `options_names_listed` is 0.0: only `name_surface_at` "
         "reads it, and refused without the switch; unfitted; at 0.0 it is also "
         "left out of the model's digest",
+    "option_position_limit":
+        "inert at 0.0: `option_limit_check` in engine/options.rs returns at once "
+        "and `Engine::option_position_limit` reads None; refused without a "
+        "listed option family; a stated simplification of exchange limits, sized "
+        "to the dealer's displayed depth, not fitted; at 0.0 it is also left out "
+        "of the model's digest",
     # The oil law (pt-v22, decision 3), inert on every shipped preset: each a
     # branch to the standing arithmetic at 0.0.
     "oil_mean_reversion":

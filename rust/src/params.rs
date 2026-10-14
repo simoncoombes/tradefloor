@@ -1465,6 +1465,21 @@ pub struct ModelParams {
     /// correlation of 0), and a value of 0.0 is left out of the model's
     /// digest. In [0, 1].
     pub surface_name_skew: f64,
+    /// The position limit on each listed option, per agent and contract, in
+    /// multiples of the dealer's displayed depth on one side (its ten levels:
+    /// 500 contracts of an index option, 200 of a name's). 0.0, on every
+    /// shipped preset, is no limit, and a value of 0.0 is left out of the
+    /// model's digest.
+    ///
+    /// Off zero an order is refused when it would take the agent's position
+    /// in the contract, with its waiting orders on it counted as filled,
+    /// past the limit in absolute value; an order that brings the position
+    /// toward zero is never refused, and an exercise or an assignment is
+    /// not an order. It is the plan's stated simplification of an
+    /// exchange's position limits, there so an agent cannot hold an
+    /// unlimited stake in a contract whose settlement print it can push.
+    /// Requires `options_index_listed` or `options_names_listed`. In [0, 100].
+    pub option_position_limit: f64,
     /// Switch that makes the fear/greed index read the business cycle and
     /// GDP growth as published instead of as they are. 0.0, on every preset
     /// through pt-v19, is off; pt-v20 sets 1.0.
@@ -7916,6 +7931,7 @@ impl ModelParams {
             options_names_listed: 0.0,
             surface_name_premium: 0.0,
             surface_name_skew: 0.0,
+            option_position_limit: 0.0,
             fear_greed_published_inputs: 0.0,
             macro_publication_repricing: 0.0,
             treasury_10y_noise: 0.03,
@@ -10543,6 +10559,7 @@ impl ModelParams {
             "options_names_listed" => self.options_names_listed,
             "surface_name_premium" => self.surface_name_premium,
             "surface_name_skew" => self.surface_name_skew,
+            "option_position_limit" => self.option_position_limit,
             "fear_greed_published_inputs" => self.fear_greed_published_inputs,
             "macro_publication_repricing" => self.macro_publication_repricing,
             "treasury_10y_noise" => self.treasury_10y_noise,
@@ -10935,6 +10952,7 @@ impl ModelParams {
             "options_names_listed" => out.options_names_listed = value,
             "surface_name_premium" => out.surface_name_premium = value,
             "surface_name_skew" => out.surface_name_skew = value,
+            "option_position_limit" => out.option_position_limit = value,
             "fear_greed_published_inputs" => out.fear_greed_published_inputs = value,
             "macro_publication_repricing" => out.macro_publication_repricing = value,
             "treasury_10y_noise" => out.treasury_10y_noise = value,
@@ -12510,6 +12528,19 @@ impl ModelParams {
                  the forecast's expected variance of the name: set forecast_horizon_sessions first.",
                 self.options_names_listed));
         }
+        if !(0.0..=100.0).contains(&self.option_position_limit) {
+            return Err(format!(
+                "option_position_limit is {}. It is in [0, 100], multiples of the dealer's displayed \
+                 depth; 0 is no limit.",
+                self.option_position_limit));
+        }
+        if self.option_position_limit != 0.0 && self.options_index_listed == 0.0 && self.options_names_listed == 0.0 {
+            return Err(format!(
+                "options_index_listed is 0 but option_position_limit is {}, and options_names_listed \
+                 is 0 too. The limit is on listed options, which only those switches list: set one of \
+                 them to 1.0 first.",
+                self.option_position_limit));
+        }
         for (name, v, lo, hi) in [
             ("surface_name_premium", self.surface_name_premium, -0.5, 1.0),
             ("surface_name_skew", self.surface_name_skew, 0.0, 1.0),
@@ -13036,6 +13067,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "options_names_listed",
     "surface_name_premium",
     "surface_name_skew",
+    "option_position_limit",
 ];
 
 #[cfg(test)]
@@ -13250,6 +13282,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "options_names_listed",
         "surface_name_premium",
         "surface_name_skew",
+        "option_position_limit",
         "fear_greed_published_inputs",
         "macro_publication_repricing",
         "treasury_10y_noise",

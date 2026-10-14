@@ -4530,12 +4530,24 @@ own worst loss and floored at 0, so a covered call or a protective put asks
 nothing a naked option does; each option is revalued as a European on its
 escrowed price over moves sized to the name's one-session sd.
 
+**Position limits.** `option_position_limit`, 0.0 on every shipped preset
+(no limit), caps each agent's position in each listed option, the index's
+and the names', at the dial times the dealer's displayed depth on one side:
+500 contracts of an index option, 200 of a name's, at 1.0. An order that
+would take the position past it, with the agent's waiting orders on the
+contract counted as filled, is refused; one that brings the position toward
+zero never is, and an exercise or an assignment is not an order. It is a
+stated simplification of an exchange's limits, there so that an agent cannot
+hold an unlimited stake in a contract whose settlement print it can push.
+`Engine.position_limit(symbol)` reads it, and an option's `quote` carries it
+as `position_limit` while it is set. Futures have no limit yet.
+
 **State.** A snapshot carries `name_options` (each name's listed expiries,
 strike grids and the dealer's pressure, and the settled expiries) while the
 switch is set, `name_options_book` once an agent has traded one, and
 `name_options_exercise` (instructions waiting for the close and every
 exercise and assignment) once there is any; the state hash covers them
-behind tags 57 to 59 only then, as `manifest.state_hash` does. Every
+behind tags 70 to 72 only then, as `manifest.state_hash` does. Every
 known-answer digest is where it was.
 
 ## Scenarios

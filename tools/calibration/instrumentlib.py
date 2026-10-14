@@ -262,6 +262,7 @@ PARAM_SPECS: dict[str, dict] = {
     "options_names_listed": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0), "derived": True},
     "surface_name_premium": {"kind": "abs", "step_unit": 0.01, "hard_range": (-0.5, 1.0), "derived": True},
     "surface_name_skew": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0), "derived": True},
+    "option_position_limit": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 100.0), "derived": True},
     "fed_stress_cut": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
     "fed_stress_vix": {"kind": "abs", "step_unit": 1.0, "hard_range": (10.0, 200.0)},
     "fed_stress_inflation_gap": {"kind": "abs", "step_unit": 0.25, "hard_range": (0.0, 10.0)},

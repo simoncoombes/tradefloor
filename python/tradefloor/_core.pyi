@@ -431,6 +431,9 @@ class Engine:
     # at the next close (`options_names_listed`); returns the contracts
     # instructed for it. Raises OrderError where it cannot be made.
     def exercise(self, agent: str, symbol: str, quantity: float) -> float: ...
+    # The position limit on a listed option, contracts per agent
+    # (`option_position_limit`); None with the dial at 0.0.
+    def position_limit(self, symbol: str) -> float | None: ...
     # Withdraw an agent's exercise instructions on a symbol; returns the
     # contracts withdrawn.
     def cancel_exercise(self, agent: str, symbol: str) -> float: ...

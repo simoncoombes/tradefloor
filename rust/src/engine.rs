@@ -12704,22 +12704,23 @@ impl Engine {
             hash_book(&mut buf, book);
         }
         // The single-name options, only while `options_names_listed` is
-        // set, behind their own tag, length-prefixed; their book behind
+        // set, behind their own tag (70 to 72: 55 to 60 are taken on other
+        // pt-v22 branches), length-prefixed; their book behind
         // another once an agent has traded one; their instructions and
         // exercises behind a third once there are any.
         if let Some(words) = self.name_options_words() {
-            hash_f64(&mut buf, 57.0);
+            hash_f64(&mut buf, 70.0);
             hash_u32(&mut buf, words.len() as u32);
             for value in words {
                 hash_f64(&mut buf, value);
             }
         }
         if let Some(book) = self.name_options_book_state() {
-            hash_f64(&mut buf, 58.0);
+            hash_f64(&mut buf, 71.0);
             hash_book(&mut buf, book);
         }
         if let Some((instructions, events)) = self.name_options_exercise_state() {
-            hash_f64(&mut buf, 59.0);
+            hash_f64(&mut buf, 72.0);
             hash_name_exercise(&mut buf, &instructions, events);
         }
         // LENGTH-PREFIXED, because these two are EMPTY between the tape row
