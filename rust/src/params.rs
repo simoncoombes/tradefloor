@@ -1339,8 +1339,8 @@ pub struct ModelParams {
     /// by the Cboe VIX formula, returns the VIX (the live VIX within a
     /// session under `vix_intraday_live`, the published VIX otherwise). Its
     /// correlation is the one whose 21-session strip has the risk-neutral
-    /// skewness `surface_skew_physical`, `surface_skew_physical_slope` and
-    /// `surface_skew_premium` give, at the curvature `surface_curvature` and
+    /// skewness `surface_skew_physical`, `surface_skew_physical_slope`,
+    /// `surface_skew_premium` and `surface_skew_premium_slope` give, at the curvature `surface_curvature` and
     /// `surface_curvature_exponent`. Its term structure scales the 21-session
     /// point by the forecast's expected index variance
     /// (`forecast_horizon_sessions`; flat without it), the term premia
@@ -1368,6 +1368,15 @@ pub struct ModelParams {
     /// preset, adds none, and a value of 0.0 is left out of the model's
     /// digest. In [-10, 10].
     pub surface_skew_premium: f64,
+    /// The skew premium's slope on the log of the VIX over 20
+    /// (`surface_skew_premium`): the risk-neutral skewness is the physical
+    /// one plus `surface_skew_premium + surface_skew_premium_slope *
+    /// ln(VIX / 20)`. Positive makes the premium shrink as the VIX rises, as
+    /// the Cboe SKEW index does against the VIX on the tape. Read only with
+    /// `surface_ssvi` set; 0.0, on every shipped preset, is a constant
+    /// premium, and a value of 0.0 is left out of the model's digest. In
+    /// [-10, 10].
+    pub surface_skew_premium_slope: f64,
     /// The surface's curvature, SSVI's `eta` in `phi(theta) = eta theta^-gamma
     /// (1 + theta)^(gamma - 1)`. Read only with `surface_ssvi` set; 0.0, on
     /// every shipped preset, is a flat smile with no skew, and a value of 0.0
@@ -7858,6 +7867,7 @@ impl ModelParams {
             surface_skew_physical: 0.0,
             surface_skew_physical_slope: 0.0,
             surface_skew_premium: 0.0,
+            surface_skew_premium_slope: 0.0,
             surface_curvature: 0.0,
             surface_curvature_exponent: 0.0,
             surface_term_premium_short: 0.0,
@@ -10481,6 +10491,7 @@ impl ModelParams {
             "surface_skew_physical" => self.surface_skew_physical,
             "surface_skew_physical_slope" => self.surface_skew_physical_slope,
             "surface_skew_premium" => self.surface_skew_premium,
+            "surface_skew_premium_slope" => self.surface_skew_premium_slope,
             "surface_curvature" => self.surface_curvature,
             "surface_curvature_exponent" => self.surface_curvature_exponent,
             "surface_term_premium_short" => self.surface_term_premium_short,
@@ -10869,6 +10880,7 @@ impl ModelParams {
             "surface_skew_physical" => out.surface_skew_physical = value,
             "surface_skew_physical_slope" => out.surface_skew_physical_slope = value,
             "surface_skew_premium" => out.surface_skew_premium = value,
+            "surface_skew_premium_slope" => out.surface_skew_premium_slope = value,
             "surface_curvature" => out.surface_curvature = value,
             "surface_curvature_exponent" => out.surface_curvature_exponent = value,
             "surface_term_premium_short" => out.surface_term_premium_short = value,
@@ -12377,6 +12389,7 @@ impl ModelParams {
             ("surface_skew_physical", self.surface_skew_physical, -10.0, 10.0),
             ("surface_skew_physical_slope", self.surface_skew_physical_slope, -10.0, 10.0),
             ("surface_skew_premium", self.surface_skew_premium, -10.0, 10.0),
+            ("surface_skew_premium_slope", self.surface_skew_premium_slope, -10.0, 10.0),
             ("surface_curvature_exponent", self.surface_curvature_exponent, 0.0, 0.5),
             ("surface_term_premium_short", self.surface_term_premium_short, -2.0, 2.0),
             ("surface_term_premium_long", self.surface_term_premium_long, -2.0, 2.0),
@@ -12397,6 +12410,7 @@ impl ModelParams {
             ("surface_skew_physical", self.surface_skew_physical),
             ("surface_skew_physical_slope", self.surface_skew_physical_slope),
             ("surface_skew_premium", self.surface_skew_premium),
+            ("surface_skew_premium_slope", self.surface_skew_premium_slope),
             ("surface_curvature", self.surface_curvature),
             ("surface_curvature_exponent", self.surface_curvature_exponent),
             ("surface_term_premium_short", self.surface_term_premium_short),
@@ -12933,6 +12947,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "surface_skew_physical",
     "surface_skew_physical_slope",
     "surface_skew_premium",
+    "surface_skew_premium_slope",
     "surface_curvature",
     "surface_curvature_exponent",
     "surface_term_premium_short",
@@ -13143,6 +13158,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "surface_skew_physical",
         "surface_skew_physical_slope",
         "surface_skew_premium",
+        "surface_skew_premium_slope",
         "surface_curvature",
         "surface_curvature_exponent",
         "surface_term_premium_short",

@@ -412,10 +412,13 @@ impl Engine {
         let vix = self.surface_vix();
         let (eta, gamma) = (p.surface_curvature, p.surface_curvature_exponent);
         let target = if eta > 0.0 {
-            let slope = if p.surface_skew_physical_slope == 0.0 {
+            // Both slopes are on ln(VIX / 20); the log is taken only when
+            // one is set, so the shipped arithmetic is unchanged.
+            let slopes = p.surface_skew_physical_slope + p.surface_skew_premium_slope;
+            let slope = if p.surface_skew_physical_slope == 0.0 && p.surface_skew_premium_slope == 0.0 {
                 0.0
             } else {
-                p.surface_skew_physical_slope * crate::mathx::log(vix / SKEW_VIX_CENTRE)
+                slopes * crate::mathx::log(vix / SKEW_VIX_CENTRE)
             };
             Some(p.surface_skew_physical + slope + p.surface_skew_premium)
         } else {
@@ -1236,6 +1239,7 @@ mod tests {
         ("surface_skew_physical", -0.8),
         ("surface_skew_physical_slope", 0.3),
         ("surface_skew_premium", -1.0),
+        ("surface_skew_premium_slope", 0.5),
         ("surface_curvature", 1.0),
         ("surface_curvature_exponent", 0.5),
         ("surface_term_premium_short", -0.03),

@@ -137,7 +137,7 @@ build show futures and options, which agents trade by symbol.
 
 - `surface_ssvi`, `options_index_listed` and `option_dealer_spread` are new
   switches, with `surface_skew_physical`, `surface_skew_physical_slope`,
-  `surface_skew_premium`, `surface_curvature`, `surface_curvature_exponent`,
+  `surface_skew_premium`, `surface_skew_premium_slope`, `surface_curvature`, `surface_curvature_exponent`,
   `surface_term_premium_short`, `surface_term_premium_long` and
   `surface_earnings_weight` beside them, all 0.0 on every preset and left out
   of the digest there. None is fitted yet.

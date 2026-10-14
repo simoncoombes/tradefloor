@@ -1205,6 +1205,7 @@ PERTURBATIONS = [
     ("surface_skew_physical", -0.8, False),
     ("surface_skew_physical_slope", 0.3, False),
     ("surface_skew_premium", -1.0, False),
+    ("surface_skew_premium_slope", 0.5, False),
     ("surface_curvature", 1.0, False),
     ("surface_curvature_exponent", 0.5, False),
     ("surface_term_premium_short", -0.03, False),
@@ -2052,6 +2053,7 @@ COMPANIONS: dict[str, dict[str, float]] = {
     "surface_ssvi": {"index_level_listed": 1.0},
     **{name: {"index_level_listed": 1.0, "surface_ssvi": 1.0}
        for name in ("surface_skew_physical", "surface_skew_physical_slope", "surface_skew_premium",
+                    "surface_skew_premium_slope",
                     "surface_curvature", "surface_curvature_exponent", "surface_term_premium_short",
                     "surface_term_premium_long")},
     "surface_earnings_weight": {"index_level_listed": 1.0, "surface_ssvi": 1.0,
