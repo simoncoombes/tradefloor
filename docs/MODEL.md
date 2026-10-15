@@ -4907,6 +4907,11 @@ changes, so it waits for a new preset.
 - With the VIX held at 65 the market is 5.1 times as volatile as with it held at 5, against 6.2 times in real markets (pt-v19: 5.2; pt-v20 before its graded arm: 3.6). The lower market sigma and jump rate take the lever down with them. It is reported beside the grade and does not gate it.
 - The index variance $V_d$ leaves out the crisis epicentre's scaling, so during an episode the VIX's read-back is not quite the variance the market realises. It also reads the lagged down-beta's condition once a session, where the market samples it every tick.
 
+**Index options.**
+
+- Index options are off: `options_index_listed` is 0.0 on every preset. The index's implied-volatility surface (`surface_ssvi`) can still be on, because single-name options take its curvature and a share of its skew, and it is the same surface whether or not the index options are listed.
+- They are off because an index straddle earns too much. On S&P 500 options, a one-month at-the-money straddle with zero beta, bought at mid and held for a week, loses about 3% a week on average (Coval and Shumway, 2001). With the options switched on, the model's straddle earns about +0.7% a week. There are two causes. Over a week the model's index moves more against its own VIX than the S&P 500 does: the mean squared weekly move over the VIX squared is 0.76, against 0.60 for the S&P 500 over 1990 to 2025. And the model's smile curves near the money, so a strike's implied volatility rises when the index moves away from it in either direction, which pays anyone long the straddle. Selling short-dated index volatility would earn far less here than on real options. *Next preset.*
+
 **Agents and the book.**
 
 - An agent's permanent impact lives in $s$, so it decays on the mispricing's half-life rather than lasting. *Next preset.*
