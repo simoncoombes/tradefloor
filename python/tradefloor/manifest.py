@@ -597,6 +597,9 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          # `surface_ssvi` is set, and the options' book once an agent has
          # traded one.
          "options", "options_book",
+         # The skew premium's noise and its key, only while
+         # `surface_skew_noise_sd` is set.
+         "skew_noise",
          # The single-name options, only while `options_names_listed` is
          # set, their book once an agent has traded one, and their exercise
          # instructions and exercises once there are any.
@@ -1091,6 +1094,17 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     if "options_book" in snapshot:
         _f64(buf, 81.0)
         _book(buf, snapshot["options_book"])
+    # The skew premium's noise and its key, only while `surface_skew_noise_sd`
+    # is set, behind their own tag: three numbers.
+    if "skew_noise" in snapshot:
+        raw = snapshot["skew_noise"]
+        if len(raw) != 24:
+            raise ValidationError(
+                f"snapshot field 'skew_noise' carries {len(raw)} bytes, not the "
+                "three f64s it holds.")
+        _f64(buf, 82.0)
+        for value in _column(raw, 3, "skew_noise"):
+            _f64(buf, value)
     # The single-name options, only while `options_names_listed` is set,
     # behind their own tag, length-prefixed; their book behind another once
     # an agent has traded one; their instructions and exercises behind a
@@ -1804,7 +1818,7 @@ _LEDGER_OPTIONAL_BUFFERS = ("fair_value_offset", "opening_z", "pending_fair_valu
                             "pending_dividend", "fed_drawdown_returns",
                             "innovation_day", "forecast", "futures",
                             "night_bridge", "vix_futures", "rate_futures",
-                            "oil_futures", "margin", "options", "name_options",
+                            "oil_futures", "margin", "options", "skew_noise", "name_options",
                             "shares_outstanding", "oil_target_drift", "core_trend",
                             "eve_decision", "spread_noise")
 

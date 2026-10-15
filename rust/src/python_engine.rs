@@ -4782,6 +4782,13 @@ impl PyEngine {
         self.inner.live_vix()
     }
 
+    /// The skew premium's noise now (`surface_skew_noise_sd`), in skewness
+    /// units (a SKEW move is `-10` times it), or None with the dial at 0.0.
+    #[getter]
+    fn skew_noise(&self) -> Option<f64> {
+        self.inner.skew_noise_level()
+    }
+
     /// Whether the model lists futures of any family
     /// (`futures_index_listed`, `futures_vix_listed`, `futures_rates_listed`
     /// or `futures_oil_listed`). A property of the model: True on a model

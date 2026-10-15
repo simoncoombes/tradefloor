@@ -425,7 +425,10 @@ impl Engine {
             } else {
                 slopes * crate::mathx::log(vix / SKEW_VIX_CENTRE)
             };
-            Some(p.surface_skew_physical + slope + p.surface_skew_premium)
+            let level = p.surface_skew_physical + slope + p.surface_skew_premium;
+            // The skew noise (`surface_skew_noise_sd`), added only when set,
+            // so the shipped arithmetic is unchanged.
+            Some(if self.carries_skew_noise() { level + self.skew_noise } else { level })
         } else {
             None
         };
@@ -1189,10 +1192,98 @@ impl Engine {
         self.options_cross_resting();
     }
 
-    /// At a close: the session ends. Nothing with both switches off.
+    /// At a close: the session ends, and the skew noise takes tonight's
+    /// step (`surface_skew_noise_sd`). Nothing with both switches off.
     pub(super) fn options_close(&mut self) {
         if self.surface_on() {
             self.options.phase = OptionsPhase::Night;
+        }
+        if let Some(next) = self.skew_noise_step(self.elapsed_days) {
+            self.skew_noise = next;
+        }
+    }
+
+    // ── The skew noise ────────────────────────────────────────────────────
+
+    /// Whether this engine's model carries the skew premium's noise
+    /// (`surface_skew_noise_sd` set), which is when the snapshot and the
+    /// state hash carry it. Off on every preset.
+    pub fn carries_skew_noise(&self) -> bool {
+        self.params.surface_skew_noise_sd != 0.0
+    }
+
+    /// The noise's one-session keep, `0.5^(1/H)`, H
+    /// `surface_skew_noise_half_life`; 0.0 (no persistence) at H 0.0.
+    fn skew_noise_keep(&self) -> f64 {
+        let h = self.params.surface_skew_noise_half_life;
+        if h == 0.0 {
+            0.0
+        } else {
+            crate::mathx::pow(0.5, 1.0 / h)
+        }
+    }
+
+    /// The noise's opening: its stationary sd, `surface_skew_noise_sd`,
+    /// times the first normal of `GameRng::keyed(key, SKEW_NOISE_TAG << 32,
+    /// 0)`, a word no session's draw uses; 0.0 with the dial at 0.0.
+    pub(super) fn skew_noise_opening(&self) -> f64 {
+        if !self.carries_skew_noise() {
+            return 0.0;
+        }
+        let z = crate::rng::GameRng::keyed(self.skew_noise_key, (crate::rng::SKEW_NOISE_TAG as u64) << 32, 0)
+            .next_normal();
+        self.params.surface_skew_noise_sd * z
+    }
+
+    /// The noise after `session`'s close, or `None` with the dial at 0.0:
+    /// `phi x + sd sqrt(1 - phi^2) z`, `z` the first normal of
+    /// `GameRng::keyed(key, SKEW_NOISE_TAG, session)`.
+    fn skew_noise_step(&self, session: i64) -> Option<f64> {
+        if !self.carries_skew_noise() {
+            return None;
+        }
+        let phi = self.skew_noise_keep();
+        let z = crate::rng::GameRng::keyed(self.skew_noise_key, crate::rng::SKEW_NOISE_TAG as u64, session as u64)
+            .next_normal();
+        let innovation = self.params.surface_skew_noise_sd * crate::mathx::sqrt(1.0 - phi * phi);
+        Some(phi * self.skew_noise + innovation * z)
+    }
+
+    /// The skew noise now, skewness units, or `None` with
+    /// `surface_skew_noise_sd` at 0.0.
+    pub fn skew_noise_level(&self) -> Option<f64> {
+        self.carries_skew_noise().then_some(self.skew_noise)
+    }
+
+    /// The skew noise for a snapshot and the state hash, `[x, key high word,
+    /// key low word]`, or `None` with `surface_skew_noise_sd` at 0.0.
+    pub fn skew_noise_words(&self) -> Option<[f64; 3]> {
+        if !self.carries_skew_noise() {
+            return None;
+        }
+        Some([self.skew_noise, (self.skew_noise_key >> 32) as f64, (self.skew_noise_key & 0xFFFF_FFFF) as f64])
+    }
+
+    /// Put the skew noise back (a restore): refused where the snapshot and
+    /// the model disagree on whether it is carried.
+    pub fn set_skew_noise_words(&mut self, words: Option<&[f64]>) -> Result<(), String> {
+        match (self.carries_skew_noise(), words) {
+            (false, None) => Ok(()),
+            (false, Some(_)) => Err("this snapshot carries the skew noise (skew_noise), which only an engine \
+                                     with surface_skew_noise_sd set keeps, and this engine's model has it at 0"
+                .to_string()),
+            (true, None) => Err("an engine with surface_skew_noise_sd set carries its skew noise \
+                                 (skew_noise); this snapshot lacks it"
+                .to_string()),
+            (true, Some(w)) => {
+                let word = |v: f64| v.is_finite() && v.fract() == 0.0 && (0.0..4_294_967_296.0).contains(&v);
+                if w.len() != 3 || !w[0].is_finite() || !word(w[1]) || !word(w[2]) {
+                    return Err(format!("this snapshot's skew noise does not parse: {w:?}"));
+                }
+                self.skew_noise = w[0];
+                self.skew_noise_key = ((w[1] as u64) << 32) | (w[2] as u64);
+                Ok(())
+            }
         }
     }
 
