@@ -331,7 +331,7 @@ jobs:
       id-token: write
       contents: read
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Wait for this version on PyPI
         shell: bash
         run: |
