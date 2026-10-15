@@ -109,6 +109,17 @@ payload, Arrow and WASM show them; agents trade by symbol.
   `skew_noise` (the level and its key) while the dial is set, hashed behind
   tag 82, as `manifest.state_hash` does. Every known-answer digest is where
   it was.
+### The index surface's own curvature
+
+- `surface_index_curvature` is a new dial, 0.0 on every preset (the shared
+  `surface_curvature`) and left out of the digest there. Off zero the index
+  surface is fitted at its own curvature and the names keep theirs: a
+  name's correlation is its share of the one the index's VIX and skewness
+  give at the shared curvature, so the names' smiles are the ones they have
+  without it. A lower index curvature puts less of the strip's variance in
+  the wings, so at-the-money volatility sits nearer the VIX, and reaches
+  less skew. No state, nothing in the snapshot; stock prices are the same
+  with it set, and every known-answer digest is where it was.
 
 ### Single-name options
 
