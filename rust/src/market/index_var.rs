@@ -1293,10 +1293,57 @@ pub fn vix_from_variance(premium: f64, variance: f64) -> f64 {
     (1.0 + premium) * 100.0 * mathx::sqrt(252.0 * variance)
 }
 
+/// [`vix_from_variance`] with the premium's slope on the variance-implied
+/// level ([`ModelParams::vix_variance_premium_slope`](crate::params::ModelParams::vix_variance_premium_slope)):
+/// `VIX = (1 + pi) (L / 20)^slope L`, `L = 100 * sqrt(252 * V)`, the level
+/// the variance implies before any premium. A slope of exactly 0.0 is
+/// [`vix_from_variance`] itself, the same bits. It reads the variance alone,
+/// so no VIX enters its own premium, and for a slope above -1 it rises
+/// with the variance. A variance of zero or less maps to what
+/// [`vix_from_variance`] gives it.
+pub fn vix_from_variance_sloped(premium: f64, slope: f64, variance: f64) -> f64 {
+    if slope == 0.0 {
+        return vix_from_variance(premium, variance);
+    }
+    let level = 100.0 * mathx::sqrt(252.0 * variance);
+    if !(level > 0.0) {
+        return vix_from_variance(premium, variance);
+    }
+    (1.0 + premium) * mathx::pow(level / 20.0, slope) * level
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::params::PT_V18;
+
+    #[test]
+    fn the_sloped_premium_is_the_constant_at_zero_and_at_a_level_of_twenty() {
+        for &v in &[1e-6, 4e-5, 1.6e-4, 9e-4] {
+            assert_eq!(
+                vix_from_variance_sloped(0.252, 0.0, v).to_bits(),
+                vix_from_variance(0.252, v).to_bits(),
+                "a slope of 0.0 is the constant's map, bit for bit"
+            );
+        }
+        // L = 20 is a daily variance of (0.20)^2 / 252.
+        let v20 = 0.04 / 252.0;
+        let got = vix_from_variance_sloped(0.252, -0.07, v20);
+        assert!((got - 1.252 * 20.0).abs() < 1e-9, "{got}");
+        // Below 20 the premium is larger, above it smaller, and the VIX
+        // rises with the variance throughout.
+        let calm = vix_from_variance_sloped(0.252, -0.07, v20 / 4.0);
+        let storm = vix_from_variance_sloped(0.252, -0.07, v20 * 4.0);
+        assert!(calm / 10.0 > 1.252 && storm / 40.0 < 1.252, "{calm} {storm}");
+        let mut last = 0.0;
+        for k in 1..400 {
+            let v = 1e-7 * f64::from(k) * f64::from(k);
+            let x = vix_from_variance_sloped(0.252, -0.5, v);
+            assert!(x > last, "increasing at k {k}");
+            last = x;
+        }
+        assert_eq!(vix_from_variance_sloped(0.252, -0.07, 0.0), 0.0);
+    }
 
     /// `SQRT_TWO` scales every `erfc` argument in the tail probability, so
     /// its bits are part of the simulation. It is the standard library's

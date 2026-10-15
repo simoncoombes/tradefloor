@@ -682,6 +682,10 @@ PERTURBATIONS = [
     # is 1.070619 at the shipped 0.252 and 1.056882 at 0.5, and the anchor
     # moves 20.81 to 24.94.
     ("vix_variance_premium", 0.5, True),
+    # LIVE ON pt-v20 for the same reason: the slope moves the premium every
+    # identity site reads, the anchor derived at construction and the
+    # read-back each day, and the VIX the couplings divide feeds the market.
+    ("vix_variance_premium_slope", -0.1, True),
     # INERT UNDER THE IDENTITY: the amplitude scales the phase table around
     # its mean, and under `vix_level_identity` the target's first branch is
     # taken and the phase table is never read at all -- the business cycle

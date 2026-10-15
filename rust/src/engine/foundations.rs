@@ -13,7 +13,7 @@ use crate::market::index_value::{
 };
 use crate::market::index_var::{
     index_conditional_variance_terms_with_states, intraday_variance_factor,
-    name_noise_variance_scaled, name_session_variance, vix_from_variance, NameConstants,
+    name_noise_variance_scaled, name_session_variance, vix_from_variance_sloped, NameConstants,
     NameVariance,
 };
 
@@ -893,7 +893,7 @@ impl Engine {
             for &(w, _, scale) in &regimes {
                 scale_bar += w * scale;
             }
-            let implied = vix_from_variance(p.vix_variance_premium, v_next);
+            let implied = vix_from_variance_sloped(p.vix_variance_premium, p.vix_variance_premium_slope, v_next);
             if p.vix_anchor_memory != 0.0 && p.vix_level_identity != 0.0 {
                 let anchor = self.vix_anchor * scale_bar;
                 let anchor = if p.vix_anchor_centre != 0.0 {

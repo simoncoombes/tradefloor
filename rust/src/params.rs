@@ -7375,6 +7375,32 @@ pub struct ModelParams {
     /// measurement doesn't support a state-dependent premium, and none is
     /// fitted.
     pub vix_variance_premium: f64,
+    /// The variance risk premium's slope on the variance-implied level
+    /// (`vix_variance_premium`): `1 + pi(L) = (1 + vix_variance_premium)
+    /// (L / 20)^slope`, `L = 100 sqrt(252 V)` the level the index's variance
+    /// implies before any premium, so the premium is the constant's at a
+    /// level of 20 and falls as the level rises when the slope is negative.
+    /// It reads the variance, never the VIX, so the map from variance to VIX
+    /// stays a function of the variance alone (increasing in it for any
+    /// slope above -1). Read only while `vix_level_identity` is non-zero;
+    /// 0.0, on every shipped preset, is today's constant premium, and a
+    /// value of 0.0 is left out of the model's digest.
+    ///
+    /// # Measurement
+    ///
+    /// ^GSPC adjusted closes and the Cboe VIX, 1990-01-02 to 2025-07-30,
+    /// 8,955 sessions with a return. Sessions bucketed by the VIX at the
+    /// close (under 12, 12-15, 15-20, 20-25, 25-30, 30-40, 40 and over), and
+    /// in each the median of the VIX over the next 21 sessions' realised
+    /// volatility: 1.405, 1.396, 1.409, 1.344, 1.335, 1.350, 1.213, the
+    /// table this dial's companion lists. Each bucket's variance-implied
+    /// level is its median VIX over that ratio (8.0 to 37.5), and the log
+    /// ratio is fitted on the log level over 20, weighted by sessions:
+    /// slope -0.0697, standard error 0.0398 from 2,000 draws of whole
+    /// calendar years. Only the slope is taken from the table; the level is
+    /// the constant's per-calendar-year measurement, unchanged. In [-0.5,
+    /// 0.5].
+    pub vix_variance_premium_slope: f64,
     /// Which index return the VIX reacts to: the session's final minute
     /// (0.0, pt-v1 through pt-v8) or the whole day's (1.0, pt-v9 onward),
     /// blended in between.
@@ -8201,6 +8227,7 @@ impl ModelParams {
             // MEASURED, and unread while the identity above is 0.0. See
             // the field's own note for the five estimators and the IQR.
             vix_variance_premium: 0.252,
+            vix_variance_premium_slope: 0.0,
             vix_cycle_amplitude: 1.0,
             vix_return_source: 0.0,
             vix_return_gain: crate::economy::VIX_RETURN_GAIN,
@@ -10855,6 +10882,7 @@ impl ModelParams {
             "vix_realised_vol_weight" => self.vix_realised_vol_weight,
             "vix_level_identity" => self.vix_level_identity,
             "vix_variance_premium" => self.vix_variance_premium,
+            "vix_variance_premium_slope" => self.vix_variance_premium_slope,
             "vix_return_clamp" => self.vix_return_clamp,
             "vix_return_gain" => self.vix_return_gain,
             "vix_return_gain_up" => self.vix_return_gain_up,
@@ -11266,6 +11294,7 @@ impl ModelParams {
             "vix_realised_vol_weight" => out.vix_realised_vol_weight = value,
             "vix_level_identity" => out.vix_level_identity = value,
             "vix_variance_premium" => out.vix_variance_premium = value,
+            "vix_variance_premium_slope" => out.vix_variance_premium_slope = value,
             "vix_return_clamp" => out.vix_return_clamp = value,
             "vix_return_gain" => out.vix_return_gain = value,
             "vix_return_gain_up" => out.vix_return_gain_up = value,
@@ -11787,6 +11816,18 @@ impl ModelParams {
                  normalise against; it is a random walk on the VIX's own scale. Set the \
                  persistence inside [0, 1) or the sigma to 0.0.",
                 self.vix_level_sigma, self.vix_level_persistence));
+        }
+        if !(-0.5..=0.5).contains(&self.vix_variance_premium_slope) {
+            return Err(format!(
+                "vix_variance_premium_slope is {}. It is in [-0.5, 0.5].",
+                self.vix_variance_premium_slope));
+        }
+        if self.vix_variance_premium_slope != 0.0 && self.vix_level_identity == 0.0 {
+            return Err(format!(
+                "vix_level_identity is 0 but vix_variance_premium_slope is {}. The slope moves the \
+                 premium the identity's VIX carries over the index's variance, which only \
+                 vix_level_identity reads: set vix_level_identity first.",
+                self.vix_variance_premium_slope));
         }
         if self.vix_level_sigma != 0.0 && self.vix_level_identity == 0.0 {
             return Err(format!(
@@ -13611,6 +13652,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "margin_scan_coverage",
     "margin_scan_tail",
     "night_session_steps",
+    "vix_variance_premium_slope",
 ];
 
 #[cfg(test)]
@@ -14003,6 +14045,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "vix_realised_vol_weight",
         "vix_level_identity",
         "vix_variance_premium",
+        "vix_variance_premium_slope",
         "vix_return_clamp",
         "vix_return_gain",
         "vix_return_gain_up",

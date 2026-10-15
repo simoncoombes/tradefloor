@@ -3415,7 +3415,8 @@ impl Engine {
         let v = crate::market::index_var::index_unconditional_variance(
             &self.params, &names, self.sector_keys.len(), &bases);
         let derived =
-            crate::market::index_var::vix_from_variance(self.params.vix_variance_premium, v);
+            crate::market::index_var::vix_from_variance_sloped(
+                self.params.vix_variance_premium, self.params.vix_variance_premium_slope, v);
         // A ROSTER WITH NO INDEX HAS NO VIX. An engine built with no public
         // names, or one whose whole roster is bankrupt, leaves an
         // unconditional variance of nothing but the market jump, and the
@@ -6929,9 +6930,10 @@ impl Engine {
         }
         let vix = self.economy.vix;
         let premium = self.params.vix_variance_premium;
+        let slope = self.params.vix_variance_premium_slope;
         let read_back = |v: f64| {
-            crate::market::index_var::vix_from_variance(
-                premium, self.index_conditional_variance_terms_at(v).total())
+            crate::market::index_var::vix_from_variance_sloped(
+                premium, slope, self.index_conditional_variance_terms_at(v).total())
         };
         let base = self.params.market_factor_sigma * self.params.market_factor_sigma;
         let mut lo = read_back(base * self.params.market_vol_floor_multiple);
@@ -8223,8 +8225,9 @@ impl Engine {
         let vix_ratio_denominator = if self.params.market_vol_vix_excursion == 0.0 {
             self.vix_anchor
         } else {
-            let implied = crate::market::index_var::vix_from_variance(
+            let implied = crate::market::index_var::vix_from_variance_sloped(
                 self.params.vix_variance_premium,
+                self.params.vix_variance_premium_slope,
                 self.index_conditional_variance_terms_now().total(),
             );
             // A read-back of zero or worse is not reachable — the factor
@@ -9157,8 +9160,8 @@ impl Engine {
         // with the dial at 0.0.
         if self.params.vix_anchor_memory != 0.0 && self.params.vix_level_identity != 0.0 {
             let mult = self.vix_level_multiplier();
-            let implied = crate::market::index_var::vix_from_variance(
-                self.params.vix_variance_premium, index_variance) * mult;
+            let implied = crate::market::index_var::vix_from_variance_sloped(
+                self.params.vix_variance_premium, self.params.vix_variance_premium_slope, index_variance) * mult;
             // Times the cycle's VIX scale, exactly 1.0 with
             // `market_vol_cycle_ratio` at 0.0 or the side's power at 0.0,
             // so the memory reads fear against the phase's normal level.
@@ -9663,8 +9666,9 @@ impl Engine {
                 // and nowhere else: a branch at a multiplier of exactly
                 // 1.0, so every preset with `vix_level_sigma` 0.0 wires
                 // the very value it wired before the level existed.
-                let implied = crate::market::index_var::vix_from_variance(
+                let implied = crate::market::index_var::vix_from_variance_sloped(
                     self.params.vix_variance_premium,
+                    self.params.vix_variance_premium_slope,
                     index_variance,
                 );
                 let mult = self.vix_level_multiplier();
@@ -11474,8 +11478,9 @@ impl Engine {
         let denominator = if self.params.market_vol_vix_excursion == 0.0 {
             self.vix_anchor
         } else {
-            let implied = crate::market::index_var::vix_from_variance(
+            let implied = crate::market::index_var::vix_from_variance_sloped(
                 self.params.vix_variance_premium,
+                self.params.vix_variance_premium_slope,
                 self.index_conditional_variance_terms_now().total(),
             );
             if implied > 0.0 { implied } else { self.vix_anchor }
@@ -11515,8 +11520,8 @@ impl Engine {
         // `advance_day_with` steps them before the economy's step.
         let (slow, stress) = if self.params.vix_anchor_memory != 0.0 && self.params.vix_level_identity != 0.0 {
             let mult = self.vix_level_multiplier();
-            let implied = crate::market::index_var::vix_from_variance(
-                self.params.vix_variance_premium, index_variance) * mult;
+            let implied = crate::market::index_var::vix_from_variance_sloped(
+                self.params.vix_variance_premium, self.params.vix_variance_premium_slope, index_variance) * mult;
             let anchor = self.vix_anchor * mult * cycle_vix_scale;
             let anchor = if self.params.vix_anchor_centre != 0.0 {
                 anchor * crate::mathx::exp(-self.params.vix_anchor_centre)
