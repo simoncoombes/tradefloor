@@ -1385,6 +1385,19 @@ pub struct ModelParams {
     /// arbitrage (the paper's Remark 4.4), so the skewness the curvature can
     /// reach falls as it rises past 1. In [0, 2).
     pub surface_curvature: f64,
+    /// The index surface's own curvature, SSVI's `eta` for the index alone
+    /// (`surface_curvature`). 0.0, on every shipped preset, is the shared
+    /// curvature, and a value of 0.0 is left out of the model's digest.
+    ///
+    /// Off zero the index surface is fitted at this curvature, and the names
+    /// keep `surface_curvature`: a name's correlation is its share
+    /// (`surface_name_skew`) of the one the index's VIX and skewness give at
+    /// the shared curvature, so the names' smiles are the ones they have
+    /// without it. A lower curvature puts less of the strip's variance in the
+    /// wings, so at-the-money volatility sits nearer the VIX, and it reaches
+    /// less skew: about SKEW 121 at 0.65 and 131 at 1.0. Read only with
+    /// `surface_ssvi` set. In [0, 2).
+    pub surface_index_curvature: f64,
     /// The surface's curvature exponent, SSVI's `gamma`
     /// (`surface_curvature`): how fast the smile flattens with the tenor.
     /// Read only with `surface_ssvi` set; 0.0, on every shipped preset, is an
@@ -7923,6 +7936,7 @@ impl ModelParams {
             surface_skew_premium: 0.0,
             surface_skew_premium_slope: 0.0,
             surface_curvature: 0.0,
+            surface_index_curvature: 0.0,
             surface_curvature_exponent: 0.0,
             surface_term_premium_short: 0.0,
             surface_term_premium_long: 0.0,
@@ -10551,6 +10565,7 @@ impl ModelParams {
             "surface_skew_premium" => self.surface_skew_premium,
             "surface_skew_premium_slope" => self.surface_skew_premium_slope,
             "surface_curvature" => self.surface_curvature,
+            "surface_index_curvature" => self.surface_index_curvature,
             "surface_curvature_exponent" => self.surface_curvature_exponent,
             "surface_term_premium_short" => self.surface_term_premium_short,
             "surface_term_premium_long" => self.surface_term_premium_long,
@@ -10944,6 +10959,7 @@ impl ModelParams {
             "surface_skew_premium" => out.surface_skew_premium = value,
             "surface_skew_premium_slope" => out.surface_skew_premium_slope = value,
             "surface_curvature" => out.surface_curvature = value,
+            "surface_index_curvature" => out.surface_index_curvature = value,
             "surface_curvature_exponent" => out.surface_curvature_exponent = value,
             "surface_term_premium_short" => out.surface_term_premium_short = value,
             "surface_term_premium_long" => out.surface_term_premium_long = value,
@@ -12472,12 +12488,19 @@ impl ModelParams {
                  correlation keeps every smile free of static arbitrage.",
                 self.surface_curvature));
         }
+        if !(self.surface_index_curvature >= 0.0 && self.surface_index_curvature < 2.0) {
+            return Err(format!(
+                "surface_index_curvature is {}. It is the index surface's eta, in [0, 2): at 2 or \
+                 above no correlation keeps every smile free of static arbitrage.",
+                self.surface_index_curvature));
+        }
         for (name, v) in [
             ("surface_skew_physical", self.surface_skew_physical),
             ("surface_skew_physical_slope", self.surface_skew_physical_slope),
             ("surface_skew_premium", self.surface_skew_premium),
             ("surface_skew_premium_slope", self.surface_skew_premium_slope),
             ("surface_curvature", self.surface_curvature),
+            ("surface_index_curvature", self.surface_index_curvature),
             ("surface_curvature_exponent", self.surface_curvature_exponent),
             ("surface_term_premium_short", self.surface_term_premium_short),
             ("surface_term_premium_long", self.surface_term_premium_long),
@@ -13059,6 +13082,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "surface_skew_premium",
     "surface_skew_premium_slope",
     "surface_curvature",
+    "surface_index_curvature",
     "surface_curvature_exponent",
     "surface_term_premium_short",
     "surface_term_premium_long",
@@ -13274,6 +13298,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "surface_skew_premium",
         "surface_skew_premium_slope",
         "surface_curvature",
+        "surface_index_curvature",
         "surface_curvature_exponent",
         "surface_term_premium_short",
         "surface_term_premium_long",

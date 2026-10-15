@@ -168,6 +168,10 @@ pub(crate) struct OptionsState {
     /// option, which open interest is read from.
     pub(crate) book: BookState,
     pub(crate) cache: FitCache,
+    /// The fit the names' correlation is a share of when the index carries
+    /// its own curvature (`surface_index_curvature`): the index's VIX and
+    /// skewness at the names' curvature.
+    pub(crate) name_cache: FitCache,
 }
 
 impl Default for OptionsState {
@@ -178,6 +182,7 @@ impl Default for OptionsState {
             settled: Vec::new(),
             book: BookState::default(),
             cache: FitCache::default(),
+            name_cache: FitCache::default(),
         }
     }
 }
@@ -333,28 +338,59 @@ impl Engine {
 
     // ── The surface ───────────────────────────────────────────────────────
 
-    /// The 21-session fit at `vix` and the skewness `target`, from the cache
-    /// when its inputs are the last fit's.
+    /// The index surface's curvature, SSVI's `eta`: `surface_index_curvature`
+    /// when set, the shared `surface_curvature` otherwise.
+    pub(super) fn index_curvature(&self) -> f64 {
+        let own = self.params.surface_index_curvature;
+        if own == 0.0 {
+            self.params.surface_curvature
+        } else {
+            own
+        }
+    }
+
+    /// The index's 21-session fit at `vix` and the skewness `target`, from
+    /// the cache when its inputs are the last fit's.
     fn surface_fit(&self, vix: f64, target: Option<f64>) -> Option<SmileFit> {
+        self.surface_fit_at(vix, target, self.index_curvature(), &self.options.cache)
+    }
+
+    /// The 21-session fit at `vix`, the skewness `target` and the curvature
+    /// `eta`, from `cache` when its inputs are the last fit's there.
+    fn surface_fit_at(&self, vix: f64, target: Option<f64>, eta: f64, cache: &FitCache) -> Option<SmileFit> {
         let p = &self.params;
         let key = [
             vix.to_bits(),
             target.map_or(u64::MAX, f64::to_bits),
-            p.surface_curvature.to_bits(),
+            eta.to_bits(),
             p.surface_curvature_exponent.to_bits(),
         ];
-        if let Ok(guard) = self.options.cache.0.lock() {
+        if let Ok(guard) = cache.0.lock() {
             if let Some((k, fit)) = *guard {
                 if k == key {
                     return Some(fit);
                 }
             }
         }
-        let fit = fit_smile(vix, target, VIX_SESSIONS / 252.0, p.surface_curvature, p.surface_curvature_exponent)?;
-        if let Ok(mut guard) = self.options.cache.0.lock() {
+        let fit = fit_smile(vix, target, VIX_SESSIONS / 252.0, eta, p.surface_curvature_exponent)?;
+        if let Ok(mut guard) = cache.0.lock() {
             *guard = Some((key, fit));
         }
         Some(fit)
+    }
+
+    /// The fit the names' smile reads (`surface_name_skew`): the index's own
+    /// while `surface_index_curvature` is 0.0; under it, the index's VIX and
+    /// skewness fitted at the names' curvature, `surface_curvature`, so a
+    /// name's smile is the one the shared curvature gives it.
+    pub(super) fn name_reference_fit(&self, index: &Surface) -> Option<(f64, SmileFit)> {
+        if self.params.surface_index_curvature == 0.0 {
+            return Some((index.ssvi.eta, index.fit));
+        }
+        let eta = self.params.surface_curvature;
+        let target = if eta > 0.0 { index.skewness_target } else { None };
+        let fit = self.surface_fit_at(index.vix, target, eta, &self.options.name_cache)?;
+        Some((eta, fit))
     }
 
     /// The earnings reports the index surface reads (`surface_earnings_weight`):
@@ -415,7 +451,7 @@ impl Engine {
     pub(super) fn surface_at(&self, clock: &Clock) -> Option<Surface> {
         let p = &self.params;
         let vix = self.surface_vix();
-        let (eta, gamma) = (p.surface_curvature, p.surface_curvature_exponent);
+        let (eta, gamma) = (self.index_curvature(), p.surface_curvature_exponent);
         let target = if eta > 0.0 {
             // Both slopes are on ln(VIX / 20); the log is taken only when
             // one is set, so the shipped arithmetic is unchanged.

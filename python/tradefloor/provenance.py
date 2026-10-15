@@ -537,6 +537,10 @@ OUT_OF_SCOPE = {
         "unread while `surface_ssvi` is 0.0: only `surface_at` and "
         "`surface_fit` read it, and refused without the switch; at 0.0 it is "
         "also left out of the model's digest",
+    "surface_index_curvature":
+        "unread while `surface_ssvi` is 0.0: only `index_curvature` reads it, "
+        "and refused without the switch; at 0.0 it is the shared "
+        "`surface_curvature` and is also left out of the model's digest",
     "surface_curvature_exponent":
         "unread while `surface_ssvi` is 0.0: only `surface_at` and "
         "`surface_fit` read it, and refused without the switch; at 0.0 it is "

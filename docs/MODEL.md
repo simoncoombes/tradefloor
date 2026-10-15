@@ -4318,6 +4318,15 @@ to the model:
   bound. How far that reaches depends on the curvature: at $\eta = 1$ and
   $\gamma = 1/2$ the 21-session SKEW spans about 69 to 131; at $\gamma = 1/4$
   about 95 to 105. With $\eta$ at 0 the smile is flat and $\rho$ is 0.
+- The index's own curvature. `surface_index_curvature`, 0.0 on every
+  shipped preset, is the shared $\eta$. Set, the index surface is fitted at
+  it and the names keep `surface_curvature`: a name's correlation is its
+  share (`surface_name_skew`) of the $\rho$ the index's VIX and skewness give
+  at the shared $\eta$. With the VIX and the skewness held, a lower $\eta$
+  puts less of the strip's variance in the wings, so the at-the-money
+  volatility sits nearer the VIX; it also reaches less skew (SKEW about 121
+  at $\eta = 0.65$, 124 at 0.75, 127 at 0.85, 131 at 1.0, at
+  $\gamma = 1/2$) (`tests/test_index_curvature.py`).
 - The term structure. $\theta_T$ is $\theta_{21}$ times a shape: the
   forecast's expected index variance summed to $T$ (`forecast_horizon_sessions`;
   a constant variance without the forecast), times
