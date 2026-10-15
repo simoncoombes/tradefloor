@@ -3908,7 +3908,14 @@ A future is priced at `F = (S - PV(D)) * exp(r * tau) + b`:
   down. With the linear mark a day's TWAP of 10 per cent of the daily
   volume costs about 0.005 daily sigma, the half-spread and little else,
   against 0.10 to 0.21 for the square-root law measured on futures
-  metaorders (Toth et al. 2011).
+  metaorders (Toth et al. 2011). The equity memory's fast part fades in a
+  few minutes, so on its own the memory leaves a day's TWAP at about a
+  third of that: an equity's price carries the rest of a metaorder's impact
+  through the day, and a future's fair value cannot. Under
+  `futures_impact_memory_half_life` (0.0 on every shipped preset, the
+  equity's fast half-life) the futures' memory's fast part fades at its own
+  half-life in open ticks instead, and the cost of a day's TWAP grows with
+  it toward the square-root law's.
 
 Each close marks every contract at `F` on the close's index. At its expiry
 session's open a contract settles in cash on the index of the opening

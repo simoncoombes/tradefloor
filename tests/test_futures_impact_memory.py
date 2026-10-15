@@ -1,4 +1,5 @@
-"""The index futures' metaorder memory (`futures_impact_memory`, pt-v22).
+"""The index futures' metaorder memory (`futures_impact_memory`, pt-v22),
+and its half-life (`futures_impact_memory_half_life`).
 
 0.0 on every shipped preset, where the spec's linear mark stays: agents'
 net flow against the house moves the basis by `0.15 sigma flow / V` and
@@ -198,3 +199,70 @@ def test_the_memory_follows_its_contract_through_the_roll():
         for c in e.contracts():
             assert math.isfinite(e.quote(c["symbol"])["basis_bp"])
     assert len(seen) > 1, "no roll in 80 sessions"
+
+
+# ── The memory's own half-life (`futures_impact_memory_half_life`) ─────────
+
+#: A half-life of two sessions in open ticks, the equity memory's slow one.
+HALF_LIFE = 780.0
+
+
+def test_half_life_off_on_every_preset_silent_and_refused_without_the_memory():
+    for name in tf.preset_names():
+        assert tf.ModelParams.from_preset(name).futures_impact_memory_half_life == 0.0, name
+    assert "futures_impact_memory_half_life" in set(tf.ModelParams.digest_silent_at_zero())
+    assert model(futures_impact_memory_half_life=0.0).fingerprint == "pt-v21"
+    with pytest.raises(tf.ValidationError):
+        model(**ON, futures_impact_memory_half_life=HALF_LIFE)
+    for bad in (-1.0, 0.5, 98281.0):
+        with pytest.raises(tf.ValidationError):
+            model(**ON, **MEMORY, futures_impact_memory=Y, futures_impact_memory_half_life=bad)
+
+
+def test_half_life_untraded_changes_nothing():
+    out = []
+    for h in (0.0, HALF_LIFE):
+        e = tf.Engine(seed=3, universe=SMALL,
+                      model=model(**ON, **MEMORY, futures_impact_memory=Y, futures_impact_memory_half_life=h))
+        rows = []
+        for _ in range(3):
+            day(e)
+            snap = e.state_snapshot()
+            snap.pop("model_fingerprint")
+            rows += [e.prices(), [e.quote(c["symbol"]) for c in e.contracts()], repr(sorted(snap.items()))]
+        out.append(rows)
+    assert out[0] == out[1]
+
+
+def test_half_life_zero_is_the_equity_fast_half_life():
+    """0.0 is a branch onto `impact_memory_half_life` (12 ticks in MEMORY):
+    a TWAP costs the same to the last bit as with the half-life set to it."""
+    zero = _twap(_warm(Y, futures_impact_memory_half_life=0.0), 0.1)
+    same = _twap(_warm(Y, futures_impact_memory_half_life=MEMORY["impact_memory_half_life"]), 0.1)
+    assert zero == same
+
+
+def test_a_longer_half_life_carries_a_day_twap_toward_the_square_root_law():
+    """With the equity's 12-tick fast part most of a slice's displacement is
+    gone before the next; at two sessions it is not, so a day TWAP pays
+    more, and the cost still grows as a square root of its size."""
+    short = [_twap(_warm(Y), f) for f in (0.01, 0.1)]
+    long_ = [_twap(_warm(Y, futures_impact_memory_half_life=HALF_LIFE), f) for f in (0.01, 0.1)]
+    assert long_[1] > 1.5 * short[1], (short, long_)
+    expo = math.log(long_[1] / long_[0]) / math.log(10.0)
+    assert 0.3 < expo < 0.7, (long_, expo)
+
+
+@pytest.mark.parametrize("f", [0.01, 0.1])
+def test_no_round_trip_pays_with_a_long_half_life(f):
+    e = _warm(1.4, futures_impact_memory_half_life=HALF_LIFE)
+    q = f * e.quote(e.contracts()[0]["symbol"])["daily_volume"]
+    plans = {
+        "block, block back": [(0, q), (1, -q)],
+        "block, six slices back": [(0, q)] + [(1, -q / 6)] * 6,
+        "hour TWAP, block back": [(5 if k else 0, q / 12) for k in range(12)] + [(1, -q)],
+        "day TWAP, hour back": [(10 if k else 0, q / 30) for k in range(30)] + [(10, -q / 6)] * 6,
+        "alternating blocks": [(1 if k else 0, q if k % 2 == 0 else -q) for k in range(20)],
+    }
+    for name, legs in plans.items():
+        assert _round_trip(e, legs) < 0.0, name
