@@ -1141,7 +1141,8 @@ impl Engine {
     /// `futures_impact_memory`: the metaorder memory's step for every
     /// contract, the equity book's (`Engine::plan_memory`) on the contract's
     /// daily volume and the index's daily sigma. On an open step both
-    /// memories decay (`impact_memory_half_life`,
+    /// memories decay (the fast part at `futures_impact_memory_half_life`,
+    /// or `impact_memory_half_life` with it at 0.0, the slow part at
     /// `impact_memory_slow_half_life`; none at night, so it holds over the
     /// night as the equity memory does); the flow against the house since
     /// the last step, over the daily volume, is added to both (the book
@@ -1164,8 +1165,15 @@ impl Engine {
         let volume = self.futures_daily_volume(self.futures_step_index());
         let law = FuturesMemoryLaw::of(&self.params, self.market_vol.sigma_daily());
         let slow_on = self.params.impact_memory_slow_half_life > 0.0;
+        // `futures_impact_memory_half_life`: 0.0 is a branch, the equity's
+        // fast half-life.
+        let fast_half_life = if self.params.futures_impact_memory_half_life == 0.0 {
+            self.params.impact_memory_half_life
+        } else {
+            self.params.futures_impact_memory_half_life
+        };
         let (fast, slow) = if open_now {
-            (memory_decay(self.params.impact_memory_half_life), memory_decay(self.params.impact_memory_slow_half_life))
+            (memory_decay(fast_half_life), memory_decay(self.params.impact_memory_slow_half_life))
         } else {
             (1.0, 1.0)
         };

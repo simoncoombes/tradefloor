@@ -1178,6 +1178,8 @@ PERTURBATIONS = [
     # only agents' futures flow, so with no agent trading a contract every
     # price, the basis and the state are the run without it.
     ("futures_impact_memory", 0.65, False),
+    # Its half-life: INERT untraded for the same reason.
+    ("futures_impact_memory_half_life", 780.0, False),
     # The VIX futures (pt-v22 phase 1). INERT by construction: a VIX future
     # reads the published and live VIX and the forecast, draws nothing and
     # writes only its own state, so no stock price or VIX moves
@@ -2051,6 +2053,8 @@ COMPANIONS: dict[str, dict[str, float]] = {
     "futures_index_listed": {"index_level_listed": 1.0},
     "night_session_steps": {"index_level_listed": 1.0, "futures_index_listed": 1.0},
     "futures_impact_memory": {"index_level_listed": 1.0, "futures_index_listed": 1.0},
+    "futures_impact_memory_half_life": {"index_level_listed": 1.0, "futures_index_listed": 1.0,
+                                        "futures_impact_memory": 0.65},
     # A VIX future is priced on the forecast, out to its sixth contract's
     # 126 sessions; the loading's dials are refused without the switch.
     "futures_vix_listed": {"forecast_horizon_sessions": 126.0},
