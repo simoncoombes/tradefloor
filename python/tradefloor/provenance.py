@@ -232,11 +232,6 @@ POST_BASELINE = {
         "`vix_level_identity` is non-zero, so no preset has had to move it "
         "-- and 0.252 is a measurement, which is exactly the kind of number "
         "that must not be invisible because it arrived as a default",
-    "vix_variance_premium_slope":
-        "the premium's slope on the variance-implied level; 0.0 on every "
-        "preset, where the premium is the constant it always was, and read "
-        "only while `vix_level_identity` is non-zero; at 0.0 it is left out "
-        "of the model's digest",
     "garch_vix_exponent":
         "the exponent on the VIX ratio in a name's variance reference, "
         "which replaced an inline literal 2.0 at the value the literal "
@@ -587,6 +582,13 @@ OUT_OF_SCOPE = {
         "the spread's leverage term reads the gap itself, as it stood; the "
         "priced gap is neither stepped, snapshotted nor hashed; at 0.0 it is "
         "also left out of the model's digest",
+    "vix_variance_premium_slope":
+        "inert at 0.0: the identity's VIX is the constant premium over the "
+        "variance-implied level, as it stood (a branch in "
+        "`vix_from_variance_sloped` returning `vix_from_variance` itself); "
+        "no draw is taken and no state is added; read only while "
+        "`vix_level_identity` is non-zero; at 0.0 it is also left out of the "
+        "model's digest",
     "pinned_vix_sets_variance":
         "inert at 0.0: a pinned VIX marks tonight's close forced only when "
         "the caller asks (`vix_sets_variance`), as it stood (a branch in "
@@ -2442,33 +2444,6 @@ DIAL_PROVENANCE: dict[str, dict[str, Any]] = {
                 "measured value is the default and zero is not",
         "source_docstring": "rust/src/params.rs, "
                             "ModelParams::vix_variance_premium",
-    },
-    "vix_variance_premium_slope": {
-        # Measured, and 0.0 on every preset: a candidate that sets it sets
-        # the measured value. Only the slope is new; the level is the
-        # constant's own per-calendar-year measurement.
-        "kind": "measured",
-        "presets": {},
-        "source": "^GSPC adjusted closes and the Cboe VIX, 1990-01-02 to "
-                  "2025-07-30, 8,955 sessions with a return; the median of "
-                  "the VIX over the next 21 sessions' realised volatility in "
-                  "seven VIX buckets (1.405, 1.396, 1.409, 1.344, 1.335, "
-                  "1.350, 1.213 from under 12 to 40 and over)",
-        "date": "2026-10-15",
-        "script": "the log of each bucket's ratio on the log of its "
-                  "variance-implied level (median VIX over the ratio) over "
-                  "20, weighted by sessions, in the project's unpublished "
-                  "design notes",
-        "residual": "standard error 0.0398 on the slope -0.0697, from 2,000 "
-                    "draws of whole calendar years",
-        "estimator": "bucket medians on the next 21 sessions, the table the "
-                     "constant's docstring lists by VIX level; the constant "
-                     "itself stays the per-calendar-year 0.252",
-        "note": "read on the variance-implied level, never on the VIX, so "
-                "the map from variance to VIX stays a function of the "
-                "variance alone",
-        "source_docstring": "rust/src/params.rs, "
-                            "ModelParams::vix_variance_premium_slope",
     },
     "vix_return_exponent": {
         # A MEASUREMENT EXISTS AND IT IS NOT OF THIS VALUE. The tape's down
