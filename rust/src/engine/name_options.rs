@@ -458,14 +458,18 @@ impl Engine {
         );
         let shape = term_shape(&inputs, n_max);
         let curve = ThetaCurve::from_shape(&shape, clock.elapsed, 1.0)?;
-        let rho = if p.surface_name_skew == 0.0 { 0.0 } else { p.surface_name_skew * index.ssvi.rho };
+        // The names' curvature and the correlation theirs is a share of: the
+        // index's own, or under `surface_index_curvature` the index's VIX and
+        // skewness fitted at the shared curvature.
+        let (eta, reference) = self.name_reference_fit(index)?;
+        let rho = if p.surface_name_skew == 0.0 { 0.0 } else { p.surface_name_skew * reference.rho };
         Some(Surface {
             root: self.companies[slot].ticker.clone(),
-            ssvi: Ssvi::new(rho, index.ssvi.eta, index.ssvi.gamma),
+            ssvi: Ssvi::new(rho, eta, index.ssvi.gamma),
             curve,
             vix: index.vix,
             skewness_target: None,
-            fit: index.fit,
+            fit: reference,
         })
     }
 
