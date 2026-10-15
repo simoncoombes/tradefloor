@@ -682,6 +682,10 @@ PERTURBATIONS = [
     # is 1.070619 at the shipped 0.252 and 1.056882 at 0.5, and the anchor
     # moves 20.81 to 24.94.
     ("vix_variance_premium", 0.5, True),
+    # LIVE ON pt-v20 for the same reason: the slope moves the premium every
+    # identity site reads, the anchor derived at construction and the
+    # read-back each day, and the VIX the couplings divide feeds the market.
+    ("vix_variance_premium_slope", -0.1, True),
     # INERT UNDER THE IDENTITY: the amplitude scales the phase table around
     # its mean, and under `vix_level_identity` the target's first branch is
     # taken and the phase table is never read at all -- the business cycle
@@ -2136,6 +2140,9 @@ def test_the_perturbation_table_covers_the_whole_settable_surface():
 #: carrying the same companions, none of the three moved. The companions
 #: are the default's 0.375 now, and the three rows are re-valued.
 COMPANIONS: dict[str, dict[str, float]] = {
+    # The premium's slope is read only under the identity, which pt-v18 and
+    # earlier leave off.
+    "vix_variance_premium_slope": {"vix_level_identity": 1.0},
     # Core differs from headline only where oil pays inflation, which the
     # symmetric pass-through does either side of 81 (the shipped branch pays
     # nothing between 50 and 80).

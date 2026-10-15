@@ -3229,8 +3229,9 @@ impl PyEngine {
         out.set_item("total", total)?;
         out.set_item(
             "implied",
-            crate::market::index_var::vix_from_variance(
+            crate::market::index_var::vix_from_variance_sloped(
                 self.inner.params().vix_variance_premium,
+                self.inner.params().vix_variance_premium_slope,
                 total,
             ),
         )?;

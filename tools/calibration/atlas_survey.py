@@ -485,6 +485,9 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # The contracts' margin (pt-v22 phase 1): its coverage and tail allowance.
     "margin_scan_coverage": (0.0, 0.995),
     "margin_scan_tail": (0.0, 2.0),
+    # The VIX premium's slope on the variance-implied level: the measured
+    # -0.07 with room either side, inside the dial's [-0.5, 0.5].
+    "vix_variance_premium_slope": (-0.2, 0.0),
     # The central bank's stress cut, points per step: 0.5 is a half-point
     # step, two steps a point, which is 2001's and 2008's emergency size.
     "fed_stress_cut": (0.0, 0.5),

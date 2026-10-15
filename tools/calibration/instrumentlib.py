@@ -497,6 +497,8 @@ PARAM_SPECS: dict[str, dict] = {
     # outside it the value is not one the tape supports.
     "vix_variance_premium": {"kind": "abs", "step_unit": 0.02,
                              "hard_range": (0.049, 0.473)},
+    "vix_variance_premium_slope": {"kind": "abs", "step_unit": 0.01,
+                                   "hard_range": (-0.5, 0.5), "derived": True},
     "vix_return_gain": {"kind": "log", "hard_range": (1.0, 250.0)},
     "vix_return_source": {"kind": "abs", "step_unit": 0.1,
                           "hard_range": (0.0, 1.0)},

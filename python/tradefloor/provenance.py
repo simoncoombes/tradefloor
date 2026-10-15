@@ -582,6 +582,13 @@ OUT_OF_SCOPE = {
         "the spread's leverage term reads the gap itself, as it stood; the "
         "priced gap is neither stepped, snapshotted nor hashed; at 0.0 it is "
         "also left out of the model's digest",
+    "vix_variance_premium_slope":
+        "inert at 0.0: the identity's VIX is the constant premium over the "
+        "variance-implied level, as it stood (a branch in "
+        "`vix_from_variance_sloped` returning `vix_from_variance` itself); "
+        "no draw is taken and no state is added; read only while "
+        "`vix_level_identity` is non-zero; at 0.0 it is also left out of the "
+        "model's digest",
     "pinned_vix_sets_variance":
         "inert at 0.0: a pinned VIX marks tonight's close forced only when "
         "the caller asks (`vix_sets_variance`), as it stood (a branch in "

@@ -22,6 +22,18 @@ same with them on as off.
 
 <!-- release-note-ends -->
 
+### The variance risk premium's slope
+
+- `vix_variance_premium_slope` is a new dial, 0.0 on every preset (today's
+  constant premium) and left out of the digest there. Off zero the premium
+  the identity's VIX carries over the index's variance falls with the level
+  that variance implies, `1 + pi(L) = (1 + vix_variance_premium) (L / 20)^slope`,
+  at every site that maps a variance to a VIX (the target, the anchor and the
+  read-backs). It reads the variance, never the VIX, takes no draw and adds
+  no state. The tape's value is -0.070 (standard error 0.040), from the VIX
+  over the next 21 sessions' realised volatility by VIX bucket. Every
+  known-answer digest is where it was.
+
 ### Index futures
 
 - `futures_index_listed` and `night_session_steps` are new dials, with
