@@ -214,7 +214,7 @@ def test_half_life_off_on_every_preset_silent_and_refused_without_the_memory():
     assert model(futures_impact_memory_half_life=0.0).fingerprint == "pt-v21"
     with pytest.raises(tf.ValidationError):
         model(**ON, futures_impact_memory_half_life=HALF_LIFE)
-    for bad in (-1.0, 0.5, 98281.0):
+    for bad in (-1.0, 98281.0):
         with pytest.raises(tf.ValidationError):
             model(**ON, **MEMORY, futures_impact_memory=Y, futures_impact_memory_half_life=bad)
 

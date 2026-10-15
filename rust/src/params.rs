@@ -1233,7 +1233,7 @@ pub struct ModelParams {
     /// end follows the square-root law whatever its duration up to a day,
     /// which needs a memory that does not fade within the day. Reads only
     /// agents' futures flow, so an untraded run is the run without it.
-    /// Requires `futures_impact_memory`. 0.0 or in [1, 98280].
+    /// Requires `futures_impact_memory`. In [0, 98280].
     pub futures_impact_memory_half_life: f64,
     /// Whether the engine lists monthly futures on the published VIX. 0.0,
     /// on every shipped preset, lists none: no contract, no state, nothing
@@ -12432,12 +12432,10 @@ impl ModelParams {
                  futures_impact_memory set, futures_index_listed is 1.0.",
                 self.futures_impact_memory));
         }
-        if !(self.futures_impact_memory_half_life == 0.0
-            || (1.0..=98280.0).contains(&self.futures_impact_memory_half_life))
-        {
+        if !(0.0..=98280.0).contains(&self.futures_impact_memory_half_life) {
             return Err(format!(
-                "futures_impact_memory_half_life is {}. It is 0.0 (the equity memory's \
-                 fast half-life) or a half-life in open ticks, in [1, 98280].",
+                "futures_impact_memory_half_life is {}. It is a half-life in open ticks, in \
+                 [0, 98280]; 0.0 takes the equity memory's fast half-life.",
                 self.futures_impact_memory_half_life));
         }
         if self.futures_impact_memory_half_life != 0.0 && self.futures_impact_memory == 0.0 {
