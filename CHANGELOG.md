@@ -273,7 +273,7 @@ payload, Arrow and WASM show them; agents trade by symbol.
   `strike`. An agent's market view serves `chain`, `surface` and
   `option_margin`.
 - A snapshot carries `options` under `surface_ssvi` and `options_book` once
-  an agent has traded an option, hashed behind tags 55 and 56 only then, as
+  an agent has traded an option, hashed behind tags 80 and 81 only then, as
   `manifest.state_hash` does. Every known-answer digest is where it was.
 
 ### Index futures

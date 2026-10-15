@@ -4416,7 +4416,7 @@ grid and range, the dealer's pressure and the settled expiries) while
 `surface_ssvi` is set, and `options_book` (waiting orders, undelivered fills
 and each agent's contracts bought and sold, from which open interest is read)
 once an agent has traded an option; the state hash covers them behind tags
-55 and 56 only then, as `manifest.state_hash` does. Every known-answer digest
+80 and 81 only then, as `manifest.state_hash` does. Every known-answer digest
 is where it was.
 
 Not built yet: the measurement of the physical skew and the screening of
