@@ -444,6 +444,13 @@ OUT_OF_SCOPE = {
         "copy of the open is run and no night is walked or carried; refused "
         "without `futures_index_listed`; at 0.0 it is also left out of the "
         "model's digest",
+    "futures_impact_memory":
+        "inert at 0.0: `futures_memory_on` is false, so `futures_meet` books no "
+        "memory, `futures_book` bounds nothing and `futures_step` keeps the "
+        "spec's linear mark; it reads only agents' futures flow, so an "
+        "untraded run is the run without it whatever its value; refused "
+        "without `futures_index_listed`; at 0.0 it is also left out of the "
+        "model's digest",
     # The VIX futures (pt-v22 phase 1), inert on every shipped preset. A VIX
     # future reads the published and live VIX and the forecast and draws
     # nothing, so off zero it leaves every price and the VIX where they were.
