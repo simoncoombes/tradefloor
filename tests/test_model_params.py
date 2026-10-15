@@ -2140,6 +2140,9 @@ def test_the_perturbation_table_covers_the_whole_settable_surface():
 #: carrying the same companions, none of the three moved. The companions
 #: are the default's 0.375 now, and the three rows are re-valued.
 COMPANIONS: dict[str, dict[str, float]] = {
+    # The premium's slope is read only under the identity, which pt-v18 and
+    # earlier leave off.
+    "vix_variance_premium_slope": {"vix_level_identity": 1.0},
     # Core differs from headline only where oil pays inflation, which the
     # symmetric pass-through does either side of 81 (the shipped branch pays
     # nothing between 50 and 80).
