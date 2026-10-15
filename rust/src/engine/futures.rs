@@ -363,6 +363,145 @@ fn on_grid(price: f64, tick: f64, side: Side) -> f64 {
     }
 }
 
+/// `futures_impact_memory`: the futures' metaorder memory law, the equity
+/// book's (`crate::agent_book::memory_displacement`) with the switch's own
+/// coefficient `y` in place of `impact_memory_coefficient`, so the futures
+/// carry the law whether or not the equity book does. `D(m) = sign(m) y
+/// sigma h(|m|)`, `h(x) = x^delta` at or above the crossover `m*` and `x
+/// m*^(delta - 1)` below it; `delta` is the latent depth's exponent and
+/// `m*` the equity memory's crossover.
+#[derive(Debug, Clone, Copy)]
+struct FuturesMemoryLaw {
+    y: f64,
+    delta: f64,
+    star: f64,
+    sigma: f64,
+}
+
+impl FuturesMemoryLaw {
+    fn of(params: &crate::params::ModelParams, sigma: f64) -> Self {
+        let (delta, _) = crate::agent_book::depth_shape(params);
+        FuturesMemoryLaw { y: params.futures_impact_memory, delta, star: params.impact_memory_crossover, sigma }
+    }
+
+    /// The displacement of a memory at `m` (fractions of daily volume), a
+    /// log price.
+    fn displacement(&self, m: f64) -> f64 {
+        if !(self.y > 0.0) || m == 0.0 || !(self.sigma > 0.0) {
+            return 0.0;
+        }
+        let a = m.abs();
+        let h = if self.star > 0.0 && a < self.star {
+            a * crate::mathx::pow(self.star, self.delta - 1.0)
+        } else {
+            crate::mathx::pow(a, self.delta)
+        };
+        let d = self.y * self.sigma * h;
+        if m > 0.0 { d } else { -d }
+    }
+
+    /// The memory whose displacement is `d`.
+    fn inverse(&self, d: f64) -> f64 {
+        if !(self.y > 0.0) || d == 0.0 || !(self.sigma > 0.0) {
+            return 0.0;
+        }
+        let a = d.abs() / (self.y * self.sigma);
+        let m = if self.star > 0.0 && a < crate::mathx::pow(self.star, self.delta) {
+            a / crate::mathx::pow(self.star, self.delta - 1.0)
+        } else {
+            crate::mathx::pow(a, 1.0 / self.delta)
+        };
+        if d > 0.0 { m } else { -m }
+    }
+}
+
+/// `futures_impact_memory`: no contract the house sells or buys is priced
+/// better than the memory's own price once that contract is in it, the
+/// equity book's `MemoryBound` on the contract's grid, applied on both
+/// sides. `reference` is the contract's price now, which carries
+/// `booked`, the displacement the last step put in it as a log price;
+/// `scale` turns a displacement of the memory into one of the price (the
+/// convergence on the index as the contract expires, and index over price).
+struct FuturesMemoryBound {
+    law: FuturesMemoryLaw,
+    volume: f64,
+    reference: f64,
+    position: f64,
+    booked: f64,
+    scale: f64,
+    tick: f64,
+}
+
+impl FuturesMemoryBound {
+    /// The bound on the `q`-th contract (cumulative) on one side: the
+    /// book's `Sell` side is what a buy meets.
+    fn price(&self, side: Side, q: f64) -> f64 {
+        let m = match side {
+            Side::Sell => self.position + q / self.volume,
+            Side::Buy => self.position - q / self.volume,
+        };
+        self.reference * crate::mathx::exp(self.scale * self.law.displacement(m) - self.booked)
+    }
+
+    /// Cumulative contracts up to which a level at `price` is inside the
+    /// bound.
+    fn reach(&self, side: Side, price: f64) -> f64 {
+        let x = (crate::mathx::log(price / self.reference) + self.booked) / self.scale;
+        let m = self.law.inverse(x);
+        match side {
+            Side::Sell => (m - self.position) * self.volume,
+            Side::Buy => (self.position - m) * self.volume,
+        }
+    }
+
+    /// One side's house orders, best first, with every contract past the
+    /// bound re-priced onto it: `crate::agent_book::MemoryBound::apply` on
+    /// the contract's grid.
+    fn apply(&self, orders: Vec<crate::order_book::BookOrder>, side: Side, symbol: &str)
+        -> Vec<crate::order_book::BookOrder> {
+        let worse = |a: f64, b: f64| match side {
+            Side::Sell => crate::mathx::max(a, b),
+            Side::Buy => crate::mathx::min(a, b),
+        };
+        let step = self.volume * DEPTH_GRID_FLOOR;
+        let mut out = Vec::with_capacity(orders.len());
+        let mut placed = 0.0;
+        let mut last: Option<f64> = None;
+        let mut pieces: Vec<(f64, f64)> = Vec::new();
+        for o in orders {
+            let mut left = o.remaining;
+            let within = crate::mathx::max(0.0, crate::mathx::min(left, self.reach(side, o.price) - placed));
+            pieces.clear();
+            if within > 0.0 {
+                pieces.push((o.price, within));
+                left -= within;
+                placed += within;
+            }
+            while left > 1e-9 {
+                let span = crate::mathx::max(step, 0.25 * placed);
+                let take = crate::mathx::min(left, span);
+                placed += take;
+                left -= take;
+                let bound = on_grid(self.price(side, placed), self.tick, side);
+                pieces.push((worse(o.price, bound), take));
+            }
+            for (k, &(price, n)) in pieces.iter().enumerate() {
+                let price = match last {
+                    Some(prev) => worse(price, prev),
+                    None => price,
+                };
+                last = Some(price);
+                out.push(if k == 0 {
+                    crate::order_book::BookOrder { price, quantity: n, remaining: n, ..o.clone() }
+                } else {
+                    o.piece(k as u32, price, n, symbol)
+                });
+            }
+        }
+        out
+    }
+}
+
 /// What a future is worth now, and from what.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Valuation {
@@ -381,6 +520,19 @@ impl Engine {
 
     pub(super) fn futures_on(&self) -> bool {
         self.params.futures_index_listed != 0.0
+    }
+
+    /// `futures_impact_memory`: agents' flow against the house marks the
+    /// index futures through the metaorder memory, not the spec's linear
+    /// mark.
+    fn futures_memory_on(&self) -> bool {
+        self.params.futures_impact_memory != 0.0
+    }
+
+    /// The contract in `slot`'s memory row (`crate::agent_book::MEMORY_*`),
+    /// zeros when it has none.
+    fn futures_memory_row(&self, slot: usize) -> [f64; crate::agent_book::MEMORY_WIDTH] {
+        self.futures.book.memory.get(slot).copied().unwrap_or([0.0; crate::agent_book::MEMORY_WIDTH])
     }
 
     /// The night's steps: 0 without a night session.
@@ -671,6 +823,30 @@ impl Engine {
         remove_front(&mut book, Side::Sell, MARKET_MAKER_ID, c.taken[TAKEN_MAKER_ASK]);
         remove_front(&mut book, Side::Buy, DEPTH_OWNER, c.taken[TAKEN_DEPTH_BID]);
         remove_front(&mut book, Side::Sell, DEPTH_OWNER, c.taken[TAKEN_DEPTH_ASK]);
+        // `futures_impact_memory`: no house contract on either side is
+        // better than the memory's price after it, the book of Alfonsi,
+        // Fruth and Schied (2010) with the maker's ladder over it: an order
+        // pays the curve it books, and selling back walks it down.
+        if self.futures_memory_on() {
+            let row = self.futures_memory_row(slot);
+            let law = FuturesMemoryLaw::of(&self.params, sigma);
+            let position = crate::agent_book::memory_position(&self.params, &row)
+                + if volume > 0.0 { row[crate::agent_book::MEMORY_FLOW] / volume } else { 0.0 };
+            let scale = convergence(v.sessions) * v.index / v.price;
+            if volume > 0.0 && v.price > 0.0 && scale > 0.0 && law.sigma > 0.0 && law.y > 0.0 {
+                let bound = FuturesMemoryBound {
+                    law,
+                    volume,
+                    reference: v.price,
+                    position,
+                    booked: scale * row[crate::agent_book::MEMORY_BOOKED],
+                    scale,
+                    tick: spec.tick,
+                };
+                book.bids = bound.apply(std::mem::take(&mut book.bids), Side::Buy, &symbol);
+                book.asks = bound.apply(std::mem::take(&mut book.asks), Side::Sell, &symbol);
+            }
+        }
         for o in &self.futures.book.orders {
             if o.ticker != symbol || exclude == Some(o.agent.as_str()) {
                 continue;
@@ -773,6 +949,12 @@ impl Engine {
                     (Side::Buy, false) => TAKEN_DEPTH_ASK,
                     (Side::Sell, false) => TAKEN_DEPTH_BID,
                 };
+                if self.futures_memory_on() {
+                    // The memory's flow and what it paid against the mid
+                    // it met, for the next step (`futures_memory_step`).
+                    let n = self.futures.contracts.len();
+                    self.futures.book.add_house_flow(n, slot, side, f.quantity, f.price, reference);
+                }
                 let c = &mut self.futures.contracts[slot];
                 c.taken[k] += f.quantity;
                 c.pending += match side {
@@ -933,6 +1115,76 @@ impl Engine {
 
     // ── Steps ─────────────────────────────────────────────────────────────
 
+    /// The index a step's flow is scaled on: the night's path, the close's
+    /// index without one, or the live level.
+    fn futures_step_index(&self) -> f64 {
+        match (self.futures.phase, self.futures.night.as_ref()) {
+            (FuturesPhase::Night, Some(b)) => b.now[0],
+            (FuturesPhase::Night, None) if self.index_close > 0.0 => self.index_close,
+            _ => self.futures_live_index(),
+        }
+    }
+
+    /// `futures_impact_memory`: the metaorder memory's step for every
+    /// contract, the equity book's (`Engine::plan_memory`) on the contract's
+    /// daily volume and the index's daily sigma. On an open step both
+    /// memories decay (`impact_memory_half_life`,
+    /// `impact_memory_slow_half_life`; none at night, so it holds over the
+    /// night as the equity memory does); the flow against the house since
+    /// the last step, over the daily volume, is added to both (the book
+    /// priced it on the curve it moves along, so no cap is needed); and the
+    /// contract's mark on the basis is the displacement, in index
+    /// basis points. An empty memory reads nothing.
+    fn futures_memory_step(&mut self, open_now: bool) {
+        use crate::agent_book::{
+            memory_decay, memory_position, MEMORY_BOOKED, MEMORY_FAST, MEMORY_FLOW, MEMORY_PAID, MEMORY_SLOW,
+            MEMORY_WIDTH,
+        };
+        if self.futures.book.memory.iter().all(|r| r.iter().all(|x| *x == 0.0)) {
+            for c in self.futures.contracts.iter_mut() {
+                c.impact = 0.0;
+            }
+            return;
+        }
+        let n = self.futures.contracts.len();
+        self.futures.book.memory.resize(n, [0.0; MEMORY_WIDTH]);
+        let volume = self.futures_daily_volume(self.futures_step_index());
+        let law = FuturesMemoryLaw::of(&self.params, self.market_vol.sigma_daily());
+        let slow_on = self.params.impact_memory_slow_half_life > 0.0;
+        let (fast, slow) = if open_now {
+            (memory_decay(self.params.impact_memory_half_life), memory_decay(self.params.impact_memory_slow_half_life))
+        } else {
+            (1.0, 1.0)
+        };
+        let snap = |x: f64| if x.abs() < 1e-12 { 0.0 } else { x };
+        for slot in 0..n {
+            let row = self.futures.book.memory[slot];
+            if row.iter().all(|x| *x == 0.0) {
+                self.futures.contracts[slot].impact = 0.0;
+                continue;
+            }
+            let shares = row[MEMORY_FLOW];
+            let net = if volume > 0.0 { shares / volume } else { 0.0 };
+            let mut next = row;
+            next[MEMORY_FAST] = snap(row[MEMORY_FAST] * fast);
+            next[MEMORY_SLOW] = if slow_on { snap(row[MEMORY_SLOW] * slow) } else { 0.0 };
+            next[MEMORY_PAID] = 0.0;
+            next[MEMORY_FLOW] = 0.0;
+            // No cap on what the flow adds: the book priced it on the
+            // curve it moves along (`futures_book`), so it paid for it.
+            if net != 0.0 {
+                next[MEMORY_FAST] += net;
+                if slow_on {
+                    next[MEMORY_SLOW] += net;
+                }
+            }
+            let d = law.displacement(memory_position(&self.params, &next));
+            next[MEMORY_BOOKED] = d;
+            self.futures.book.memory[slot] = next;
+            self.futures.contracts[slot].impact = 1e4 * d;
+        }
+    }
+
     /// One step of the futures: the flow since the last step reaches the
     /// basis and the old flow's mark decays, the basis noise steps (one
     /// normal, always), the maker re-quotes whole and the latent depth
@@ -947,16 +1199,13 @@ impl Engine {
         self.futures.rng.site(Site::FuturesBasisZ, 0);
         let z = self.futures.rng.next_normal();
         self.futures.basis = a * self.futures.basis + sd * z;
+        let memory = self.futures_memory_on();
         if !self.futures.contracts.is_empty() {
             // The flow's scale, read only when some contract has flow to
-            // apply: an untraded step reads nothing but its own state.
-            let scale = if self.futures.contracts.iter().any(|c| c.pending != 0.0) {
-                let index = match (self.futures.phase, self.futures.night.as_ref()) {
-                    (FuturesPhase::Night, Some(b)) => b.now[0],
-                    (FuturesPhase::Night, None) if self.index_close > 0.0 => self.index_close,
-                    _ => self.futures_live_index(),
-                };
-                let volume = self.futures_daily_volume(index);
+            // apply: an untraded step reads nothing but its own state. With
+            // `futures_impact_memory` the memory marks the flow instead.
+            let scale = if !memory && self.futures.contracts.iter().any(|c| c.pending != 0.0) {
+                let volume = self.futures_daily_volume(self.futures_step_index());
                 spec.impact_coefficient * 1e4 * self.market_vol.sigma_daily() / volume
             } else {
                 0.0
@@ -974,6 +1223,9 @@ impl Engine {
                 for k in [TAKEN_DEPTH_BID, TAKEN_DEPTH_ASK] {
                     c.taken[k] = if c.taken[k] * refill < 1e-6 { 0.0 } else { c.taken[k] * refill };
                 }
+            }
+            if memory {
+                self.futures_memory_step(!night);
             }
         }
         if night {
@@ -1046,6 +1298,14 @@ impl Engine {
         self.futures.night = None;
         let t = self.elapsed_days;
         let index = self.futures_live_index();
+        // `futures_impact_memory`: each memory row follows its contract
+        // through the roll; an expiring contract's row goes with it.
+        let memory: Vec<(i64, [f64; crate::agent_book::MEMORY_WIDTH])> =
+            if self.futures.book.memory.iter().any(|r| r.iter().any(|x| *x != 0.0)) {
+                self.futures.contracts.iter().map(|c| c.expiry).zip(self.futures.book.memory.iter().copied()).collect()
+            } else {
+                Vec::new()
+            };
         let mut kept = Vec::with_capacity(self.futures.contracts.len());
         for c in std::mem::take(&mut self.futures.contracts) {
             if c.expiry <= t {
@@ -1065,6 +1325,20 @@ impl Engine {
         kept.truncate(calendar::INDEX_FUTURES_LISTED);
         for c in kept.iter_mut() {
             c.taken = [0.0; 4];
+        }
+        if !memory.is_empty() {
+            self.futures.book.memory = kept
+                .iter()
+                .map(|c| {
+                    memory.iter().find(|(e, _)| *e == c.expiry).map(|(_, r)| *r)
+                        .unwrap_or([0.0; crate::agent_book::MEMORY_WIDTH])
+                })
+                .collect();
+            for (c, r) in kept.iter_mut().zip(self.futures.book.memory.iter()) {
+                if r.iter().all(|x| *x == 0.0) {
+                    c.impact = 0.0;
+                }
+            }
         }
         self.futures.contracts = kept;
         self.futures_cross_resting();

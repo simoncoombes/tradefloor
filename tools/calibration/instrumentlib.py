@@ -230,6 +230,7 @@ PARAM_SPECS: dict[str, dict] = {
                           "derived": True},
     "night_session_steps": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 390.0),
                             "derived": True},
+    "futures_impact_memory": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 5.0), "derived": True},
     # The VIX futures (pt-v22 phase 1), the same: none moves a price.
     "futures_vix_listed": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0), "derived": True},
     "futures_vix_live_fast_share": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0),
