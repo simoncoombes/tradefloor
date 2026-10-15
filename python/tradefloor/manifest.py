@@ -1071,12 +1071,12 @@ def state_hash(snapshot: dict[str, Any]) -> str:
                 f"snapshot field 'options' carries {len(raw)} bytes, which is "
                 "not a whole number of f64s.")
         values = _column(raw, len(raw) // 8, "options")
-        _f64(buf, 55.0)
+        _f64(buf, 80.0)
         _u32(buf, len(values))
         for value in values:
             _f64(buf, value)
     if "options_book" in snapshot:
-        _f64(buf, 56.0)
+        _f64(buf, 81.0)
         _book(buf, snapshot["options_book"])
     # LENGTH-PREFIXED, because these two are empty between the tape row that
     # consumes them and the close that fills them again -- unlike every

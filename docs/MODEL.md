@@ -4262,7 +4262,7 @@ digest there, list European options on the price index and quote them:
 `options_index_listed` lists calls and puts, and `option_dealer_spread` is
 the half-spread of the dealer that quotes them. The surface's companions,
 `surface_skew_physical`, `surface_skew_physical_slope`,
-`surface_skew_premium`, `surface_curvature`, `surface_curvature_exponent`,
+`surface_skew_premium`, `surface_skew_premium_slope`, `surface_curvature`, `surface_curvature_exponent`,
 `surface_term_premium_short`, `surface_term_premium_long` and
 `surface_earnings_weight`, are 0.0 on every shipped preset too and refused
 without the surface. None of them has been fitted: the physical skew is a
@@ -4304,10 +4304,15 @@ to the model:
   $10^{-6}$ points.
 - The skew. $\rho$ is the one whose 21-session strip has, by the Cboe SKEW
   formula, the risk-neutral skewness
-  $S = s_0 + s_1 \ln(\mathrm{VIX}/20) + p$: $s_0$ and $s_1$ the physical
-  skewness of 21-session log returns as a function of the VIX
-  (`surface_skew_physical`, `surface_skew_physical_slope`) and $p$ the skew
-  premium (`surface_skew_premium`). SKEW is $100 - 10S$. The skewness rises
+  $S = s_0 + s_1 \ln(\mathrm{VIX}/20) + p_0 + p_1 \ln(\mathrm{VIX}/20)$:
+  $s_0$ and $s_1$ the physical skewness of 21-session log returns as a
+  function of the VIX (`surface_skew_physical`,
+  `surface_skew_physical_slope`) and $p_0$ and $p_1$ the skew premium and
+  its slope (`surface_skew_premium`, `surface_skew_premium_slope`). On the
+  model's histories the physical skewness deepens as the VIX rises, while
+  on the tape the SKEW index falls as the VIX rises; a constant premium
+  would carry the model's direction into the surface, and $p_1$ lets the
+  premium shrink with the VIX instead. SKEW is $100 - 10S$. The skewness rises
   with $\rho$, which is found by regula falsi with $\theta$ re-solved at each
   step; a skewness beyond what $|\rho|$ at its bound gives is met at the
   bound. How far that reaches depends on the curvature: at $\eta = 1$ and
@@ -4411,7 +4416,7 @@ grid and range, the dealer's pressure and the settled expiries) while
 `surface_ssvi` is set, and `options_book` (waiting orders, undelivered fills
 and each agent's contracts bought and sold, from which open interest is read)
 once an agent has traded an option; the state hash covers them behind tags
-55 and 56 only then, as `manifest.state_hash` does. Every known-answer digest
+80 and 81 only then, as `manifest.state_hash` does. Every known-answer digest
 is where it was.
 
 Not built yet: the options' Arrow schema, the observation payload's options

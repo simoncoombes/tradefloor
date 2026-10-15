@@ -25,14 +25,14 @@ from tradefloor.replay import replay
 SMALL = tf.Universe.random(10, seed=5)
 UNIVERSE = tf.Universe.random(30, seed=111)
 DIALS = ("options_index_listed", "surface_ssvi", "surface_skew_physical", "surface_skew_physical_slope",
-         "surface_skew_premium", "surface_curvature", "surface_curvature_exponent",
+         "surface_skew_premium", "surface_skew_premium_slope", "surface_curvature", "surface_curvature_exponent",
          "surface_term_premium_short", "surface_term_premium_long", "surface_earnings_weight",
          "option_dealer_spread")
 BASE = dict(index_level_listed=1.0, vix_intraday_live=1.0, forecast_horizon_sessions=252.0,
             forecast_vix_dispersion=0.3, forecast_vix_dispersion_half_life=31.5,
             forecast_vix_dispersion_skew=0.81)
 SURFACE = dict(surface_ssvi=1.0, surface_skew_physical=-0.8, surface_skew_physical_slope=0.3,
-               surface_skew_premium=-1.0, surface_curvature=1.0, surface_curvature_exponent=0.5,
+               surface_skew_premium=-1.0, surface_skew_premium_slope=0.5, surface_curvature=1.0, surface_curvature_exponent=0.5,
                surface_term_premium_short=-0.03, surface_term_premium_long=0.1,
                surface_earnings_weight=1.0)
 ON = dict(BASE, **SURFACE, options_index_listed=1.0, option_dealer_spread=0.004,
@@ -167,8 +167,15 @@ def test_the_surface_reads_the_skew_asked_and_the_term_premia():
         day(engine)
     s = engine.surface("IDX")
     vix = engine.macro_state.vix
-    target = -0.8 + 0.3 * math.log(vix / 20.0) - 1.0
+    target = -0.8 + 0.3 * math.log(vix / 20.0) - 1.0 + 0.5 * math.log(vix / 20.0)
     assert s.skewness_target == pytest.approx(target, abs=1e-12)
+    # The premium's slope moves only the skewness asked, by its own term.
+    still = tf.Engine(seed=23, universe=SMALL, model=model(**dict(ON, surface_skew_premium_slope=0.0)))
+    for _ in range(3):
+        day(still)
+    assert still.macro_state.vix == vix
+    assert s.skewness_target - still.surface("IDX").skewness_target == pytest.approx(
+        0.5 * math.log(vix / 20.0), abs=1e-12)
     assert s.strip_skew(21.0) == pytest.approx(100.0 - 10.0 * target, abs=1e-5)
     assert s.skew == pytest.approx(s.strip_skew(21.0), abs=1e-6)
     # A flatter curvature reads less skew from the same skewness asked.
