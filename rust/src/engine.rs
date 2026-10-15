@@ -2530,6 +2530,7 @@ impl Engine {
         pre.params.futures_index_listed = 0.0;
         pre.params.night_session_steps = 0.0;
         pre.params.futures_impact_memory = 0.0;
+        pre.params.futures_impact_memory_half_life = 0.0;
         pre.params.futures_vix_listed = 0.0;
         pre.params.futures_vix_live_fast_share = 0.0;
         pre.params.futures_vix_live_fast_half_life = 0.0;
