@@ -337,14 +337,7 @@ impl FuturesState {
 /// The index future expiring at `session`, settled on `reference`.
 fn settlement_of(session: i64, reference: f64) -> Settlement {
     let kind = ContractKind::IndexFuture;
-    Settlement {
-        symbol: index_future_symbol(session),
-        kind,
-        root: kind.root().to_string(),
-        session,
-        value: reference,
-        reference,
-    }
+    Settlement::new(index_future_symbol(session), kind, kind.root().to_string(), session, reference, reference)
 }
 
 /// How far a future's basis has converged: `min(1, sessions to expiry /
@@ -588,6 +581,16 @@ impl Engine {
         self.futures.contracts.iter().position(|c| c.expiry == parsed.expiry)
     }
 
+    /// Whether this model lists futures of any family: one of
+    /// `futures_index_listed`, `futures_vix_listed`, `futures_rates_listed`
+    /// and `futures_oil_listed` set. A property of the model, not of the
+    /// moment: a model that lists VIX futures says so before its first
+    /// close, when [`Engine::contracts`] is still empty. False on every
+    /// shipped preset.
+    pub fn lists_futures(&self) -> bool {
+        self.futures_on() || self.vix_futures_on() || self.rate_futures_on() || self.oil_futures_on()
+    }
+
     /// Whether `symbol` names a listed contract: an index, VIX, rate or oil
     /// future under its family's switch.
     pub fn is_listed_contract(&self, symbol: &str) -> bool {
@@ -595,6 +598,8 @@ impl Engine {
             || (self.vix_futures_on() && self.vix_futures_slot(symbol).is_some())
             || (self.rate_futures_on() && self.rate_futures_slot(symbol).is_some())
             || (self.oil_futures_on() && self.oil_futures_slot(symbol).is_some())
+            || self.is_listed_option(symbol)
+            || self.is_listed_name_option(symbol)
     }
 
     /// Whether an order with the id `id` already waits in any book: the
@@ -605,6 +610,8 @@ impl Engine {
             || self.vix_futures_orders().iter().any(|o| o.id == id)
             || self.rate_futures_orders().iter().any(|o| o.id == id)
             || self.oil_futures_orders().iter().any(|o| o.id == id)
+            || self.option_orders().iter().any(|o| o.id == id)
+            || self.name_option_orders().iter().any(|o| o.id == id)
     }
 
     // ── Pricing ───────────────────────────────────────────────────────────
@@ -612,7 +619,7 @@ impl Engine {
     /// The mean policy rate expected to be in force over the sessions from
     /// now to `expiry`, a fraction a year: the forecast's path where there
     /// is one, the policy rate now where there is not.
-    fn futures_rate(&self, expiry: i64, now: f64) -> f64 {
+    pub(super) fn futures_rate(&self, expiry: i64, now: f64) -> f64 {
         let current = self.economy.federal_funds_rate;
         let Some(f) = self.forecast() else {
             return current / 100.0;
@@ -640,32 +647,28 @@ impl Engine {
     /// The present value, in index points at `rate`, of the constituents'
     /// dividends going ex after the last open and no later than `expiry`.
     fn futures_dividends(&self, expiry: i64, rate: f64, now: f64) -> f64 {
+        self.carry_dividends(expiry, rate, now, self.futures_listing_after())
+    }
+
+    /// The present value, in index points at `rate`, of the constituents'
+    /// dividends going ex after session `after` and no later than `expiry`:
+    /// the declared amount within 21 sessions of an ex-date, the Lintner
+    /// rule's projection beyond.
+    pub(super) fn carry_dividends(&self, expiry: i64, rate: f64, now: f64, after: i64) -> f64 {
         use crate::market::dividends as dv;
         if self.params.dividend_payout_share == 0.0 || !(self.index_divisor > 0.0) {
             return 0.0;
         }
-        let after = self.futures_listing_after();
         let mut total = 0.0;
         for c in &self.companies {
             if !c.is_public || c.is_bankrupt {
                 continue;
             }
-            let Some(d) = c.stock.dividend else {
-                continue;
-            };
-            if !(d.target_yield > 0.0) {
-                continue;
-            }
-            let k = dv::sessions_since_ex(&c.ticker, after);
-            let mut ex = after + dv::DIVIDEND_PERIOD - k;
-            let mut state = d;
-            let mut amount = if d.declared { d.amount } else { dv::declare(&self.params, &d, c.stock.price) };
-            while ex <= expiry {
-                let points = c.stock.shares_outstanding * amount / self.index_divisor;
-                total += points * crate::mathx::exp(-rate * (ex as f64 - now) / SESSIONS_PER_YEAR as f64);
-                state.amount = amount;
-                amount = dv::declare(&self.params, &state, c.stock.price);
-                ex += dv::DIVIDEND_PERIOD;
+            // The same lookahead the American options' pricer reads, so a
+            // name's projected dividends are one number wherever they enter.
+            for u in dv::lookahead(&self.params, &c.ticker, c.stock.dividend.as_ref(), after, c.stock.price, expiry) {
+                let points = c.stock.shares_outstanding * u.amount / self.index_divisor;
+                total += points * crate::mathx::exp(-rate * (u.ex_day as f64 - now) / SESSIONS_PER_YEAR as f64);
             }
         }
         total
@@ -859,6 +862,16 @@ impl Engine {
     /// The agent-facing book of a listed contract: `None` for a symbol not
     /// listed.
     pub fn contract_book(&self, symbol: &str) -> Option<OrderBook> {
+        if self.options_on() {
+            if let Some(book) = self.option_book(symbol) {
+                return Some(book);
+            }
+        }
+        if self.names_on() {
+            if let Some(book) = self.name_option_book(symbol) {
+                return Some(book);
+            }
+        }
         if self.vix_futures_on() {
             if let Some(slot) = self.vix_futures_slot(symbol) {
                 return self.vix_futures_book_at(slot);
@@ -1472,13 +1485,16 @@ impl Engine {
     /// `futures_index_listed`, then the six VIX futures under
     /// `futures_vix_listed`, then the thirteen policy-rate and eight
     /// term-rate futures under `futures_rates_listed`, then the twelve oil
-    /// futures under `futures_oil_listed`, each family in expiry order; none
-    /// with all off.
+    /// futures under `futures_oil_listed`, each family in expiry order, then
+    /// the index options under `options_index_listed`, by expiry, strike and
+    /// right; none with all off.
     pub fn contracts(&self) -> Vec<ContractSpec> {
         let mut out = self.index_futures_contracts();
         out.extend(self.vix_futures_contracts());
         out.extend(self.rate_futures_contracts());
         out.extend(self.oil_futures_contracts());
+        out.extend(self.option_contracts());
+        out.extend(self.name_option_contracts());
         out
     }
 
@@ -1507,6 +1523,8 @@ impl Engine {
                     tick: INDEX_FUTURE.tick,
                     settlement: kind.settlement(),
                     front: front == Some(k),
+                    right: None,
+                    strike: None,
                 }
             })
             .collect()
@@ -1577,7 +1595,8 @@ impl Engine {
 
     /// The final settlements made at `session`'s open, or every one so far
     /// with `None`, in session order, an index future before a VIX future at
-    /// the same open. Empty with both switches off.
+    /// the same open and the index options after the futures. Empty with
+    /// every switch off.
     pub fn settlements(&self, session: Option<i64>) -> Vec<Settlement> {
         let mut out: Vec<Settlement> = if self.futures_on() {
             self.futures
@@ -1592,6 +1611,8 @@ impl Engine {
         out.extend(self.vix_futures_settlements(session));
         out.extend(self.rate_futures_settlements(session));
         out.extend(self.oil_futures_settlements(session));
+        out.extend(self.option_settlements(session));
+        out.extend(self.name_option_settlements(session));
         // Stable, so each family keeps its own order within a session.
         out.sort_by_key(|s| s.session);
         out

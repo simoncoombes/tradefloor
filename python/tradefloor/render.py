@@ -198,6 +198,35 @@ _LABELS: dict[str, dict[str, str]] = {
                          "standing panel follows the table."),
         "detail_intro": ("{shown} of {n} symbols, being every name you "
                         "hold plus a standing panel."),
+        "futures": "Futures",
+        "index_level": "price index",
+        "front": "front",
+        "fair": "  fair value",
+        "mark": "  last settlement",
+        "to_expiry": "  sessions to expiry",
+        "contracts": "contracts",
+        "margin_initial": "margin, initial",
+        "margin_maintenance": "margin, maintenance",
+        "margin_call": "margin call",
+        "call_day": "made at the close of day {day}",
+        "options": "Index options",
+        "options_intro": ("Strikes run from low to high in steps "
+                          "(low-high/step). An option trades by its "
+                          "symbol, IDX.O0035.C1050.00 being the 1050 call "
+                          "settling at session 35, in contracts of 100 a "
+                          "point. Volatilities are per year."),
+        "options_head": ("expiry|sessions|forward|strikes|atm vol|25d put|"
+                         "25d call|skew"),
+        "options_held": "Options held:",
+        "cost": "cost",
+        "mid": "mid",
+        "name_options": "Single-name options",
+        "name_options_intro": ("American, 100 shares a contract, settling "
+                               "at the close of each expiry session: {expiries}. "
+                               "ACME.O0035.C42.50 is the 42.50 call on ACME. "
+                               "Side EXERCISE with a quantity exercises "
+                               "contracts held at the close. At-the-money "
+                               "volatility 21 sessions out, per year:"),
     },
     "fr": {
         "title": "MARCHE SIMULE",
@@ -246,6 +275,37 @@ _LABELS: dict[str, dict[str, str]] = {
                          "panneau permanent suit le tableau."),
         "detail_intro": ("{shown} symboles sur {n}, soit chaque nom "
                         "detenu et un panneau permanent."),
+        "futures": "Contrats a terme",
+        "index_level": "indice de prix",
+        "front": "echeance proche",
+        "fair": "  valeur theorique",
+        "mark": "  dernier cours de compensation",
+        "to_expiry": "  seances avant echeance",
+        "contracts": "contrats",
+        "margin_initial": "marge initiale",
+        "margin_maintenance": "marge de maintien",
+        "margin_call": "appel de marge",
+        "call_day": "emis a la cloture du jour {day}",
+        "options": "Options sur indice",
+        "options_intro": ("Les prix d'exercice vont du plus bas au plus "
+                          "haut par pas (bas-haut/pas). Une option se "
+                          "negocie par son symbole, IDX.O0035.C1050.00 "
+                          "etant le call 1050 regle a la seance 35, en "
+                          "contrats de 100 par point. Les volatilites sont "
+                          "annuelles."),
+        "options_head": ("echeance|seances|a terme|exercice|vol atm|put 25d|"
+                         "call 25d|pente"),
+        "options_held": "Options detenues :",
+        "cost": "cout",
+        "mid": "milieu",
+        "name_options": "Options sur actions",
+        "name_options_intro": ("Americaines, 100 actions par contrat, "
+                               "reglees a la cloture de chaque seance "
+                               "d'echeance : {expiries}. ACME.O0035.C42.50 "
+                               "est le call 42,50 sur ACME. Le cote EXERCISE "
+                               "avec une quantite exerce des contrats detenus "
+                               "a la cloture. Volatilite a la monnaie a 21 "
+                               "seances, annuelle :"),
     },
 }
 
@@ -274,6 +334,15 @@ def _pct(value: Any) -> str:
 
 def _qty(value: Any) -> str:
     return "not available" if value is None else f"{value:,.0f}"
+
+
+def _vol(value: Any) -> str:
+    return "-" if value is None else f"{value * 100:.2f}%"
+
+
+#: The index options' expiry table (pt-v22 phase 2), fixed widths as `_ROW`.
+_OPTION_ROW = ("{expiry:>8}{sessions:>10}{forward:>12}{strikes:>18}{atm:>10}"
+               "{put:>10}{call:>10}{skew:>9}")
 
 
 def _bps(value: Any) -> str:
@@ -566,7 +635,107 @@ class TextRenderer:
             out.append(f"  {order['symbol']:<8} {order['side']:<4} "
                        f"{_qty(order['remaining'])} {L['shares']} "
                        f"{L['at']} {_money(order['limit_price'])}")
+        # Only on a model that lists futures, whose payload carries the key
+        # (observation schema 3); every other payload renders the bytes it
+        # did.
+        if "futures" in payload:
+            out += self._futures_block(payload, L)
+        # And the index options' summary on a model that lists them (pt-v22
+        # phase 2), with the index and the margin when no futures block
+        # has shown them.
+        if "options" in payload:
+            out += self._options_block(payload, L,
+                                       alone="futures" not in payload)
         return "\n".join(out)
+
+    def _futures_block(self, payload: dict[str, Any],
+                       L: dict[str, str]) -> list[str]:
+        """The listed futures, the price index and the account's margin."""
+        out = ["", L["futures"], "-" * len(L["futures"])]
+        index = payload.get("index")
+        if index is not None:
+            out.append(f"{L['index_level']:<23}{_num(index['level'])}")
+        for c in payload["futures"]:
+            out += [
+                "",
+                c["symbol"] + (f" ({L['front']})" if c["front"] else ""),
+                f"{L['price']:<23}{_num(c['price'])}",
+                f"{L['fair']:<23}{_num(c['fair'])}",
+                f"{L['mark']:<23}{_num(c['mark'])}",
+                f"{L['bid_ask']:<23}{_num(c['best_bid'])}"
+                f" / {_num(c['best_ask'])}",
+                f"{L['to_expiry']:<23}{_num(c['sessions_to_expiry'])}",
+                f"{L['position']:<23}{_qty(c['position'])} {L['contracts']}",
+                f"{L['max_order_shares']:<23}"
+                f"{_qty(c['max_order_contracts'])} {L['contracts']}",
+            ]
+        return out + self._margin_lines(payload, L)
+
+    @staticmethod
+    def _margin_lines(payload: dict[str, Any],
+                      L: dict[str, str]) -> list[str]:
+        """The account's margin, when the payload carries it."""
+        margin = payload.get("margin")
+        if margin is None:
+            return []
+        call = margin["call"]
+        return [
+            "",
+            f"{L['margin_initial']:<23}{_money(margin['initial'])}",
+            f"{L['margin_maintenance']:<23}"
+            f"{_money(margin['maintenance'])}",
+            f"{L['margin_call']:<23}"
+            + (L["none"] if call is None
+               else L["call_day"].format(day=call["day"])),
+        ]
+
+    def _options_block(self, payload: dict[str, Any], L: dict[str, str],
+                       *, alone: bool) -> list[str]:
+        """The listed expiries, the options held and, ``alone``, the price
+        index and the account's margin."""
+        out = ["", L["options"], "-" * len(L["options"])]
+        index = payload.get("index")
+        if alone and index is not None:
+            out.append(f"{L['index_level']:<23}{_num(index['level'])}")
+        options = payload["options"]
+        names = options.get("names")
+        # The index's table on a model that lists index options; a model
+        # that lists only the names' shows theirs alone.
+        if options["expiries"] or names is None:
+            out += ["", L["options_intro"], "",
+                    _OPTION_ROW.format(**dict(zip(
+                        ("expiry", "sessions", "forward", "strikes", "atm",
+                         "put", "call", "skew"), L["options_head"].split("|"))))]
+        else:
+            out = ["", L["name_options"], "-" * len(L["name_options"])]
+            if alone and index is not None:
+                out.append(f"{L['index_level']:<23}{_num(index['level'])}")
+        for e in options["expiries"]:
+            out.append(_OPTION_ROW.format(
+                expiry=e["expiry"],
+                sessions=f"{e['sessions_to_expiry']:.2f}",
+                forward=f"{e['forward']:.2f}",
+                strikes=(f"{e['strike_low']:g}-{e['strike_high']:g}"
+                         f"/{e['strike_step']:g}"),
+                atm=_vol(e["atm_iv"]), put=_vol(e["put_25d_iv"]),
+                call=_vol(e["call_25d_iv"]), skew=_vol(e["skew_25d"])))
+        if names is not None:
+            if options["expiries"]:
+                out += ["", L["name_options"]]
+            out += ["", L["name_options_intro"].format(
+                expiries=", ".join(str(x) for x in names["expiries"]))]
+            items = list(names["iv_30d"].items())
+            for k in range(0, len(items), 6):
+                out.append("  " + "  ".join(f"{t} {_vol(v)}" for t, v in items[k:k + 6]))
+        out += ["", L["options_held"]]
+        if not options["positions"]:
+            out.append(f"  {L['none']}")
+        for p in options["positions"]:
+            out.append(f"  {p['symbol']:<20} {_qty(p['quantity'])} "
+                       f"{L['contracts']}, {L['cost']} {_num(p['cost'])}, "
+                       f"{L['mid']} {_num(p['mid'])}, "
+                       f"delta {_num(p['delta'])}")
+        return out + (self._margin_lines(payload, L) if alone else [])
 
     def _price_line(self, asset: dict[str, Any]) -> tuple[str, str]:
         """The (label, value) for an asset's headline price line."""

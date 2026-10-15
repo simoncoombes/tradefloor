@@ -99,7 +99,7 @@ def test_the_readme_counts_the_mcp_tools_the_server_registers():
     read_only = source.count("annotations=_READ_ONLY,")
     words = {12: "twelve", 13: "thirteen", 14: "fourteen", 15: "fifteen",
              16: "sixteen", 17: "seventeen", 18: "eighteen", 19: "nineteen",
-             20: "twenty"}
+             20: "twenty", 21: "twenty-one", 22: "twenty-two"}
     text = read("README.md")
     assert (f"| MCP server | {words[count]} tools for a coding agent, "
             f"{words[read_only]} of them read-only") in text

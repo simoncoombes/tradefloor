@@ -438,7 +438,8 @@ def test_the_serializer_agrees_with_the_shared_one():
             == common.serialize_observation(obs, history=agent.history,
                                             max_participation=0.01))
     assert fr.OBSERVABLE_MACRO is common.OBSERVABLE_MACRO
-    assert fr.SIDES == common.SIDES
+    # Every side but EXERCISE, which the version-2 mandate does not offer.
+    assert fr.SIDES == tuple(x for x in common.SIDES if x != "EXERCISE")
     assert fr.HISTORY_STEPS == common.HISTORY_STEPS
     assert fr.MAX_PARTICIPATION == common.MAX_PARTICIPATION
 

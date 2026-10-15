@@ -937,6 +937,12 @@ PERTURBATIONS = [
     ("unemployment_natural_rate", 4.5, True),
     ("oil_inventory_reversion", 0.002, True),
     ("oil_inflation_passthrough", 1.0, True),
+    # The oil law's reversion, noise and inventory level effect (pt-v22, the
+    # oil law), each a branch at 0.0 on every preset. LIVE: each moves the
+    # oil price the burn-in's inflation and the bank read.
+    ("oil_mean_reversion", 0.0035, True),
+    ("oil_noise_sd", 1.4, True),
+    ("oil_inventory_level_gain", 30.0, True),
     # INERT by construction: nothing a price reads is downstream of the
     # index (tests/test_fear_greed_published.py). RE-VALUED 2026-09-26: 1.0
     # is pt-v20's own value since its graded arm, so the row perturbs back
@@ -1194,6 +1200,27 @@ PERTURBATIONS = [
     # tail allowance carries the coverage it requires.
     ("margin_scan_coverage", 0.99, False),
     ("margin_scan_tail", 1.3, False),
+    # The index options, their surface and their dealer (pt-v22 phase 2).
+    # INERT by construction: the surface and the options read public state,
+    # draw nothing and write only their own state, so no stock price moves
+    # (tests/test_index_options.py). Each carries what it requires as its
+    # companion.
+    ("surface_ssvi", 1.0, False),
+    ("surface_skew_physical", -0.8, False),
+    ("surface_skew_physical_slope", 0.3, False),
+    ("surface_skew_premium", -1.0, False),
+    ("surface_skew_premium_slope", 0.5, False),
+    ("surface_curvature", 1.0, False),
+    ("surface_curvature_exponent", 0.5, False),
+    ("surface_term_premium_short", -0.03, False),
+    ("surface_term_premium_long", 0.1, False),
+    ("surface_earnings_weight", 1.0, False),
+    ("options_index_listed", 1.0, False),
+    ("option_dealer_spread", 0.004, False),
+    ("options_names_listed", 1.0, False),
+    ("surface_name_premium", 0.1, False),
+    ("surface_name_skew", 0.5, False),
+    ("option_position_limit", 1.0, False),
     # The VIX's fear memory (pt-v22 phase 1). LIVE: the first close's VIX
     # sits off its target, the memory takes up a share of the gap, and the
     # target the step reverts to moves, which the factor's VIX-coupled
@@ -1919,6 +1946,13 @@ ECONOMY_STREAM_MOVERS = frozenset({
     # follow the path the two dials move. Both were here at 0.8.0 and left
     # with pt-v20's first composition.
     "oil_supply_response", "oil_opec_symmetry",
+    # The oil law (pt-v22, 2026-10-09), measured on this probe: the reversion
+    # at 0.0035 and the inventory level effect at 30 each move the economy
+    # stream and not the market stream. Each moves the burn-in's oil price,
+    # and the OPEC decision's conditional draws (economy/daily.rs: 0 on an
+    # ordinary day, 1 to 3 on a decision day by the price band) follow the
+    # band the price is in. The noise's scale at 1.4 moves no draw count.
+    "oil_mean_reversion", "oil_inventory_level_gain",
     # The risk-management cut (r13 macro-clock, 2026-09-26), measured on
     # this probe: `fed_growth_cut` 2.0 moves the economy stream by +34 draws
     # (9172 to 9206), the market stream by 0. It acts on the 755-day
@@ -2022,6 +2056,25 @@ COMPANIONS: dict[str, dict[str, float]] = {
     "futures_vix_listed": {"forecast_horizon_sessions": 126.0},
     # The tail allowance scales the margin, which the coverage sets.
     "margin_scan_tail": {"margin_scan_coverage": 0.99},
+    # The surface is on the price index; its companions are refused without
+    # it, the earnings term without the forecast; the options and the
+    # dealer's spread needs the options, and they the surface.
+    "surface_ssvi": {"index_level_listed": 1.0},
+    **{name: {"index_level_listed": 1.0, "surface_ssvi": 1.0}
+       for name in ("surface_skew_physical", "surface_skew_physical_slope", "surface_skew_premium",
+                    "surface_skew_premium_slope",
+                    "surface_curvature", "surface_curvature_exponent", "surface_term_premium_short",
+                    "surface_term_premium_long")},
+    "surface_earnings_weight": {"index_level_listed": 1.0, "surface_ssvi": 1.0,
+                                "forecast_horizon_sessions": 21.0},
+    "options_index_listed": {"index_level_listed": 1.0, "surface_ssvi": 1.0},
+    "option_dealer_spread": {"index_level_listed": 1.0, "surface_ssvi": 1.0,
+                             "options_index_listed": 1.0},
+    "options_names_listed": {"index_level_listed": 1.0, "surface_ssvi": 1.0,
+                             "forecast_horizon_sessions": 63.0},
+    **{name: {"index_level_listed": 1.0, "surface_ssvi": 1.0, "forecast_horizon_sessions": 63.0,
+              "options_names_listed": 1.0}
+       for name in ("surface_name_premium", "surface_name_skew", "option_position_limit")},
     "futures_vix_live_fast_share": {"forecast_horizon_sessions": 126.0, "futures_vix_listed": 1.0},
     "futures_vix_live_fast_half_life": {"forecast_horizon_sessions": 126.0, "futures_vix_listed": 1.0},
     "futures_vix_live_slow_half_life": {"forecast_horizon_sessions": 126.0, "futures_vix_listed": 1.0},

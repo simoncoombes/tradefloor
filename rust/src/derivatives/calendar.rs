@@ -19,6 +19,16 @@
 //! quarterly index futures' expiries are every third of them. The next
 //! [`VIX_FUTURES_LISTED`] are listed: 126 sessions, the furthest horizon the
 //! VIX futures' rows read.
+//!
+//! Index options expire on the same sessions as the VIX futures. The next
+//! [`INDEX_OPTION_MONTHLIES`] monthly expiries are listed, then the
+//! quarterly expiries (the index futures') after them, up to
+//! [`INDEX_OPTION_EXPIRIES`] in all, which reaches about a year.
+//!
+//! Single-name options expire on the same sessions, at the close rather
+//! than the open: the next [`NAME_OPTION_MONTHLIES`] monthly expiries, then
+//! quarterlies, [`NAME_OPTION_EXPIRIES`] in all, reaching nine months to a
+//! year.
 
 /// Sessions in the model's year.
 pub const SESSIONS_PER_YEAR: i64 = 252;
@@ -129,9 +139,45 @@ pub fn roll_session(expiry: i64) -> i64 {
     expiry - ROLL_SESSIONS
 }
 
+/// How many monthly index-option expiries are listed, from the front.
+pub const INDEX_OPTION_MONTHLIES: usize = 6;
+
+/// How many index-option expiries are listed in all: the monthlies, then
+/// quarterlies.
+pub const INDEX_OPTION_EXPIRIES: usize = 8;
+
+/// The index-option expiries strictly after session `after`, in order: the
+/// next [`INDEX_OPTION_MONTHLIES`] monthly expiries, then the quarterly
+/// expiries after the last of them, [`INDEX_OPTION_EXPIRIES`] in all.
+pub fn index_option_expiries(after: i64) -> Vec<i64> {
+    let mut out = vix_future_expiries(after, INDEX_OPTION_MONTHLIES);
+    let last = *out.last().expect("at least one monthly");
+    out.extend(index_future_expiries(last, INDEX_OPTION_EXPIRIES - INDEX_OPTION_MONTHLIES));
+    out
+}
+
 /// Whether `session` is an index-future expiry.
 pub fn is_index_future_expiry(session: i64) -> bool {
     session.rem_euclid(SESSIONS_PER_QUARTER) == quarterly_expiry(0)
+}
+
+/// How many monthly single-name option expiries are listed, from the front.
+pub const NAME_OPTION_MONTHLIES: usize = 3;
+
+/// How many single-name option expiries are listed in all: the monthlies,
+/// then quarterlies.
+pub const NAME_OPTION_EXPIRIES: usize = 6;
+
+/// The single-name option expiries at or after session `from`, in order:
+/// the next [`NAME_OPTION_MONTHLIES`] monthly expiries, then the quarterly
+/// expiries after the last of them, [`NAME_OPTION_EXPIRIES`] in all. A name
+/// option settles at its expiry session's close, so the one expiring at
+/// `from` still trades in that session; the sessions are the index options'.
+pub fn name_option_expiries(from: i64) -> Vec<i64> {
+    let mut out = vix_future_expiries(from - 1, NAME_OPTION_MONTHLIES);
+    let last = *out.last().expect("at least one monthly");
+    out.extend(index_future_expiries(last, NAME_OPTION_EXPIRIES - NAME_OPTION_MONTHLIES));
+    out
 }
 
 #[cfg(test)]
@@ -192,6 +238,50 @@ mod tests {
             assert_eq!(m[12] - m[0], 12 * SESSIONS_PER_MONTH);
             let q = period_ends(t, SESSIONS_PER_QUARTER, TERM_RATE_FUTURES_LISTED);
             assert!(q[0] >= t && q[0] - t < SESSIONS_PER_QUARTER);
+        }
+    }
+
+    #[test]
+    fn index_options_list_six_monthlies_then_quarterlies_out_to_about_a_year() {
+        assert_eq!(index_option_expiries(-1), vec![14, 35, 56, 77, 98, 119, 182, 245]);
+        for t in -50..3000 {
+            let e = index_option_expiries(t);
+            assert_eq!(e.len(), INDEX_OPTION_EXPIRIES);
+            assert!(e[0] > t);
+            for w in e.windows(2) {
+                assert!(w[1] > w[0]);
+            }
+            for x in &e[..INDEX_OPTION_MONTHLIES] {
+                assert!(is_vix_future_expiry(*x));
+            }
+            for x in &e[INDEX_OPTION_MONTHLIES..] {
+                assert!(is_index_future_expiry(*x));
+            }
+            // The last is at most a year and a quarter out, and at least most of a year.
+            assert!(e[7] - t <= 252 + 21 && e[7] - t >= 189, "{t} {e:?}");
+        }
+    }
+
+    #[test]
+    fn name_options_list_three_monthlies_then_quarterlies_and_trade_on_their_expiry() {
+        assert_eq!(name_option_expiries(0), vec![14, 35, 56, 119, 182, 245]);
+        // The one expiring at a session still lists in it: it settles at the close.
+        assert_eq!(name_option_expiries(14)[0], 14);
+        assert_eq!(name_option_expiries(15)[0], 35);
+        for t in -50..3000 {
+            let e = name_option_expiries(t);
+            assert_eq!(e.len(), NAME_OPTION_EXPIRIES);
+            assert!(e[0] >= t && e[0] - t < SESSIONS_PER_MONTH, "{t} {e:?}");
+            for w in e.windows(2) {
+                assert!(w[1] > w[0]);
+            }
+            for x in &e {
+                assert!(is_vix_future_expiry(*x));
+            }
+            for x in &e[NAME_OPTION_MONTHLIES..] {
+                assert!(is_index_future_expiry(*x));
+            }
+            assert!(e[5] - t >= 189 && e[5] - t <= 252, "{t} {e:?}");
         }
     }
 

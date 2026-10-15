@@ -486,6 +486,30 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # The contracts' margin (pt-v22 phase 1): its coverage and tail allowance.
     "margin_scan_coverage": (0.0, 0.995),
     "margin_scan_tail": (0.0, 2.0),
+    # The index options, their surface and their dealer (pt-v22 phase 2):
+    # two switches, the surface's skew, curvature, term premia and earnings
+    # weight, and the dealer's half-spread. None of them moves a stock price.
+    "surface_ssvi": (0.0, 1.0),
+    "options_index_listed": (0.0, 1.0),
+    "surface_skew_physical": (-2.0, 0.0),
+    "surface_skew_physical_slope": (-1.0, 1.0),
+    "surface_skew_premium": (-2.0, 0.0),
+    "surface_skew_premium_slope": (0.0, 2.0),
+    "surface_curvature": (0.0, 1.5),
+    "surface_curvature_exponent": (0.0, 0.5),
+    "surface_term_premium_short": (-0.3, 0.3),
+    "surface_term_premium_long": (-0.3, 0.3),
+    "surface_earnings_weight": (0.0, 2.0),
+    "option_dealer_spread": (0.0, 0.02),
+    # The single-name options (pt-v22 phase 3): a switch, the single-name
+    # volatility premium and the names' share of the index skew. None of
+    # them moves a stock price.
+    "options_names_listed": (0.0, 1.0),
+    "surface_name_premium": (0.0, 0.25),
+    "surface_name_skew": (0.0, 1.0),
+    # The options' position limit, in multiples of the dealer's displayed
+    # depth: it refuses orders and moves no stock price.
+    "option_position_limit": (0.0, 5.0),
     # The central bank's stress cut, points per step: 0.5 is a half-point
     # step, two steps a point, which is 2001's and 2008's emergency size.
     "fed_stress_cut": (0.0, 0.5),
@@ -653,6 +677,9 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # applied both sides, and 2.0 is twice it.
     "oil_inventory_reversion": (0.0, 0.01),
     "oil_inflation_passthrough": (0.0, 2.0),
+    "oil_mean_reversion": (0.0, 0.03),
+    "oil_noise_sd": (0.0, 3.0),
+    "oil_inventory_level_gain": (0.0, 100.0),
     # The share of oil demand supply answers on the daily step. Bounded by
     # meaning again: 0.0 is the hardcoded zero the reference writes, 1.0 is
     # the value that makes the inventory random walk driftless, and past 1.0

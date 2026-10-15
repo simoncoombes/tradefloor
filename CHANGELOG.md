@@ -20,7 +20,261 @@ priced at its carry fair value plus a basis, with its own book, and settled
 on the index of its expiry session's opening prints. Stock prices are the
 same with them on as off.
 
+Four more list European index options and American options on every name,
+settled in shares, quoted from arbitrage-free surfaces. The MCP server,
+payload, Arrow and WASM show them; agents trade by symbol.
+
 <!-- release-note-ends -->
+
+### Single-name options
+
+- `options_names_listed` is a new switch, with `surface_name_premium` and
+  `surface_name_skew` beside it, all 0.0 on every preset and left out of the
+  digest there; `option_dealer_spread` now reads it too. It needs
+  `surface_ssvi` and `forecast_horizon_sessions`. None is fitted.
+- From the first close every public name lists American calls and puts,
+  100 shares a contract: the next three monthly expiries and the three
+  quarterlies after them, on the index options' sessions, each settling at
+  its expiry session's close. Strikes sit on the name's price tier, in
+  dollars 0.50 apart under 5, 1 under 50, 2.50 under 100, 5 under 200 and
+  10 above, ten either side of the price, widened at each open and close.
+- A name's surface is the forecast's expected variance of the name to
+  each tenor times `(1 + surface_name_premium)^2`, with the index's term
+  premia and the variance of the name's own reports, `surface_name_skew`
+  times the index's correlation and the index's curvature. The dealer
+  quotes a Leisen-Reimer tree on the escrowed price with the declared and
+  projected dividends to expiry, priced when asked and kept for the
+  session, so an untraded run prices none; its ladder steps by the
+  European vega, and its inventory moves its volatility as the index
+  dealer's does.
+- At each close an agent's exercise instructions are exercised, up to the
+  long position held; the dealer exercises its net longs where its own tree
+  says exercising beats holding (a call only on the eve of an ex-date);
+  every option a cent or more in the money on the closing print of its
+  expiry is exercised; and the contracts exercised are assigned to the
+  short positions, agents' and the dealer's, pro rata in whole contracts.
+  Each side is a `settlements()` row, the dealer's beside the agents', so a
+  close's rows sum to no shares and no cash. A delivery moves no price and
+  takes no draw: stock prices are the same with the switch on as off,
+  traded or not.
+- `Portfolio.settle_close` delivers an exercise or assignment: the option
+  closes at no premium, the shares join or leave the name's position at the
+  strike and the cash moves, recorded in `Portfolio.deliveries`, not in
+  `fills`. An assignment can leave an account short. Such stock is a
+  holding like any other, valued at the price and traded by the next order
+  (the gym's next target weights included); it is never a trade, so it adds
+  nothing to a scorecard's trades, turnover or impact.
+- `Portfolio.exercise` and `tf.Exercise(quantity)` instruct an exercise for
+  the close; `evaluate`, `World` and the MCP session take it and
+  `tca.analyse` refuses it. The scan margin nets a name's options against
+  the stock held in it, so a covered call asks nothing a naked one does.
+- `option_position_limit`, 0.0 on every preset and left out of the digest
+  there, caps each agent's position in each listed option at the dial times
+  the dealer's displayed depth on one side (500 contracts of an index
+  option, 200 of a name's), waiting orders counted as filled; an order back
+  toward zero always passes. `Engine.position_limit(symbol)` reads it, and
+  an option's quote carries `position_limit` while it is set.
+- `Engine.exercise_violations()` reads rows AX1 (the dealer exercises only
+  where its tree says, calls only on an ex-date's eve, every option held is
+  worth at least the European on the same tree) and AX2 (each delivery
+  moves 100 shares a contract and the strike times the shares, and a
+  close's rows sum to nothing).
+- A snapshot carries `name_options` under the switch, `name_options_book`
+  once an agent has traded one and `name_options_exercise` once there is an
+  instruction or an exercise, hashed behind tags 70 to 72 only then, as
+  `manifest.state_hash` does. Exercises join the order log and `replay`
+  runs them. Every known-answer digest is where it was.
+
+### The single-name options' public API
+
+- Rust: `Engine::exercise`, `cancel_exercise`, `exercise_instructions`,
+  `exercise_violations`, `lists_name_options`, `name_option_roots`,
+  `name_surface` and `name_carry`; `chain`, `option_quote`,
+  `option_expiries`, `surface`, `option_margin`, `contracts`, `settlements`
+  and the order calls take a name's options. `ContractKind::NameOption`,
+  `SettlementRule::PhysicalAtClose`, `SettlementEvent`, and
+  `Settlement`'s new `event`, `agent`, `quantity`, `shares` and `cash`;
+  `NameOptionSpec`, `NAME_OPTION`, `name_option_symbol`,
+  `NAME_OPTION_DEALER`, `dealer::american_ladder`,
+  `ThetaCurve::from_shape` and `calendar::name_option_expiries`.
+- Python: `Engine.exercise`, `cancel_exercise`, `exercise_instructions`,
+  `exercise_violations`, `lists_name_options` and `name_option_roots`;
+  `chain`, `quote`, `option_expiries`, `surface` and `option_margin` take a
+  name, and a settlement row gains `event`, `agent`, `quantity`, `shares`
+  and `cash`, as `settlements_table` does. `MarketView.lists_name_options`
+  and `name_option_roots`, `PortfolioView.deliveries`,
+  `tf.contracts.NAME_OPTIONS` and `portfolio.is_name_option`.
+- MCP: `option_chain` takes `root`, a ticker, to read that name's options;
+  `session_step` takes `{"exercise": q}` on a name's option held; a session
+  view adds `name_options_listed` and each agent's `deliveries`;
+  `describe_simulator` names the family.
+- Payloads: on a model that lists name options the observation's
+  `options` gains `names` (the expiries and each name's at-the-money
+  volatility 21 sessions out) and lists the name options held. A decision's
+  action may name one, and the side `EXERCISE` exercises contracts held;
+  FinRobot's version-2 mandate does not offer it. `TextRenderer` renders a
+  `Single-name options` block.
+- Arrow: `chain_table(root)` reads a name's chains, each row a tree's
+  quote.
+- WASM: `Sim.nameOptionRoots` lists the names with options and
+  `Sim.nameOptionExpiries(ticker)` reads each of a name's expiries as an
+  `OptionExpiry`, both empty on every shipped preset.
+
+### The options' public API
+
+- MCP: `option_chain(session_id, expiry, strikes)` reads the index options
+  a session's market lists: each listed expiry's strike grid, forward,
+  at-the-money implied volatility and 25-delta skew, and one expiry's chain
+  (the nearest when none is named), `strikes` strikes either side of the
+  forward (10 by default), each option's symbol, the dealer's bid, ask and
+  sizes, mid, implied volatility, Greeks and open interest. It is
+  read-only, so the server has 22 tools, 16 of them read-only.
+  `quote_contracts` quotes an option by symbol, with the surface's
+  volatility, the carry and the scan margin on one short contract.
+  `session_step` places, rests and cancels option orders by symbol, counted
+  in contracts, as it does futures. On a market that lists options
+  `session_state` (and every session result) adds the price index, the
+  number of options listed, and each agent's `options` (quantity, average
+  premium, the dealer's mid, realised premium) and `margin`.
+  `list_contracts` lists the futures only and, on a market with options,
+  adds `option_expiries`, the same summary, where it returned every option
+  as a row; a refused symbol names the futures and points to
+  `option_chain` rather than spelling out every option.
+  `describe_simulator`'s `instruments` gains `options`.
+- Payloads: on a model that lists index options the observation (version
+  3) gains `options`, beside `index` and `margin`: `expiries`, each listed
+  expiry's summary, and `positions`, the options held with the dealer's
+  quote. A decision's action may name a listed option, counted in
+  contracts. An option has no daily volume, so the 2% participation cap
+  does not apply to it: the dealer's ladder bounds a fill (ten levels of 50
+  contracts a side) and the leverage limit applies. `TextRenderer` renders
+  an `Index options` block (English and French) when the payload has the
+  key.
+- Arrow: `Engine.chain_table(root="IDX", expiry=None)`, the
+  `option_quotes` table: every listed option's quote now, one row each,
+  with `day` the engine's day count, so tables read at successive closes
+  stack into a history. It is read when asked, not recorded, because a
+  model's chains are some 650 options a day. Its schema carries
+  `schema_version` "1".
+- WASM: `Sim.optionExpiries`, each listed expiry as an `OptionExpiry`
+  (`expiry`, `sessionsToExpiry`, `forward`, `strikeLow`, `strikeHigh`,
+  `strikeStep`, `atmIv`, `put25dIv`, `call25dIv`, `skew25d`). Empty on every
+  shipped preset.
+- Python: `Engine.lists_options` and `MarketView.lists_options`, a property
+  of the model; `Engine.option_expiries(root="IDX")` and
+  `MarketView.option_expiries`; `PortfolioView.options`, as copies; and
+  `tf.contracts.OPTION_ROOTS`.
+- Rust: `Engine::lists_options`, `Engine::option_expiries`,
+  `derivatives::ExpirySummary` and `derivatives::dealer::read_smile`, which
+  reads the at-the-money volatility at the forward (linear in
+  log-moneyness) and each 25-delta volatility (linear in delta) off a
+  chain; and `wasm::OptionExpiry`.
+- On a model that lists futures and options both, `futures_bars`, the
+  payload's `futures` and a decision's volume cap read the futures only.
+  Each read every listed contract, and an option's quote has none of a
+  future's keys.
+- Every known-answer digest is where it was.
+
+### The futures' public API
+
+- MCP: `list_contracts(session_id)` lists the futures a session's market
+  lists now, with the price index; `quote_contracts(session_id, symbols)`
+  quotes them (the front of each family when no symbol is named), with the
+  book's touch, fair value, basis, settlement mark, carry, daily volume and
+  margins. Both are read-only, so the server has 21 tools, 15 of them
+  read-only. `session_step` takes a listed contract's symbol in `orders`,
+  counted in contracts, in the three order forms a ticker takes, and a
+  contract symbol on a preset that lists none is refused with the reason.
+  On a market that lists futures `session_state` (and every session
+  result) adds the price index and the number of contracts listed to
+  `market`, and each agent's `futures` (quantity, mark, multiplier,
+  variation paid) and `margin` (initial, maintenance, excess, the open call
+  and the count of calls). `describe_simulator` gains `instruments`:
+  equities, the rate indices, and the futures families with the switch that
+  lists each and the shipped presets that set one (none).
+- Payloads: `OBSERVATION_SCHEMA_VERSION` and `DECISION_SCHEMA_VERSION` go
+  to "3", and `REPLAYABLE_SCHEMA_VERSIONS` gains "3". On a model that lists
+  futures the observation gains top-level `index` (`level`, `close`),
+  `futures` (one entry per listed contract, read off its quote, with
+  `position` and `max_order_contracts`) and `margin` (`initial`,
+  `maintenance`, `excess`, `call`), built by the new
+  `integrations.common.derivatives_payload`, which the FinRobot serializer
+  shares; on every other model the payload is version 2's to the byte, and
+  every committed recording replays. A decision's action may name a listed
+  future, its quantity in contracts and capped at 2% of the contract's
+  daily volume; the schema's shape is version 2's and only its
+  descriptions say so. `TextRenderer` renders a `Futures` block (English
+  and French) when the payload has the keys.
+- Arrow: `Engine.futures_bars(day=None)`, one row per listed contract per
+  recorded day, read at `record` (price, fair value, basis, touch, mark,
+  underlying, sessions to expiry, initial margin), and
+  `Engine.settlements_table(day=None)`, the settlements as a table. Each
+  schema carries a `schema_version` metadata key, "1". Recording them is a
+  read: a recorded run's prices and state hash are the unrecorded run's.
+- WASM: `Sim.indexLevel` (undefined with `index_level_listed` off) and
+  `Sim.frontFutures`, the front contract of each listed family as a
+  `FutureQuote` (`symbol`, `root`, `expiry`, `price`, `fair`, `bid`, `ask`,
+  `mark`, `basisBp`, `sessionsToExpiry`, `multiplier`). A page reaches the
+  switches only through a shipped preset, so both read nothing today.
+- Python: `tradefloor.contracts` with `parse`, `format`, `is_contract` and
+  `FUTURE_ROOTS`, calling the engine's own symbol reader;
+  `Engine.lists_futures` and `MarketView.lists_futures`, a property of the
+  model; `Portfolio.margin(engine)` (`initial`, `maintenance`, `equity`,
+  `excess`, `call`); and `PortfolioView.futures`, `margin()`,
+  `margin_requirement()` and `margin_calls`, as copies.
+- Rust: `Engine::lists_futures`, and `wasm::FutureQuote`.
+- RELEASING.md's traded known-answer line names the preset from the script
+  and its JSON: pt-v21 from 0.10.0, pt-v20 only in 0.8.5 to 0.9.1.
+- Every known-answer digest is where it was.
+
+### Index options
+
+- `surface_ssvi`, `options_index_listed` and `option_dealer_spread` are new
+  switches, with `surface_skew_physical`, `surface_skew_physical_slope`,
+  `surface_skew_premium`, `surface_skew_premium_slope`, `surface_curvature`, `surface_curvature_exponent`,
+  `surface_term_premium_short`, `surface_term_premium_long` and
+  `surface_earnings_weight` beside them, all 0.0 on every preset and left out
+  of the digest there. None is fitted yet.
+- The surface is SSVI (Gatheral and Jacquier 2014) with the paper's
+  no-arbitrage conditions checked at every knot. Its 21-session strip,
+  priced by the Cboe VIX formula, returns the VIX (row SV1, by
+  construction); its correlation is solved so the strip's Cboe SKEW
+  skewness is the physical skew at the VIX plus a premium; its term
+  structure follows the forecast's expected index variance, two log premia
+  and the earnings reports before each tenor.
+- Options are European, cash-settled at $100 a point on the index of the
+  expiry session's opening prints: the next six monthly expiries and the
+  quarterlies after them, forty-odd strikes each on a grid fixed at listing.
+  One dealer quotes every option: Black's price at the surface's volatility
+  moved by a decaying, vega-weighted inventory, a half-spread in volatility
+  that grows with moneyness and the VIX, ten levels of 50 contracts on
+  Cboe's SPX grid. Quoted chains carry no static arbitrage (row SV2).
+- Margin extends to options through a scan: the worst loss over seven index
+  moves and three volatility shifts sized to `margin_scan_coverage`.
+  `Portfolio` holds options (`Portfolio.options`, `OptionPosition`): the
+  premium moves cash, positions are marked at the dealer's mid, settle at
+  expiry, count at delta-notional against the leverage limit and add the
+  scan to `margin_requirement`; an unmet margin call closes them too.
+- New API in Rust: `Engine::surface`, `Engine::surface_carry`,
+  `Engine::chain`, `Engine::option_quote`, `Engine::option_margin` and
+  `Engine::option_arbitrage`; `derivatives::pricing` (`black_price`,
+  `black_greeks`, `implied_vol`, `Greeks`), `derivatives::surface` (`Ssvi`,
+  `Surface`, `ThetaCurve`, `StripMoments`, `fit_smile`, `strip_moments`,
+  `term_shape`), `derivatives::dealer` (`OptionQuote`, `OptionDealerSpec`,
+  `INDEX_OPTION_DEALER`, `ladder`, `chain_violations`),
+  `derivatives::calendar::index_option_expiries`, `IndexOptionSpec`,
+  `INDEX_OPTION`, `index_option_symbol` and `ContractKind::IndexOption`;
+  `ContractSpec` gains `right` and `strike`. `submit_order`, `cancel_order`,
+  `open_orders`, `take_fills`, `contracts`, `settlements` and `contract_book`
+  take options. In Python: `Engine.chain(root, expiry)`,
+  `Engine.surface(root)` (a `VolSurface`), `Engine.option_margin(positions)`
+  and `Engine.option_arbitrage(root)`; `quote`, `submit`, `cancel` and `book`
+  take an option symbol, and `contracts()` gives an option's `right` and
+  `strike`. An agent's market view serves `chain`, `surface` and
+  `option_margin`.
+- A snapshot carries `options` under `surface_ssvi` and `options_book` once
+  an agent has traded an option, hashed behind tags 80 and 81 only then, as
+  `manifest.state_hash` does. Every known-answer digest is where it was.
 
 ### Index futures
 
@@ -75,6 +329,17 @@ same with them on as off.
   `settlements(day)`, `index_level`, `live_vix` and `forecast()`, and `act`
   trades a contract by its symbol. The scorecard's impact leaves contracts
   out: it reads the names' prices, which no contract moves.
+
+### The oil law
+
+- `oil_mean_reversion`, `oil_noise_sd` and `oil_inventory_level_gain` are
+  new dials, 0.0 on every preset and left out of the digest there, each a
+  branch to the standing oil step at 0.0. Off zero the oil price closes the
+  dial's share of its gap to the target a session in place of 0.03, draws
+  its noise at the dial's sd in place of 2.0, and takes inventory's pressure
+  on its level (the gain times the pressure's change) in place of a daily
+  push. The forecast steps the same law. Every known-answer digest is where
+  it was.
 
 ### Oil futures
 
@@ -202,6 +467,32 @@ same with them on as off.
   released in 0.10.2) reads the forecast (`forecast_horizon_sessions`) and
   the live VIX again at once, as a pin does, and the forecast reads the
   premium fading and the floor held.
+
+### An American options pricer
+
+- New module `derivatives::american`, the pricer pt-v22's single-stock
+  options will quote from. It is library code that the engine does not
+  call yet: no dial reads it, it takes no draw, and every known-answer
+  digest is where it was. It provides a Leisen-Reimer binomial tree
+  (`price`, `steps_for`, `OptionSpec`, `Style`, `Lattice`, `TreeValue`),
+  with cash dividends on the escrowed price (`CashDividend`,
+  `CashDividend::from_ex_day`), the early-exercise boundary at each step
+  (`BoundaryPoint`), and the dealer's exercise decision (`early_exercise`,
+  `ExerciseDecision`). That decision exercises a call only on the session
+  before an ex-date, and a put whenever the tree says to. It also holds
+  the OCC's exercise-by-exception rule at expiry (`exercised_at_expiry`,
+  `EXERCISE_BY_EXCEPTION`).
+- `market::dividends::lookahead` lists a name's ex-dates up to a session,
+  with their amounts: the declared amount inside the 21-session
+  declaration lead, and beyond it the declaration rule applied again on
+  today's EMA of closes. It reads only past closes and the public target
+  yield. The index futures' carry (`futures_index_listed`) now reads its
+  dividends through it, with the same arithmetic in the same order, so
+  every futures price is the same to the bit.
+- Checked against Hull's worked examples: the five-step American put
+  4.49, the put with a known dividend 4.44, the converged put 4.28, and
+  the dividend call's 3.67. A European tree is within 1e-4 of
+  Black-Scholes at 401 steps.
 
 ## 0.10.2
 
