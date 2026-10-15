@@ -443,6 +443,7 @@ impl Engine {
             || (self.vix_futures_on() && self.vix_futures_slot(symbol).is_some())
             || (self.rate_futures_on() && self.rate_futures_slot(symbol).is_some())
             || (self.oil_futures_on() && self.oil_futures_slot(symbol).is_some())
+            || self.is_listed_option(symbol)
     }
 
     /// Whether an order with the id `id` already waits in any book: the
@@ -453,6 +454,7 @@ impl Engine {
             || self.vix_futures_orders().iter().any(|o| o.id == id)
             || self.rate_futures_orders().iter().any(|o| o.id == id)
             || self.oil_futures_orders().iter().any(|o| o.id == id)
+            || self.option_orders().iter().any(|o| o.id == id)
     }
 
     // ── Pricing ───────────────────────────────────────────────────────────
@@ -460,7 +462,7 @@ impl Engine {
     /// The mean policy rate expected to be in force over the sessions from
     /// now to `expiry`, a fraction a year: the forecast's path where there
     /// is one, the policy rate now where there is not.
-    fn futures_rate(&self, expiry: i64, now: f64) -> f64 {
+    pub(super) fn futures_rate(&self, expiry: i64, now: f64) -> f64 {
         let current = self.economy.federal_funds_rate;
         let Some(f) = self.forecast() else {
             return current / 100.0;
@@ -488,11 +490,18 @@ impl Engine {
     /// The present value, in index points at `rate`, of the constituents'
     /// dividends going ex after the last open and no later than `expiry`.
     fn futures_dividends(&self, expiry: i64, rate: f64, now: f64) -> f64 {
+        self.carry_dividends(expiry, rate, now, self.futures_listing_after())
+    }
+
+    /// The present value, in index points at `rate`, of the constituents'
+    /// dividends going ex after session `after` and no later than `expiry`:
+    /// the declared amount within 21 sessions of an ex-date, the Lintner
+    /// rule's projection beyond.
+    pub(super) fn carry_dividends(&self, expiry: i64, rate: f64, now: f64, after: i64) -> f64 {
         use crate::market::dividends as dv;
         if self.params.dividend_payout_share == 0.0 || !(self.index_divisor > 0.0) {
             return 0.0;
         }
-        let after = self.futures_listing_after();
         let mut total = 0.0;
         for c in &self.companies {
             if !c.is_public || c.is_bankrupt {
@@ -683,6 +692,11 @@ impl Engine {
     /// The agent-facing book of a listed contract: `None` for a symbol not
     /// listed.
     pub fn contract_book(&self, symbol: &str) -> Option<OrderBook> {
+        if self.options_on() {
+            if let Some(book) = self.option_book(symbol) {
+                return Some(book);
+            }
+        }
         if self.vix_futures_on() {
             if let Some(slot) = self.vix_futures_slot(symbol) {
                 return self.vix_futures_book_at(slot);
@@ -1198,13 +1212,15 @@ impl Engine {
     /// `futures_index_listed`, then the six VIX futures under
     /// `futures_vix_listed`, then the thirteen policy-rate and eight
     /// term-rate futures under `futures_rates_listed`, then the twelve oil
-    /// futures under `futures_oil_listed`, each family in expiry order; none
-    /// with all off.
+    /// futures under `futures_oil_listed`, each family in expiry order, then
+    /// the index options under `options_index_listed`, by expiry, strike and
+    /// right; none with all off.
     pub fn contracts(&self) -> Vec<ContractSpec> {
         let mut out = self.index_futures_contracts();
         out.extend(self.vix_futures_contracts());
         out.extend(self.rate_futures_contracts());
         out.extend(self.oil_futures_contracts());
+        out.extend(self.option_contracts());
         out
     }
 
@@ -1233,6 +1249,8 @@ impl Engine {
                     tick: INDEX_FUTURE.tick,
                     settlement: kind.settlement(),
                     front: front == Some(k),
+                    right: None,
+                    strike: None,
                 }
             })
             .collect()
@@ -1303,7 +1321,8 @@ impl Engine {
 
     /// The final settlements made at `session`'s open, or every one so far
     /// with `None`, in session order, an index future before a VIX future at
-    /// the same open. Empty with both switches off.
+    /// the same open and the index options after the futures. Empty with
+    /// every switch off.
     pub fn settlements(&self, session: Option<i64>) -> Vec<Settlement> {
         let mut out: Vec<Settlement> = if self.futures_on() {
             self.futures
@@ -1318,6 +1337,7 @@ impl Engine {
         out.extend(self.vix_futures_settlements(session));
         out.extend(self.rate_futures_settlements(session));
         out.extend(self.oil_futures_settlements(session));
+        out.extend(self.option_settlements(session));
         // Stable, so each family keeps its own order within a session.
         out.sort_by_key(|s| s.session);
         out

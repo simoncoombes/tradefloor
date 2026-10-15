@@ -1133,6 +1133,11 @@ def _nothing_dormant():
                    # The contracts' margin (pt-v22 phase 1).
                    margin_scan_coverage=0.99,
                    margin_scan_tail=1.3,
+                   # The index options, their surface and their dealer (pt-v22
+                   # phase 2): two switches; the surface's companions and the
+                   # dealer's spread take the blanket 0.05.
+                   surface_ssvi=1.0,
+                   options_index_listed=1.0,
                    # Two switches read only under a macro pin (r13).
                    macro_pins_hold=1.0,
                    pinned_vix_feedback=1.0,
@@ -1377,6 +1382,14 @@ UNREACHED_SNAPSHOT_FIELDS = {
         "which waits on a trade, and the settlements made. "
         "tests/test_rate_futures.py holds each in the state hash and across a "
         "restore.",
+    "options":
+        "the index options and the surface's clock (`surface_ssvi`, "
+        "`options_index_listed`). They move no price: a quote is computed from "
+        "public state when asked. What the key alone carries is the listing "
+        "(each expiry's strike grid and range), the dealer's pressure, which "
+        "waits on a trade, and the settled expiries, which wait on an expiry "
+        "inside the window. tests/test_index_options.py holds each in the "
+        "state hash and across a restore.",
     "oil_futures":
         "the oil futures (`futures_oil_listed`). They move no price, and every "
         "close marks them afresh from the forecast. What the key alone "

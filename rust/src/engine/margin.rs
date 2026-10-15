@@ -11,9 +11,19 @@
 //! 2` in each tail and `t` the tail allowance (`margin_scan_tail`; 1 at
 //! 0.0). Maintenance is initial over [`MAINTENANCE_RATIO`]. The margin reads
 //! the marks and writes only its own state, so no price moves.
+//!
+//! Options (`options_index_listed`) are margined by a scan, as SPAN and
+//! OCC's TIMS margin them: an option portfolio's initial margin is its worst
+//! loss over [`SCAN_MOVES`] of the index, sized to `z * t` times the index's
+//! one-session sd at the VIX, each at [`SCAN_VOL_SHIFTS`] of its implied
+//! volatility, sized to `z * t` times [`SCAN_VOL_SD`] ([`option_scan_loss`]).
+//! A long option's loss is at most its premium and a spread's at most its
+//! width, so offsetting positions margin net, as a clearing house's scan
+//! does. The scan reads quotes and writes nothing.
 
 use super::*;
-use crate::derivatives::{ContractKind, OIL_FUTURE, POLICY_RATE_FUTURE, TERM_RATE_FUTURE, VIX_FUTURE};
+use crate::derivatives::pricing::black_greeks;
+use crate::derivatives::{ContractKind, Right, OIL_FUTURE, POLICY_RATE_FUTURE, TERM_RATE_FUTURE, VIX_FUTURE};
 
 /// The half-life, in sessions, of the margin's volatility.
 pub const MARGIN_HALF_LIFE: f64 = 7.0;
@@ -27,6 +37,7 @@ fn kind_code(kind: ContractKind) -> f64 {
         ContractKind::VixFuture => 1.0,
         ContractKind::PolicyRateFuture => 2.0,
         ContractKind::TermRateFuture => 3.0,
+        // Options are margined by the scan and keep no record here.
         _ => 4.0,
     }
 }
@@ -41,6 +52,64 @@ fn kind_of(code: f64) -> Option<ContractKind> {
         4 => Some(ContractKind::OilFuture),
         _ => None,
     }
+}
+
+/// The index moves an option scan tries, as shares of its move size: the
+/// seven price scan points of CME SPAN.
+pub const SCAN_MOVES: [f64; 7] = [-1.0, -2.0 / 3.0, -1.0 / 3.0, 0.0, 1.0 / 3.0, 2.0 / 3.0, 1.0];
+
+/// The implied-volatility shifts an option scan tries at each move, as
+/// shares of its volatility shift.
+pub const SCAN_VOL_SHIFTS: [f64; 3] = [-1.0, 0.0, 1.0];
+
+/// The one-session sd of an option's log implied volatility the scan's
+/// volatility shift is sized to: a stated constant, about the daily sd of
+/// the published VIX's log changes, not fitted to any row. The tail
+/// allowance `margin_scan_tail` scales it with the index's move.
+pub const SCAN_VOL_SD: f64 = 0.07;
+
+/// One option position an option scan revalues.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct ScanOption {
+    pub(crate) right: Right,
+    /// The index less the present value of the dividends before expiry.
+    pub(crate) carry_spot: f64,
+    pub(crate) strike: f64,
+    pub(crate) years: f64,
+    pub(crate) vol: f64,
+    pub(crate) rate: f64,
+    /// Signed contracts times the multiplier: dollars per index point of the
+    /// option's price, negative for a short.
+    pub(crate) units: f64,
+}
+
+/// An option portfolio's worst loss over the scan, dollars, 0 when no
+/// scenario loses: each of [`SCAN_MOVES`] times `index_move` (index points)
+/// at each of [`SCAN_VOL_SHIFTS`] times `vol_shift` (a share of each
+/// option's volatility), the dividends' present value, the rate and the
+/// time to expiry held.
+pub(crate) fn option_scan_loss(positions: &[ScanOption], index_move: f64, vol_shift: f64) -> f64 {
+    if positions.is_empty() {
+        return 0.0;
+    }
+    let now: Vec<f64> = positions
+        .iter()
+        .map(|p| black_greeks(p.right, p.carry_spot, p.strike, p.years, p.vol, p.rate).0)
+        .collect();
+    let mut worst: f64 = 0.0;
+    for &m in &SCAN_MOVES {
+        for &v in &SCAN_VOL_SHIFTS {
+            let mut loss = 0.0;
+            for (p, before) in positions.iter().zip(now.iter()) {
+                let spot = crate::mathx::max(1e-9, p.carry_spot + m * index_move);
+                let vol = crate::mathx::max(1e-6, p.vol * (1.0 + v * vol_shift));
+                let after = black_greeks(p.right, spot, p.strike, p.years, vol, p.rate).0;
+                loss += p.units * (before - after);
+            }
+            worst = crate::mathx::max(worst, loss);
+        }
+    }
+    worst
 }
 
 /// One contract's margin record.
@@ -206,6 +275,18 @@ impl Engine {
         self.margin.entries = kept;
     }
 
+    /// The option scan's size at the VIX `vix` and the index `index`: the
+    /// index move, `z * t` times the index's one-session sd the VIX implies
+    /// (`VIX = (1 + vix_variance_premium) 100 sqrt(252 V)`) in index points,
+    /// and the volatility shift, `z * t` times [`SCAN_VOL_SD`].
+    pub(super) fn option_scan_size(&self, vix: f64, index: f64) -> (f64, f64) {
+        let p = &self.params;
+        let tail = if p.margin_scan_tail == 0.0 { 1.0 } else { p.margin_scan_tail };
+        let z = normal_quantile(0.5 + 0.5 * p.margin_scan_coverage) * tail;
+        let sigma = vix / (100.0 * (1.0 + p.vix_variance_premium) * crate::mathx::sqrt(252.0));
+        (z * sigma * index, z * SCAN_VOL_SD)
+    }
+
     /// A listed contract's initial margin, dollars a contract: `None` with
     /// the dial off and before the contract's first close.
     pub(crate) fn initial_margin(&self, kind: ContractKind, expiry: i64, multiplier: f64) -> Option<f64> {
@@ -265,6 +346,36 @@ mod tests {
         assert!(normal_quantile(0.5).abs() < 1e-12);
         assert!((normal_quantile(0.995) - 2.575_829_303_548_9).abs() < 1e-9);
         assert!((normal_quantile(0.975) - 1.959_963_984_540_1).abs() < 1e-9);
+    }
+
+    fn option(right: Right, strike: f64, units: f64) -> ScanOption {
+        ScanOption { right, carry_spot: 1000.0, strike, years: 21.0 / 252.0, vol: 0.2, rate: 0.03, units }
+    }
+
+    #[test]
+    fn the_option_scan_margins_shorts_and_nets_offsetting_positions() {
+        let (m, v) = (30.0, 0.18);
+        let price = |o: &ScanOption| black_greeks(o.right, o.carry_spot, o.strike, o.years, o.vol, o.rate).0;
+        // A short call loses most on the largest rise at the highest volatility.
+        let short = option(Right::Call, 1000.0, -100.0);
+        let up = ScanOption { carry_spot: 1030.0, vol: 0.2 * 1.18, ..short };
+        let want = 100.0 * (price(&up) - price(&short));
+        assert!((option_scan_loss(&[short], m, v) - want).abs() < 1e-9 * want);
+        // A long option loses at most its premium.
+        let long = option(Right::Put, 980.0, 100.0);
+        let premium = 100.0 * price(&long);
+        let l = option_scan_loss(&[long], m, v);
+        assert!(l > 0.0 && l < premium);
+        // A position and its offset margin nothing.
+        assert_eq!(option_scan_loss(&[short, option(Right::Call, 1000.0, 100.0)], m, v), 0.0);
+        // A call spread loses at most its width.
+        let spread = [option(Right::Call, 1000.0, -100.0), option(Right::Call, 1010.0, 100.0)];
+        let s = option_scan_loss(&spread, m, v);
+        assert!(s > 0.0 && s <= 100.0 * 10.0);
+        assert!(s < option_scan_loss(&spread[..1], m, v));
+        // A wider scan asks more of a short.
+        assert!(option_scan_loss(&[short], 2.0 * m, v) > option_scan_loss(&[short], m, v));
+        assert_eq!(option_scan_loss(&[], m, v), 0.0);
     }
 
     #[test]

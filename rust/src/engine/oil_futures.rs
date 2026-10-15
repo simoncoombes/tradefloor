@@ -620,6 +620,8 @@ impl Engine {
                 tick: OIL_FUTURE.tick,
                 settlement: kind.settlement(),
                 front: front == Some(k),
+                right: None,
+                strike: None,
             })
             .collect()
     }
