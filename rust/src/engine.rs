@@ -2627,6 +2627,7 @@ impl Engine {
         pre.params.surface_skew_noise_half_life = 0.0;
         pre.params.surface_curvature = 0.0;
         pre.params.surface_index_curvature = 0.0;
+        pre.params.surface_index_vertex = 0.0;
         pre.params.surface_curvature_exponent = 0.0;
         pre.params.surface_term_premium_short = 0.0;
         pre.params.surface_term_premium_long = 0.0;

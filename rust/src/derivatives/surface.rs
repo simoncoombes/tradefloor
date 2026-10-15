@@ -70,11 +70,21 @@ pub struct Ssvi {
     pub rho: f64,
     pub eta: f64,
     pub gamma: f64,
+    /// The vertex's move toward the money (`surface_index_vertex`): the
+    /// smile is SSVI's at `k + shift m`, `m = -rho / phi` its vertex. 0.0 is
+    /// SSVI itself.
+    pub shift: f64,
 }
 
 impl Ssvi {
     pub fn new(rho: f64, eta: f64, gamma: f64) -> Self {
-        Ssvi { rho, eta, gamma }
+        Ssvi { rho, eta, gamma, shift: 0.0 }
+    }
+
+    /// The same smile with its vertex moved a share `shift` of the way to the
+    /// money.
+    pub fn with_shift(self, shift: f64) -> Self {
+        Ssvi { shift, ..self }
     }
 
     /// The power law, `eta theta^-gamma (1 + theta)^(gamma - 1)`: 0 with `eta`
@@ -91,8 +101,30 @@ impl Ssvi {
     pub fn total_variance(&self, k: f64, theta: f64) -> f64 {
         let p = self.phi(theta);
         let r = self.rho;
+        // The vertex moved toward the money (`shift`); exactly SSVI at 0.0.
+        let k = if self.shift == 0.0 || p == 0.0 { k } else { k - self.shift * r / p };
         let x = p * k + r;
         0.5 * theta * (1.0 + r * p * k + mathx::sqrt(x * x + 1.0 - r * r))
+    }
+
+    /// Durrleman's condition, `g(k) >= 0`, on 401 points over eight
+    /// at-the-money total standard deviations either side: the check that
+    /// replaces Gatheral and Jacquier's sufficient conditions once the
+    /// vertex is moved, where they no longer apply.
+    pub fn check_durrleman(&self, theta: f64) -> Result<(), String> {
+        let width = 8.0 * mathx::sqrt(theta);
+        let h = 1e-5 * mathx::max(width, 1e-3);
+        for i in 0..=400 {
+            let k = -width + 2.0 * width * f64::from(i) / 400.0;
+            let w = self.total_variance(k, theta);
+            let w1 = (self.total_variance(k + h, theta) - self.total_variance(k - h, theta)) / (2.0 * h);
+            let w2 = (self.total_variance(k + h, theta) + self.total_variance(k - h, theta) - 2.0 * w) / (h * h);
+            let g = (1.0 - k * w1 / (2.0 * w)) * (1.0 - k * w1 / (2.0 * w)) - 0.25 * w1 * w1 * (1.0 / w + 0.25) + 0.5 * w2;
+            if !(w > 0.0 && g >= -1e-9) {
+                return Err(format!("butterfly: Durrleman's g is {g} at k {k}, theta {theta}"));
+            }
+        }
+        Ok(())
     }
 
     /// The largest `|rho|` the fit allows at `eta`: inside `2 / eta - 1`, where
@@ -110,6 +142,9 @@ impl Ssvi {
     /// butterfly pair of their Theorem 4.2 and the bound on `d(theta
     /// phi)/d theta` of their Theorem 4.1. `Err` names the first that fails.
     pub fn check(&self, theta: f64) -> Result<(), String> {
+        if self.shift != 0.0 {
+            return self.check_durrleman(theta);
+        }
         let (r, e, g) = (self.rho, self.eta, self.gamma);
         if !(theta > 0.0 && theta.is_finite()) {
             return Err(format!("theta is {theta}; it is finite and positive"));
@@ -230,8 +265,16 @@ pub struct SmileFit {
 /// by the squared ratio of the target to the strip's VIX, which is nearly
 /// proportional to `theta`. Converges to a relative 1e-13 in a handful of
 /// steps; at most 100.
-fn theta_for_vix(rho: f64, eta: f64, gamma: f64, target_vix: f64, years: f64, start: f64) -> Option<(f64, StripMoments)> {
-    let ssvi = Ssvi::new(rho, eta, gamma);
+fn theta_for_vix(
+    rho: f64,
+    eta: f64,
+    gamma: f64,
+    shift: f64,
+    target_vix: f64,
+    years: f64,
+    start: f64,
+) -> Option<(f64, StripMoments)> {
+    let ssvi = Ssvi::new(rho, eta, gamma).with_shift(shift);
     let mut theta = start;
     let mut last = None;
     for _ in 0..100 {
@@ -259,6 +302,19 @@ fn theta_for_vix(rho: f64, eta: f64, gamma: f64, target_vix: f64, years: f64, st
 /// `rho`, and `theta` re-solved at each `rho`; a skewness beyond the bound's
 /// is met at the bound, `reached` false. `None` when no strip prices.
 pub fn fit_smile(target_vix: f64, target_skewness: Option<f64>, years: f64, eta: f64, gamma: f64) -> Option<SmileFit> {
+    fit_smile_shifted(target_vix, target_skewness, years, eta, gamma, 0.0)
+}
+
+/// [`fit_smile`] on the smile with its vertex moved a share `shift` of the
+/// way to the money ([`Ssvi::with_shift`]); 0.0 is [`fit_smile`] itself.
+pub fn fit_smile_shifted(
+    target_vix: f64,
+    target_skewness: Option<f64>,
+    years: f64,
+    eta: f64,
+    gamma: f64,
+    shift: f64,
+) -> Option<SmileFit> {
     if !(target_vix > 0.0 && target_vix.is_finite() && years > 0.0) {
         return None;
     }
@@ -266,14 +322,14 @@ pub fn fit_smile(target_vix: f64, target_skewness: Option<f64>, years: f64, eta:
     let target = match target_skewness {
         Some(s) if eta > 0.0 && s.is_finite() => s,
         _ => {
-            let (theta, moments) = theta_for_vix(0.0, eta, gamma, target_vix, years, start)?;
+            let (theta, moments) = theta_for_vix(0.0, eta, gamma, shift, target_vix, years, start)?;
             return Some(SmileFit { theta, rho: 0.0, moments, reached: target_skewness.is_none() || eta == 0.0 });
         }
     };
     let bound = Ssvi::rho_bound(eta);
     let mut theta_hint = start;
     let mut eval = |rho: f64| -> Option<(f64, StripMoments)> {
-        let r = theta_for_vix(rho, eta, gamma, target_vix, years, theta_hint)?;
+        let r = theta_for_vix(rho, eta, gamma, shift, target_vix, years, theta_hint)?;
         theta_hint = r.0;
         Some(r)
     };
@@ -541,6 +597,20 @@ impl Surface {
             }
             last = theta;
             self.ssvi.check(theta)?;
+        }
+        // Off SSVI the knots' order is not enough: total variance must not
+        // fall with the tenor at any log-moneyness.
+        if self.ssvi.shift != 0.0 {
+            for pair in self.curve.knots.windows(2) {
+                let width = 8.0 * mathx::sqrt(pair[1]);
+                for i in 0..=200 {
+                    let k = -width + 2.0 * width * f64::from(i) / 200.0;
+                    let (a, b) = (self.ssvi.total_variance(k, pair[0]), self.ssvi.total_variance(k, pair[1]));
+                    if b < a - 1e-12 {
+                        return Err(format!("calendar: total variance falls from {a} to {b} at k {k}"));
+                    }
+                }
+            }
         }
         Ok(())
     }

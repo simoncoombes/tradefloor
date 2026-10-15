@@ -39,7 +39,7 @@ use crate::derivatives::dealer::{
     chain_violations, dealer_thetas, ladder, pressure_after, read_smile, walk, ExpirySummary, Ladder, OptionQuote,
 };
 use crate::derivatives::pricing::{black_greeks, black_price, intrinsic};
-use crate::derivatives::surface::{fit_smile, term_shape, SmileFit, Ssvi, Surface, TermInputs, ThetaCurve, VIX_SESSIONS};
+use crate::derivatives::surface::{fit_smile_shifted, term_shape, SmileFit, Ssvi, Surface, TermInputs, ThetaCurve, VIX_SESSIONS};
 use crate::derivatives::{
     index_option_symbol, ContractKind, ContractSpec, ContractSymbol, Right, Settlement, SymbolKind, INDEX_OPTION,
     INDEX_OPTION_DEALER,
@@ -146,7 +146,7 @@ const SETTLED_WIDTH: usize = 5;
 /// The 21-session fit last made, by its inputs' bits: the fit solves two
 /// strips' worth of prices per step, and a session's quotes read one VIX.
 #[derive(Debug, Default)]
-pub(crate) struct FitCache(std::sync::Mutex<Option<([u64; 4], SmileFit)>>);
+pub(crate) struct FitCache(std::sync::Mutex<Option<([u64; 5], SmileFit)>>);
 
 impl Clone for FitCache {
     fn clone(&self) -> Self {
@@ -352,18 +352,20 @@ impl Engine {
     /// The index's 21-session fit at `vix` and the skewness `target`, from
     /// the cache when its inputs are the last fit's.
     fn surface_fit(&self, vix: f64, target: Option<f64>) -> Option<SmileFit> {
-        self.surface_fit_at(vix, target, self.index_curvature(), &self.options.cache)
+        self.surface_fit_at(vix, target, self.index_curvature(), self.params.surface_index_vertex, &self.options.cache)
     }
 
-    /// The 21-session fit at `vix`, the skewness `target` and the curvature
-    /// `eta`, from `cache` when its inputs are the last fit's there.
-    fn surface_fit_at(&self, vix: f64, target: Option<f64>, eta: f64, cache: &FitCache) -> Option<SmileFit> {
+    /// The 21-session fit at `vix`, the skewness `target`, the curvature
+    /// `eta` and the vertex's move `shift`, from `cache` when its inputs are
+    /// the last fit's there.
+    fn surface_fit_at(&self, vix: f64, target: Option<f64>, eta: f64, shift: f64, cache: &FitCache) -> Option<SmileFit> {
         let p = &self.params;
         let key = [
             vix.to_bits(),
             target.map_or(u64::MAX, f64::to_bits),
             eta.to_bits(),
             p.surface_curvature_exponent.to_bits(),
+            shift.to_bits(),
         ];
         if let Ok(guard) = cache.0.lock() {
             if let Some((k, fit)) = *guard {
@@ -372,7 +374,7 @@ impl Engine {
                 }
             }
         }
-        let fit = fit_smile(vix, target, VIX_SESSIONS / 252.0, eta, p.surface_curvature_exponent)?;
+        let fit = fit_smile_shifted(vix, target, VIX_SESSIONS / 252.0, eta, p.surface_curvature_exponent, shift)?;
         if let Ok(mut guard) = cache.0.lock() {
             *guard = Some((key, fit));
         }
@@ -384,12 +386,12 @@ impl Engine {
     /// skewness fitted at the names' curvature, `surface_curvature`, so a
     /// name's smile is the one the shared curvature gives it.
     pub(super) fn name_reference_fit(&self, index: &Surface) -> Option<(f64, SmileFit)> {
-        if self.params.surface_index_curvature == 0.0 {
+        if self.params.surface_index_curvature == 0.0 && self.params.surface_index_vertex == 0.0 {
             return Some((index.ssvi.eta, index.fit));
         }
         let eta = self.params.surface_curvature;
         let target = if eta > 0.0 { index.skewness_target } else { None };
-        let fit = self.surface_fit_at(index.vix, target, eta, &self.options.name_cache)?;
+        let fit = self.surface_fit_at(index.vix, target, eta, 0.0, &self.options.name_cache)?;
         Some((eta, fit))
     }
 
@@ -488,7 +490,7 @@ impl Engine {
         let curve = ThetaCurve::new(&shape, clock.elapsed, fit.theta)?;
         Some(Surface {
             root: ContractKind::IndexOption.root().to_string(),
-            ssvi: Ssvi::new(fit.rho, eta, gamma),
+            ssvi: Ssvi::new(fit.rho, eta, gamma).with_shift(p.surface_index_vertex),
             curve,
             vix,
             skewness_target: target,
