@@ -882,10 +882,16 @@ def test_an_agent_can_beat_the_oracle():
     their own impact, and with an agent's fills applied once none of them
     beats it on these eight markets. The point survives with the same
     information spent differently: three names a side instead of five, at
-    the same gross and participation cap, out-earns the default on 6 of the
-    8 (ratios 1.04, 1.20, 1.16, 1.10, 1.20, 1.00, 1.18, 0.94). Asserted as
-    existing rather than as a count, because the count is a property of
-    the seeds.
+    the same gross and participation cap, out-earns the default on some of
+    the 8: 6 when this was written (ratios 1.04, 1.20, 1.16, 1.10, 1.20,
+    1.00, 1.18, 0.94), and 3 on the 0.10.2 default (seeds 0, 1 and 5, at
+    1.40, 1.12 and 1.92). Asserted as existing rather than as a count,
+    because the count is a property of the seeds.
+
+    So the loop stops at the first seed that beats it. An existence claim
+    is settled by one witness, and the seeds after it cost 30s on a CI
+    runner without being able to change the verdict; the eight remain the
+    search, so the failure still means none of them did.
     """
     universe = tradefloor.Universe.random(30, seed=11)
     beaten = 0
@@ -895,6 +901,7 @@ def test_an_agent_can_beat_the_oracle():
                                      seed=seed, universe=universe, days=10)
         if scores["narrower"].pnl > scores["oracle"].pnl:
             beaten += 1
+            break
     assert beaten > 0, (
         "nothing beat the Oracle in eight seeds -- either the baselines got "
         "worse or the Oracle stopped being a same-constraints reference"
