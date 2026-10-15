@@ -2948,7 +2948,13 @@ A = (1 + \varpi)\cdot 100\,\sqrt{252\,\bar V}
 ```
 
 $\varpi$ is the variance risk premium, the gap between the VIX and realised
-volatility. $\bar V$ is the same sum at the unconditional point: the factor
+volatility. With `vix_variance_premium_slope` set (0.0 on every shipped
+preset) it falls with the level the variance implies,
+$1 + \varpi(L) = (1 + \varpi)\,(L / 20)^{s}$ with $L = 100\sqrt{252\,V}$, in
+both $I_d$ and $A$: the premium reads the variance, never the VIX. $s$ is
+measured on the tape's VIX over the next 21 sessions' realised volatility by
+VIX bucket (1.41 under 12 to 1.21 above 40): -0.070, standard error 0.040.
+$\bar V$ is the same sum at the unconditional point: the factor
 at its baseline, sector states at 1, each company's variance at its resting
 level, and $\Lambda$ averaged over up and down days. $A$ is computed once, when
 the engine is built, and depends on the roster: on pt-v20 20.9 on
@@ -3018,6 +3024,7 @@ does not move, it takes no noise and no jump.
 | Symbol | Dial | pt-v20 | pt-v21 | Kind | Source |
 |---|---|---|---|---|---|
 | $\varpi$ | `vix_variance_premium` | 0.252 | same | measured | median yearly VIX over realised volatility, S&P 500 and VIX 1990 to 2025; interquartile range ±0.13 |
+| $s$ | `vix_variance_premium_slope` | 0.0 | same | measured | -0.070 (se 0.040): the log of the VIX over the next 21 sessions' realised volatility, by VIX bucket, on the log variance-implied level; 0.0 ships the constant |
 | | `vix_level_identity` | 1.0 | same | measured | switches the target to the index's implied VIX; chosen on a 120-seed paired comparison |
 | $\kappa_X$ | `vix_mean_reversion` | 0.27 a day | same | chosen | needs a joint solve with the fear gain |
 | | `vix_decay_ratio` | 1.0 | same | measured | the same reversion up and down; 120-seed comparison |
