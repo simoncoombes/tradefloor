@@ -1666,6 +1666,25 @@ pub struct ModelParams {
     /// selling back walks the displacement down. Requires
     /// `futures_index_listed`. In [0, 5].
     pub futures_impact_memory: f64,
+    /// The half-life of the index futures' metaorder memory, in open ticks
+    /// (`futures_impact_memory_half_life`). 0.0, on every shipped preset,
+    /// is a branch: the futures' memory decays at the equity memory's fast
+    /// half-life (`impact_memory_half_life`), and a value of 0.0 is left
+    /// out of the model's digest.
+    ///
+    /// Off zero, the fast part of each index future's memory decays at this
+    /// half-life instead; its slow part, weight, crossover and exponent stay
+    /// the equity's. The equity memory's fast part fades within a few
+    /// minutes, which leaves a day's TWAP on the futures at a third or less
+    /// of the square-root law's cost: the equity's price carries the rest of
+    /// a metaorder's impact through the day, and nothing does on a future,
+    /// whose fair value the futures cannot move. Toth et al. (Physical
+    /// Review X 1, 021006, 2011) find the impact at a futures metaorder's
+    /// end follows the square-root law whatever its duration up to a day,
+    /// which needs a memory that does not fade within the day. Reads only
+    /// agents' futures flow, so an untraded run is the run without it.
+    /// Requires `futures_impact_memory`. 0.0 or in [1, 98280].
+    pub futures_impact_memory_half_life: f64,
     /// Whether the engine lists monthly futures on the published VIX. 0.0,
     /// on every shipped preset, lists none: no contract, no state, nothing
     /// in the snapshot or the state hash, and a value of 0.0 is left out of
@@ -8318,6 +8337,7 @@ impl ModelParams {
             basis_persistence: 0.0,
             night_session_steps: 0.0,
             futures_impact_memory: 0.0,
+            futures_impact_memory_half_life: 0.0,
             futures_vix_listed: 0.0,
             futures_vix_live_fast_share: 0.0,
             futures_vix_live_fast_half_life: 0.0,
@@ -10965,6 +10985,7 @@ impl ModelParams {
             "basis_persistence" => self.basis_persistence,
             "night_session_steps" => self.night_session_steps,
             "futures_impact_memory" => self.futures_impact_memory,
+            "futures_impact_memory_half_life" => self.futures_impact_memory_half_life,
             "futures_vix_listed" => self.futures_vix_listed,
             "futures_vix_live_fast_share" => self.futures_vix_live_fast_share,
             "futures_vix_live_fast_half_life" => self.futures_vix_live_fast_half_life,
@@ -11377,6 +11398,7 @@ impl ModelParams {
             "basis_persistence" => out.basis_persistence = value,
             "night_session_steps" => out.night_session_steps = value,
             "futures_impact_memory" => out.futures_impact_memory = value,
+            "futures_impact_memory_half_life" => out.futures_impact_memory_half_life = value,
             "futures_vix_listed" => out.futures_vix_listed = value,
             "futures_vix_live_fast_share" => out.futures_vix_live_fast_share = value,
             "futures_vix_live_fast_half_life" => out.futures_vix_live_fast_half_life = value,
@@ -13049,6 +13071,22 @@ impl ModelParams {
                  futures_impact_memory set, futures_index_listed is 1.0.",
                 self.futures_impact_memory));
         }
+        if !(self.futures_impact_memory_half_life == 0.0
+            || (1.0..=98280.0).contains(&self.futures_impact_memory_half_life))
+        {
+            return Err(format!(
+                "futures_impact_memory_half_life is {}. It is 0.0 (the equity memory's \
+                 fast half-life) or a half-life in open ticks, in [1, 98280].",
+                self.futures_impact_memory_half_life));
+        }
+        if self.futures_impact_memory_half_life != 0.0 && self.futures_impact_memory == 0.0 {
+            return Err(format!(
+                "futures_impact_memory is 0 but futures_impact_memory_half_life is {}. The \
+                 half-life is the futures' metaorder memory's, which only \
+                 futures_impact_memory keeps: with the half-life set, futures_impact_memory \
+                 is above 0.",
+                self.futures_impact_memory_half_life));
+        }
         if !(self.futures_vix_listed == 0.0 || self.futures_vix_listed == 1.0) {
             return Err(format!(
                 "futures_vix_listed is {}. It is a switch, 0.0 off or 1.0 on.",
@@ -13651,6 +13689,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "margin_scan_tail",
     "night_session_steps",
     "futures_impact_memory",
+    "futures_impact_memory_half_life",
 ];
 
 #[cfg(test)]
@@ -13874,6 +13913,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "basis_persistence",
         "night_session_steps",
         "futures_impact_memory",
+        "futures_impact_memory_half_life",
         "futures_vix_listed",
         "futures_vix_live_fast_share",
         "futures_vix_live_fast_half_life",
