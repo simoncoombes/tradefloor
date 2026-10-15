@@ -657,6 +657,19 @@ pub fn publication_key(root_seed: u64) -> u64 {
     splitmix64_mix(root_seed ^ (((PUBLICATION_TAG as u64) << 32) | 0xFFFF_FFFF))
 }
 
+/// The tag of the skew premium's own noise (`surface_skew_noise_sd`), ASCII
+/// "SKWN".
+pub const SKEW_NOISE_TAG: u32 = 0x534B_574E;
+
+/// The key of a root seed's skew-noise draws: as [`publication_key`] under
+/// [`SKEW_NOISE_TAG`]. Each session's normal is the first of
+/// `GameRng::keyed(key, SKEW_NOISE_TAG, session)`, and the opening's the
+/// first of `GameRng::keyed(key, SKEW_NOISE_TAG << 32, 0)`, so it takes
+/// nothing from any stream and moves no other draw.
+pub fn skew_noise_key(root_seed: u64) -> u64 {
+    splitmix64_mix(root_seed ^ (((SKEW_NOISE_TAG as u64) << 32) | 0xFFFF_FFFF))
+}
+
 /// The `k`-th publication uniform in [0, 1) of a key:
 /// `splitmix64_mix(key ^ splitmix64_mix(PUBLICATION_TAG << 32 | k)) >> 11`
 /// times `2^-53`. Stateless and integer-only up to the one exact scaling:

@@ -1377,6 +1377,32 @@ pub struct ModelParams {
     /// premium, and a value of 0.0 is left out of the model's digest. In
     /// [-10, 10].
     pub surface_skew_premium_slope: f64,
+    /// The skew premium's own noise: the stationary sd of an AR(1) added to
+    /// the skewness the surface's 21-session strip is fitted to
+    /// (`surface_skew_premium`), so the Cboe SKEW index moves apart from the
+    /// VIX as it does on the tape (SKEW is `100 - 10` times the skewness, so
+    /// 1.0 here is 10 SKEW points). Read only with `surface_ssvi` set and
+    /// `surface_curvature` above 0; 0.0, on every shipped preset, adds none:
+    /// no state, nothing in the snapshot or the state hash, and a value of
+    /// 0.0 is left out of the model's digest.
+    ///
+    /// Off zero the noise opens at a draw from its stationary distribution
+    /// and steps once a session at the close, `x' = phi x + sd sqrt(1 -
+    /// phi^2) z`, `phi = 0.5^(1 / surface_skew_noise_half_life)`, each
+    /// normal the first of a keyed generator on the root seed's own key
+    /// (`rng::skew_noise_key`), so it takes no draw from any stream. It moves
+    /// the index surface's correlation, and the names' with it
+    /// (`surface_name_skew`); the target is met inside the curvature's reach
+    /// (`fit_smile`), so a draw beyond it holds the strip at the bound. An
+    /// option's price feeds nothing a stock price reads. A measured dial: the
+    /// residual of the tape's SKEW on ln(VIX / 20), its sd and persistence.
+    /// In [0, 5].
+    pub surface_skew_noise_sd: f64,
+    /// The skew noise's half-life in sessions (`surface_skew_noise_sd`).
+    /// 0.0, on every shipped preset, is no persistence (a fresh draw each
+    /// session), and a value of 0.0 is left out of the model's digest. Read
+    /// only with `surface_skew_noise_sd` set. In [0, 10000].
+    pub surface_skew_noise_half_life: f64,
     /// The surface's curvature, SSVI's `eta` in `phi(theta) = eta theta^-gamma
     /// (1 + theta)^(gamma - 1)`. Read only with `surface_ssvi` set; 0.0, on
     /// every shipped preset, is a flat smile with no skew, and a value of 0.0
@@ -7922,6 +7948,8 @@ impl ModelParams {
             surface_skew_physical_slope: 0.0,
             surface_skew_premium: 0.0,
             surface_skew_premium_slope: 0.0,
+            surface_skew_noise_sd: 0.0,
+            surface_skew_noise_half_life: 0.0,
             surface_curvature: 0.0,
             surface_curvature_exponent: 0.0,
             surface_term_premium_short: 0.0,
@@ -10550,6 +10578,8 @@ impl ModelParams {
             "surface_skew_physical_slope" => self.surface_skew_physical_slope,
             "surface_skew_premium" => self.surface_skew_premium,
             "surface_skew_premium_slope" => self.surface_skew_premium_slope,
+            "surface_skew_noise_sd" => self.surface_skew_noise_sd,
+            "surface_skew_noise_half_life" => self.surface_skew_noise_half_life,
             "surface_curvature" => self.surface_curvature,
             "surface_curvature_exponent" => self.surface_curvature_exponent,
             "surface_term_premium_short" => self.surface_term_premium_short,
@@ -10943,6 +10973,8 @@ impl ModelParams {
             "surface_skew_physical_slope" => out.surface_skew_physical_slope = value,
             "surface_skew_premium" => out.surface_skew_premium = value,
             "surface_skew_premium_slope" => out.surface_skew_premium_slope = value,
+            "surface_skew_noise_sd" => out.surface_skew_noise_sd = value,
+            "surface_skew_noise_half_life" => out.surface_skew_noise_half_life = value,
             "surface_curvature" => out.surface_curvature = value,
             "surface_curvature_exponent" => out.surface_curvature_exponent = value,
             "surface_term_premium_short" => out.surface_term_premium_short = value,
@@ -12456,6 +12488,8 @@ impl ModelParams {
             ("surface_skew_physical_slope", self.surface_skew_physical_slope, -10.0, 10.0),
             ("surface_skew_premium", self.surface_skew_premium, -10.0, 10.0),
             ("surface_skew_premium_slope", self.surface_skew_premium_slope, -10.0, 10.0),
+            ("surface_skew_noise_sd", self.surface_skew_noise_sd, 0.0, 5.0),
+            ("surface_skew_noise_half_life", self.surface_skew_noise_half_life, 0.0, 10000.0),
             ("surface_curvature_exponent", self.surface_curvature_exponent, 0.0, 0.5),
             ("surface_term_premium_short", self.surface_term_premium_short, -2.0, 2.0),
             ("surface_term_premium_long", self.surface_term_premium_long, -2.0, 2.0),
@@ -12477,6 +12511,8 @@ impl ModelParams {
             ("surface_skew_physical_slope", self.surface_skew_physical_slope),
             ("surface_skew_premium", self.surface_skew_premium),
             ("surface_skew_premium_slope", self.surface_skew_premium_slope),
+            ("surface_skew_noise_sd", self.surface_skew_noise_sd),
+            ("surface_skew_noise_half_life", self.surface_skew_noise_half_life),
             ("surface_curvature", self.surface_curvature),
             ("surface_curvature_exponent", self.surface_curvature_exponent),
             ("surface_term_premium_short", self.surface_term_premium_short),
@@ -12488,6 +12524,20 @@ impl ModelParams {
                     "surface_ssvi is 0 but {name} is {v}. It shapes the implied-volatility surface, \
                      which only surface_ssvi keeps: set surface_ssvi to 1.0 first."));
             }
+        }
+        if self.surface_skew_noise_sd != 0.0 && self.surface_curvature == 0.0 {
+            return Err(format!(
+                "surface_curvature is 0 but surface_skew_noise_sd is {}. The noise moves the \
+                 skewness the surface is fitted to, which a flat smile (surface_curvature 0) does \
+                 not read: set surface_curvature first.",
+                self.surface_skew_noise_sd));
+        }
+        if self.surface_skew_noise_half_life != 0.0 && self.surface_skew_noise_sd == 0.0 {
+            return Err(format!(
+                "surface_skew_noise_sd is 0 but surface_skew_noise_half_life is {}. The half-life \
+                 is the skew noise's persistence, which only surface_skew_noise_sd keeps: set \
+                 surface_skew_noise_sd first.",
+                self.surface_skew_noise_half_life));
         }
         if self.surface_earnings_weight != 0.0 && self.forecast_horizon_sessions == 0.0 {
             return Err(format!(
@@ -13058,6 +13108,8 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "surface_skew_physical_slope",
     "surface_skew_premium",
     "surface_skew_premium_slope",
+    "surface_skew_noise_sd",
+    "surface_skew_noise_half_life",
     "surface_curvature",
     "surface_curvature_exponent",
     "surface_term_premium_short",
@@ -13273,6 +13325,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "surface_skew_physical_slope",
         "surface_skew_premium",
         "surface_skew_premium_slope",
+        "surface_skew_noise_sd",
+        "surface_skew_noise_half_life",
         "surface_curvature",
         "surface_curvature_exponent",
         "surface_term_premium_short",
