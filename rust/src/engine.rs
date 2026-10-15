@@ -13236,14 +13236,14 @@ impl Engine {
         // `surface_ssvi` is set, behind their own tag, length-prefixed; their
         // book behind another once an agent has traded an option.
         if let Some(words) = self.options_words() {
-            hash_f64(&mut buf, 55.0);
+            hash_f64(&mut buf, 80.0);
             hash_u32(&mut buf, words.len() as u32);
             for value in words {
                 hash_f64(&mut buf, value);
             }
         }
         if let Some(book) = self.options_book_state() {
-            hash_f64(&mut buf, 56.0);
+            hash_f64(&mut buf, 81.0);
             hash_book(&mut buf, book);
         }
         // The single-name options, only while `options_names_listed` is set.
