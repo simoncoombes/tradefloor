@@ -4419,9 +4419,136 @@ once an agent has traded an option; the state hash covers them behind tags
 80 and 81 only then, as `manifest.state_hash` does. Every known-answer digest
 is where it was.
 
-Not built yet: the options' Arrow schema, the observation payload's options
-summary, the MCP `option_chain` tool, the WASM getters, and the measurement
-of the physical skew and the screening of the premia and the spread.
+Not built yet: the measurement of the physical skew and the screening of
+the premia and the spread.
+
+## Single-name options
+
+A switch, 0.0 on every shipped preset and left out of the model's digest
+there, lists American options on every name: `options_names_listed`, which
+needs `surface_ssvi` (a name's smile takes the index surface's curvature
+and a share of its correlation) and `forecast_horizon_sessions` (a name's
+level is the forecast's expected variance of the name). Its companions,
+`surface_name_premium` and `surface_name_skew`, are 0.0 on every shipped
+preset too and refused without it; `option_dealer_spread` reads it as it
+reads the index options. None is fitted: the premium and the skew are to be
+screened on rows SS1 to SS4 and EV1 to EV3 with the owner's approval. An
+option, its surface and a delivery read public state, draw nothing and write
+only their own state, so a model with the switch on prints the same stock
+prices as one with it off, traded or not, and an untraded run prices no
+option (`tests/test_name_options.py`).
+
+**The chain.** From the first close every public name lists calls and puts
+at the next three monthly expiries and the three quarterlies after them,
+on the index options' sessions, reaching 189 to 251 sessions
+(`calendar::name_option_expiries`). Each is American and physically
+settled, 100 shares a contract, settling at its expiry session's close, so
+it trades through its last session; symbols are `ACME.O0035.C42.50`. An
+expiry's strikes sit on the name's price tier when it lists, in dollars:
+0.50 apart under 5, 1 under 50, 2.50 under 100, 5 under 200 and 10 above. Ten strikes
+are listed either side of the price, and the range widens at each open and
+close to keep ten. A name whose ticker is a contract family's root lists
+none.
+
+**The surface.** A name's at-the-money total variance to $T$ sessions is
+the forecast's expected one-session variance of the name summed to $T$ (its
+GJR, sector and market parts, `Engine.forecast()["name_variance"]`), times
+$(1 + p)^2$ with $p$ `surface_name_premium`, times the index's term premium
+$e^{\pi(T)}$, plus `surface_earnings_weight` times
+`earnings_surprise_sigma` squared times the name's expected one-session
+variance at each of its own reports before $T$. A report printing at an
+open counts for an option settling at that session's close and not the one
+before. The shape is held non-decreasing. Its smile is SSVI with the index
+surface's $\eta$ and $\gamma$ and $
+ho$ `surface_name_skew` times the
+index's fitted $
+ho$, so a name's skew is flatter than the index's for a
+skew share below 1 and, with $|
+ho|$ no larger than the index's, every
+smile stays inside the paper's Remark 4.4. `Engine.surface("ACME")` reads
+it, with the escrowed price's forward.
+
+**The price.** An option settling at the close of session $E$ has
+$E + 1 - t$ sessions left at time $t$, a close counting as the next
+session's start. The dealer quotes the American value of a Leisen-Reimer
+binomial tree (`derivatives::american`, at least 101 steps and two a
+session) on the escrowed price $S - \mathrm{PV}(D)$: $D$ the dividends
+going ex before expiry, declared within 21 sessions of an ex-date and the
+Lintner rule's projection beyond (`market::dividends::lookahead`), each
+held by the tree to the close before its ex-date, so exercising there
+captures it; $r$ the mean policy rate the forecast expects to expiry; the
+volatility the surface's at the strike's log-moneyness on the escrowed
+forward, moved by the dealer's pressure as the index dealer's is. A tree is
+priced when a quote, an order or a margin asks and kept for the session.
+The quote's delta and gamma are the tree's, its vega and theta the
+European's; its ladder is the American mid moved by the European price's
+change across the volatility ladder, ten levels of 20 contracts a side on
+the equity options' grid (a cent below 3.00, five cents at or above).
+
+**Exercise and assignment.** The dealer is the other side of every trade,
+and each agent's position is its contracts bought less sold. At each close,
+in this order: every exercise instruction an agent gave
+(`Engine.exercise`, `tf.Exercise`) is exercised up to the long position it
+still holds; the dealer exercises its net long in a contract where its own
+tree, at the surface's volatility, says exercising now beats holding
+(`american::early_exercise`): a call only on the eve of an ex-date whose
+dividend is worth more than its time value, a put when it is deep enough
+that the interest on the strike outweighs the insurance left; and at an
+expiry session's close every option in the money by a cent or more on the
+closing print is exercised, the OCC's exercise by exception. The contracts
+exercised are assigned to every short position, agents' and the dealer's,
+pro rata: whole contracts by largest remainder where every position is
+whole, exact shares otherwise. A call's holder receives 100 shares a
+contract and pays the strike for them, a put's delivers them and is paid;
+the writer the reverse. Each side is a `settlements(day)` row (`event`
+`"exercise"` or `"assignment"`, the party, the contracts, the shares and
+the cash), the dealer's beside the agents', so a close's rows sum to no
+shares and no cash. Nothing trades in the stock's book: a delivery moves no
+price and takes no draw. A name that leaves the roster takes its options
+with it, each position paid in cash at its intrinsic value on the last
+price.
+
+**Rows AX1 and AX2.** `Engine.exercise_violations()` reads both at the last
+close: each delivery moves 100 shares a contract and the strike times the
+shares to the cent, and a close's rows sum to nothing (AX2); and, between
+that close and the next open, every early exercise of the dealer's is one
+its tree, priced again, still makes, a call's only on an ex-date's eve,
+every long it still holds is one its tree holds, and every option held is
+worth at least the European on the same tree (AX1). The tests read both at
+every close of traded runs.
+
+**Accounts.** `Portfolio.settle_close` delivers the close's exercises and
+assignments: the option closes at no premium, the shares join or leave the
+name's stock position at the strike, and the cash moves, each recorded in
+`Portfolio.deliveries`. An assignment can leave an account short the stock.
+Shares an agent did not order are holdings like any other: valued at the
+price, counted in leverage, paid or charged dividends, and traded by the
+next order, the gym's next target weights included. They are not trades,
+so a scorecard's trades, turnover and impact leave them out. The scan
+margin scans a name's options with the stock held in it, less the stock's
+own worst loss and floored at 0, so a covered call or a protective put asks
+nothing a naked option does; each option is revalued as a European on its
+escrowed price over moves sized to the name's one-session sd.
+
+**Position limits.** `option_position_limit`, 0.0 on every shipped preset
+(no limit), caps each agent's position in each listed option, the index's
+and the names', at the dial times the dealer's displayed depth on one side:
+500 contracts of an index option, 200 of a name's, at 1.0. An order that
+would take the position past it, with the agent's waiting orders on the
+contract counted as filled, is refused; one that brings the position toward
+zero never is, and an exercise or an assignment is not an order. It is a
+stated simplification of an exchange's limits, there so that an agent cannot
+hold an unlimited stake in a contract whose settlement print it can push.
+`Engine.position_limit(symbol)` reads it, and an option's `quote` carries it
+as `position_limit` while it is set. Futures have no limit yet.
+
+**State.** A snapshot carries `name_options` (each name's listed expiries,
+strike grids and the dealer's pressure, and the settled expiries) while the
+switch is set, `name_options_book` once an agent has traded one, and
+`name_options_exercise` (instructions waiting for the close and every
+exercise and assignment) once there is any; the state hash covers them
+behind tags 70 to 72 only then, as `manifest.state_hash` does. Every
+known-answer digest is where it was.
 
 ## Scenarios
 

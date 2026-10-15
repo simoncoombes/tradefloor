@@ -337,14 +337,7 @@ impl FuturesState {
 /// The index future expiring at `session`, settled on `reference`.
 fn settlement_of(session: i64, reference: f64) -> Settlement {
     let kind = ContractKind::IndexFuture;
-    Settlement {
-        symbol: index_future_symbol(session),
-        kind,
-        root: kind.root().to_string(),
-        session,
-        value: reference,
-        reference,
-    }
+    Settlement::new(index_future_symbol(session), kind, kind.root().to_string(), session, reference, reference)
 }
 
 /// How far a future's basis has converged: `min(1, sessions to expiry /
@@ -436,6 +429,16 @@ impl Engine {
         self.futures.contracts.iter().position(|c| c.expiry == parsed.expiry)
     }
 
+    /// Whether this model lists futures of any family: one of
+    /// `futures_index_listed`, `futures_vix_listed`, `futures_rates_listed`
+    /// and `futures_oil_listed` set. A property of the model, not of the
+    /// moment: a model that lists VIX futures says so before its first
+    /// close, when [`Engine::contracts`] is still empty. False on every
+    /// shipped preset.
+    pub fn lists_futures(&self) -> bool {
+        self.futures_on() || self.vix_futures_on() || self.rate_futures_on() || self.oil_futures_on()
+    }
+
     /// Whether `symbol` names a listed contract: an index, VIX, rate or oil
     /// future under its family's switch.
     pub fn is_listed_contract(&self, symbol: &str) -> bool {
@@ -444,6 +447,7 @@ impl Engine {
             || (self.rate_futures_on() && self.rate_futures_slot(symbol).is_some())
             || (self.oil_futures_on() && self.oil_futures_slot(symbol).is_some())
             || self.is_listed_option(symbol)
+            || self.is_listed_name_option(symbol)
     }
 
     /// Whether an order with the id `id` already waits in any book: the
@@ -455,6 +459,7 @@ impl Engine {
             || self.rate_futures_orders().iter().any(|o| o.id == id)
             || self.oil_futures_orders().iter().any(|o| o.id == id)
             || self.option_orders().iter().any(|o| o.id == id)
+            || self.name_option_orders().iter().any(|o| o.id == id)
     }
 
     // ── Pricing ───────────────────────────────────────────────────────────
@@ -507,22 +512,11 @@ impl Engine {
             if !c.is_public || c.is_bankrupt {
                 continue;
             }
-            let Some(d) = c.stock.dividend else {
-                continue;
-            };
-            if !(d.target_yield > 0.0) {
-                continue;
-            }
-            let k = dv::sessions_since_ex(&c.ticker, after);
-            let mut ex = after + dv::DIVIDEND_PERIOD - k;
-            let mut state = d;
-            let mut amount = if d.declared { d.amount } else { dv::declare(&self.params, &d, c.stock.price) };
-            while ex <= expiry {
-                let points = c.stock.shares_outstanding * amount / self.index_divisor;
-                total += points * crate::mathx::exp(-rate * (ex as f64 - now) / SESSIONS_PER_YEAR as f64);
-                state.amount = amount;
-                amount = dv::declare(&self.params, &state, c.stock.price);
-                ex += dv::DIVIDEND_PERIOD;
+            // The same lookahead the American options' pricer reads, so a
+            // name's projected dividends are one number wherever they enter.
+            for u in dv::lookahead(&self.params, &c.ticker, c.stock.dividend.as_ref(), after, c.stock.price, expiry) {
+                let points = c.stock.shares_outstanding * u.amount / self.index_divisor;
+                total += points * crate::mathx::exp(-rate * (u.ex_day as f64 - now) / SESSIONS_PER_YEAR as f64);
             }
         }
         total
@@ -694,6 +688,11 @@ impl Engine {
     pub fn contract_book(&self, symbol: &str) -> Option<OrderBook> {
         if self.options_on() {
             if let Some(book) = self.option_book(symbol) {
+                return Some(book);
+            }
+        }
+        if self.names_on() {
+            if let Some(book) = self.name_option_book(symbol) {
                 return Some(book);
             }
         }
@@ -1221,6 +1220,7 @@ impl Engine {
         out.extend(self.rate_futures_contracts());
         out.extend(self.oil_futures_contracts());
         out.extend(self.option_contracts());
+        out.extend(self.name_option_contracts());
         out
     }
 
@@ -1338,6 +1338,7 @@ impl Engine {
         out.extend(self.rate_futures_settlements(session));
         out.extend(self.oil_futures_settlements(session));
         out.extend(self.option_settlements(session));
+        out.extend(self.name_option_settlements(session));
         // Stable, so each family keeps its own order within a session.
         out.sort_by_key(|s| s.session);
         out

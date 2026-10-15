@@ -500,6 +500,15 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "surface_term_premium_long": (-0.3, 0.3),
     "surface_earnings_weight": (0.0, 2.0),
     "option_dealer_spread": (0.0, 0.02),
+    # The single-name options (pt-v22 phase 3): a switch, the single-name
+    # volatility premium and the names' share of the index skew. None of
+    # them moves a stock price.
+    "options_names_listed": (0.0, 1.0),
+    "surface_name_premium": (0.0, 0.25),
+    "surface_name_skew": (0.0, 1.0),
+    # The options' position limit, in multiples of the dealer's displayed
+    # depth: it refuses orders and moves no stock price.
+    "option_position_limit": (0.0, 5.0),
     # The central bank's stress cut, points per step: 0.5 is a half-point
     # step, two steps a point, which is 2001's and 2008's emergency size.
     "fed_stress_cut": (0.0, 0.5),

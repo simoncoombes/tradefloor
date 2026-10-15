@@ -89,7 +89,15 @@ pub(crate) struct ScanOption {
 /// option's volatility), the dividends' present value, the rate and the
 /// time to expiry held.
 pub(crate) fn option_scan_loss(positions: &[ScanOption], index_move: f64, vol_shift: f64) -> f64 {
-    if positions.is_empty() {
+    option_scan_loss_with(positions, 0.0, index_move, vol_shift)
+}
+
+/// [`option_scan_loss`] with a linear position in the underlying beside the
+/// options: `linear` units (shares, for a single name) each losing the move,
+/// so stock and the options on it are scanned together. With `linear` at 0
+/// it is [`option_scan_loss`]'s arithmetic.
+pub(crate) fn option_scan_loss_with(positions: &[ScanOption], linear: f64, index_move: f64, vol_shift: f64) -> f64 {
+    if positions.is_empty() && linear == 0.0 {
         return 0.0;
     }
     let now: Vec<f64> = positions
@@ -105,6 +113,9 @@ pub(crate) fn option_scan_loss(positions: &[ScanOption], index_move: f64, vol_sh
                 let vol = crate::mathx::max(1e-6, p.vol * (1.0 + v * vol_shift));
                 let after = black_greeks(p.right, spot, p.strike, p.years, vol, p.rate).0;
                 loss += p.units * (before - after);
+            }
+            if linear != 0.0 {
+                loss -= linear * m * index_move;
             }
             worst = crate::mathx::max(worst, loss);
         }
@@ -184,7 +195,7 @@ impl MarginState {
 
 /// The standard normal quantile at `p`, by bisection on its distribution
 /// function.
-fn normal_quantile(p: f64) -> f64 {
+pub(super) fn normal_quantile(p: f64) -> f64 {
     let cdf = |x: f64| 0.5 * crate::mathx::erfc(-x / std::f64::consts::SQRT_2);
     let (mut lo, mut hi) = (-10.0, 10.0);
     for _ in 0..80 {

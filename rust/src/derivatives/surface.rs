@@ -440,6 +440,29 @@ impl ThetaCurve {
         Some(ThetaCurve { elapsed, knots: unit.knots.iter().map(|x| x * scale).collect() })
     }
 
+    /// The curve of shape `shape` (knots 1 on) itself, made non-decreasing
+    /// by a running maximum and scaled by `factor`, with no level fixed: a
+    /// single name's, whose shape is already its expected variance. `None`
+    /// for an empty or non-positive shape.
+    pub fn from_shape(shape: &[f64], elapsed: f64, factor: f64) -> Option<Self> {
+        if shape.len() < 2 || !(factor > 0.0 && factor.is_finite()) {
+            return None;
+        }
+        let mut knots = Vec::with_capacity(shape.len());
+        let mut top = 0.0;
+        for &x in shape {
+            if !(x.is_finite()) {
+                return None;
+            }
+            top = mathx::max(top, x);
+            knots.push(if factor == 1.0 { top } else { top * factor });
+        }
+        if !(knots[0] > 0.0) {
+            return None;
+        }
+        Some(ThetaCurve { elapsed, knots })
+    }
+
     /// The at-the-money total variance `t` sessions out.
     pub fn at(&self, t: f64) -> f64 {
         if !(t > 0.0) {

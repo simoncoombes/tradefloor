@@ -35,7 +35,9 @@
 use super::*;
 use crate::agent_book::{AgentFill, AgentOrder, BookState, Liquidity, RestMode, AGENT_BOOK_CAP};
 use crate::derivatives::calendar;
-use crate::derivatives::dealer::{chain_violations, dealer_thetas, ladder, pressure_after, walk, Ladder, OptionQuote};
+use crate::derivatives::dealer::{
+    chain_violations, dealer_thetas, ladder, pressure_after, read_smile, walk, ExpirySummary, Ladder, OptionQuote,
+};
 use crate::derivatives::pricing::{black_greeks, black_price, intrinsic};
 use crate::derivatives::surface::{fit_smile, term_shape, SmileFit, Ssvi, Surface, TermInputs, ThetaCurve, VIX_SESSIONS};
 use crate::derivatives::{
@@ -53,7 +55,7 @@ pub const SKEW_VIX_CENTRE: f64 = 20.0;
 
 /// The fewest whole sessions the surface's term structure runs: past a
 /// year, so the 252-session strip (the VIX1Y analogue) reads knots.
-const SURFACE_MIN_KNOTS: usize = 270;
+pub(super) const SURFACE_MIN_KNOTS: usize = 270;
 
 /// Where the options stand in the day.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -99,18 +101,18 @@ pub(crate) struct ListedExpiry {
 }
 
 impl ListedExpiry {
-    fn strikes(&self) -> impl Iterator<Item = f64> + '_ {
+    pub(super) fn strikes(&self) -> impl Iterator<Item = f64> + '_ {
         (self.lo..=self.hi).map(move |n| strike_at(n, self.step))
     }
 
     /// Whether `strike` is on this expiry's grid and listed.
-    fn lists(&self, strike: f64) -> bool {
+    pub(super) fn lists(&self, strike: f64) -> bool {
         let n = (strike / self.step).round();
         n >= self.lo as f64 && n <= self.hi as f64 && (strike_at(n as i64, self.step) - strike).abs() < 0.005
     }
 
     /// Widen the range to `each` strikes either side of `index`.
-    fn widen(&mut self, index: f64, each: i64) {
+    pub(super) fn widen(&mut self, index: f64, each: i64) {
         let centre = (index / self.step).round() as i64;
         let lo = std::cmp::max(1, centre - each);
         if self.hi < self.lo {
@@ -124,7 +126,7 @@ impl ListedExpiry {
 }
 
 /// A strike on a grid, in whole cents.
-fn strike_at(n: i64, step: f64) -> f64 {
+pub(super) fn strike_at(n: i64, step: f64) -> f64 {
     (n as f64 * step * 100.0).round() / 100.0
 }
 
@@ -263,12 +265,12 @@ impl OptionsState {
 /// share of the session run, the expiries listed after `after`, and the
 /// first session whose opening prints are still to come.
 #[derive(Debug, Clone, Copy)]
-struct Clock {
-    now: f64,
-    base: i64,
-    elapsed: f64,
-    after: i64,
-    unprinted: i64,
+pub(super) struct Clock {
+    pub(super) now: f64,
+    pub(super) base: i64,
+    pub(super) elapsed: f64,
+    pub(super) after: i64,
+    pub(super) unprinted: i64,
 }
 
 /// What an expiry's options read: its time, carry and the thetas the
@@ -298,7 +300,7 @@ impl Engine {
         self.params.surface_ssvi != 0.0
     }
 
-    fn options_clock(&self) -> Clock {
+    pub(super) fn options_clock(&self) -> Clock {
         let t = self.elapsed_days;
         match self.options.phase {
             OptionsPhase::BeforeFirstOpen => Clock { now: t as f64, base: t, elapsed: 0.0, after: t - 1, unprinted: t },
@@ -325,7 +327,7 @@ impl Engine {
 
     /// The VIX the surface is fitted to: the live VIX within a session under
     /// `vix_intraday_live`, the published VIX otherwise.
-    fn surface_vix(&self) -> f64 {
+    pub(super) fn surface_vix(&self) -> f64 {
         self.live_vix().unwrap_or_else(|| self.published_vix())
     }
 
@@ -396,8 +398,13 @@ impl Engine {
     }
 
     /// The index's surface now (`surface_ssvi`): `None` with the switch off
-    /// or for a root other than `IDX`, and where no strip prices.
+    /// or for a root other than `IDX`, and where no strip prices. A name's
+    /// surface (`options_names_listed`) is [`Engine::name_surface`], which a
+    /// listed name's ticker as `root` reads here.
     pub fn surface(&self, root: &str) -> Option<Surface> {
+        if self.names_on() && root != ContractKind::IndexOption.root() {
+            return self.name_surface(root);
+        }
         if !self.surface_on() || root != ContractKind::IndexOption.root() {
             return None;
         }
@@ -405,7 +412,7 @@ impl Engine {
         self.surface_at(&clock)
     }
 
-    fn surface_at(&self, clock: &Clock) -> Option<Surface> {
+    pub(super) fn surface_at(&self, clock: &Clock) -> Option<Surface> {
         let p = &self.params;
         let vix = self.surface_vix();
         let (eta, gamma) = (p.surface_curvature, p.surface_curvature_exponent);
@@ -606,6 +613,9 @@ impl Engine {
     /// not price. Its `initial_margin` is the scan's on one short contract
     /// (`margin_scan_coverage`).
     pub fn option_quote(&self, symbol: &str) -> Option<OptionQuote> {
+        if self.names_on() && self.is_listed_name_option(symbol) {
+            return self.name_option_quote(symbol);
+        }
         if !self.options_on() {
             return None;
         }
@@ -624,7 +634,13 @@ impl Engine {
     /// the put at each: `None` with the switch off, for an expiry not listed
     /// and where the surface does not price. Margins are left `None`: ask
     /// [`Engine::option_quote`] or [`Engine::option_margin`] for them.
+    ///
+    /// A listed name's ticker as `root` reads its American options
+    /// (`options_names_listed`), each a tree's quote.
     pub fn chain(&self, root: &str, expiry: i64) -> Option<Vec<OptionQuote>> {
+        if self.names_on() && root != ContractKind::IndexOption.root() {
+            return self.name_chain(root, expiry);
+        }
         if !self.options_on() || root != ContractKind::IndexOption.root() {
             return None;
         }
@@ -633,14 +649,74 @@ impl Engine {
         let surface = self.surface_at(&clock)?;
         let thetas = self.option_thetas(&surface, &clock);
         let ctx = self.expiry_context(&clock, slot, &thetas);
+        Some(self.expiry_chain(&surface, &ctx, slot))
+    }
+
+    /// The listed expiry in `slot`'s chain, by strike, the call before the
+    /// put at each.
+    fn expiry_chain(&self, surface: &Surface, ctx: &ExpiryContext, slot: usize) -> Vec<OptionQuote> {
         let e = &self.options.expiries[slot];
         let mut out = Vec::with_capacity(2 * (e.hi - e.lo + 1) as usize);
         for strike in e.strikes() {
             for right in [Right::Call, Right::Put] {
-                out.push(self.option_priced(&surface, &ctx, expiry, right, strike).1);
+                out.push(self.option_priced(surface, ctx, e.expiry, right, strike).1);
             }
         }
-        Some(out)
+        out
+    }
+
+    /// Whether this model lists index options (`options_index_listed`): a
+    /// property of the model, as [`Engine::lists_futures`] is. False on
+    /// every shipped preset.
+    pub fn lists_options(&self) -> bool {
+        self.options_on()
+    }
+
+    /// Every listed expiry on `root` as a trader reads it off the chain now,
+    /// in expiry order: its strike grid, forward, the dealer's at-the-money
+    /// volatility and the 25-delta skew ([`ExpirySummary`],
+    /// [`crate::derivatives::dealer::read_smile`]). Empty with the switch
+    /// off, for a root other than `IDX` and where the surface does not
+    /// price. A read.
+    ///
+    /// A listed name's ticker as `root` reads its options
+    /// (`options_names_listed`), on the dealer's volatilities and the
+    /// European deltas on the escrowed price, which price no tree.
+    pub fn option_expiries(&self, root: &str) -> Vec<ExpirySummary> {
+        if self.names_on() && root != ContractKind::IndexOption.root() {
+            return self.name_option_expiries(root);
+        }
+        if !self.options_on() || root != ContractKind::IndexOption.root() {
+            return Vec::new();
+        }
+        let clock = self.options_clock();
+        let Some(surface) = self.surface_at(&clock) else {
+            return Vec::new();
+        };
+        let thetas = self.option_thetas(&surface, &clock);
+        (0..self.options.expiries.len())
+            .map(|slot| {
+                let e = &self.options.expiries[slot];
+                let ctx = self.expiry_context(&clock, slot, &thetas);
+                let (atm_iv, put_25d_iv, call_25d_iv) = read_smile(&self.expiry_chain(&surface, &ctx, slot));
+                ExpirySummary {
+                    root: root.to_string(),
+                    expiry: e.expiry,
+                    sessions_to_expiry: ctx.sessions,
+                    forward: ctx.forward,
+                    strike_low: strike_at(e.lo, e.step),
+                    strike_high: strike_at(e.hi, e.step),
+                    strike_step: e.step,
+                    atm_iv,
+                    put_25d_iv,
+                    call_25d_iv,
+                    skew_25d: match (put_25d_iv, call_25d_iv) {
+                        (Some(p), Some(c)) => Some(p - c),
+                        _ => None,
+                    },
+                }
+            })
+            .collect()
     }
 
     /// Static-arbitrage violations on every listed chain now (row SV2), and
@@ -666,10 +742,25 @@ impl Engine {
     /// The scan's initial margin on a portfolio of listed options, dollars
     /// (`margin_scan_coverage`): `(symbol, signed contracts)`, symbols not
     /// listed left out. `None` with margin or options off.
+    ///
+    /// Single-name options (`options_names_listed`) are scanned name by
+    /// name, each with the stock in it the positions name by ticker
+    /// (`(ticker, signed shares)`), and the names' margins add to the
+    /// index's (see `engine::name_options`).
     pub fn option_margin(&self, positions: &[(String, f64)]) -> Option<f64> {
-        if !self.margin_on() || !self.options_on() {
+        if !self.margin_on() || !(self.options_on() || self.names_on()) {
             return None;
         }
+        let names = if self.names_on() { self.name_option_margin(positions)? } else { 0.0 };
+        if !self.options_on() {
+            return Some(names);
+        }
+        let index = self.index_option_margin(positions)?;
+        Some(if names == 0.0 { index } else { index + names })
+    }
+
+    /// The index options' part of [`Engine::option_margin`].
+    fn index_option_margin(&self, positions: &[(String, f64)]) -> Option<f64> {
         let clock = self.options_clock();
         let surface = self.surface_at(&clock)?;
         let thetas = self.option_thetas(&surface, &clock);
@@ -874,6 +965,8 @@ impl Engine {
         if self.options.phase != OptionsPhase::Session {
             return Err(format!("{symbol} is an index option, which trades in the session only"));
         }
+        let depth = INDEX_OPTION_DEALER.levels as f64 * INDEX_OPTION_DEALER.displayed_size;
+        self.option_limit_check(&self.options.book, depth, agent, symbol, side, quantity)?;
         let id = match order_id {
             Some(id) => {
                 if id.is_empty() {
@@ -931,6 +1024,70 @@ impl Engine {
             mode,
             fills,
         })
+    }
+
+    /// Refuse an order that would take `agent`'s position in `symbol`, with
+    /// its waiting orders on it counted as filled, past the position limit
+    /// (`option_position_limit` times `depth`, the dealer's displayed depth
+    /// on one side). An order that brings the position toward zero passes.
+    /// Nothing with the dial at 0.0.
+    pub(super) fn option_limit_check(
+        &self,
+        book: &BookState,
+        depth: f64,
+        agent: &str,
+        symbol: &str,
+        side: Side,
+        quantity: f64,
+    ) -> Result<(), String> {
+        let dial = self.params.option_position_limit;
+        if dial == 0.0 {
+            return Ok(());
+        }
+        let limit = dial * depth;
+        let held = book
+            .flow
+            .iter()
+            .filter(|(a, t, _, _)| a == agent && t == symbol)
+            .fold(0.0, |acc, (_, _, b, s)| acc + (b - s));
+        let waiting = book.orders.iter().filter(|o| o.agent == agent && o.ticker == symbol).fold(0.0, |acc, o| {
+            acc + match o.side {
+                Side::Buy => o.remaining,
+                Side::Sell => -o.remaining,
+            }
+        });
+        let before = held + waiting;
+        let after = before
+            + match side {
+                Side::Buy => quantity,
+                Side::Sell => -quantity,
+            };
+        if after.abs() > limit + 1e-9 && after.abs() > before.abs() {
+            return Err(format!(
+                "position limit: {agent} would hold {after} contracts of {symbol} with its waiting orders \
+                 filled, past the limit of {limit} (option_position_limit {dial} times the dealer's \
+                 displayed depth of {depth})"
+            ));
+        }
+        Ok(())
+    }
+
+    /// The position limit on the listed option `symbol`, contracts per agent
+    /// (`option_position_limit` times the dealer's displayed depth on one
+    /// side): `None` with the dial at 0.0 and for a symbol not listed.
+    pub fn option_position_limit(&self, symbol: &str) -> Option<f64> {
+        let dial = self.params.option_position_limit;
+        if dial == 0.0 {
+            return None;
+        }
+        let spec = if self.is_listed_option(symbol) {
+            &INDEX_OPTION_DEALER
+        } else if self.is_listed_name_option(symbol) {
+            &crate::derivatives::NAME_OPTION_DEALER
+        } else {
+            return None;
+        };
+        Some(dial * spec.levels as f64 * spec.displayed_size)
     }
 
     pub(super) fn cancel_option_order(&mut self, order_id: &str, agent: Option<&str>) -> bool {
@@ -1087,14 +1244,14 @@ impl Engine {
             for n in s.lo..=s.hi {
                 let strike = strike_at(n, s.step);
                 for right in [Right::Call, Right::Put] {
-                    out.push(Settlement {
-                        symbol: index_option_symbol(s.expiry, right, strike),
+                    out.push(Settlement::new(
+                        index_option_symbol(s.expiry, right, strike),
                         kind,
-                        root: kind.root().to_string(),
-                        session: s.expiry,
-                        value: intrinsic(right, s.reference, strike),
-                        reference: s.reference,
-                    });
+                        kind.root().to_string(),
+                        s.expiry,
+                        intrinsic(right, s.reference, strike),
+                        s.reference,
+                    ));
                 }
             }
         }
@@ -1164,7 +1321,7 @@ impl Engine {
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use super::*;
     use crate::economy::{create_initial_central_bank_state, create_initial_economy_state, InitialEconomyOptions};
 
@@ -1277,6 +1434,33 @@ mod tests {
             assert!(q.iv > 0.0 && (q.iv - q.surface_iv).abs() < 1e-15, "no inventory, no shift");
             assert_eq!(q.open_interest, 0.0);
         }
+    }
+
+    #[test]
+    fn each_expiry_reads_its_own_chain_and_off_there_is_none() {
+        let mut e = engine(19, ON);
+        let mut buffer = SessionBuffer::new();
+        assert!(e.lists_options());
+        for d in 0..3 {
+            day(&mut e, d, &mut buffer);
+        }
+        let read = e.option_expiries("IDX");
+        assert_eq!(read.len(), e.options.expiries.len());
+        for (s, x) in read.iter().zip(&e.options.expiries) {
+            assert_eq!(s.expiry, x.expiry);
+            let chain = e.chain("IDX", x.expiry).unwrap();
+            assert_eq!(read_smile(&chain), (s.atm_iv, s.put_25d_iv, s.call_25d_iv));
+            assert_eq!(s.forward.to_bits(), chain[0].forward.to_bits());
+            assert_eq!(s.sessions_to_expiry.to_bits(), chain[0].sessions_to_expiry.to_bits());
+            assert_eq!((s.strike_low, s.strike_high), (chain[0].strike, chain[chain.len() - 1].strike));
+            let strikes = ((s.strike_high - s.strike_low) / s.strike_step).round() as usize + 1;
+            assert_eq!(chain.len(), 2 * strikes);
+            assert!(s.skew_25d.unwrap() > 0.0, "{s:?}");
+        }
+        assert!(e.option_expiries("VIX").is_empty());
+        let off = engine(19, &[]);
+        assert!(!off.lists_options());
+        assert!(off.option_expiries("IDX").is_empty());
     }
 
     #[test]

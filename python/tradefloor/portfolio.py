@@ -100,6 +100,18 @@ def _option_expiry(symbol: str) -> int:
     return int(match.group(1))
 
 
+def _option_root(symbol: str) -> str:
+    """An option symbol's root: ``IDX`` for an index option, the ticker for
+    a single-name option (pt-v22 phase 3)."""
+    return symbol.rsplit(".", 3)[0]
+
+
+def is_name_option(symbol: object) -> bool:
+    """Whether ``symbol`` is spelled as a single-name option's symbol: an
+    option whose root is a ticker rather than ``IDX``."""
+    return is_option_symbol(symbol) and _option_root(symbol) != "IDX"  # type: ignore[arg-type]
+
+
 class LeverageError(OrderError):
     """An order refused because it would take the portfolio past
     ``max_leverage``.
@@ -225,12 +237,12 @@ def _shape_message(orders: Any) -> str:
             f"nothing. It returned a {kind}: {_describe(orders)}")
 
 
-def check_order(ticker: Any, order: Any) -> "Limit | Cancel | float | None":
+def check_order(ticker: Any, order: Any) -> "Limit | Cancel | Exercise | float | None":
     """One entry of an ``act()`` mapping, checked.
 
-    Returns a :class:`Limit` or :class:`Cancel` as given, a market order's
-    signed share count as a float, or ``None`` for an entry that trades
-    nothing (``None`` or zero). A market order's count is checked by
+    Returns a :class:`Limit`, :class:`Cancel` or :class:`Exercise` as given,
+    a market order's signed share count as a float, or ``None`` for an entry
+    that trades nothing (``None`` or zero). A market order's count is checked by
     :func:`shares`. Raises :class:`ValidationError`, naming the ticker, for
     a ticker that is not a string and for a value :func:`shares` refuses: a
     ``bool``, a string, a complex number, NaN, an infinity, or anything
@@ -241,11 +253,11 @@ def check_order(ticker: Any, order: Any) -> "Limit | Cancel | float | None":
     if not isinstance(ticker, str):
         raise ValidationError(
             f"a ticker must be a string, got {_describe(ticker)}")
-    if order is None or isinstance(order, (Limit, Cancel)):
+    if order is None or isinstance(order, (Limit, Cancel, Exercise)):
         return order
     quantity = shares(order, what=f"the order for {ticker!r}",
-                      expected="a number of shares, a tf.Limit or a "
-                               "tf.Cancel")
+                      expected="a number of shares, a tf.Limit, a "
+                               "tf.Cancel or a tf.Exercise")
     return quantity if quantity != 0 else None
 
 def _finite_positive(value: object) -> bool:
@@ -311,6 +323,43 @@ class Limit:
 
     def __hash__(self) -> int:
         return hash((Limit, self.quantity, self.price))
+
+
+class Exercise:
+    """Exercise a single-name option, as a value in an agent's ``act()``
+    mapping: ``{"ACME.O0035.C42.50": tf.Exercise(5)}`` exercises 5 of the
+    contracts held at the session's close (pt-v22 phase 3,
+    ``options_names_listed``).
+
+    A call's holder pays the strike for 100 shares a contract, and a put's
+    delivers 100 shares for it: the shares arrive in, or leave, the
+    portfolio's stock position at the close, through
+    :meth:`Portfolio.settle_close`, and a position can go short this way.
+    The quantity is positive contracts, at most the long position held;
+    several in one session add up. An index option is European and cannot
+    be exercised. See :meth:`Portfolio.exercise`.
+    """
+
+    __slots__ = ("quantity",)
+
+    def __init__(self, quantity: float) -> None:
+        quantity = shares(quantity, what="an Exercise's quantity",
+                          expected="a number of contracts")
+        if not quantity > 0:
+            raise ValidationError(
+                f"an Exercise needs a positive, finite number of contracts, got {quantity}")
+        self.quantity = quantity
+
+    def __repr__(self) -> str:
+        return f"Exercise({self.quantity:g})"
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Exercise):
+            return NotImplemented
+        return self.quantity == other.quantity
+
+    def __hash__(self) -> int:
+        return hash((Exercise, self.quantity))
 
 
 class Cancel:
@@ -425,7 +474,7 @@ class Portfolio:
                  "max_leverage", "_stamp", "cash_interest", "interest",
                  "owner", "_in_book", "margin_interest", "dividends", "distributions",
                  "_collected", "reinvest_dividends", "futures", "margin_calls",
-                 "_margin_call", "liquidations", "settled", "options")
+                 "_margin_call", "liquidations", "settled", "options", "deliveries")
 
     def __init__(self, cash: float = 1_000_000.0,
                  *, max_leverage: float | None = None,
@@ -524,6 +573,13 @@ class Portfolio:
         #: option hook a no-op that asks the engine nothing, for a portfolio
         #: that never traded one.
         self.options: dict[str, OptionPosition] = {}
+        #: One entry per single-name option exercised or assigned (pt-v22
+        #: phase 3), as :meth:`settle_close` delivered it: ``day`` (the
+        #: session it was exercised at), ``symbol``, ``event``
+        #: (``"exercise"`` or ``"assignment"``), ``contracts``, ``ticker``,
+        #: ``shares`` received (negative: delivered), ``price`` (the strike)
+        #: and ``cash`` received (negative: paid).
+        self.deliveries: list[dict] = []
 
     # -- trading ----------------------------------------------------------
 
@@ -972,10 +1028,38 @@ class Portfolio:
                 per = None
             total += abs(f.quantity) * (per or 0.0)
         if self.options:
-            scan = engine.option_margin([(o.symbol, o.quantity) for o in self.options.values()])
+            held = [(o.symbol, o.quantity) for o in self.options.values()]
+            # The stock in a name whose options are held, so a covered call
+            # or a protective put margins net (pt-v22 phase 3).
+            names = {_option_root(o.symbol) for o in self.options.values()
+                     if is_name_option(o.symbol)}
+            held += [(t, p.quantity) for t, p in self.positions.items()
+                     if t in names and p.quantity]
+            scan = engine.option_margin(held)
             if scan is not None:
                 total += scan / 1.1 if maintenance else scan
         return total
+
+    def margin(self, engine: Engine) -> dict[str, Any]:
+        """The account's margin now, a dict: ``initial`` and ``maintenance``,
+        the requirements the futures and options held ask
+        (:meth:`margin_requirement`), dollars; ``equity``, the net worth they
+        are measured against; ``excess``, equity less the initial
+        requirement, the room left before a close could call; and ``call``,
+        the margin call the last close made and the next open decides
+        (``day``, ``equity``, ``maintenance``, ``initial``), or None. The
+        calls already decided are in :attr:`margin_calls`.
+
+        Every figure is 0.0 for an account without futures or options, which
+        asks the engine nothing new: ``equity`` is then its net worth."""
+        equity = self.net_worth(engine)
+        initial = self.margin_requirement(engine)
+        maintenance = self.margin_requirement(engine, maintenance=True)
+        call = self._margin_call
+        return {"initial": initial, "maintenance": maintenance,
+                "equity": equity, "excess": equity - initial,
+                "call": None if call is None else
+                {k: call[k] for k in ("day", "equity", "maintenance", "initial")}}
 
     # -- options (pt-v22 phase 2) ------------------------------------------
 
@@ -1044,10 +1128,98 @@ class Portfolio:
         equity -= filled * q["multiplier"] * (price - q["mid"])
         return float("inf") if equity <= 0 else gross / equity
 
+    def exercise(self, engine: Engine, symbol: str, quantity: float) -> float:
+        """Exercise ``quantity`` contracts of a single-name option this
+        portfolio holds long, at the session's close (pt-v22 phase 3,
+        ``options_names_listed``). Returns the contracts instructed for the
+        close so far.
+
+        The instruction waits in the engine (``Engine.exercise``) until the
+        close, which exercises it up to the long position held then; the
+        shares and the cash move at :meth:`settle_close`. Refused with a
+        :class:`ValidationError` for a quantity that is not a positive
+        number, and with an :class:`OrderError` for more than the position
+        held, for an index option (European) and for a symbol not listed.
+        """
+        quantity = shares(quantity, what="an exercise's quantity",
+                          expected="a number of contracts")
+        if not quantity > 0:
+            raise ValidationError(
+                f"an exercise needs a positive, finite number of contracts, got {quantity}")
+        held = self.options.get(symbol)
+        if held is None or held.quantity < quantity - 1e-9:
+            raise OrderError(
+                f"this portfolio holds {held.quantity if held else 0.0:g} contracts "
+                f"of {symbol} long and cannot exercise {quantity:g}")
+        return float(engine.exercise(self.owner, symbol, quantity))
+
+    def _close_option(self, held: OptionPosition, filled: float, price: float) -> None:
+        """Close ``filled`` contracts of ``held`` at ``price`` a contract,
+        realising its premium on what closes, with no cash: an exercise or an
+        assignment closes the option at no premium, the strike moving the
+        cash."""
+        existing = held.quantity
+        closing = min(abs(filled), abs(existing))
+        direction = 1.0 if existing > 0 else -1.0
+        held.realised += (price - held.cost) * closing * direction * held.multiplier
+        held.quantity = existing + filled
+        if abs(held.quantity) < 1e-12:
+            held.quantity = 0.0
+        if held.quantity == 0:
+            self.options.pop(held.symbol, None)
+
+    def _deliver(self, engine: Engine, session: int) -> None:
+        """The single-name options' exercises and assignments at the close
+        of ``session`` (pt-v22 phase 3): each closes its contracts and moves
+        its shares into or out of the name's stock position at the strike,
+        and its cash; a delisted name's options are paid in cash; and every
+        name option expiring at that close and still held closes at nothing,
+        having finished out of the money.
+
+        Shares delivered this way are holdings like any other, valued at the
+        name's price and traded by the next order like any other, but they
+        are not trades: they reach :attr:`deliveries`, not :attr:`fills`,
+        and move no price."""
+        rows = [r for r in engine.settlements(session)
+                if r.get("agent") == self.owner and is_name_option(r["symbol"])]
+        for r in rows:
+            symbol = r["symbol"]
+            held = self.options.get(symbol)
+            if r["event"] in ("exercise", "assignment"):
+                contracts = float(r["quantity"])
+                if held is not None:
+                    self._close_option(held, -contracts if r["event"] == "exercise"
+                                       else contracts, 0.0)
+                ticker = r["root"]
+                moved = float(r["shares"])
+                strike = abs(float(r["cash"]) / moved) if moved else 0.0
+                position = self.positions.setdefault(ticker, Position(ticker))
+                self._apply(position, moved, strike)
+                self.cash += float(r["cash"])
+                self.deliveries.append({
+                    "day": session, "symbol": symbol, "event": r["event"],
+                    "contracts": contracts, "ticker": ticker, "shares": moved,
+                    "price": strike, "cash": float(r["cash"])})
+            elif r["event"] == "settlement" and held is not None:
+                # A delisted name's options, paid at their intrinsic value.
+                self.cash += float(r["cash"])
+                self.settled.append({"day": session, "symbol": symbol,
+                                     "quantity": held.quantity,
+                                     "price": float(r["value"]), "cash": float(r["cash"])})
+                self._close_option(held, -held.quantity, float(r["value"]))
+        for symbol in [s for s, o in self.options.items()
+                       if is_name_option(s) and _option_expiry(s) <= session]:
+            held = self.options[symbol]
+            self.settled.append({"day": session, "symbol": symbol,
+                                 "quantity": held.quantity, "price": 0.0, "cash": 0.0})
+            self._close_option(held, -held.quantity, 0.0)
+
     def _settle_options(self, engine: Engine, day: int) -> None:
-        """Pay out every held option whose expiry has settled, at its
-        settlement value, and close it."""
-        for symbol in [s for s, o in self.options.items() if _option_expiry(s) <= day]:
+        """Pay out every held index option whose expiry has settled, at its
+        settlement value, and close it. A single-name option settles in
+        shares at its close instead (:meth:`_deliver`)."""
+        for symbol in [s for s, o in self.options.items()
+                       if not is_name_option(s) and _option_expiry(s) <= day]:
             values = {s["symbol"]: s["value"] for s in engine.settlements(_option_expiry(symbol))}
             if symbol not in values:
                 continue
@@ -1105,10 +1277,11 @@ class Portfolio:
     def settle_close(self, engine: Engine) -> None:
         """At a close, after the engine's: each futures position's variation
         margin to its new settlement mark, the contracts that settle at this
-        close paid out, and a margin call when the account's equity is under
-        the maintenance requirement. A no-op, asking the engine nothing, for
-        a portfolio with no futures. The harnesses call it after the
-        close."""
+        close paid out, the single-name options exercised and assigned at it
+        delivered (:meth:`_deliver`), and a margin call when the account's
+        equity is under the maintenance requirement. A no-op, asking the
+        engine nothing, for a portfolio with no futures and no options. The
+        harnesses call it after the close."""
         if not self.futures and not self.options:
             return
         day = int(engine.day_count)
@@ -1124,6 +1297,10 @@ class Portfolio:
             held.variation += cash
             held.mark = float(mark)
         self._settle_expired(engine, day)
+        if any(is_name_option(s) for s in self.options):
+            # The close just made is session `day - 1`: the day count moved
+            # on at it.
+            self._deliver(engine, day - 1)
         if not self.futures and not self.options:
             return
         maintenance = self.margin_requirement(engine, maintenance=True)

@@ -60,8 +60,8 @@ from . import _checks
 from ._arith import ordered_sum
 from ._core import Engine, Instrument, Macro, ModelParams, OrderError, ValidationError
 from ._core import check_seed
-from .portfolio import (Cancel, LeverageError, Limit, Portfolio, check_order,
-                        order_items)
+from .portfolio import (Cancel, Exercise, LeverageError, Limit, Portfolio,
+                        check_order, order_items)
 from .sandbox import (PUBLISHED_MACRO, HiddenState, MarketView,
                       PortfolioView, TamperGuard, declares_hidden_state)
 from .universe_util import fingerprint_of
@@ -532,6 +532,12 @@ class Scorecard:
     each step's session (infinite once net worth is gone), and the other two
     read it: the share of steps that ended holding any position, and the
     mean multiple over the steps with a finite one.
+
+    Shares an agent did not order, handed over or taken by a single-name
+    option's exercise or assignment (pt-v22 phase 3), are holdings like any
+    other: valued at the price in the equity curve and counted in the
+    exposure. They are not trades, so ``trades``, ``turnover`` and
+    ``impact_bps`` leave them out.
 
     ``rejected`` counts the orders the market refused and the actions an
     LLM adapter refused on its own (its ``refusals()``, such as a ticker
@@ -1355,6 +1361,11 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
                         continue
                     if isinstance(order, Cancel):
                         portfolio.cancel(engine, ticker=ticker)
+                        continue
+                    if isinstance(order, Exercise):
+                        # An instruction for the close, not a trade: the
+                        # shares move at settle_close.
+                        portfolio.exercise(engine, ticker, order.quantity)
                         continue
                     if isinstance(order, Limit):
                         # As World does it: a new limit on a name replaces

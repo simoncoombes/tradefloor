@@ -84,6 +84,22 @@ pub const INDEX_OPTION_DEALER: OptionDealerSpec = OptionDealerSpec {
     inventory_half_life: crate::rates::INVENTORY_HALF_LIFE_TICKS,
 };
 
+/// The single-name options' dealer: the index dealer's quote on the US
+/// equity options' grid (a cent below 3.00, five cents at or above, the
+/// penny programme's), ten levels of 20 contracts a side.
+pub const NAME_OPTION_DEALER: OptionDealerSpec = OptionDealerSpec {
+    tick: 0.01,
+    tick_large: 0.05,
+    tick_switch: 3.0,
+    displayed_size: 20.0,
+    levels: 10,
+    level_step: 0.5,
+    moneyness_slope: 0.25,
+    inventory_skew: 0.5,
+    inventory_cap: 4.0,
+    inventory_half_life: crate::rates::INVENTORY_HALF_LIFE_TICKS,
+};
+
 impl OptionDealerSpec {
     /// The grid at `price`.
     pub fn tick_at(&self, price: f64) -> f64 {
@@ -163,13 +179,45 @@ pub fn ladder(
     vol: f64,
     half_spread: f64,
 ) -> Ladder {
-    let mid = black_price(right, forward, strike, years, vol, discount);
+    ladder_with(spec, |v| black_price(right, forward, strike, years, v, discount), vol, half_spread)
+}
+
+/// The ladder of an American option whose tree prices it at `mid` at the
+/// volatility `vol`: each level is `mid` moved by the European price's
+/// change between `vol` and the level's volatility, Black's on the forward
+/// `forward` (the escrowed price's), so a level costs no tree and the
+/// ladder's steps are the European vega's. The rest is [`ladder`]'s.
+#[allow(clippy::too_many_arguments)]
+pub fn american_ladder(
+    spec: &OptionDealerSpec,
+    right: Right,
+    forward: f64,
+    strike: f64,
+    years: f64,
+    discount: f64,
+    vol: f64,
+    half_spread: f64,
+    mid: f64,
+) -> Ladder {
+    let at_mid = black_price(right, forward, strike, years, vol, discount);
+    ladder_with(
+        spec,
+        |v| if v == vol { mid } else { mid + black_price(right, forward, strike, years, v, discount) - at_mid },
+        vol,
+        half_spread,
+    )
+}
+
+/// The ladder `price_at` gives: its mid at `vol`, each side's levels at the
+/// volatility the half-spread `half_spread` moves it by, best first.
+fn ladder_with(spec: &OptionDealerSpec, price_at: impl Fn(f64) -> f64, vol: f64, half_spread: f64) -> Ladder {
+    let mid = price_at(vol);
     let mut asks: Vec<Level> = Vec::with_capacity(spec.levels);
     let mut bids: Vec<Level> = Vec::with_capacity(spec.levels);
     for j in 0..spec.levels {
         let h = half_spread * (1.0 + j as f64 * spec.level_step);
         let ask_vol = vol + h;
-        let mut ask = on_grid(spec, black_price(right, forward, strike, years, ask_vol, discount), true);
+        let mut ask = on_grid(spec, price_at(ask_vol), true);
         let floor = match asks.last() {
             Some(prev) => prev.price + spec.tick_at(prev.price),
             // Strictly above the mid even where the spread is under a tick.
@@ -183,7 +231,7 @@ pub fn ladder(
     for j in 0..spec.levels {
         let h = half_spread * (1.0 + j as f64 * spec.level_step);
         let bid_vol = mathx::max(1e-4, vol - h);
-        let mut bid = on_grid(spec, black_price(right, forward, strike, years, bid_vol, discount), false);
+        let mut bid = on_grid(spec, price_at(bid_vol), false);
         let cap = match bids.last() {
             Some(prev) => prev.price - spec.tick_at(prev.price - 1e-9),
             // Strictly below the mid.
@@ -259,10 +307,18 @@ pub fn dealer_thetas(expiries: &[(f64, f64)], shifts: &[f64]) -> Vec<f64> {
 
 /// A listed option's quote, as [`crate::engine::Engine::chain`] and
 /// [`crate::engine::Engine::option_quote`] read it.
+///
+/// A single-name option (`options_names_listed`) is American: its `mid` and
+/// `fair` are a Leisen-Reimer tree's values on the escrowed price with the
+/// dividends to expiry (`derivatives::american`), at `iv` and `surface_iv`;
+/// its delta and gamma are the tree's, per share, and its vega and theta
+/// the European's on the escrowed price; `forward` is the escrowed price's
+/// forward, `index` the name's price, `dividends` the dividends' present
+/// value per share, and `multiplier` 100 shares.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct OptionQuote {
-    /// `IDX.O0294.C1050.00`.
+    /// `IDX.O0294.C1050.00`, or `ACME.O0294.C42.50`.
     pub symbol: String,
     pub root: String,
     pub expiry: i64,
@@ -291,7 +347,7 @@ pub struct OptionQuote {
     pub rate: f64,
     pub dividends: f64,
     pub sessions_to_expiry: f64,
-    /// Dollars per index point.
+    /// Dollars per index point, or shares a contract.
     pub multiplier: f64,
     /// The grid at the mid.
     pub tick: f64,
@@ -303,6 +359,65 @@ pub struct OptionQuote {
     /// margin.
     pub initial_margin: Option<f64>,
     pub maintenance_margin: Option<f64>,
+}
+
+/// One listed expiry as a trader reads it off its quoted chain
+/// ([`crate::engine::Engine::option_expiries`]): the strike grid that names
+/// its contracts, the dealer's at-the-money volatility and the 25-delta
+/// skew. Every volatility is the dealer's mid volatility (`iv`), a fraction
+/// a year.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct ExpirySummary {
+    pub root: String,
+    pub expiry: i64,
+    pub sessions_to_expiry: f64,
+    /// The forward to expiry, index points.
+    pub forward: f64,
+    /// The listed strikes: `strike_low` to `strike_high` in steps of
+    /// `strike_step`, index points.
+    pub strike_low: f64,
+    pub strike_high: f64,
+    pub strike_step: f64,
+    /// The volatility at the forward ([`read_smile`]).
+    pub atm_iv: Option<f64>,
+    /// The volatility where a put's delta is -0.25, and where a call's is
+    /// 0.25 ([`read_smile`]).
+    pub put_25d_iv: Option<f64>,
+    pub call_25d_iv: Option<f64>,
+    /// `put_25d_iv - call_25d_iv`: positive when out-of-the-money puts are
+    /// dearer than out-of-the-money calls, as on equity indices.
+    pub skew_25d: Option<f64>,
+}
+
+/// The at-the-money and 25-delta volatilities of one expiry's chain, as
+/// `(atm, put_25d, call_25d)`: the mid volatility (`iv`) at the forward,
+/// linear in log-moneyness between the listed strikes either side of it;
+/// and where a put's delta is -0.25 and where a call's is 0.25, each linear
+/// in delta between the listed strikes either side. A strike's call and put
+/// share one volatility, so the at-the-money point reads the calls. Each is
+/// `None` where the grid does not reach it, and all three for a chain with
+/// no time left, whose volatilities are 0.
+pub fn read_smile(chain: &[OptionQuote]) -> (Option<f64>, Option<f64>, Option<f64>) {
+    let side = |right: Right| {
+        let mut v: Vec<&OptionQuote> =
+            chain.iter().filter(|q| q.right == right && q.sessions_to_expiry > 0.0 && q.iv > 0.0).collect();
+        v.sort_by(|a, b| a.strike.total_cmp(&b.strike));
+        v
+    };
+    let (calls, puts) = (side(Right::Call), side(Right::Put));
+    let atm = calls.windows(2).find_map(|w| {
+        let (ka, kb) = (mathx::log(w[0].strike / w[0].forward), mathx::log(w[1].strike / w[1].forward));
+        (ka <= 0.0 && 0.0 <= kb && kb > ka).then(|| w[0].iv + (w[1].iv - w[0].iv) * (0.0 - ka) / (kb - ka))
+    });
+    // A call's delta and a put's both fall as the strike rises.
+    let at_delta = |quotes: &[&OptionQuote], target: f64| {
+        quotes.windows(2).find_map(|w| {
+            let (da, db) = (w[0].greeks.delta, w[1].greeks.delta);
+            (da >= target && target >= db && da > db).then(|| w[0].iv + (w[1].iv - w[0].iv) * (da - target) / (da - db))
+        })
+    };
+    (atm, at_delta(&puts, -0.25), at_delta(&calls, 0.25))
 }
 
 /// Static-arbitrage violations on quoted chains (row SV2), each a sentence:
@@ -516,6 +631,62 @@ mod tests {
             }
         }
         out
+    }
+
+    /// The volatility where `right`'s delta is `target`, on the continuous
+    /// smile the grid samples, by bisection on the strike.
+    fn exact_at_delta(ssvi: &Ssvi, theta: f64, sessions: f64, right: Right, target: f64) -> f64 {
+        let (spot, rate, years) = (1000.0, 0.03, sessions / 252.0);
+        let fwd = spot * mathx::exp(rate * years);
+        let iv = |strike: f64| mathx::sqrt(ssvi.total_variance(mathx::log(strike / fwd), theta) / years);
+        let (mut lo, mut hi) = (700.0_f64, 1300.0_f64);
+        for _ in 0..100 {
+            let mid = 0.5 * (lo + hi);
+            if black_greeks(right, spot, mid, years, iv(mid), rate).1.delta > target {
+                lo = mid;
+            } else {
+                hi = mid;
+            }
+        }
+        iv(0.5 * (lo + hi))
+    }
+
+    #[test]
+    fn the_smile_reads_the_forward_and_the_25_delta_points() {
+        let (sessions, theta) = (34.6, 0.0056);
+        // Flat: every point is the one volatility, and the skew nothing.
+        let flat = quotes_from(&Ssvi::new(0.0, 0.0, 0.5), &[(35, sessions, theta)], 1000.0, 0.03);
+        let sigma = mathx::sqrt(theta * 252.0 / sessions);
+        let (atm, put, call) = read_smile(&flat);
+        for v in [atm, put, call] {
+            assert!((v.unwrap() - sigma).abs() < 1e-12, "{v:?} {sigma}");
+        }
+        // Skewed: the forward reads theta, and each 25-delta point the
+        // continuous smile's within interpolation error on a 10-point grid.
+        let ssvi = Ssvi::new(-0.7, 1.0, 0.5);
+        let skewed = quotes_from(&ssvi, &[(35, sessions, theta)], 1000.0, 0.03);
+        let (atm, put, call) = read_smile(&skewed);
+        assert!((atm.unwrap() - sigma).abs() < 2e-4, "{atm:?} {sigma}");
+        let (put, call) = (put.unwrap(), call.unwrap());
+        assert!((put - exact_at_delta(&ssvi, theta, sessions, Right::Put, -0.25)).abs() < 5e-4, "{put}");
+        assert!((call - exact_at_delta(&ssvi, theta, sessions, Right::Call, 0.25)).abs() < 5e-4, "{call}");
+        assert!(put > atm.unwrap() && atm.unwrap() > call, "{put} {atm:?} {call}");
+        // A grid that stops short of 25 delta reads the forward alone.
+        let narrow: Vec<OptionQuote> =
+            skewed.iter().filter(|q| (q.strike - 1000.0).abs() <= 20.0).cloned().collect();
+        let (atm, put, call) = read_smile(&narrow);
+        assert!(atm.is_some() && put.is_none() && call.is_none());
+        // No time left: nothing to read.
+        let expired: Vec<OptionQuote> = skewed
+            .iter()
+            .cloned()
+            .map(|mut q| {
+                q.sessions_to_expiry = 0.0;
+                q.iv = 0.0;
+                q
+            })
+            .collect();
+        assert_eq!(read_smile(&expired), (None, None, None));
     }
 
     #[test]

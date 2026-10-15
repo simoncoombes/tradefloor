@@ -555,10 +555,37 @@ OUT_OF_SCOPE = {
         "`forecast_horizon_sessions`; at 0.0 it is also left out of the "
         "model's digest",
     "option_dealer_spread":
-        "unread while `options_index_listed` is 0.0, as every preset ships it: "
-        "only `option_priced` and `option_thetas` in engine/options.rs read it, "
-        "and refused without the switch; at 0.0 it is also left out of the "
+        "unread while `options_index_listed` and `options_names_listed` are "
+        "0.0, as every preset ships them: only `option_priced` and "
+        "`option_thetas` in engine/options.rs and `name_priced` and "
+        "`name_context` in engine/name_options.rs read it, and refused without "
+        "a switch; at 0.0 it is also left out of the model's digest",
+    # The single-name options (pt-v22 phase 3), inert on every shipped
+    # preset. An option, its surface and a delivery read public state, draw
+    # nothing and write only their own state, so off zero they leave every
+    # price where it was as well.
+    "options_names_listed":
+        "inert at 0.0: `name_options_open`, `name_options_close` and "
+        "`name_options_session_step` in engine/name_options.rs return at once "
+        "with the switch off, `Engine::contracts` lists no name option, "
+        "`Engine::exercise` refuses, and no name option state is snapshotted "
+        "or hashed; refused without `surface_ssvi` and "
+        "`forecast_horizon_sessions`; at 0.0 it is also left out of the "
         "model's digest",
+    "surface_name_premium":
+        "unread while `options_names_listed` is 0.0: only `name_surface_at` "
+        "reads it, and refused without the switch; unfitted; at 0.0 it is also "
+        "left out of the model's digest",
+    "surface_name_skew":
+        "unread while `options_names_listed` is 0.0: only `name_surface_at` "
+        "reads it, and refused without the switch; unfitted; at 0.0 it is also "
+        "left out of the model's digest",
+    "option_position_limit":
+        "inert at 0.0: `option_limit_check` in engine/options.rs returns at once "
+        "and `Engine::option_position_limit` reads None; refused without a "
+        "listed option family; a stated simplification of exchange limits, sized "
+        "to the dealer's displayed depth, not fitted; at 0.0 it is also left out "
+        "of the model's digest",
     # The oil law (pt-v22, decision 3), inert on every shipped preset: each a
     # branch to the standing arithmetic at 0.0.
     "oil_mean_reversion":

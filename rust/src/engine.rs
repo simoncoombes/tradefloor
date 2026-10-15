@@ -84,6 +84,9 @@ mod margin;
 /// The index options, their surface and their dealer (`options_index_listed`,
 /// `surface_ssvi`, `option_dealer_spread`).
 mod options;
+/// The single-name options, their surfaces, exercise and delivery
+/// (`options_names_listed`, `surface_name_premium`, `surface_name_skew`).
+mod name_options;
 
 /// The reference MAIN stream's sequence. Not 0 and not 1 —
 /// both are different streams from the same seed, and picking the wrong one
@@ -1202,6 +1205,10 @@ pub struct Engine {
     /// carried in the snapshot and the state hash only while `surface_ssvi`
     /// is set. See `engine::options`.
     options: options::OptionsState,
+    /// The single-name options (`options_names_listed`): empty and never
+    /// touched with the switch off; carried in the snapshot and the state
+    /// hash only while it is set. See `engine::name_options`.
+    name_options: name_options::NameOptionsState,
     /// `fed_stress_cut`: the highest published VIX since the last meeting.
     /// 0.0 and never touched with the cut off; carried in the snapshot and
     /// the state hash only while it is set.
@@ -2345,6 +2352,7 @@ impl Engine {
             oil_futures: oil_futures::OilFuturesState::default(),
             margin: margin::MarginState::default(),
             options: options::OptionsState::default(),
+            name_options: name_options::NameOptionsState::default(),
             stress_vix_max: 0.0,
             stress_hold_age: STRESS_HOLD_NEVER,
             drawdown_returns: std::collections::VecDeque::new(),
@@ -2513,7 +2521,11 @@ impl Engine {
         pre.params.surface_term_premium_short = 0.0;
         pre.params.surface_term_premium_long = 0.0;
         pre.params.surface_earnings_weight = 0.0;
+        pre.params.options_names_listed = 0.0;
+        pre.params.surface_name_premium = 0.0;
+        pre.params.surface_name_skew = 0.0;
         pre.options = options::OptionsState::default();
+        pre.name_options = name_options::NameOptionsState::default();
         pre.earnings_key = crate::rng::prehistory_key(self.earnings_key);
         pre.cycle_publication.key = crate::rng::prehistory_key(self.cycle_publication.key);
         let opening = (self.economy.cycle_phase, self.economy.months_in_current_phase);
@@ -4437,6 +4449,8 @@ impl Engine {
             // The options dealer's minute (`options_index_listed`): its
             // pressure decays and waiting orders its quote crosses fill.
             self.options_session_step();
+            // The same for the single-name options (`options_names_listed`).
+            self.name_options_session_step();
         }
         if population_open {
             if let Some(pop) = self.population.as_mut() {
@@ -5761,16 +5775,20 @@ impl Engine {
         }
         // A listed contract trades in its own book (`futures_index_listed`,
         // `futures_vix_listed`), and an option with the dealer
-        // (`options_index_listed`).
+        // (`options_index_listed`, `options_names_listed`).
         if (self.futures_on()
             || self.vix_futures_on()
             || self.rate_futures_on()
             || self.oil_futures_on()
-            || self.options_on())
+            || self.options_on()
+            || self.names_on())
             && !self.companies.iter().any(|c| c.ticker == ticker)
         {
             if let Ok(symbol) = crate::derivatives::ContractSymbol::parse(ticker) {
                 if let crate::derivatives::SymbolKind::Option { .. } = symbol.kind {
+                    if self.is_listed_name_option(ticker) {
+                        return self.submit_name_option_order(agent, ticker, side, quantity, limit, order_id);
+                    }
                     return self.submit_option_order(agent, ticker, side, quantity, limit, order_id);
                 }
                 if self.vix_futures_on() && symbol.root == crate::derivatives::ContractKind::VixFuture.root() {
@@ -5882,6 +5900,7 @@ impl Engine {
             || self.cancel_rate_future_order(order_id, agent)
             || self.cancel_oil_future_order(order_id, agent)
             || self.cancel_option_order(order_id, agent)
+            || self.cancel_name_option_order(order_id, agent)
     }
 
     /// Waiting orders, in arrival order, for one agent or all: the names'
@@ -5896,6 +5915,7 @@ impl Engine {
             .chain(self.rate_futures_orders().iter())
             .chain(self.oil_futures_orders().iter())
             .chain(self.option_orders().iter())
+            .chain(self.name_option_orders().iter())
             .filter(|o| agent.is_none_or(|a| a == o.agent))
             .cloned()
             .collect()
@@ -5925,6 +5945,8 @@ impl Engine {
         taken.extend(self.take_oil_futures_fills(agent));
         // The options' fills (`options_index_listed`), on their own counter.
         taken.extend(self.take_option_fills(agent));
+        // The single-name options' (`options_names_listed`), on theirs.
+        taken.extend(self.take_name_option_fills(agent));
         taken
     }
 
@@ -7130,6 +7152,9 @@ impl Engine {
         // an expiry due settles on them and the next is listed; the
         // surface's clock starts the session (`surface_ssvi`).
         self.options_open();
+        // The single-name options' strikes widen around the opening prints
+        // (`options_names_listed`).
+        self.name_options_open();
     }
 
     /// The overnight move, applied once per name at the open, before the
@@ -10564,6 +10589,10 @@ impl Engine {
         // The contracts' margin on every family's marks
         // (`margin_scan_coverage`). Nothing with the dial off.
         self.margin_close_update();
+        // The single-name options at the close, on that forecast
+        // (`options_names_listed`): exercises and assignments, the expiries
+        // due settle on the closing prints, the next are listed.
+        self.name_options_close();
         // The night's path for the index futures, to the next open as a copy
         // runs it (`night_session_steps`). Nothing with the dial at 0.0.
         self.futures_night_setup();
@@ -11602,6 +11631,9 @@ impl Engine {
         if index < self.book.memory.len() {
             self.book.memory.remove(index);
         }
+        // Its options are withdrawn and paid at their intrinsic value
+        // (`options_names_listed`), while the slot is still its own.
+        self.name_options_remove(index);
         let leaving = self.companies[index].ticker.clone();
         self.book.orders.retain(|o| o.ticker != leaving);
         self.book.flow.retain(|(_, t, _, _)| *t != leaving);
@@ -12671,6 +12703,26 @@ impl Engine {
             hash_f64(&mut buf, 81.0);
             hash_book(&mut buf, book);
         }
+        // The single-name options, only while `options_names_listed` is
+        // set, behind their own tag (70 to 72: 55 to 60 are taken on other
+        // pt-v22 branches), length-prefixed; their book behind
+        // another once an agent has traded one; their instructions and
+        // exercises behind a third once there are any.
+        if let Some(words) = self.name_options_words() {
+            hash_f64(&mut buf, 70.0);
+            hash_u32(&mut buf, words.len() as u32);
+            for value in words {
+                hash_f64(&mut buf, value);
+            }
+        }
+        if let Some(book) = self.name_options_book_state() {
+            hash_f64(&mut buf, 71.0);
+            hash_book(&mut buf, book);
+        }
+        if let Some((instructions, events)) = self.name_options_exercise_state() {
+            hash_f64(&mut buf, 72.0);
+            hash_name_exercise(&mut buf, &instructions, events);
+        }
         // LENGTH-PREFIXED, because these two are EMPTY between the tape row
         // that consumes them and the close that fills them again, where
         // every per-slot array above always follows the roster. An empty
@@ -13233,6 +13285,37 @@ fn hash_book(buf: &mut Vec<u8>, book: &crate::agent_book::BookState) {
                 hash_f64(buf, *v);
             }
         }
+    }
+}
+
+/// The single-name options' exercise state (`options_names_listed`), in the
+/// order the snapshot's `name_options_exercise` entry holds it: the
+/// instructions waiting for the close, then every exercise, assignment and
+/// delisting settlement, each its session, event, party, symbol, contracts,
+/// shares, cash, value and reference.
+fn hash_name_exercise(
+    buf: &mut Vec<u8>,
+    instructions: &[(String, String, f64)],
+    events: &[crate::derivatives::Settlement],
+) {
+    hash_str(buf, "name_options_exercise");
+    hash_u32(buf, instructions.len() as u32);
+    for (agent, symbol, quantity) in instructions {
+        hash_str(buf, agent);
+        hash_str(buf, symbol);
+        hash_f64(buf, *quantity);
+    }
+    hash_u32(buf, events.len() as u32);
+    for e in events {
+        hash_i64(buf, e.session);
+        hash_str(buf, e.event.as_str());
+        hash_str(buf, e.agent.as_deref().unwrap_or(""));
+        hash_str(buf, &e.symbol);
+        hash_f64(buf, e.quantity);
+        hash_f64(buf, e.shares);
+        hash_f64(buf, e.cash);
+        hash_f64(buf, e.value);
+        hash_f64(buf, e.reference);
     }
 }
 
