@@ -1739,7 +1739,7 @@ pub struct ModelParams {
     /// Off zero each listed contract's initial margin, set at each close, is
     /// its multiplier times `z * t * sigma`: `sigma` the contract's own
     /// one-session sd, an exponentially weighted mean of its squared
-    /// close-to-close mark changes at a half-life of 21 sessions (the
+    /// close-to-close mark changes at a half-life of seven sessions (the
     /// historical-volatility scaling clearing houses' value-at-risk margins
     /// use), seeded at listing from its family's front; `z` the standard
     /// normal quantile that leaves `(1 - coverage) / 2` in each tail; and
@@ -1758,6 +1758,178 @@ pub struct ModelParams {
     /// contracts' moves past it read the coverage's complement (row MG1). In
     /// [0, 5].
     pub margin_scan_tail: f64,
+    /// Whether the engine lists European options on its price index. 0.0,
+    /// on every shipped preset, lists none: no contract, no state, nothing in
+    /// the snapshot or the state hash, and a value of 0.0 is left out of the
+    /// model's digest.
+    ///
+    /// Off zero the engine lists, from the first open, cash-settled calls and
+    /// puts on the index (`IDX.Onnnn.Rk.cc`, a $100 multiplier) at the next
+    /// six monthly expiries and the quarterly expiries after them, eight in
+    /// all out to about a year (`derivatives::calendar`: session 15 of a
+    /// 21-session month, `21m + 14`). Each settles at its expiry session's
+    /// open on the index of that session's opening prints, the AM settlement
+    /// of SPX. An expiry's strikes are a grid set at its listing, a fifth of
+    /// the at-the-money sd to expiry apart at the VIX then, rounded to 1, 2,
+    /// 2.5 or 5 times a power of ten, twenty either side of the index, and
+    /// widened at each open to keep twenty either side. The dealer
+    /// (`option_dealer_spread`) quotes every option from the surface
+    /// (`surface_ssvi`, which this requires) and takes the other
+    /// side of every trade, in the session only. An option's price feeds
+    /// nothing a stock price reads. A switch.
+    pub options_index_listed: f64,
+    /// Whether the engine keeps an implied-volatility surface on its price
+    /// index. 0.0, on every shipped preset, keeps none, and a value of 0.0 is
+    /// left out of the model's digest.
+    ///
+    /// Off zero `Engine::surface` reads an SSVI surface (Gatheral and
+    /// Jacquier, Quantitative Finance 14(1), 2014; `derivatives::surface`)
+    /// built from public state when asked, with no state of its own. Its
+    /// 21-session at-the-money total variance is the one whose strip, priced
+    /// by the Cboe VIX formula, returns the VIX (the live VIX within a
+    /// session under `vix_intraday_live`, the published VIX otherwise). Its
+    /// correlation is the one whose 21-session strip has the risk-neutral
+    /// skewness `surface_skew_physical`, `surface_skew_physical_slope`,
+    /// `surface_skew_premium` and `surface_skew_premium_slope` give, at the curvature `surface_curvature` and
+    /// `surface_curvature_exponent`. Its term structure scales the 21-session
+    /// point by the forecast's expected index variance
+    /// (`forecast_horizon_sessions`; flat without it), the term premia
+    /// (`surface_term_premium_short`, `surface_term_premium_long`) and the
+    /// earnings reports the calendar puts before each tenor
+    /// (`surface_earnings_weight`). Requires `index_level_listed`. A switch.
+    pub surface_ssvi: f64,
+    /// The physical skewness of the index's 21-session log return at a VIX
+    /// of 20, which the surface's risk-neutral skewness starts from. Read
+    /// only with `surface_ssvi` set and `surface_curvature` above 0; 0.0, on
+    /// every shipped preset, is a skewness of 0, and a value of 0.0 is left
+    /// out of the model's digest. A derived dial: to be measured on the
+    /// model's own histories, as a function of the published VIX, with
+    /// `surface_skew_physical_slope`. In [-10, 10].
+    pub surface_skew_physical: f64,
+    /// The physical skewness's slope on the log of the VIX over 20
+    /// (`surface_skew_physical`). Read only with `surface_ssvi` set; 0.0, on
+    /// every shipped preset, is no slope, and a value of 0.0 is left out of
+    /// the model's digest. In [-10, 10].
+    pub surface_skew_physical_slope: f64,
+    /// The skew premium: added to the physical skewness, the risk-neutral
+    /// skewness the surface's 21-session strip is fitted to (the Cboe SKEW
+    /// index is `100 - 10` times it). Negative makes the surface's put wing
+    /// dearer. Read only with `surface_ssvi` set; 0.0, on every shipped
+    /// preset, adds none, and a value of 0.0 is left out of the model's
+    /// digest. In [-10, 10].
+    pub surface_skew_premium: f64,
+    /// The skew premium's slope on the log of the VIX over 20
+    /// (`surface_skew_premium`): the risk-neutral skewness is the physical
+    /// one plus `surface_skew_premium + surface_skew_premium_slope *
+    /// ln(VIX / 20)`. Positive makes the premium shrink as the VIX rises, as
+    /// the Cboe SKEW index does against the VIX on the tape. Read only with
+    /// `surface_ssvi` set; 0.0, on every shipped preset, is a constant
+    /// premium, and a value of 0.0 is left out of the model's digest. In
+    /// [-10, 10].
+    pub surface_skew_premium_slope: f64,
+    /// The surface's curvature, SSVI's `eta` in `phi(theta) = eta theta^-gamma
+    /// (1 + theta)^(gamma - 1)`. Read only with `surface_ssvi` set; 0.0, on
+    /// every shipped preset, is a flat smile with no skew, and a value of 0.0
+    /// is left out of the model's digest. Off zero the fitted correlation is
+    /// held inside `2 / eta - 1`, where every smile is free of static
+    /// arbitrage (the paper's Remark 4.4), so the skewness the curvature can
+    /// reach falls as it rises past 1. In [0, 2).
+    pub surface_curvature: f64,
+    /// The surface's curvature exponent, SSVI's `gamma`
+    /// (`surface_curvature`): how fast the smile flattens with the tenor.
+    /// Read only with `surface_ssvi` set; 0.0, on every shipped preset, is an
+    /// exponent of 0, and a value of 0.0 is left out of the model's digest.
+    /// In [0, 0.5], where the paper's Remark 4.4 holds.
+    pub surface_curvature_exponent: f64,
+    /// The log premium on implied variance at 6 sessions over the
+    /// forecast's expected variance, relative to the 21-session point the
+    /// VIX fixes; log-linear in the tenor's log between them. Read only with
+    /// `surface_ssvi` set; 0.0, on every shipped preset, adds none, and a
+    /// value of 0.0 is left out of the model's digest. In [-2, 2].
+    pub surface_term_premium_short: f64,
+    /// The log premium on implied variance at 252 sessions, relative to the
+    /// 21-session point; log-linear in the tenor's log from 21 sessions on.
+    /// Read only with `surface_ssvi` set; 0.0, on every shipped preset, adds
+    /// none, and a value of 0.0 is left out of the model's digest. In [-2,
+    /// 2].
+    pub surface_term_premium_long: f64,
+    /// The weight on the earnings reports' variance in the index surface's
+    /// term structure. Each report the calendar (`Engine::earnings_calendar`)
+    /// puts before a tenor adds the name's index weight squared times
+    /// `earnings_surprise_sigma` squared times its expected one-session
+    /// variance at the report (the forecast's), so short-dated implied
+    /// variance rises into a season of reports and falls after it; the
+    /// surprise itself is not read. Read only with `surface_ssvi` set;
+    /// 0.0, on every shipped preset, adds none, and a value of 0.0 is left
+    /// out of the model's digest. Requires `forecast_horizon_sessions`. In
+    /// [0, 10].
+    pub surface_earnings_weight: f64,
+    /// The options dealer's half-spread at the money, in volatility (0.005
+    /// is half a vol point), before the equity maker's VIX multiplier and the
+    /// widening away from the money (`derivatives::INDEX_OPTION_DEALER`).
+    /// Read only with `options_index_listed` set; 0.0, on every shipped
+    /// preset, is a dealer quoting one tick either side of its mid, and a
+    /// value of 0.0 is left out of the model's digest. The dealer quotes
+    /// every listed option from the surface: ten levels of 50 contracts a side,
+    /// each further out by half the half-spread, its quoted volatility moved
+    /// by the vega-weighted inventory agents' trades leave it, which decays
+    /// at the rate maker's 15-tick half-life. Requires
+    /// `options_index_listed` or `options_names_listed`. In [0, 0.5].
+    pub option_dealer_spread: f64,
+    /// Whether the engine lists American options on each roster name. 0.0,
+    /// on every shipped preset, lists none: no contract, no state, nothing in
+    /// the snapshot or the state hash, and a value of 0.0 is left out of the
+    /// model's digest.
+    ///
+    /// Off zero the engine lists, from the first close, physically settled
+    /// American calls and puts on every public name (`ACME.Onnnn.Rk.cc`,
+    /// 100 shares a contract) at the next three monthly expiries and the
+    /// three quarterly expiries after them (`derivatives::calendar`: the
+    /// index options' sessions), each settling at its expiry session's close:
+    /// an option in the money by a cent or more on the closing print is
+    /// exercised and delivers its shares at the strike. Strikes sit on the
+    /// name's price tier (`derivatives::NameOptionSpec::strike_step`), ten
+    /// either side of the price, widened at each open and close. The dealer
+    /// (`option_dealer_spread`) quotes each from a Leisen-Reimer tree on the
+    /// name's surface (`surface_name_premium`, `surface_name_skew`) with the
+    /// declared and projected dividends to expiry, priced when asked; it is
+    /// the other side of every trade, exercises the longs this leaves it
+    /// where its tree says exercising beats holding, and assigns its
+    /// exercises and agents' to the short positions pro rata. Agents
+    /// exercise with `Engine::exercise`, at the close. Requires
+    /// `surface_ssvi` and `forecast_horizon_sessions`. An option's price and
+    /// a delivery feed nothing a stock price reads. A switch.
+    pub options_names_listed: f64,
+    /// The single-name volatility premium: a name's implied volatility over
+    /// its expected volatility, less one, so a name's at-the-money total
+    /// variance is `(1 + premium)^2` times the forecast's expected variance
+    /// of the name to the tenor, before the earnings term. Read only with
+    /// `options_names_listed` set; 0.0, on every shipped preset, is no
+    /// premium, and a value of 0.0 is left out of the model's digest. In
+    /// [-0.5, 1].
+    pub surface_name_premium: f64,
+    /// The single-name skew: a name's smile correlation as a share of the
+    /// index surface's fitted correlation, so names carry the index's
+    /// curvature and a flatter skew. Read only with `options_names_listed`
+    /// set; 0.0, on every shipped preset, is a symmetric smile (a
+    /// correlation of 0), and a value of 0.0 is left out of the model's
+    /// digest. In [0, 1].
+    pub surface_name_skew: f64,
+    /// The position limit on each listed option, per agent and contract, in
+    /// multiples of the dealer's displayed depth on one side (its ten levels:
+    /// 500 contracts of an index option, 200 of a name's). 0.0, on every
+    /// shipped preset, is no limit, and a value of 0.0 is left out of the
+    /// model's digest.
+    ///
+    /// Off zero an order is refused when it would take the agent's position
+    /// in the contract, with its waiting orders on it counted as filled,
+    /// past the limit in absolute value; an order that brings the position
+    /// toward zero is never refused, and an exercise or an assignment is
+    /// not an order. It is the plan's stated simplification of an
+    /// exchange's position limits, there so an agent cannot hold an
+    /// unlimited stake in a contract whose settlement print it can push.
+    /// Requires `options_index_listed` or `options_names_listed`. In [0, 100].
+    pub option_position_limit: f64,
     /// Switch that makes the fear/greed index read the business cycle and
     /// GDP growth as published instead of as they are. 0.0, on every preset
     /// through pt-v19, is off; pt-v20 sets 1.0.
@@ -8302,6 +8474,22 @@ impl ModelParams {
             futures_oil_listed: 0.0,
             margin_scan_coverage: 0.0,
             margin_scan_tail: 0.0,
+            options_index_listed: 0.0,
+            surface_ssvi: 0.0,
+            surface_skew_physical: 0.0,
+            surface_skew_physical_slope: 0.0,
+            surface_skew_premium: 0.0,
+            surface_skew_premium_slope: 0.0,
+            surface_curvature: 0.0,
+            surface_curvature_exponent: 0.0,
+            surface_term_premium_short: 0.0,
+            surface_term_premium_long: 0.0,
+            surface_earnings_weight: 0.0,
+            option_dealer_spread: 0.0,
+            options_names_listed: 0.0,
+            surface_name_premium: 0.0,
+            surface_name_skew: 0.0,
+            option_position_limit: 0.0,
             fear_greed_published_inputs: 0.0,
             macro_publication_repricing: 0.0,
             treasury_10y_noise: 0.03,
@@ -10948,6 +11136,22 @@ impl ModelParams {
             "futures_oil_listed" => self.futures_oil_listed,
             "margin_scan_coverage" => self.margin_scan_coverage,
             "margin_scan_tail" => self.margin_scan_tail,
+            "options_index_listed" => self.options_index_listed,
+            "surface_ssvi" => self.surface_ssvi,
+            "surface_skew_physical" => self.surface_skew_physical,
+            "surface_skew_physical_slope" => self.surface_skew_physical_slope,
+            "surface_skew_premium" => self.surface_skew_premium,
+            "surface_skew_premium_slope" => self.surface_skew_premium_slope,
+            "surface_curvature" => self.surface_curvature,
+            "surface_curvature_exponent" => self.surface_curvature_exponent,
+            "surface_term_premium_short" => self.surface_term_premium_short,
+            "surface_term_premium_long" => self.surface_term_premium_long,
+            "surface_earnings_weight" => self.surface_earnings_weight,
+            "option_dealer_spread" => self.option_dealer_spread,
+            "options_names_listed" => self.options_names_listed,
+            "surface_name_premium" => self.surface_name_premium,
+            "surface_name_skew" => self.surface_name_skew,
+            "option_position_limit" => self.option_position_limit,
             "fear_greed_published_inputs" => self.fear_greed_published_inputs,
             "macro_publication_repricing" => self.macro_publication_repricing,
             "treasury_10y_noise" => self.treasury_10y_noise,
@@ -11359,6 +11563,22 @@ impl ModelParams {
             "futures_oil_listed" => out.futures_oil_listed = value,
             "margin_scan_coverage" => out.margin_scan_coverage = value,
             "margin_scan_tail" => out.margin_scan_tail = value,
+            "options_index_listed" => out.options_index_listed = value,
+            "surface_ssvi" => out.surface_ssvi = value,
+            "surface_skew_physical" => out.surface_skew_physical = value,
+            "surface_skew_physical_slope" => out.surface_skew_physical_slope = value,
+            "surface_skew_premium" => out.surface_skew_premium = value,
+            "surface_skew_premium_slope" => out.surface_skew_premium_slope = value,
+            "surface_curvature" => out.surface_curvature = value,
+            "surface_curvature_exponent" => out.surface_curvature_exponent = value,
+            "surface_term_premium_short" => out.surface_term_premium_short = value,
+            "surface_term_premium_long" => out.surface_term_premium_long = value,
+            "surface_earnings_weight" => out.surface_earnings_weight = value,
+            "option_dealer_spread" => out.option_dealer_spread = value,
+            "options_names_listed" => out.options_names_listed = value,
+            "surface_name_premium" => out.surface_name_premium = value,
+            "surface_name_skew" => out.surface_name_skew = value,
+            "option_position_limit" => out.option_position_limit = value,
             "fear_greed_published_inputs" => out.fear_greed_published_inputs = value,
             "macro_publication_repricing" => out.macro_publication_repricing = value,
             "treasury_10y_noise" => out.treasury_10y_noise = value,
@@ -13079,6 +13299,120 @@ impl ModelParams {
                  first.",
                 self.margin_scan_tail));
         }
+        for (name, v) in [("options_index_listed", self.options_index_listed), ("surface_ssvi", self.surface_ssvi)] {
+            if !(v == 0.0 || v == 1.0) {
+                return Err(format!("{name} is {v}. It is a switch, 0.0 off or 1.0 on."));
+            }
+        }
+        if self.surface_ssvi != 0.0 && self.index_level_listed == 0.0 {
+            return Err(format!(
+                "index_level_listed is 0 but surface_ssvi is {}. The surface is on the price index, \
+                 which only index_level_listed keeps: with surface_ssvi on, index_level_listed is 1.0.",
+                self.surface_ssvi));
+        }
+        for (name, v, lo, hi) in [
+            ("surface_skew_physical", self.surface_skew_physical, -10.0, 10.0),
+            ("surface_skew_physical_slope", self.surface_skew_physical_slope, -10.0, 10.0),
+            ("surface_skew_premium", self.surface_skew_premium, -10.0, 10.0),
+            ("surface_skew_premium_slope", self.surface_skew_premium_slope, -10.0, 10.0),
+            ("surface_curvature_exponent", self.surface_curvature_exponent, 0.0, 0.5),
+            ("surface_term_premium_short", self.surface_term_premium_short, -2.0, 2.0),
+            ("surface_term_premium_long", self.surface_term_premium_long, -2.0, 2.0),
+            ("surface_earnings_weight", self.surface_earnings_weight, 0.0, 10.0),
+            ("option_dealer_spread", self.option_dealer_spread, 0.0, 0.5),
+        ] {
+            if !(lo..=hi).contains(&v) {
+                return Err(format!("{name} is {v}. It is in [{lo}, {hi}]."));
+            }
+        }
+        if !(self.surface_curvature >= 0.0 && self.surface_curvature < 2.0) {
+            return Err(format!(
+                "surface_curvature is {}. It is the surface's eta, in [0, 2): at 2 or above no \
+                 correlation keeps every smile free of static arbitrage.",
+                self.surface_curvature));
+        }
+        for (name, v) in [
+            ("surface_skew_physical", self.surface_skew_physical),
+            ("surface_skew_physical_slope", self.surface_skew_physical_slope),
+            ("surface_skew_premium", self.surface_skew_premium),
+            ("surface_skew_premium_slope", self.surface_skew_premium_slope),
+            ("surface_curvature", self.surface_curvature),
+            ("surface_curvature_exponent", self.surface_curvature_exponent),
+            ("surface_term_premium_short", self.surface_term_premium_short),
+            ("surface_term_premium_long", self.surface_term_premium_long),
+            ("surface_earnings_weight", self.surface_earnings_weight),
+        ] {
+            if v != 0.0 && self.surface_ssvi == 0.0 {
+                return Err(format!(
+                    "surface_ssvi is 0 but {name} is {v}. It shapes the implied-volatility surface, \
+                     which only surface_ssvi keeps: set surface_ssvi to 1.0 first."));
+            }
+        }
+        if self.surface_earnings_weight != 0.0 && self.forecast_horizon_sessions == 0.0 {
+            return Err(format!(
+                "forecast_horizon_sessions is 0 but surface_earnings_weight is {}. A report's \
+                 variance is the forecast's expected variance of the name at the report: set \
+                 forecast_horizon_sessions first.",
+                self.surface_earnings_weight));
+        }
+        if self.options_index_listed != 0.0 && self.surface_ssvi == 0.0 {
+            return Err(format!(
+                "surface_ssvi is 0 but options_index_listed is {}. The dealer quotes every option \
+                 from the surface, which only surface_ssvi keeps: with options_index_listed on, \
+                 surface_ssvi is 1.0.",
+                self.options_index_listed));
+        }
+        if self.option_dealer_spread != 0.0 && self.options_index_listed == 0.0 && self.options_names_listed == 0.0 {
+            return Err(format!(
+                "options_index_listed is 0 but option_dealer_spread is {}, and options_names_listed \
+                 is 0 too. The spread is the options dealer's, which quotes only what those switches \
+                 list: set one of them to 1.0 first.",
+                self.option_dealer_spread));
+        }
+        if !(self.options_names_listed == 0.0 || self.options_names_listed == 1.0) {
+            return Err(format!(
+                "options_names_listed is {}. It is a switch, 0.0 off or 1.0 on.",
+                self.options_names_listed));
+        }
+        if self.options_names_listed != 0.0 && self.surface_ssvi == 0.0 {
+            return Err(format!(
+                "surface_ssvi is 0 but options_names_listed is {}. A name's smile takes the index \
+                 surface's curvature and its correlation, which only surface_ssvi keeps: with \
+                 options_names_listed on, surface_ssvi is 1.0.",
+                self.options_names_listed));
+        }
+        if self.options_names_listed != 0.0 && self.forecast_horizon_sessions == 0.0 {
+            return Err(format!(
+                "forecast_horizon_sessions is 0 but options_names_listed is {}. A name's surface is \
+                 the forecast's expected variance of the name: set forecast_horizon_sessions first.",
+                self.options_names_listed));
+        }
+        if !(0.0..=100.0).contains(&self.option_position_limit) {
+            return Err(format!(
+                "option_position_limit is {}. It is in [0, 100], multiples of the dealer's displayed \
+                 depth; 0 is no limit.",
+                self.option_position_limit));
+        }
+        if self.option_position_limit != 0.0 && self.options_index_listed == 0.0 && self.options_names_listed == 0.0 {
+            return Err(format!(
+                "options_index_listed is 0 but option_position_limit is {}, and options_names_listed \
+                 is 0 too. The limit is on listed options, which only those switches list: set one of \
+                 them to 1.0 first.",
+                self.option_position_limit));
+        }
+        for (name, v, lo, hi) in [
+            ("surface_name_premium", self.surface_name_premium, -0.5, 1.0),
+            ("surface_name_skew", self.surface_name_skew, 0.0, 1.0),
+        ] {
+            if !(lo..=hi).contains(&v) {
+                return Err(format!("{name} is {v}. It is in [{lo}, {hi}]."));
+            }
+            if v != 0.0 && self.options_names_listed == 0.0 {
+                return Err(format!(
+                    "options_names_listed is 0 but {name} is {v}. It shapes the names' surfaces, which \
+                     only options_names_listed keeps: set options_names_listed to 1.0 first."));
+            }
+        }
         if !(self.fear_greed_published_inputs == 0.0 || self.fear_greed_published_inputs == 1.0) {
             return Err(format!(
                 "fear_greed_published_inputs is {}. It is a switch: 0 (the index reads the \
@@ -13611,6 +13945,22 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "margin_scan_coverage",
     "margin_scan_tail",
     "night_session_steps",
+    "options_index_listed",
+    "surface_ssvi",
+    "surface_skew_physical",
+    "surface_skew_physical_slope",
+    "surface_skew_premium",
+    "surface_skew_premium_slope",
+    "surface_curvature",
+    "surface_curvature_exponent",
+    "surface_term_premium_short",
+    "surface_term_premium_long",
+    "surface_earnings_weight",
+    "option_dealer_spread",
+    "options_names_listed",
+    "surface_name_premium",
+    "surface_name_skew",
+    "option_position_limit",
 ];
 
 #[cfg(test)]
@@ -13841,6 +14191,22 @@ pub fn settable_names() -> Vec<&'static str> {
         "futures_oil_listed",
         "margin_scan_coverage",
         "margin_scan_tail",
+        "options_index_listed",
+        "surface_ssvi",
+        "surface_skew_physical",
+        "surface_skew_physical_slope",
+        "surface_skew_premium",
+        "surface_skew_premium_slope",
+        "surface_curvature",
+        "surface_curvature_exponent",
+        "surface_term_premium_short",
+        "surface_term_premium_long",
+        "surface_earnings_weight",
+        "option_dealer_spread",
+        "options_names_listed",
+        "surface_name_premium",
+        "surface_name_skew",
+        "option_position_limit",
         "fear_greed_published_inputs",
         "macro_publication_repricing",
         "treasury_10y_noise",

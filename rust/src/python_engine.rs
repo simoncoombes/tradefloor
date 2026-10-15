@@ -1575,6 +1575,9 @@ pub struct PyEngine {
     /// meeting schedule -- differently from the engine it forked from.
     day_count: u32,
     recorded_macro: Vec<crate::python_arrow::MacroRow>,
+    /// The listed contracts' rows, one per contract per recorded day, on a
+    /// model that lists futures (`futures_bars`); empty on every other.
+    recorded_futures: Vec<crate::python_arrow::FuturesBarRow>,
     /// Recorded order-book depth. Empty unless a caller asks for it.
     recorded_book: Vec<crate::python_arrow::BookRow>,
     /// Every input that crossed into this engine, in order.
@@ -1746,6 +1749,7 @@ impl PyEngine {
             // day it runs, which is the day being explained.
             copy.recorded.clear();
             copy.recorded_macro.clear();
+            copy.recorded_futures.clear();
             copy.recorded_book.clear();
             copy.day_buffer.clear();
             // And the draw log, which is the size of the tape. Without
@@ -1910,13 +1914,15 @@ impl PyEngine {
             )));
         }
         // A contract symbol goes to the core, which lists the contracts
-        // (`futures_index_listed`, `futures_vix_listed`) and says when one is
-        // not listed.
+        // (`futures_index_listed`, `futures_vix_listed`, the index options'
+        // `options_index_listed`) and says when one is not listed.
         let p = self.inner.params();
         let contract = (p.futures_index_listed != 0.0
             || p.futures_vix_listed != 0.0
             || p.futures_rates_listed != 0.0
-            || p.futures_oil_listed != 0.0)
+            || p.futures_oil_listed != 0.0
+            || p.options_index_listed != 0.0
+            || p.options_names_listed != 0.0)
             && crate::derivatives::ContractSymbol::parse(ticker).is_ok();
         if !self.tickers.iter().any(|t| t == ticker) && !contract {
             return Err(ValidationError::new_err(format!(
@@ -2131,6 +2137,7 @@ impl PyEngine {
             tickers,
             recorded: Vec::new(),
             recorded_macro: Vec::new(),
+            recorded_futures: Vec::new(),
             recorded_book: Vec::new(),
             log: Vec::new(),
             explanations: Explanations::default(),
@@ -4775,6 +4782,39 @@ impl PyEngine {
         self.inner.live_vix()
     }
 
+    /// Whether the model lists futures of any family
+    /// (`futures_index_listed`, `futures_vix_listed`, `futures_rates_listed`
+    /// or `futures_oil_listed`). A property of the model: True on a model
+    /// that lists VIX futures before its first close, while `contracts()` is
+    /// still empty. False on every shipped preset.
+    #[getter]
+    fn lists_futures(&self) -> bool {
+        self.inner.lists_futures()
+    }
+
+    /// Whether the model lists index options (`options_index_listed`): a
+    /// property of the model, as `lists_futures` is. False on every shipped
+    /// preset.
+    #[getter]
+    fn lists_options(&self) -> bool {
+        self.inner.lists_options()
+    }
+
+    /// Whether the model lists American options on its names
+    /// (`options_names_listed`): a property of the model, True before the
+    /// first close lists any. False on every shipped preset.
+    #[getter]
+    fn lists_name_options(&self) -> bool {
+        self.inner.lists_name_options()
+    }
+
+    /// The tickers whose options are listed now, in roster order
+    /// (`options_names_listed`): empty with the switch off and before the
+    /// first close. A read.
+    fn name_option_roots(&self) -> Vec<String> {
+        self.inner.name_option_roots()
+    }
+
     /// The forecast the last close computed (`forecast_horizon_sessions`), or
     /// None with the dial at 0 and before the first close. Entry `h - 1` of
     /// each list is the expectation `h` sessions ahead: `vix`, the published
@@ -4823,7 +4863,11 @@ impl PyEngine {
     /// `"average_policy_rate_at_close"`, `"compounded_policy_rate_at_close"`
     /// or `"oil_price_at_open"`)
     /// and `front` (the first of its family whose roll has not come; a rate
-    /// future's period in progress).
+    /// future's period in progress). Then the index options
+    /// (`options_index_listed`), by expiry, strike and right, `kind`
+    /// `"option"`, symbols such as `IDX.O0035.C1050.00`, with `right` (`"C"`
+    /// or `"P"`) and `strike` (index points) beside the rest; their `tick` is
+    /// the grid's smallest, 0.05.
     fn contracts<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyDict>>> {
         self.inner
             .contracts()
@@ -4839,6 +4883,11 @@ impl PyEngine {
                 d.set_item("tick", c.tick)?;
                 d.set_item("settlement", c.settlement.as_str())?;
                 d.set_item("front", c.front)?;
+                // An option's right and strike (`options_index_listed`).
+                if let (Some(right), Some(strike)) = (c.right, c.strike) {
+                    d.set_item("right", right.letter().to_string())?;
+                    d.set_item("strike", strike)?;
+                }
                 Ok(d)
             })
             .collect()
@@ -4874,7 +4923,22 @@ impl PyEngine {
     /// settlement, `premium` 0, `index` the oil price now and `rate` the
     /// mean policy rate expected to expiry. `expected`, `premium`
     /// and `loading` are None for an index future. A read.
+    ///
+    /// For an index option (`options_index_listed`) the dict is the dealer's
+    /// quote, as a row of `chain`, with `initial_margin` and
+    /// `maintenance_margin` the scan's on one short contract
+    /// (`margin_scan_coverage`) and `mark` None.
     fn quote<'py>(&self, py: Python<'py>, symbol: &str) -> PyResult<Bound<'py, PyDict>> {
+        if let Some(q) = self.inner.option_quote(symbol) {
+            let d = option_quote_dict(py, &q)?;
+            d.set_item("initial_margin", q.initial_margin)?;
+            d.set_item("maintenance_margin", q.maintenance_margin)?;
+            // The position limit (`option_position_limit`), only where one is set.
+            if let Some(limit) = self.inner.option_position_limit(symbol) {
+                d.set_item("position_limit", limit)?;
+            }
+            return Ok(d);
+        }
         let q = self.inner.quote(symbol).ok_or_else(|| {
             ValidationError::new_err(format!(
                 "{symbol:?} is not a listed contract: Engine.contracts() lists the ones that \
@@ -4908,14 +4972,26 @@ impl PyEngine {
         Ok(d)
     }
 
-    /// The contracts' final settlements made at the open of session `day`,
-    /// or every one so far with `day` None, in order: dicts with `symbol`,
+    /// The contracts' final settlements made at session `day`, or every
+    /// one so far with `day` None, in session order: dicts with `symbol`,
     /// `root`, `kind`, `session`, `value` (the settlement price) and
     /// `reference` (what it settles on, from which `value` is set: the index
     /// of the expiry session's opening prints for an index future, the
-    /// published VIX at the expiry open for a VIX future), in session order.
-    /// Empty with `futures_index_listed` and `futures_vix_listed` off. A
-    /// read.
+    /// published VIX at the expiry open for a VIX future, a name's closing
+    /// print for its options), and `event`, `"settlement"`. Empty with
+    /// every derivative switch off. A read.
+    ///
+    /// On a model that lists single-name options (`options_names_listed`)
+    /// the rows of a close also hold each exercise and assignment made at
+    /// it: `event` `"exercise"` or `"assignment"`, `agent` (the party: an
+    /// agent's label, or `"mm"`, the dealer), `quantity` (contracts),
+    /// `shares` (received, negative when delivered, 100 a contract) and
+    /// `cash` (received, negative when paid: the strike times the shares),
+    /// with `reference` the name's price at that close. A delisted name's
+    /// options are paid in cash at their intrinsic value: `event`
+    /// `"settlement"` with `agent` named, `quantity` the position and `cash`
+    /// what it is paid. Every other row has `agent` None and `quantity`,
+    /// `shares` and `cash` 0.
     #[pyo3(signature = (day = None))]
     fn settlements<'py>(&self, py: Python<'py>, day: Option<i64>) -> PyResult<Vec<Bound<'py, PyDict>>> {
         self.inner
@@ -4929,9 +5005,214 @@ impl PyEngine {
                 d.set_item("session", s.session)?;
                 d.set_item("value", s.value)?;
                 d.set_item("reference", s.reference)?;
+                d.set_item("event", s.event.as_str())?;
+                d.set_item("agent", s.agent.as_deref())?;
+                d.set_item("quantity", s.quantity)?;
+                d.set_item("shares", s.shares)?;
+                d.set_item("cash", s.cash)?;
                 Ok(d)
             })
             .collect()
+    }
+
+    /// Instruct the exercise of `quantity` contracts of `agent`'s long
+    /// position in the listed single-name option `symbol`
+    /// (`options_names_listed`) at the next close. The holder of a call pays
+    /// the strike for 100 shares a contract, the holder of a put delivers
+    /// 100 shares for it; each contract exercised is assigned to the short
+    /// positions pro rata, and `settlements(day)` holds both sides. Returns
+    /// the contracts now instructed for the close. Refused for an index
+    /// option (European), for a quantity that is not a positive number, and
+    /// for more than the position less what is already instructed. At the
+    /// close each instruction is exercised up to the long position held
+    /// then. Recorded in the order log.
+    fn exercise(&mut self, agent: &str, symbol: &str, quantity: f64) -> PyResult<f64> {
+        let out = self
+            .inner
+            .exercise(agent, symbol, quantity)
+            .map_err(crate::python_book::OrderError::new_err)?;
+        self.log.push(crate::python_log::LogEntry::Exercise {
+            agent: agent.to_string(),
+            symbol: symbol.to_string(),
+            quantity,
+        });
+        Ok(out)
+    }
+
+    /// The position limit on a listed option, contracts per agent
+    /// (`option_position_limit` times the dealer's displayed depth on one
+    /// side: 500 contracts of an index option, 200 of a name's): None with
+    /// the dial at 0.0 and for a symbol not listed. An order that would take
+    /// an agent's position, its waiting orders counted as filled, past it is
+    /// refused, unless it brings the position toward zero. A read.
+    fn position_limit(&self, symbol: &str) -> Option<f64> {
+        self.inner.option_position_limit(symbol)
+    }
+
+    /// Withdraw `agent`'s exercise instructions on `symbol` that wait for
+    /// the close. Returns the contracts withdrawn. Recorded in the order
+    /// log.
+    fn cancel_exercise(&mut self, agent: &str, symbol: &str) -> f64 {
+        self.log.push(crate::python_log::LogEntry::CancelExercise {
+            agent: agent.to_string(),
+            symbol: symbol.to_string(),
+        });
+        self.inner.cancel_exercise(agent, symbol)
+    }
+
+    /// The exercise instructions waiting for the next close, for one agent
+    /// or all, in arrival order: dicts with `agent`, `symbol` and
+    /// `quantity`. A read.
+    #[pyo3(signature = (agent = None))]
+    fn exercise_instructions<'py>(&self, py: Python<'py>, agent: Option<String>) -> PyResult<Vec<Bound<'py, PyDict>>> {
+        self.inner
+            .exercise_instructions(agent.as_deref())
+            .into_iter()
+            .map(|(agent, symbol, quantity)| {
+                let d = PyDict::new_bound(py);
+                d.set_item("agent", agent)?;
+                d.set_item("symbol", symbol)?;
+                d.set_item("quantity", quantity)?;
+                Ok(d)
+            })
+            .collect()
+    }
+
+    /// Construction rows AX1 and AX2 at the last close
+    /// (`options_names_listed`), as sentences, empty when they hold: each
+    /// exercise and assignment moves 100 shares a contract and the strike
+    /// times the shares in cash, the close's rows sum to nothing in every
+    /// contract; and, read between that close and the next open, every
+    /// early exercise of the dealer's is one its tree makes, a call's only
+    /// on the eve of an ex-date, every long it still holds is one its tree
+    /// holds, and every option held is worth at least the European on the
+    /// same tree. Refused with the switch off. A read.
+    fn exercise_violations(&self) -> PyResult<Vec<String>> {
+        self.inner.exercise_violations().ok_or_else(|| {
+            ValidationError::new_err("no single-name option is listed: options_names_listed is off".to_string())
+        })
+    }
+
+    /// The index options at one expiry (`options_index_listed`), as a list of
+    /// dicts by strike, the call before the put at each: `symbol`, `root`,
+    /// `kind` (`"option"`), `expiry`, `right` (`"C"` or `"P"`), `strike`;
+    /// `bid` and `ask`, the dealer's touch (None on a side it does not show,
+    /// a bid under one tick), `bid_size` and `ask_size`; `mid`, Black's price
+    /// at `iv`, the dealer's volatility, off the grid so a strike's call and
+    /// put mids meet put-call parity; `fair`, the price at `surface_iv`, the
+    /// surface's volatility without the dealer's inventory; `delta`,
+    /// `gamma` (per index point), `vega` (per unit of volatility) and
+    /// `theta` (per session) at `iv`; `forward`, `index`, `rate`
+    /// (fractional), `dividends` (index points) and `sessions_to_expiry`;
+    /// `multiplier` (100), `tick` (the grid at the mid), `open_interest`
+    /// (contracts); `initial_margin` and `maintenance_margin` None here
+    /// (`quote` and `option_margin` give them); and `mark`, None. Refused
+    /// with the switch off and for an expiry not listed. A read.
+    ///
+    /// A listed name's ticker as `root` reads its American options
+    /// (`options_names_listed`): `mid` and `fair` are a Leisen-Reimer
+    /// tree's values with the dividends to expiry, `delta` and `gamma` the
+    /// tree's per share, `vega` and `theta` the European's, `forward` the
+    /// escrowed price's, `index` the name's price, `dividends` per share,
+    /// and `multiplier` 100 shares. Each row prices a tree, so a chain reads
+    /// in tens of milliseconds.
+    fn chain<'py>(&self, py: Python<'py>, root: &str, expiry: i64) -> PyResult<Vec<Bound<'py, PyDict>>> {
+        let rows = self.inner.chain(root, expiry).ok_or_else(|| {
+            ValidationError::new_err(format!(
+                "no option chain on {root:?} at expiry {expiry}: Engine.contracts() lists the \
+                 options that trade, and none does with options_index_listed and \
+                 options_names_listed off"
+            ))
+        })?;
+        rows.iter().map(|q| option_quote_dict(py, q)).collect()
+    }
+
+    /// Every listed expiry of the index options (`options_index_listed`) as
+    /// a trader reads it off the chain now, in expiry order, a list of
+    /// dicts: `root`, `expiry` (the session it settles at, counted from 0),
+    /// `sessions_to_expiry`, `forward`, the strike grid (`strike_low` to
+    /// `strike_high` in steps of `strike_step`, index points), `atm_iv`, the
+    /// dealer's mid volatility at the forward, linear in log-moneyness
+    /// between the strikes either side; `put_25d_iv` and `call_25d_iv`, its
+    /// volatility where a put's delta is -0.25 and a call's 0.25, linear in
+    /// delta between the strikes either side; and `skew_25d`, the put's less
+    /// the call's. A volatility the grid does not reach, or on a chain with
+    /// no time left, is None. Empty with the switch off. A read.
+    #[pyo3(signature = (root = "IDX"))]
+    fn option_expiries<'py>(&self, py: Python<'py>, root: &str) -> PyResult<Vec<Bound<'py, PyDict>>> {
+        self.inner
+            .option_expiries(root)
+            .iter()
+            .map(|e| {
+                let d = PyDict::new_bound(py);
+                d.set_item("root", &e.root)?;
+                d.set_item("expiry", e.expiry)?;
+                d.set_item("sessions_to_expiry", e.sessions_to_expiry)?;
+                d.set_item("forward", e.forward)?;
+                d.set_item("strike_low", e.strike_low)?;
+                d.set_item("strike_high", e.strike_high)?;
+                d.set_item("strike_step", e.strike_step)?;
+                d.set_item("atm_iv", e.atm_iv)?;
+                d.set_item("put_25d_iv", e.put_25d_iv)?;
+                d.set_item("call_25d_iv", e.call_25d_iv)?;
+                d.set_item("skew_25d", e.skew_25d)?;
+                Ok(d)
+            })
+            .collect()
+    }
+
+    /// The implied-volatility surface on `root` now (`surface_ssvi`), a
+    /// `VolSurface`: `iv(k, t)` at log-moneyness `k = ln(K / F)` and `t`
+    /// sessions out, `total_variance`, `theta`, `forward(t)`, `rate(t)`,
+    /// `dividends(t)`, the Cboe formulas `strip_vix(t)` and `strip_skew(t)`,
+    /// and its parameters. Only `"IDX"`, the price index. Refused with the
+    /// switch off. A read.
+    ///
+    /// A listed name's ticker as `root` reads that name's surface
+    /// (`options_names_listed`): its term structure is the forecast's
+    /// expected variance of the name times `(1 + surface_name_premium)^2`,
+    /// the index's term premia and its own reports; its correlation is
+    /// `surface_name_skew` times the index's, at the index's curvature; its
+    /// `vix` and fit are the index's. `forward(t)` is the escrowed price's
+    /// forward and `dividends(t)` per share.
+    #[pyo3(signature = (root = "IDX"))]
+    fn surface(&self, root: &str) -> PyResult<PySurface> {
+        let surface = self.inner.surface(root).ok_or_else(|| {
+            ValidationError::new_err(format!(
+                "no surface on {root:?}: the engine keeps one on \"IDX\", the price index, with \
+                 surface_ssvi on, and one on each listed name with options_names_listed on"
+            ))
+        })?;
+        let name = root != "IDX";
+        let mut carry = Vec::new();
+        let last = surface.curve.knots.len() + 2;
+        for n in 0..=last {
+            let t = crate::mathx::max(0.0, n as f64 - surface.curve.elapsed);
+            let c = if name { self.inner.name_carry(root, t) } else { self.inner.surface_carry(t) };
+            carry.push(c.unwrap_or((f64::NAN, f64::NAN, f64::NAN)));
+        }
+        Ok(PySurface { inner: surface, carry })
+    }
+
+    /// The scan's initial margin on a portfolio of index options, dollars
+    /// (`margin_scan_coverage`): `positions` as `(symbol, signed contracts)`
+    /// pairs, symbols not listed left out. The worst loss over seven index
+    /// moves sized to the coverage's quantile of the index's one-session sd
+    /// at the VIX, each at three implied-volatility shifts; a long option
+    /// asks at most its premium and offsetting positions net. None with
+    /// margin or options off. A read.
+    fn option_margin(&self, positions: Vec<(String, f64)>) -> Option<f64> {
+        self.inner.option_margin(&positions)
+    }
+
+    /// Static-arbitrage violations on every listed option chain now (row
+    /// SV2), and the surface's own conditions: a list of sentences, empty
+    /// when there are none. Refused with `options_index_listed` off. A read.
+    #[pyo3(signature = (root = "IDX"))]
+    fn option_arbitrage(&self, root: &str) -> PyResult<Vec<String>> {
+        self.inner.option_arbitrage(root).ok_or_else(|| {
+            ValidationError::new_err("no option chain is listed: options_index_listed is off".to_string())
+        })
     }
 
     /// Walk the night session for index futures (`night_session_steps`),
@@ -5282,6 +5563,30 @@ impl PyEngine {
             fear_greed_index: e.fear_greed_index,
             universe_stress: self.inner.universe_stress(),
         });
+        // The listed contracts as they stand, on a model that lists futures
+        // only: `contracts` and `quote` are reads, so recording moves
+        // nothing, and every other model records what it did.
+        if self.inner.lists_futures() {
+            for c in self.inner.contracts().into_iter().filter(|c| c.kind.is_future()) {
+                let Some(q) = self.inner.quote(&c.symbol) else { continue };
+                self.recorded_futures.push(crate::python_arrow::FuturesBarRow {
+                    day,
+                    symbol: c.symbol.clone(),
+                    root: c.root.clone(),
+                    expiry: c.expiry,
+                    front: c.front,
+                    price: q.price,
+                    fair: q.fair,
+                    basis_bp: q.basis_bp,
+                    bid: q.bid,
+                    ask: q.ask,
+                    mark: q.mark,
+                    index: q.index,
+                    sessions_to_expiry: q.sessions_to_expiry,
+                    initial_margin: q.initial_margin,
+                });
+            }
+        }
         Ok(())
     }
 
@@ -5289,6 +5594,7 @@ impl PyEngine {
     fn clear_recording(&mut self) {
         self.recorded.clear();
         self.recorded_macro.clear();
+        self.recorded_futures.clear();
         self.recorded_book.clear();
     }
 
@@ -5710,6 +6016,86 @@ impl PyEngine {
         Ok(crate::python_arrow::PyArrowStream::new(
             "macro",
             crate::python_arrow::macro_schema(),
+            vec![batch],
+        ))
+    }
+
+    /// The `futures_bars` table (pt-v22 phase 1): one row per listed
+    /// contract per recorded day, read at `record`. Every day loop in the
+    /// package records after the day's last session and before its close,
+    /// so `price` is the contract's price at the day's last print, `fair`
+    /// its fair value then, `basis_bp` the gap in basis points, `bid` and
+    /// `ask` its book's touch, `mark` the previous close's settlement mark,
+    /// `index` what `fair` reads, `sessions_to_expiry`, and
+    /// `initial_margin`, dollars a contract as the last close set it.
+    /// Nullable where a quote's field is None. `day = N` is that recorded
+    /// day alone. Empty on a model that lists no futures, which is every
+    /// shipped preset. The schema's `schema_version` metadata key is "1".
+    #[pyo3(signature = (day = None))]
+    fn futures_bars(&self, day: Option<u32>) -> PyResult<crate::python_arrow::PyArrowStream> {
+        let rows: Vec<&crate::python_arrow::FuturesBarRow> =
+            self.recorded_futures.iter().filter(|r| day.is_none_or(|d| r.day == d)).collect();
+        let batch = crate::python_arrow::futures_bars_batch(&rows).map_err(crate::python_arrow::arrow_err)?;
+        Ok(crate::python_arrow::PyArrowStream::new(
+            "futures_bars",
+            crate::python_arrow::futures_bars_schema(),
+            vec![batch],
+        ))
+    }
+
+    /// The `settlements` table (pt-v22 phase 1): `Engine.settlements(day)`
+    /// as Arrow, one row per final settlement in session order, with
+    /// `session`, `symbol`, `root`, `kind`, `value` and `reference`, and a
+    /// single-name option's exercises and assignments (`event`, `agent`,
+    /// `quantity`, `shares`, `cash`, as `settlements` gives them). Read
+    /// from the engine, not from a recording, so it holds every settlement
+    /// the run has made. Empty on a model that lists no futures. The
+    /// schema's `schema_version` metadata key is "1".
+    #[pyo3(signature = (day = None))]
+    fn settlements_table(&self, day: Option<i64>) -> PyResult<crate::python_arrow::PyArrowStream> {
+        let rows = self.inner.settlements(day);
+        let batch = crate::python_arrow::settlements_batch(&rows).map_err(crate::python_arrow::arrow_err)?;
+        Ok(crate::python_arrow::PyArrowStream::new(
+            "settlements",
+            crate::python_arrow::settlements_schema(),
+            vec![batch],
+        ))
+    }
+
+    /// The `option_quotes` table (pt-v22 phase 2): the index options'
+    /// chains now as Arrow, every listed expiry's in expiry order, or
+    /// `expiry`'s alone, each by strike, the call before the put, as
+    /// `chain` quotes them. `day` is the engine's day count when read, so
+    /// tables read at successive closes stack into a history. Read now, not
+    /// recorded: a chain is several hundred contracts. Empty on a model that
+    /// lists no options, which is every shipped preset; an expiry not listed
+    /// is refused. The schema's `schema_version` metadata key is "1".
+    ///
+    /// A listed name's ticker as `root` reads its options
+    /// (`options_names_listed`), each row a tree's quote (see `chain`), so a
+    /// whole name's table prices a few hundred trees.
+    #[pyo3(signature = (root = "IDX", expiry = None))]
+    fn chain_table(&self, root: &str, expiry: Option<i64>) -> PyResult<crate::python_arrow::PyArrowStream> {
+        let mut rows = Vec::new();
+        if (root == "IDX" && self.inner.lists_options()) || (root != "IDX" && self.inner.lists_name_options()) {
+            let expiries: Vec<i64> = match expiry {
+                Some(x) => vec![x],
+                None => self.inner.option_expiries(root).iter().map(|e| e.expiry).collect(),
+            };
+            for x in expiries {
+                rows.extend(self.inner.chain(root, x).ok_or_else(|| {
+                    ValidationError::new_err(format!(
+                        "no option chain on {root:?} at expiry {x}: Engine.option_expiries() lists the \
+                         expiries that trade"
+                    ))
+                })?);
+            }
+        }
+        let batch = crate::python_arrow::option_quotes_batch(self.day_count, &rows)
+            .map_err(crate::python_arrow::arrow_err)?;
+        Ok(crate::python_arrow::PyArrowStream::new(
+            "option_quotes",
+            crate::python_arrow::option_quotes_schema(),
             vec![batch],
         ))
     }
@@ -6382,4 +6768,180 @@ pub fn stationary_sigma(
         )));
     }
     Ok(crate::mispricing::stationary_sigma(phi, theta, innovation_sigma))
+}
+
+/// An index option's quote as the dict `Engine.chain` rows and
+/// `Engine.quote` read.
+fn option_quote_dict<'py>(py: Python<'py>, q: &crate::derivatives::OptionQuote) -> PyResult<Bound<'py, PyDict>> {
+    let d = PyDict::new_bound(py);
+    d.set_item("symbol", &q.symbol)?;
+    d.set_item("root", &q.root)?;
+    d.set_item("kind", "option")?;
+    d.set_item("expiry", q.expiry)?;
+    d.set_item("right", q.right.letter().to_string())?;
+    d.set_item("strike", q.strike)?;
+    d.set_item("bid", q.bid)?;
+    d.set_item("ask", q.ask)?;
+    d.set_item("bid_size", q.bid_size)?;
+    d.set_item("ask_size", q.ask_size)?;
+    d.set_item("mid", q.mid)?;
+    d.set_item("fair", q.fair)?;
+    d.set_item("iv", q.iv)?;
+    d.set_item("surface_iv", q.surface_iv)?;
+    d.set_item("delta", q.greeks.delta)?;
+    d.set_item("gamma", q.greeks.gamma)?;
+    d.set_item("vega", q.greeks.vega)?;
+    d.set_item("theta", q.greeks.theta)?;
+    d.set_item("forward", q.forward)?;
+    d.set_item("index", q.index)?;
+    d.set_item("rate", q.rate)?;
+    d.set_item("dividends", q.dividends)?;
+    d.set_item("sessions_to_expiry", q.sessions_to_expiry)?;
+    d.set_item("multiplier", q.multiplier)?;
+    d.set_item("tick", q.tick)?;
+    d.set_item("open_interest", q.open_interest)?;
+    d.set_item("initial_margin", py.None())?;
+    d.set_item("maintenance_margin", py.None())?;
+    d.set_item("mark", py.None())?;
+    Ok(d)
+}
+
+/// An implied-volatility surface (`Engine.surface`), fixed at the moment it
+/// was read: `t` is sessions from then, `k` the log-moneyness `ln(K / F)` on
+/// the forward to `t`.
+#[pyclass(name = "VolSurface", module = "tradefloor._core", frozen)]
+pub struct PySurface {
+    inner: crate::derivatives::Surface,
+    /// `(forward, rate, dividends)` at whole sessions from the knots' origin.
+    carry: Vec<(f64, f64, f64)>,
+}
+
+impl PySurface {
+    fn carry_at(&self, t: f64) -> (f64, f64, f64) {
+        let n = (t + self.inner.curve.elapsed).round();
+        let i = if n.is_finite() && n > 0.0 { std::cmp::min(n as usize, self.carry.len() - 1) } else { 0 };
+        let (_, rate, dividends) = self.carry[i];
+        // The forward to `t` exactly, on the carry of the session it reaches.
+        let index = self.carry[0].0 + self.carry[0].2;
+        let index = if index.is_finite() { index } else { f64::NAN };
+        (
+            (index - dividends) * crate::mathx::exp(rate * crate::mathx::max(0.0, t) / 252.0),
+            rate,
+            dividends,
+        )
+    }
+}
+
+#[pymethods]
+impl PySurface {
+    /// The underlying's root.
+    #[getter]
+    fn root(&self) -> String {
+        self.inner.root.clone()
+    }
+
+    /// The VIX the 21-session point was fitted to.
+    #[getter]
+    fn vix(&self) -> f64 {
+        self.inner.vix
+    }
+
+    /// SSVI's correlation, curvature and curvature exponent.
+    #[getter]
+    fn rho(&self) -> f64 {
+        self.inner.ssvi.rho
+    }
+
+    #[getter]
+    fn eta(&self) -> f64 {
+        self.inner.ssvi.eta
+    }
+
+    #[getter]
+    fn gamma(&self) -> f64 {
+        self.inner.ssvi.gamma
+    }
+
+    /// The risk-neutral skewness the 21-session strip was fitted to, None
+    /// for a flat smile; whether the fit reached it; and the Cboe SKEW
+    /// index the fitted strip reads.
+    #[getter]
+    fn skewness_target(&self) -> Option<f64> {
+        self.inner.skewness_target
+    }
+
+    #[getter]
+    fn reached(&self) -> bool {
+        self.inner.fit.reached
+    }
+
+    #[getter]
+    fn skew(&self) -> f64 {
+        self.inner.fit.moments.skew_index()
+    }
+
+    /// The share of the session in progress already run when it was read.
+    #[getter]
+    fn elapsed(&self) -> f64 {
+        self.inner.curve.elapsed
+    }
+
+    /// The at-the-money total variance `t` sessions out.
+    fn theta(&self, t: f64) -> f64 {
+        self.inner.theta(t)
+    }
+
+    /// Total implied variance at log-moneyness `k`, `t` sessions out.
+    fn total_variance(&self, k: f64, t: f64) -> f64 {
+        self.inner.total_variance(k, t)
+    }
+
+    /// Implied volatility, a fraction a year, at log-moneyness `k`, `t`
+    /// sessions out.
+    fn iv(&self, k: f64, t: f64) -> f64 {
+        self.inner.iv(k, t)
+    }
+
+    /// The index's forward `t` sessions out, `(S - PV(D)) e^{r t / 252}`.
+    fn forward(&self, t: f64) -> f64 {
+        self.carry_at(t).0
+    }
+
+    /// The mean policy rate the forecast expects to `t`, a fraction a year.
+    fn rate(&self, t: f64) -> f64 {
+        self.carry_at(t).1
+    }
+
+    /// The dividends' present value before `t`, index points.
+    fn dividends(&self, t: f64) -> f64 {
+        self.carry_at(t).2
+    }
+
+    /// The Cboe VIX formula on the strip `t` sessions out, volatility points.
+    fn strip_vix(&self, t: f64) -> Option<f64> {
+        self.inner.strip(t).map(|m| m.vix)
+    }
+
+    /// The Cboe SKEW index on the strip `t` sessions out.
+    fn strip_skew(&self, t: f64) -> Option<f64> {
+        self.inner.strip(t).map(|m| m.skew_index())
+    }
+
+    /// Gatheral and Jacquier's conditions at every knot: None when they all
+    /// hold, else the first that fails.
+    fn check(&self) -> Option<String> {
+        self.inner.check().err()
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "VolSurface(root={:?}, vix={:.4}, rho={:.4}, eta={}, gamma={}, skew={:.2})",
+            self.inner.root,
+            self.inner.vix,
+            self.inner.ssvi.rho,
+            self.inner.ssvi.eta,
+            self.inner.ssvi.gamma,
+            self.inner.fit.moments.skew_index()
+        )
+    }
 }

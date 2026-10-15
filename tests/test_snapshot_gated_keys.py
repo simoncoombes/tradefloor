@@ -179,6 +179,10 @@ CASES = {
     "oil_futures": (dict(futures_oil_listed=1.0), ("oil_futures",), (), (), {}),
     # The contracts' margin, carried whenever its dial is set.
     "margin": (dict(futures_oil_listed=1.0, margin_scan_coverage=0.99), ("oil_futures", "margin"), (), (), {}),
+    # The index options and the surface's clock, carried whenever the
+    # surface's switch is set.
+    "options": (dict(index_level_listed=1.0, surface_ssvi=1.0, options_index_listed=1.0,
+                     option_dealer_spread=0.004), ("index_divisor", "options"), (), (), {}),
     # Credit's own state and its key, stepped every session on its own draws.
     "spread_noise": (dict(corporate_spread_noise_sd=0.025, corporate_spread_noise_half_life=16.0,
                           corporate_yield_daily=1.0),

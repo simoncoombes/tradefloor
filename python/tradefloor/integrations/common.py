@@ -137,8 +137,11 @@ OBSERVABLE_MACRO = MACRO_FIELDS
 #: The sides a decision may name. HOLD carries no quantity and produces no
 #: order, so the agent can decline a decision period. CANCEL carries no
 #: quantity either: it withdraws every limit order still waiting on the
-#: symbol, the :class:`tradefloor.Cancel` a Python agent returns.
-SIDES = ("BUY", "SELL", "HOLD", "CANCEL")
+#: symbol, the :class:`tradefloor.Cancel` a Python agent returns. EXERCISE
+#: (decision schema 3, pt-v22 phase 3) exercises ``quantity`` contracts of a
+#: single-name option held, at the session's close, the
+#: :class:`tradefloor.Exercise` a Python agent returns.
+SIDES = ("BUY", "SELL", "HOLD", "CANCEL", "EXERCISE")
 
 #: The order types an action may name. ``"market"`` sweeps the book now;
 #: ``"limit"`` is a :class:`tradefloor.Limit` and needs a ``limit_price``.
@@ -171,7 +174,20 @@ MAX_PARTICIPATION = 0.02
 #: while the rest of the decision trades. Version 1 was market orders only,
 #: and one bad action refused the whole decision. Fixed for the 0.8.x line
 #: (``docs/SUPPORT.md``).
-DECISION_SCHEMA_VERSION = "2"
+#:
+#: Version 3 (pt-v22 phase 1): an action's ``symbol`` may name a listed
+#: future (``IDX.F0119``, ``Engine.contracts()``), its ``quantity`` then
+#: counted in contracts and capped at ``MAX_PARTICIPATION`` of the
+#: contract's stated daily volume. The shape is version 2's: no field is
+#: added, and a decision valid under 2 is valid and means the same under 3.
+#: From pt-v22 phase 2 a symbol may also name a listed index option
+#: (``IDX.O0035.C1050.00``), counted in contracts. An option has no daily
+#: volume to cap it at: its dealer fills at most the ladder it shows, ten
+#: levels of 50 contracts a side, and the leverage limit applies. From
+#: phase 3 it may name a listed single-name option (``ACME.O0035.C42.50``),
+#: and the side ``EXERCISE`` exercises ``quantity`` contracts of one held at
+#: the close. A decision valid under version 2 is valid and means the same.
+DECISION_SCHEMA_VERSION = "3"
 
 #: Version of the observation payload :func:`serialize_observation` builds
 #: and every adapter shows its framework. Stamped into every saved
@@ -189,13 +205,24 @@ DECISION_SCHEMA_VERSION = "2"
 #: earnings calendar. pt-v21, the default from 0.10.0, does both. On every
 #: other model the payload is version 1's to the byte, so a version-1
 #: recording still replays there (`REPLAYABLE_SCHEMA_VERSIONS`).
-OBSERVATION_SCHEMA_VERSION = "2"
+#:
+#: Version 3 (pt-v22 phase 1) adds three top-level keys, `index`,
+#: `futures` and `margin`, on a model that lists futures (any of
+#: `futures_index_listed`, `futures_vix_listed`, `futures_rates_listed`,
+#: `futures_oil_listed`), and nothing else. From pt-v22 phase 2 a model that
+#: lists index options (`options_index_listed`) adds `options`, a summary
+#: of each listed expiry and the options held, with `index` and `margin`.
+#: No shipped preset lists any, so on every shipped preset the payload is
+#: version 2's (or 1's) to the byte.
+OBSERVATION_SCHEMA_VERSION = "3"
 
-#: The recorded payload versions a replay looks up. Version 2 only adds
-#: keys, and only on a model with dividends or the earnings calendar, so a
-#: version-1 recording's keys are still the digests of what this build sends
-#: on any model without them; on one with them the lookup misses and says so.
-REPLAYABLE_SCHEMA_VERSIONS = ("1", "2")
+#: The recorded payload versions a replay looks up. Versions 2 and 3 only
+#: add keys, each only on a model with what the keys describe (dividends or
+#: the earnings calendar; listed futures or options), so an older
+#: recording's keys are
+#: still the digests of what this build sends on any model without them; on
+#: one with them the lookup misses and says so.
+REPLAYABLE_SCHEMA_VERSIONS = ("1", "2", "3")
 
 
 # -- errors -------------------------------------------------------------------
@@ -528,7 +555,8 @@ class Action:
         return out
 
     def signed(self) -> float:
-        """The share delta this action asks for. HOLD and CANCEL are zero."""
+        """The share delta this action asks for. HOLD, CANCEL and EXERCISE
+        are zero: an exercise trades nothing now."""
         if self.side == "BUY":
             return self.quantity
         if self.side == "SELL":
@@ -541,6 +569,8 @@ class Action:
     def __repr__(self) -> str:
         if self.side in ("HOLD", "CANCEL"):
             return f"{self.side} {self.symbol}"
+        if self.side == "EXERCISE":
+            return f"EXERCISE {self.quantity:,.0f} {self.symbol}"
         if self.limit_price is not None:
             return (f"{self.side} {self.quantity:,.0f} {self.symbol} "
                     f"limit {self.limit_price:g}")
@@ -636,14 +666,33 @@ def decision_schema() -> dict[str, Any]:
                     "type": "object",
                     "additionalProperties": False,
                     "properties": {
-                        "symbol": {"type": "string", "minLength": 1},
+                        "symbol": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "A ticker from the observation's "
+                                           "assets, or on a model that "
+                                           "lists futures a contract "
+                                           "symbol from its futures, such "
+                                           "as IDX.F0119, or on one that "
+                                           "lists options an option's "
+                                           "symbol, ROOT.Onnnn.Rk.cc, such "
+                                           "as IDX.O0035.C1050.00 (the "
+                                           "1050 call settling at session "
+                                           "35) or ACME.O0035.C42.50 (an "
+                                           "option on the name ACME).",
+                        },
                         "side": {"enum": list(SIDES)},
                         "quantity": {
                             "type": "number",
                             "minimum": 0,
-                            "description": "Shares, non-negative. The side "
+                            "description": "Shares, or contracts for a "
+                                           "future or an option; "
+                                           "non-negative. The side "
                                            "carries the direction. Omit or "
-                                           "zero for HOLD and CANCEL.",
+                                           "zero for HOLD and CANCEL. For "
+                                           "EXERCISE, the contracts of a "
+                                           "single-name option held to "
+                                           "exercise at the close.",
                         },
                         "order_type": {
                             "enum": list(ORDER_TYPES),
@@ -735,7 +784,8 @@ def decision_model() -> Any:
         model_config = pydantic.ConfigDict(extra="forbid")
 
         symbol: str = pydantic.Field(
-            min_length=props["symbol"]["minLength"])
+            min_length=props["symbol"]["minLength"],
+            description=props["symbol"]["description"])
         side: Side
         # allow_inf_nan=False, explicitly: pydantic's default admits an
         # INFINITE quantity through a field whose schema says minimum 0,
@@ -1003,10 +1053,11 @@ def _action_from_item(i: int, item: Any, action_type: type) -> Action:
         raise DecisionError(
             f"action {i} has no usable 'symbol': {item.get('symbol')!r}")
     side = item.get("side")
-    if not isinstance(side, str) or side.upper() not in SIDES:
+    sides = getattr(action_type, "_sides", SIDES)
+    if not isinstance(side, str) or side.upper() not in sides:
         raise DecisionError(
             f"action {i} names side {side!r}, which is not one of "
-            f"{', '.join(SIDES)}")
+            f"{', '.join(sides)}")
     side = side.upper()
 
     # Refused, never dropped. A stop loss, a take profit or a time in force
@@ -1039,6 +1090,11 @@ def _action_from_item(i: int, item: Any, action_type: type) -> Action:
             "side carries the direction, so a sell is SELL with a positive "
             "quantity. A negative one is ambiguous about which of the two "
             "the model meant.")
+    if side == "EXERCISE" and not quantity:
+        raise DecisionError(
+            f"action {i} is an EXERCISE with no quantity. EXERCISE names the "
+            "contracts of a single-name option held to exercise at the close, "
+            "a positive number.")
     if side in ("HOLD", "CANCEL") and quantity:
         what = ("means no trade" if side == "HOLD"
                 else "withdraws the limit orders waiting on the symbol")
@@ -1073,6 +1129,10 @@ def _action_from_item(i: int, item: Any, action_type: type) -> Action:
                 f"action {i} has order_type 'market' and a limit_price. The "
                 "two fields ask for different orders, and executing either "
                 "would ignore the other.")
+    elif side == "EXERCISE" and order_type is not None:
+        raise DecisionError(
+            f"action {i} is an EXERCISE with order_type {order_type!r}. An "
+            "exercise is not an order: it takes no order type.")
     elif order_type == "limit":
         raise DecisionError(
             f"action {i} has order_type 'limit' and no limit_price. A limit "
@@ -1115,16 +1175,33 @@ def _orders_from(decision: Decision, obs: Any, *, max_participation: float,
                  ) -> tuple[dict[str, Any], list[str]]:
     """:func:`orders_from`, with the class an unlisted symbol raises as a
     parameter, so the FinRobot adapter raises its own."""
-    from ..portfolio import Cancel, Limit
+    from ..portfolio import Cancel, Exercise, Limit, is_name_option
 
     listed = list(obs.tickers)
+    # The futures listed now, by symbol, with the daily volume each one's
+    # book is sized to (decision schema 3); empty, asking the engine
+    # nothing, on a model that lists none.
+    contracts = _listed_contracts(obs.engine)
+    # Whether index or single-name options are listed (pt-v22 phases 2 and
+    # 3): a symbol then may name one, which the engine is asked about only
+    # when one is named.
+    options = _lists_options(obs.engine) or _lists_name_options(obs.engine)
     orders: dict[str, Any] = {}
     notes: list[str] = []
 
     for action in decision.actions:
-        if action.symbol not in listed:
+        option = (options and action.symbol not in listed
+                  and _listed_option(obs.engine, action.symbol))
+        if (action.symbol not in listed and action.symbol not in contracts
+                and not option):
             message = (f"{action.symbol!r} is not listed in this market. The "
-                       f"universe is {', '.join(listed)}.")
+                       f"universe is {', '.join(listed)}."
+                       + (f" The futures listed are {', '.join(contracts)}."
+                          if contracts else "")
+                       + (" The options listed are each expiry's strikes in "
+                          "the payload's options, named ROOT.Onnnn.Rk.cc "
+                          "(IDX.O0035.C1050.00)."
+                          if options else ""))
             if refused is None:
                 raise unlisted(message)
             refused.append({"action": action.as_dict(), "reason": message})
@@ -1132,8 +1209,27 @@ def _orders_from(decision: Decision, obs: Any, *, max_participation: float,
         if action.side == "CANCEL":
             orders[action.symbol] = Cancel()
             continue
+        if action.side == "EXERCISE":
+            if not (option and is_name_option(action.symbol)):
+                message = (f"{action.symbol!r} cannot be exercised: EXERCISE "
+                           "names a listed single-name option held, such as "
+                           "ACME.O0035.C42.50. An index option is European "
+                           "and settles in cash at expiry.")
+                if refused is None:
+                    raise unlisted(message)
+                refused.append({"action": action.as_dict(), "reason": message})
+                continue
+            orders[action.symbol] = Exercise(action.quantity)
+            continue
         delta = action.signed()
         if not delta:
+            continue
+        if option:
+            # No daily volume to take a share of: the dealer's ladder fills
+            # what it shows and the leverage limit decides the rest.
+            if abs(delta) >= 1.0:
+                orders[action.symbol] = (delta if action.limit_price is None
+                                         else Limit(delta, action.limit_price))
             continue
         # A cap of zero IS a cap. `if cap > 0` once read "no volume to
         # participate in" as "no cap at all": with avg_volume or
@@ -1142,10 +1238,14 @@ def _orders_from(decision: Decision, obs: Any, *, max_participation: float,
         # agent max_order_shares of exactly 0.0 -- the observation and the
         # enforcement stating opposite things. Clipped to zero, the order
         # falls out as dust below and the note says what happened.
-        cap = max(0.0, max_participation * obs.avg_volume(action.symbol))
+        if action.symbol in contracts:
+            volume, unit = contracts[action.symbol], "contracts"
+        else:
+            volume, unit = obs.avg_volume(action.symbol), "shares"
+        cap = max(0.0, max_participation * volume)
         if abs(delta) > cap:
             notes.append(
-                f"{action.symbol}: asked for {abs(delta):,.0f} shares, "
+                f"{action.symbol}: asked for {abs(delta):,.0f} {unit}, "
                 f"clipped to {cap:,.0f} ({max_participation:.1%} of average "
                 "daily volume)")
             delta = cap if delta > 0 else -cap
@@ -1160,10 +1260,11 @@ def recorded_orders(orders: dict[str, Any]) -> dict[str, Any]:
 
     A market order stays a signed share count, as every record before
     decision schema 2 holds it. A limit order becomes
-    ``{"quantity": <signed shares>, "limit_price": <price>}`` and a cancel
-    becomes ``{"cancel": True}``.
+    ``{"quantity": <signed shares>, "limit_price": <price>}``, a cancel
+    becomes ``{"cancel": True}`` and an exercise ``{"exercise":
+    <contracts>}``.
     """
-    from ..portfolio import Cancel, Limit
+    from ..portfolio import Cancel, Exercise, Limit
 
     out: dict[str, Any] = {}
     for symbol, order in orders.items():
@@ -1172,6 +1273,8 @@ def recorded_orders(orders: dict[str, Any]) -> dict[str, Any]:
                            "limit_price": order.price}
         elif isinstance(order, Cancel):
             out[symbol] = {"cancel": True}
+        elif isinstance(order, Exercise):
+            out[symbol] = {"exercise": order.quantity}
         else:
             out[symbol] = order
     return out
@@ -1197,6 +1300,225 @@ def _dividends_paid(engine: Any) -> list[float] | None:
         except Exception:
             return None
     return list(engine.dividends_today()) if on else None
+
+
+def _lists_futures(engine: Any) -> bool:
+    """Whether the model lists futures (``Engine.lists_futures``), from a
+    :class:`~tradefloor.sandbox.MarketView` or a live engine; False on an
+    engine without the property, a test proxy say."""
+    try:
+        return bool(engine.lists_futures)
+    except AttributeError:
+        return False
+
+
+def _lists_options(engine: Any) -> bool:
+    """Whether the model lists index options (``Engine.lists_options``),
+    from a :class:`~tradefloor.sandbox.MarketView` or a live engine; False
+    on an engine without the property."""
+    try:
+        return bool(engine.lists_options)
+    except AttributeError:
+        return False
+
+
+def _lists_name_options(engine: Any) -> bool:
+    """Whether the model lists single-name options
+    (``Engine.lists_name_options``), from a
+    :class:`~tradefloor.sandbox.MarketView` or a live engine; False on an
+    engine without the property."""
+    try:
+        return bool(engine.lists_name_options)
+    except AttributeError:
+        return False
+
+
+def _listed_option(engine: Any, symbol: str) -> bool:
+    """Whether ``symbol`` names an index or single-name option the engine
+    lists now."""
+    from ..contracts import is_contract, parse
+
+    if not is_contract(symbol) or parse(symbol)["kind"] != "option":
+        return False
+    try:
+        engine.quote(symbol)
+    except ValidationError:
+        return False
+    return True
+
+
+def _listed_contracts(engine: Any) -> dict[str, float]:
+    """The futures listed now, symbol to the daily volume (contracts) each
+    one's book is sized to, in the engine's order; empty on a model that
+    lists none, which asks the engine nothing beyond the flag. The index
+    options are not among them: an option has no daily volume."""
+    if not _lists_futures(engine):
+        return {}
+    return {c["symbol"]: float(engine.quote(c["symbol"])["daily_volume"])
+            for c in engine.contracts() if c["kind"] == "future"}
+
+
+def derivatives_payload(obs: Any, *,
+                        max_participation: float = MAX_PARTICIPATION,
+                        ) -> dict[str, Any]:
+    """The observation payload's derivative keys, version 3: ``index``,
+    ``futures`` and ``margin`` on a model that lists futures; ``index``,
+    ``margin`` and ``options`` on one that lists index options; all four on
+    one that lists both; and an empty dict on every other model, so its
+    payload is the one version 2 sent.
+
+    ``index`` is the price index (``index_level_listed``) as ``level`` now
+    and ``close`` at the last close, or None on a model without it.
+
+    ``futures`` lists each future the engine lists now, in its order:
+    ``symbol``, ``root``, ``expiry`` (the session it settles at),
+    ``sessions_to_expiry``, ``front``, ``settlement`` (what it settles on),
+    ``price``, ``fair``, ``basis_bp``, ``mark`` (the last close's settlement
+    mark), ``best_bid``, ``best_ask``, ``underlying`` (what ``fair`` reads:
+    the index, the VIX, the policy rate or oil), ``rate`` and ``dividends``
+    (the carry ``fair`` holds), ``expected`` and ``premium`` (a VIX, rate or
+    oil future's expected settlement and premium, None for an index
+    future), ``multiplier`` (dollars a point), ``tick``, ``daily_volume``
+    and ``max_order_contracts`` (contracts), ``initial_margin`` and
+    ``maintenance_margin`` (dollars a contract), and ``position``
+    (contracts held, signed). Every value is the engine's quote, which reads
+    public state only.
+
+    ``margin`` is the account's: ``initial`` and ``maintenance`` (dollars
+    the futures and options held ask), ``excess`` (net worth less
+    ``initial``) and ``call`` (the margin call the last close made and the
+    next open decides, or None). None for a portfolio that cannot say.
+
+    ``options`` summarises the index options (pt-v22 phase 2) in two lists,
+    so the payload stays small; ``Engine.chain`` and the MCP server's
+    ``option_chain`` give whole chains. ``expiries``, one entry per listed
+    expiry in expiry order, as ``Engine.option_expiries`` reads it off the
+    chain: ``root``, ``expiry``, ``sessions_to_expiry``, ``forward``, the
+    strike grid (``strike_low`` to ``strike_high`` by ``strike_step``),
+    ``atm_iv`` (the dealer's volatility at the forward), ``put_25d_iv`` and
+    ``call_25d_iv`` (where a put's delta is -0.25 and a call's 0.25) and
+    ``skew_25d`` (the put's less the call's), volatilities a fraction a
+    year and None where the grid does not reach. ``positions``, one entry
+    per option held, by symbol: ``symbol``, ``expiry``, ``right``,
+    ``strike``, ``quantity`` (contracts, signed), ``cost`` (the average
+    premium paid a contract), ``multiplier``, ``best_bid``, ``best_ask``,
+    ``mid``, ``iv``, ``delta`` and ``sessions_to_expiry`` from the dealer's
+    quote. An option is named ``ROOT.Onnnn.Rk.cc``: ``IDX.O0035.C1050.00``
+    is the 1050 call settling at session 35 (``tf.contracts.format``).
+
+    On a model that lists single-name options (pt-v22 phase 3) ``options``
+    is there whether or not the index's are (``expiries`` then empty), its
+    ``positions`` hold the name options too, and ``names`` says what the
+    names list: ``expiries``, the sessions their options settle at the
+    close of, and ``iv_30d``, each listed name's at-the-money implied
+    volatility 21 sessions out on its surface, a fraction a year, by
+    ticker. ``ACME.O0035.C42.50`` is the 42.50 call on ACME, American, 100
+    shares a contract, exercised with the side ``EXERCISE``.
+
+    Shared by :func:`serialize_observation` and the FinRobot adapter's own
+    serializer, so both payloads carry the same keys on every model.
+    """
+    engine = obs.engine
+    lists_futures, lists_options = _lists_futures(engine), _lists_options(engine)
+    lists_names = _lists_name_options(engine)
+    if not lists_futures and not lists_options and not lists_names:
+        return {}
+    level = engine.index_level
+    futures = []
+    for contract in engine.contracts() if lists_futures else ():
+        if contract["kind"] != "future":
+            continue
+        symbol = contract["symbol"]
+        q = engine.quote(symbol)
+        futures.append({
+            "symbol": symbol,
+            "root": contract["root"],
+            "expiry": contract["expiry"],
+            "sessions_to_expiry": q["sessions_to_expiry"],
+            "front": contract["front"],
+            "settlement": contract["settlement"],
+            "price": q["price"],
+            "fair": q["fair"],
+            "basis_bp": q["basis_bp"],
+            "mark": q["mark"],
+            "best_bid": q["bid"],
+            "best_ask": q["ask"],
+            "underlying": q["index"],
+            "rate": q["rate"],
+            "dividends": q["dividends"],
+            "expected": q["expected"],
+            "premium": q["premium"],
+            "multiplier": q["multiplier"],
+            "tick": q["tick"],
+            "daily_volume": q["daily_volume"],
+            "max_order_contracts": max_participation * q["daily_volume"],
+            "initial_margin": q["initial_margin"],
+            "maintenance_margin": q["maintenance_margin"],
+            "position": obs.position(symbol),
+        })
+    reader = getattr(type(obs.portfolio), "margin", None)
+    margin = None
+    if reader is not None:
+        held = obs.portfolio.margin(engine)
+        margin = {"initial": held["initial"],
+                  "maintenance": held["maintenance"],
+                  "excess": held["excess"],
+                  "call": held["call"]}
+    out: dict[str, Any] = {
+        "index": (None if level is None
+                  else {"level": level["level"], "close": level["close"]}),
+    }
+    if lists_futures:
+        out["futures"] = futures
+    out["margin"] = margin
+    if lists_options or lists_names:
+        out["options"] = _options_payload(obs, index=lists_options,
+                                          names=lists_names)
+    return out
+
+
+#: The tenor, in sessions, of the at-the-money volatility the payload shows
+#: for each name: the 30 days of Cboe's single-stock volatility indices.
+NAME_IV_SESSIONS = 21.0
+
+
+def _options_payload(obs: Any, *, index: bool = True,
+                     names: bool = False) -> dict[str, Any]:
+    """The payload's ``options`` key (:func:`derivatives_payload`)."""
+    engine = obs.engine
+    positions = []
+    held = getattr(obs.portfolio, "options", None) or {}
+    for symbol in sorted(held):
+        try:
+            q = engine.quote(symbol)
+        except ValidationError:
+            # Settled at this open and paid: no longer quoted.
+            continue
+        positions.append({
+            "symbol": symbol,
+            "expiry": q["expiry"],
+            "right": q["right"],
+            "strike": q["strike"],
+            "quantity": held[symbol].quantity,
+            "cost": held[symbol].cost,
+            "multiplier": q["multiplier"],
+            "best_bid": q["bid"],
+            "best_ask": q["ask"],
+            "mid": q["mid"],
+            "iv": q["iv"],
+            "delta": q["delta"],
+            "sessions_to_expiry": q["sessions_to_expiry"],
+        })
+    out: dict[str, Any] = {"expiries": engine.option_expiries() if index else [],
+                           "positions": positions}
+    if names:
+        roots = list(engine.name_option_roots())
+        out["names"] = {
+            "expiries": ([e["expiry"] for e in engine.option_expiries(roots[0])]
+                         if roots else []),
+            "iv_30d": {t: engine.surface(t).iv(0.0, NAME_IV_SESSIONS) for t in roots},
+        }
+    return out
 
 
 def serialize_observation(obs: Any, *,
@@ -1261,11 +1583,17 @@ def serialize_observation(obs: Any, *,
     orders needs to see which of them are still working before it sends
     another or a CANCEL.
 
+    On a model that lists futures the payload also carries ``index``,
+    ``futures`` and ``margin``, and on one that lists index options
+    ``index``, ``margin`` and ``options`` (:func:`derivatives_payload`). An
+    agent trades a future or an option by naming its symbol in an action,
+    the quantity in contracts.
+
     The payload is version ``OBSERVATION_SCHEMA_VERSION``: no key is added,
     removed or renamed, and no value changes meaning, in a patch release
     (``docs/SUPPORT.md``). Version 2 (0.10.0) added the two conditional
-    asset keys below to version 1.
-    ``tests/test_integrations.py`` pins every key.
+    asset keys below to version 1, and version 3 the four conditional
+    derivative keys. ``tests/test_integrations.py`` pins every key.
     """
     macro_state = obs.engine.macro_state
     macro = {field: getattr(macro_state, field) for field in OBSERVABLE_MACRO}
@@ -1337,6 +1665,7 @@ def serialize_observation(obs: Any, *,
             "buying_power": headroom,
             "open_orders": open_orders_of(obs),
         },
+        **derivatives_payload(obs, max_participation=max_participation),
     }
 
 
