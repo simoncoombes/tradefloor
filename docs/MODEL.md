@@ -3897,6 +3897,25 @@ A future is priced at `F = (S - PV(D)) * exp(r * tau) + b`:
   agents' net flow against the house, `0.15 * sigma * flow / V`, decaying at
   a 30-step half-life. Both are scaled by `min(1, n / 6)`, with `n` the
   sessions to expiry, so a future converges on the index over its roll.
+  Under `futures_impact_memory` (0.0 on every shipped preset) the flow's
+  mark is the equity book's metaorder memory instead: `D(M) = sign(M) Y
+  sigma h(|M|)` on the contract's own memory `M` of that flow, in daily
+  volumes, with `Y` the switch's value and the memory's half-lives, slow
+  weight, crossover and exponent the equity's (`impact_memory_*`). It
+  holds over the night, a step's flow moves it at most `1.5` times what
+  that flow paid per contract, and against its lean no house contract is
+  priced better than the memory's price after it, so selling back walks it
+  down. With the linear mark a day's TWAP of 10 per cent of the daily
+  volume costs about 0.005 daily sigma, the half-spread and little else,
+  against 0.10 to 0.21 for the square-root law measured on futures
+  metaorders (Toth et al. 2011). The equity memory's fast part fades in a
+  few minutes, so on its own the memory leaves a day's TWAP at about a
+  third of that: an equity's price carries the rest of a metaorder's impact
+  through the day, and a future's fair value cannot. Under
+  `futures_impact_memory_half_life` (0.0 on every shipped preset, the
+  equity's fast half-life) the futures' memory's fast part fades at its own
+  half-life in open ticks instead, and the cost of a day's TWAP grows with
+  it toward the square-root law's.
 
 Each close marks every contract at `F` on the close's index. At its expiry
 session's open a contract settles in cash on the index of the opening
