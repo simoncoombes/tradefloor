@@ -690,6 +690,21 @@ pub fn spread_noise_key(root_seed: u64) -> u64 {
     splitmix64_mix(root_seed ^ (((SPREAD_NOISE_TAG as u64) << 32) | 0xFFFF_FFFF))
 }
 
+/// The tag of the 10-year's own term premium (`treasury_term_premium_sd`),
+/// ASCII "TTPM".
+pub const TERM_PREMIUM_TAG: u32 = 0x5454_504D;
+
+/// The key of a root seed's term-premium draws: as [`publication_key`] under
+/// [`TERM_PREMIUM_TAG`]. A run's session `day` takes the first normal of
+/// `GameRng::keyed(key, TERM_PREMIUM_TAG, day)`, a burn-in day the first of
+/// `GameRng::keyed(key, TERM_PREMIUM_TAG, day | 1 << 40)` (the burn-in counts
+/// its own days from 1 as the run does), and the opening the first of
+/// `GameRng::keyed(key, TERM_PREMIUM_TAG << 32, 0)`, so it takes nothing from
+/// any stream.
+pub fn term_premium_key(root_seed: u64) -> u64 {
+    splitmix64_mix(root_seed ^ (((TERM_PREMIUM_TAG as u64) << 32) | 0xFFFF_FFFF))
+}
+
 pub fn publication_key(root_seed: u64) -> u64 {
     splitmix64_mix(root_seed ^ (((PUBLICATION_TAG as u64) << 32) | 0xFFFF_FFFF))
 }

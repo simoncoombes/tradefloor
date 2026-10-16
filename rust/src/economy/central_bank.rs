@@ -214,6 +214,10 @@ pub struct PolicyOptions {
     /// formula's base beside the leverage term. `None`, on every preset, is
     /// no state.
     pub spread_noise: Option<f64>,
+    /// `treasury_term_premium_sd`: the 10-year's own term premium, points
+    /// added to the meeting's 10-year target as the daily anchor adds them.
+    /// `None`, on every preset, is no state.
+    pub term_premium: Option<f64>,
     /// `fed_core_inflation`: the inflation the meeting reads in place of
     /// headline, core (headline less `EconomyState::oil_inflation_level`).
     /// `None`, on every preset, is headline.
@@ -285,6 +289,7 @@ impl PolicyOptions {
             spread_equity_gain: 0.0,
             spread_priced_gap: false,
             spread_noise: None,
+            term_premium: None,
             policy_inflation: None,
             curve_inflation: None,
             zlb_path: 0.0,
@@ -800,6 +805,13 @@ pub fn update_central_bank_with(
         && curve_inflation < FED_PUT_INFLATION_CEILING
     {
         treasury_target_10y - super::daily::haven_term_cut(options.zlb_haven_gain, economy.vix)
+    } else {
+        treasury_target_10y
+    };
+    // The 10-year's own term premium (`treasury_term_premium_sd`) in the
+    // target too, as the daily anchor adds it. Guarded.
+    let treasury_target_10y = if let Some(x) = options.term_premium {
+        treasury_target_10y + x
     } else {
         treasury_target_10y
     };

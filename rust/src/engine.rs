@@ -1307,6 +1307,14 @@ pub struct Engine {
     /// (`corporate_spread_noise_sd`): 0.0 with the dial off, which it never
     /// leaves.
     spread_noise: f64,
+    /// The key of the 10-year's own term premium's draws
+    /// (`treasury_term_premium_sd`), derived from the root seed and carried
+    /// by a snapshot that holds it.
+    term_premium_key: u64,
+    /// The 10-year's own term premium, percentage points added to its anchor
+    /// (`treasury_term_premium_sd`): 0.0 with the dial off, which it never
+    /// leaves.
+    term_premium: f64,
     /// The decision the Fed's own reading implied at the last close
     /// (`fed_eve_decision`), which the next scheduled meeting delivers;
     /// `None` before the first close with the switch on, and always with it
@@ -2395,6 +2403,8 @@ impl Engine {
             core_trend: 0.0,
             spread_noise_key: crate::rng::spread_noise_key(seed),
             spread_noise: 0.0,
+            term_premium_key: crate::rng::term_premium_key(seed),
+            term_premium: 0.0,
             eve_decision: None,
             population: None,
         };
@@ -2404,6 +2414,10 @@ impl Engine {
         // CREDIT'S OWN STATE OPENING (`corporate_spread_noise_sd`): a draw
         // from its stationary distribution on its own key. Nothing at 0.0.
         engine.spread_noise = engine.spread_noise_opening();
+        // THE 10-YEAR'S OWN TERM PREMIUM OPENING (`treasury_term_premium_sd`):
+        // a draw from its stationary distribution on its own key. Nothing at
+        // 0.0.
+        engine.term_premium = engine.term_premium_opening();
         engine.vix_anchor = engine.derive_vix_anchor();
         engine.cycle_nowcast_terms = engine.derive_cycle_nowcast_terms();
         // The front two index futures (`futures_index_listed`); nothing with
@@ -9229,6 +9243,12 @@ impl Engine {
             inputs.yields.spread_noise = Some((self.spread_noise, next));
             self.spread_noise = next;
         }
+        // THE 10-YEAR'S OWN TERM PREMIUM (`treasury_term_premium_sd`):
+        // `daily_inputs` handed the step tonight's state, which the session
+        // keeps; nothing at 0.0.
+        if let Some(next) = inputs.yields.term_premium {
+            self.term_premium = next;
+        }
         self.economy = update_economy_daily(&self.economy, &inputs, rng);
         // The host's premium on the target (`set_vix_target_premium`), read
         // by the step above, faded for the next close.
@@ -9502,6 +9522,9 @@ impl Engine {
             spread_priced_gap: self.carries_spread_priced_gap(),
             // Credit's own state (`corporate_spread_noise_sd`); `None` off.
             spread_noise: if self.carries_spread_noise() { Some(self.spread_noise) } else { None },
+            // The 10-year's own term premium (`treasury_term_premium_sd`);
+            // `None` off.
+            term_premium: if self.carries_term_premium() { Some(self.term_premium) } else { None },
             // Core in headline's place for the bank and the curve
             // (`fed_core_inflation`, `treasury_core_inflation`); `None` with
             // the switches off.
@@ -9795,6 +9818,11 @@ impl Engine {
                 // set by the session's own step, which draws it; a projection
                 // of the close leaves it out.
                 spread_noise: None,
+                // The 10-year's own term premium tonight
+                // (`treasury_term_premium_sd`): a function of the state, the
+                // key and the day, so the live mark's projection and the
+                // close read the same; `None` at 0.0.
+                term_premium: self.term_premium_step(request.game_day),
             },
             volatility: request.volatility,
             active_shocks: request.active_shocks,
@@ -10184,6 +10212,88 @@ impl Engine {
                 "this model sets corporate_spread_noise_sd and the snapshot carries no spread_noise".to_string()),
             (Some(_), false) => Err(
                 "this snapshot carries spread_noise and this model's corporate_spread_noise_sd is 0".to_string()),
+        }
+    }
+
+    /// Whether this engine's model carries the 10-year's own term premium
+    /// (`treasury_term_premium_sd` set), which is when the snapshot and the
+    /// state hash carry it. Off on every preset.
+    pub fn carries_term_premium(&self) -> bool {
+        self.params.treasury_term_premium_sd != 0.0
+    }
+
+    /// The term premium's one-session keep, `0.5^(1/H)`, H
+    /// `treasury_term_premium_half_life`; 0.0 (no persistence) at H 0.0.
+    fn term_premium_keep(&self) -> f64 {
+        let h = self.params.treasury_term_premium_half_life;
+        if h == 0.0 { 0.0 } else { crate::mathx::pow(0.5, 1.0 / h) }
+    }
+
+    /// The term premium's opening: the stationary sd `sigma / sqrt(1 -
+    /// phi^2)` times the first normal of `GameRng::keyed(key,
+    /// TERM_PREMIUM_TAG << 32, 0)`, a word no session's draw uses; 0.0 with
+    /// `treasury_term_premium_sd` at 0.0.
+    fn term_premium_opening(&self) -> f64 {
+        if !self.carries_term_premium() {
+            return 0.0;
+        }
+        let sigma = self.params.treasury_term_premium_sd;
+        let phi = self.term_premium_keep();
+        let z = crate::rng::GameRng::keyed(
+            self.term_premium_key, (crate::rng::TERM_PREMIUM_TAG as u64) << 32, 0).next_normal();
+        sigma / (1.0 - phi * phi).sqrt() * z
+    }
+
+    /// The term premium after the session `game_day`, or `None` with
+    /// `treasury_term_premium_sd` at 0.0: `phi x + sigma z`, `z` the first
+    /// normal of `GameRng::keyed(key, TERM_PREMIUM_TAG, day)`. The economy's
+    /// burn-in numbers its days from 1 as the run does, so its days take the
+    /// index `day | 1 << 40`, which no session reaches, and the run does not
+    /// replay the burn-in's draws.
+    fn term_premium_step(&self, game_day: i64) -> Option<f64> {
+        if !self.carries_term_premium() {
+            return None;
+        }
+        let index = if self.economy_alone { game_day as u64 | 1 << 40 } else { game_day as u64 };
+        let z = crate::rng::GameRng::keyed(
+            self.term_premium_key, crate::rng::TERM_PREMIUM_TAG as u64, index).next_normal();
+        Some(self.term_premium_keep() * self.term_premium + self.params.treasury_term_premium_sd * z)
+    }
+
+    /// The term premium for a snapshot and the state hash, `[x, key high
+    /// word, key low word]`, or `None` with `treasury_term_premium_sd` at 0.0.
+    pub fn term_premium_words(&self) -> Option<[f64; 3]> {
+        if !self.carries_term_premium() {
+            return None;
+        }
+        Some([self.term_premium, (self.term_premium_key >> 32) as f64, (self.term_premium_key & 0xFFFF_FFFF) as f64])
+    }
+
+    /// The 10-year's own term premium now, percentage points
+    /// (`treasury_term_premium_sd`); 0.0 off.
+    pub fn term_premium_level(&self) -> f64 {
+        self.term_premium
+    }
+
+    /// Put the term premium back from [`Engine::term_premium_words`].
+    pub fn set_term_premium_state(&mut self, words: Option<&[f64]>) -> Result<(), String> {
+        match (words, self.carries_term_premium()) {
+            (None, false) => Ok(()),
+            (Some(w), true) => {
+                let whole = |v: f64| v.is_finite() && v >= 0.0 && v <= u32::MAX as f64 && v.fract() == 0.0;
+                if w.len() != 3 || !w[0].is_finite() || !whole(w[1]) || !whole(w[2]) {
+                    return Err(format!(
+                        "this snapshot's term_premium is {w:?}: it is the 10-year's own term premium \
+                         and its key's two 32-bit words"));
+                }
+                self.term_premium = w[0];
+                self.term_premium_key = ((w[1] as u64) << 32) | (w[2] as u64);
+                Ok(())
+            }
+            (None, true) => Err(
+                "this model sets treasury_term_premium_sd and the snapshot carries no term_premium".to_string()),
+            (Some(_), false) => Err(
+                "this snapshot carries term_premium and this model's treasury_term_premium_sd is 0".to_string()),
         }
     }
 
@@ -13183,6 +13293,14 @@ impl Engine {
         // behind its own tag.
         if let Some(words) = self.spread_noise_words() {
             hash_f64(&mut buf, 59.0);
+            for value in words {
+                hash_f64(&mut buf, value);
+            }
+        }
+        // The 10-year's own term premium, only while
+        // `treasury_term_premium_sd` is set, behind its own tag.
+        if let Some(words) = self.term_premium_words() {
+            hash_f64(&mut buf, 60.0);
             for value in words {
                 hash_f64(&mut buf, value);
             }

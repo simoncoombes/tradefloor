@@ -133,6 +133,15 @@ same with them on as off.
   the VIX it stated by weeks: replaying the real 2020-21 VIX, realized
   volatility ran about twice the S&P 500's once the VIX was back at 20-40,
   and short of it at the March peak.
+- `treasury_term_premium_sd` and `treasury_term_premium_half_life` are new
+  dials, 0.0 on every preset and left out of the digest there: off zero the
+  10-year carries its own term premium, an AR(1) stepped every session on its
+  own keyed draws (no stream moves) and opened from its stationary
+  distribution, added to the 10-year's daily anchor and to the meeting's
+  10-year target. Without it the 10-year's only noise is iid against a 5 per
+  cent pull, so it mean-reverts within the month: its variance ratio over 21
+  and 63 sessions is about 0.70 and 0.55 where DGS10's (1990-2025) is 0.974
+  and 0.950.
 - `corporate_spread_noise_sd` and `corporate_spread_noise_half_life` are new
   dials, 0.0 on every preset and left out of the digest there: off zero
   credit carries its own state, an AR(1) stepped every session on its own

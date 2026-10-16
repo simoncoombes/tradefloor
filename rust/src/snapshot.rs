@@ -1670,6 +1670,10 @@ impl Engine {
         if let Some(words) = self.spread_noise_words() {
             out.put("spread_noise", V::from_f64s(&words));
         }
+        // The 10-year's own term premium (`treasury_term_premium_sd`).
+        if let Some(words) = self.term_premium_words() {
+            out.put("term_premium", V::from_f64s(&words));
+        }
         // The eve's decision (`fed_eve_decision`).
         if let Some(words) = self.eve_decision_words() {
             out.put("eve_decision", V::from_f64s(&words));
@@ -2056,6 +2060,7 @@ impl Engine {
             Gated::dial("oil_target_drift", "oil_target_drift_sd", p.oil_target_drift_sd),
             Gated::dial("core_trend", "core_trend_sd", p.core_trend_sd),
             Gated::dial("spread_noise", "corporate_spread_noise_sd", p.corporate_spread_noise_sd),
+            Gated::dial("term_premium", "treasury_term_premium_sd", p.treasury_term_premium_sd),
             Gated::dial("eve_decision", "fed_eve_decision", p.fed_eve_decision),
             Gated::when(
                 "buyback_log_shares",
@@ -2814,6 +2819,14 @@ impl Engine {
                 None => None,
             };
             inner.set_spread_noise_state(words.as_deref()).map_err(core)?;
+        }
+        // The 10-year's own term premium (`treasury_term_premium_sd`).
+        {
+            let words = match snapshot.get("term_premium") {
+                Some(_) => Some(read_buffer(snapshot, "", "term_premium")?),
+                None => None,
+            };
+            inner.set_term_premium_state(words.as_deref()).map_err(core)?;
         }
         // The eve's decision (`fed_eve_decision`).
         {
