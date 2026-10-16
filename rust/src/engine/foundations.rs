@@ -642,6 +642,15 @@ impl Engine {
         }
         let cadence = cadence / 14.0;
         let last = day + horizon as i64;
+        // `forecast_policy_neutral_core`: the neutral moves with the
+        // inflation the meeting reads, above the bank's target, at the
+        // close the forecast starts from. 0.0 is a branch: the fixed neutral.
+        let neutral = if p.forecast_policy_neutral_core != 0.0 {
+            let pi = if p.fed_core_inflation != 0.0 { self.core_inflation() } else { self.economy.inflation_rate };
+            p.forecast_policy_neutral + p.forecast_policy_neutral_core * (pi - self.central_bank.target_inflation)
+        } else {
+            p.forecast_policy_neutral
+        };
         let mut path = vec![r0; horizon];
         let mut rate = r0;
         let mut push = (1.0 - p.forecast_policy_shadow_discount) * shadow;
@@ -653,7 +662,7 @@ impl Engine {
             }
             let mut change = push;
             if p.forecast_policy_reversion != 0.0 {
-                change += p.forecast_policy_reversion * (p.forecast_policy_neutral - rate);
+                change += p.forecast_policy_reversion * (neutral - rate);
             }
             rate += change;
             for slot in path.iter_mut().skip((at - day - 1) as usize) {

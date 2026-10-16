@@ -19,7 +19,16 @@ histories and frozen as dials, and this tool is how they were fitted:
   (`forecast_policy_shadow_discount`, `forecast_policy_persistence`,
   `forecast_policy_reversion` and `forecast_policy_neutral`), fitted by least
   squares on the realised policy rate at 5 to 252 sessions, since the
-  meeting ladder is discrete and has no expected-value step to iterate.
+  meeting ladder is discrete and has no expected-value step to iterate;
+  with `--neutral-core` the neutral's move with the inflation the meeting
+  reads above target (`forecast_policy_neutral_core`) is fitted with them.
+  The fit's objective is least squares subject to an unbiased forecast:
+  the mean squared error at each target horizon plus `BIAS_WEIGHT` (100)
+  times that horizon's squared mean error, since an unbiased forecast is the
+  forecast's job and row RF5 reads the mean error (changed 2026-10-16 from
+  plain least squares, which on the pt-v22 candidate's law left +0.38 bp at
+  63 sessions, t 1.8 on 270 histories). The policy dials want histories as
+  long as RF5's, 21 years (`--sessions 5292`).
 
 A history's policy rate level lasts its whole run, so the policy fit wants
 many histories: 40 put the neutral rate at 1.4 per cent, and the forecast
@@ -67,9 +76,15 @@ def history(args):
     universe = tf.Universe.random(40, seed=111)
     engine = tf.Engine(seed=seed, universe=universe,
                        model=tf.ModelParams.from_preset(preset, **SWITCHES, **dials))
+    core = engine.model.fed_core_inflation != 0.0
     rows = []
     for _ in range(sessions):
-        engine.run_days(1)
+        # the session by hand: the same path as `run_days(1)` (checked to the
+        # bit) without its record of every day, which a 21-year history
+        # cannot hold in memory on many processes
+        engine.open_market()
+        engine.run_session(9, 30, 3, 390)
+        engine.close_market()
         f = engine.forecast()
         econ = engine.economy()
         bank = engine.state_snapshot()["central_bank"]
@@ -82,6 +97,10 @@ def history(args):
             # The policy path's last rate: the shadow, with every derived
             # dial at zero, which is all the fit reads of it.
             path_end=100.0 * f["policy_rate"][-1],
+            # The inflation the meeting reads above the bank's target
+            # (`forecast_policy_neutral_core`): core under
+            # `fed_core_inflation`, headline without it.
+            gap=(econ["core_inflation"] if core else econ["inflation_rate"]) - bank["target_inflation"],
         ))
     return rows
 
@@ -148,14 +167,84 @@ def fit_dispersion(histories):
     return best[1], best[2], skew, spread
 
 
-def fit_policy(histories, burn=0):
-    """The policy projection's four dials, by least squares on a grid, on
-    every close from `burn` on."""
+#: The policy fit's arrays, handed to the grid's processes (see fit_policy).
+_FIT = {}
+
+
+def _paths(d, phi, kappa, neutral, k):
+    import numpy as np
+
+    F = _FIT
+    target = neutral + k * F["gap"]
+    levels, rate, push = [], F["r0"].copy(), (1.0 - d) * F["shadow"]
+    for _ in F["offsets"]:
+        rate = rate + push + kappa * (target - rate)
+        levels.append(rate.copy())
+        push = phi * push
+    out = {}
+    for h in F["targets"]:
+        f = F["r0"].copy()
+        for j, o in enumerate(F["offsets"]):
+            f = np.where(F["first"] + o <= h, levels[j], f)
+        out[h] = f
+    return out
+
+
+#: The weight on each horizon's squared mean error in the policy fit's loss,
+#: against 1 on its mean squared error: the fit is least squares subject to
+#: an unbiased forecast at every target horizon (RF5 reads the mean error),
+#: the constraint held by a penalty, since five dials cannot zero six means
+#: exactly.
+BIAS_WEIGHT = 100.0
+
+
+def _loss(x):
+    p = _paths(*x)
+    out = 0.0
+    for h in _FIT["targets"]:
+        e = _FIT["realised"][h] - p[h]
+        out += float((e * e).mean()) + _FIT.get("bias_weight", 0.0) * float(e.mean()) ** 2
+    return out
+
+
+def _block(points):
+    best = None
+    for i, x in points:
+        v = _loss(x)
+        if best is None or v < best[0]:
+            best = (v, i, x)
+    return best
+
+
+def _init(fit):
+    _FIT.update(fit)
+
+
+def _search(points, workers):
+    """The first point, in the grid's order, with the strictly smallest loss:
+    what a serial loop over the grid returns, searched in blocks on
+    `workers` processes."""
+    points = list(enumerate(points))
+    n = max(1, min(workers, len(points)))
+    if n == 1:
+        return _block(points)
+    with ProcessPoolExecutor(n, initializer=_init, initargs=(dict(_FIT),)) as pool:
+        found = [b for b in pool.map(_block, [points[i::n] for i in range(n)]) if b is not None]
+    return min(found, key=lambda b: (b[0], b[1]))
+
+
+def fit_policy(histories, burn=0, workers=1, core=False, bias_weight=BIAS_WEIGHT):
+    """The policy projection's dials, by least squares on a grid, on every
+    close from `burn` on: the shadow's discount, its persistence, the
+    reversion and the neutral rate, and with `core` the neutral's move with
+    the meeting's inflation gap (`forecast_policy_neutral_core`), the fifth.
+    The grid is searched on `workers` processes; the answer is the serial
+    loop's."""
     import numpy as np
 
     targets = (5, 21, 42, 63, 126, 252)
     cadence = sum(round((42 + j) * 252 / 365) for j in range(14)) / 14.0
-    r0, shadow, first, realised = [], [], [], {h: [] for h in targets}
+    r0, shadow, first, gap, realised = [], [], [], [], {h: [] for h in targets}
     for rows in histories:
         for t in range(burn, len(rows) - max(targets)):
             row = rows[t]
@@ -165,47 +254,34 @@ def fit_policy(histories, burn=0):
             r0.append(row["rate"])
             shadow.append(row["path_end"] - row["rate"])
             first.append(max(at, start) - row["day"])
+            gap.append(row.get("gap", 0.0))
             for h in targets:
                 realised[h].append(rows[t + h]["rate"])
-    r0, shadow, first = np.array(r0), np.array(shadow), np.array(first)
-    realised = {h: np.array(v) for h, v in realised.items()}
-    offsets = [round(j * cadence) for j in range(10)]
-
-    def paths(d, phi, kappa, neutral):
-        levels, rate, push = [], r0.copy(), (1.0 - d) * shadow
-        for _ in offsets:
-            rate = rate + push + kappa * (neutral - rate)
-            levels.append(rate.copy())
-            push = phi * push
-        out = {}
-        for h in targets:
-            f = r0.copy()
-            for j, o in enumerate(offsets):
-                f = np.where(first + o <= h, levels[j], f)
-            out[h] = f
-        return out
-
-    def loss(x):
-        p = paths(*x)
-        return sum(float(((realised[h] - p[h]) ** 2).mean()) for h in targets)
-
-    best = (loss((0.0, 0.0, 0.0, 2.5)), (0.0, 0.0, 0.0, 2.5))
-    for d in np.arange(0.0, 0.55, 0.05):
-        for phi in np.arange(0.0, 0.95, 0.1):
-            for kappa in (0.0, 0.01, 0.02, 0.03, 0.05, 0.08, 0.12):
-                for neutral in (1.0, 1.4, 1.8, 2.2):
-                    v = loss((d, phi, kappa, neutral))
-                    if v < best[0]:
-                        best = (v, (d, phi, kappa, neutral))
-    d0, p0, k0, n0 = best[1]
-    for d in np.arange(max(0.0, d0 - 0.05), d0 + 0.051, 0.01):
-        for phi in np.arange(max(0.0, p0 - 0.1), min(0.95, p0 + 0.101), 0.02):
-            for kappa in np.arange(max(0.0, k0 - 0.02), k0 + 0.021, 0.0025):
-                for neutral in np.arange(max(0.0, n0 - 0.4), n0 + 0.41, 0.02):
-                    v = loss((d, phi, kappa, neutral))
-                    if v < best[0]:
-                        best = (v, (d, phi, kappa, neutral))
-    return tuple(round(float(x), 4) for x in best[1])
+    _FIT.update(r0=np.array(r0), shadow=np.array(shadow), first=np.array(first), gap=np.array(gap),
+                realised={h: np.array(v) for h, v in realised.items()}, targets=targets,
+                offsets=[round(j * cadence) for j in range(10)], bias_weight=bias_weight)
+    ks = (0.0, 0.25, 0.5, 0.75, 1.0, 1.25) if core else (0.0,)
+    # The neutral's grid reaches 4.2 per cent: a candidate law can hold its
+    # rate above the 2.2 the grid once stopped at.
+    coarse = [(0.0, 0.0, 0.0, 2.5, 0.0)] + [
+        (d, phi, kappa, neutral, k)
+        for d in np.arange(0.0, 0.55, 0.05)
+        for phi in np.arange(0.0, 0.95, 0.1)
+        for kappa in (0.0, 0.01, 0.02, 0.03, 0.05, 0.08, 0.12)
+        for neutral in (1.0, 1.4, 1.8, 2.2, 2.6, 3.0, 3.4, 3.8, 4.2)
+        for k in ks]
+    _, _, best = _search(coarse, workers)
+    d0, p0, k0, n0, c0 = best
+    fine_k = np.arange(max(0.0, c0 - 0.15), c0 + 0.151, 0.05) if core else (0.0,)
+    fine = [best] + [
+        (d, phi, kappa, neutral, k)
+        for d in np.arange(max(0.0, d0 - 0.05), d0 + 0.051, 0.01)
+        for phi in np.arange(max(0.0, p0 - 0.1), min(0.95, p0 + 0.101), 0.02)
+        for kappa in np.arange(max(0.0, k0 - 0.02), k0 + 0.021, 0.0025)
+        for neutral in np.arange(max(0.0, n0 - 0.4), n0 + 0.41, 0.02 if not core else 0.04)
+        for k in fine_k]
+    _, _, best = _search(fine, workers)
+    return tuple(round(float(x), 4) for x in best)
 
 
 def main(argv=None):
@@ -235,6 +311,18 @@ def main(argv=None):
                              "first year); derive fits the VIX's spread on every close "
                              "and the policy dials from the same close RF5 reads")
     parser.add_argument("--workers", type=int, default=8)
+    parser.add_argument("--fit-workers", type=int, default=None,
+                        help="processes for the policy fit's grid (default --workers); the "
+                             "histories' processes hold a run each, the grid's only arrays")
+    parser.add_argument("--bias-weight", type=float, default=BIAS_WEIGHT,
+                        help="the policy fit's weight on each horizon's squared mean error "
+                             f"(default {BIAS_WEIGHT:g}; 0 is plain least squares)")
+    parser.add_argument("--fit-both", action="store_true",
+                        help="fit the policy dials with and without forecast_policy_neutral_core "
+                             "on the same histories, one JSON line each")
+    parser.add_argument("--neutral-core", action="store_true",
+                        help="also fit forecast_policy_neutral_core, the neutral's move with the "
+                             "inflation the meeting reads above target")
     args = parser.parse_args(argv)
     default = "3001,3040" if args.mode == "derive" else "7001,7016"
     lo, hi = (int(x) for x in (args.seeds or default).split(","))
@@ -249,12 +337,18 @@ def main(argv=None):
         sd, hl, skew, spread = fit_dispersion(histories)
         print("log VIX spread about the forecast:",
               ", ".join(f"h{h} {v:.4f}" for h, v in spread.items()))
-        d, phi, kappa, neutral = fit_policy([by_seed[s] for s in policy_seeds], burn=args.burn)
-        print(json.dumps(dict(
-            forecast_vix_dispersion=round(sd, 4), forecast_vix_dispersion_half_life=hl,
-            forecast_vix_dispersion_skew=round(skew, 2),
-            forecast_policy_shadow_discount=d, forecast_policy_persistence=phi,
-            forecast_policy_reversion=kappa, forecast_policy_neutral=neutral)))
+        for with_core in ((False, True) if args.fit_both else (args.neutral_core,)):
+            d, phi, kappa, neutral, core = fit_policy(
+                [by_seed[s] for s in policy_seeds], burn=args.burn,
+                workers=args.fit_workers or args.workers, core=with_core, bias_weight=args.bias_weight)
+            out = dict(
+                forecast_vix_dispersion=round(sd, 4), forecast_vix_dispersion_half_life=hl,
+                forecast_vix_dispersion_skew=round(skew, 2),
+                forecast_policy_shadow_discount=d, forecast_policy_persistence=phi,
+                forecast_policy_reversion=kappa, forecast_policy_neutral=neutral)
+            if with_core:
+                out["forecast_policy_neutral_core"] = core
+            print(json.dumps(out), flush=True)
     else:
         histories = run(seeds, args.sessions, {**law, **json.loads(args.dials)}, args.preset,
                         args.workers)
