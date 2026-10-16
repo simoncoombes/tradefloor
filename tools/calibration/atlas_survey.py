@@ -465,6 +465,7 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "forecast_policy_shadow_discount": (0.0, 0.5),
     "forecast_policy_persistence": (0.0, 0.9),
     "forecast_policy_reversion": (0.0, 0.3),
+    "forecast_policy_neutral_core": (0.0, 1.5),
     # The index futures and their night session (pt-v22 phase 1): a switch,
     # the basis noise's sd (index basis points) and close-to-close
     # persistence, and the night's steps. None of them moves a stock price.

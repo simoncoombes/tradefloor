@@ -1249,6 +1249,7 @@ PERTURBATIONS = [
     ("forecast_policy_shadow_discount", 0.25, False),
     ("forecast_policy_persistence", 0.5, False),
     ("forecast_policy_reversion", 0.1, False),
+    ("forecast_policy_neutral_core", 0.75, False),
     ("forecast_policy_neutral", 1.7, False),
     # The index futures and their night session (pt-v22 phase 1). INERT by
     # construction: a future reads the index, the dividends and the forecast
