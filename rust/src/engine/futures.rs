@@ -955,7 +955,19 @@ impl Engine {
         let spec = &INDEX_FUTURE;
         let steps_a_day = SESSION_TICKS + f64::from(self.night_steps());
         let rho = self.params.basis_persistence;
-        let a = if rho > 0.0 { crate::mathx::pow(rho, 1.0 / steps_a_day) } else { 0.0 };
+        let share = self.params.basis_night_share;
+        let nights = f64::from(self.night_steps());
+        let a = if !(rho > 0.0) {
+            0.0
+        } else if share != 0.0 && nights > 0.0 {
+            // `basis_night_share`: the night's steps carry `rho^share` of a
+            // day's decay and the session's ticks the rest; the noise below
+            // keeps the basis's sd, so the close's reading is unchanged.
+            let part = if night { share / nights } else { (1.0 - share) / SESSION_TICKS };
+            crate::mathx::pow(rho, part)
+        } else {
+            crate::mathx::pow(rho, 1.0 / steps_a_day)
+        };
         let sd = self.params.basis_sd * crate::mathx::sqrt(crate::mathx::max(0.0, 1.0 - a * a));
         self.futures.rng.site(Site::FuturesBasisZ, 0);
         let z = self.futures.rng.next_normal();
