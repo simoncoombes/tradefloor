@@ -926,6 +926,16 @@ pub struct Engine {
     /// value; never touched with the dial at 0.0, where the snapshot and the
     /// state hash do not carry it.
     market_vol_cycle_log: Option<f64>,
+    /// The time-held fade's clock (`market_vol_cycle_hold_onset`): the phase
+    /// the last close traded in and the consecutive closes it has held,
+    /// that close included. `None` before the first close with the dial set,
+    /// and always with it at 0.0, where the snapshot and the state hash do
+    /// not carry it.
+    cycle_hold: Option<(crate::economy::CyclePhase, i64)>,
+    /// The held VIX's slow log average (`market_vol_vix_hold_half_life`),
+    /// kept from a contraction's or trough's first close past its onset;
+    /// `None` otherwise, and always with the dial at 0.0.
+    vix_hold_log: Option<f64>,
     /// The published VIX's stress-premium memory: the read-back's log
     /// deviation from the anchor's centre, kept at `vix_anchor_memory`'s
     /// rate and set to 0.0 by a pinned VIX. Moves only with
@@ -2326,6 +2336,8 @@ impl Engine {
             vix_log_level: 0.0,
             vix_anchor_slow: 0.0,
             market_vol_cycle_log: None,
+            cycle_hold: None,
+            vix_hold_log: None,
             vix_stress_memory: 0.0,
             vix_fear: 0.0,
             vix_target_premium: 0.0,
@@ -8467,6 +8479,18 @@ impl Engine {
                 (market_vol_level * m * m, vix_ratio_denominator * self.market_vol_cycle_vix_scale())
             }
         };
+        // THE TIME-HELD FADE'S CLOCK AND THE HELD VIX
+        // (`market_vol_cycle_hold_onset`, `market_vol_vix_hold_half_life`):
+        // a branch at 0.0, every shipped preset, that reads and moves
+        // nothing. Off it, the phase's age is counted here, after the
+        // multiplier's step has read tonight's age, and past a contraction's
+        // or a trough's onset the coupling's denominator follows the held
+        // VIX.
+        let vix_ratio_denominator = if self.params.market_vol_cycle_hold_onset == 0.0 {
+            vix_ratio_denominator
+        } else {
+            self.step_cycle_hold(vix_ratio_denominator)
+        };
         self.last_market_targets = Some(if self.vix_sets_variance_pending {
             self.vix_sets_variance_pending = false;
             let denominator =
@@ -10724,7 +10748,7 @@ impl Engine {
         let target = if self.market_vol_cycle_pinned() {
             0.0
         } else {
-            self.market_vol_cycle_target_log()
+            self.market_vol_cycle_held_target(self.market_vol_cycle_target_log())
         };
         // The release half-life (`market_vol_cycle_release_half_life`)
         // while the multiplier falls toward a lower target, as a phase
@@ -10741,6 +10765,159 @@ impl Engine {
             }
             _ => target,
         }
+    }
+
+    /// The time-held fade's clock as tonight's close will leave it
+    /// (`market_vol_cycle_hold_onset`): the phase this session closes in and
+    /// its age in closes, tonight's included. `None` with the dial at 0.0.
+    /// It reads the phase in the economy, which is the one a host wrote
+    /// through `economy_mut`, pinned or left to the engine's own cycle, and
+    /// is a function of the state alone, so the live marks' projection of the
+    /// close reads the age the close does.
+    fn cycle_hold_tonight(&self) -> Option<(crate::economy::CyclePhase, i64)> {
+        if self.params.market_vol_cycle_hold_onset == 0.0 {
+            return None;
+        }
+        let phase = self.economy.cycle_phase;
+        Some(match self.cycle_hold {
+            Some((held, age)) if held == phase => (phase, age.saturating_add(1)),
+            _ => (phase, 1),
+        })
+    }
+
+    /// Closes past its onset for a contraction or trough held `hold` long:
+    /// the age less the onset, the `market_vol_cycle_hold_onset` quantile of
+    /// the phase's own sojourn on this engine's table
+    /// (`economy::cycle::sojourn_quantile_days_for`). `None` in any other
+    /// phase, at or before the onset, and with the dial at 0.0.
+    fn cycle_hold_past_onset(&self, hold: Option<(crate::economy::CyclePhase, i64)>) -> Option<i64> {
+        use crate::economy::CyclePhase;
+        let (phase, age) = hold?;
+        if !matches!(phase, CyclePhase::Contraction | CyclePhase::Trough) {
+            return None;
+        }
+        let onset = crate::economy::cycle::sojourn_quantile_days_for(
+            phase, &self.cycle_spec(), self.params.market_vol_cycle_hold_onset);
+        if age > onset {
+            Some(age - onset)
+        } else {
+            None
+        }
+    }
+
+    /// The cycle multiplier's target (in logs) once a held contraction or
+    /// trough has faded (`market_vol_cycle_hold_fade`): `l (1 - f (1 -
+    /// 0.5^(x / H)))` at `x` closes past the onset while `l > 0`, `H` being
+    /// `market_vol_cycle_hold_half_life` (the whole share at 0.0). `target`
+    /// itself, bit for bit, with the fade at 0.0, every shipped preset, at
+    /// or under one, and before the onset.
+    fn market_vol_cycle_held_target(&self, target: f64) -> f64 {
+        let f = self.params.market_vol_cycle_hold_fade;
+        if f == 0.0 || target <= 0.0 {
+            return target;
+        }
+        match self.cycle_hold_past_onset(self.cycle_hold_tonight()) {
+            Some(past) => {
+                let h = self.params.market_vol_cycle_hold_half_life;
+                let gone = if h == 0.0 {
+                    1.0
+                } else {
+                    1.0 - crate::mathx::pow(0.5, past as f64 / h)
+                };
+                target * (1.0 - f * gone)
+            }
+            None => target,
+        }
+    }
+
+    /// The held VIX's slow log average tonight's close would leave, and the
+    /// coupling denominator it would apply, given the close's own
+    /// denominator `d` (`market_vol_vix_hold_half_life`). Past a
+    /// contraction's or trough's onset the average opens at `log d` and
+    /// steps toward the log VIX at the half-life, and the denominator is
+    /// `max(d, exp(s))`; `(None, d)` before the onset, in any other phase,
+    /// with the half-life at 0.0, and `d` itself on a forced close (which
+    /// applies no phase scale either). Reads the state and writes nothing.
+    fn vix_hold_next(&self, d: f64) -> (Option<f64>, f64) {
+        let h = self.params.market_vol_vix_hold_half_life;
+        if h == 0.0 || self.cycle_hold_past_onset(self.cycle_hold_tonight()).is_none() {
+            return (None, d);
+        }
+        let s = match self.vix_hold_log {
+            Some(s) => {
+                let a = 1.0 - crate::mathx::pow(0.5, 1.0 / h);
+                s + a * (crate::mathx::log(self.economy.vix) - s)
+            }
+            None => crate::mathx::log(d),
+        };
+        if self.vix_sets_variance_pending {
+            (Some(s), d)
+        } else {
+            (Some(s), crate::mathx::max(d, crate::mathx::exp(s)))
+        }
+    }
+
+    /// Advance the time-held fade's clock and the held VIX to tonight's
+    /// close, and return the coupling's denominator: [`Engine::vix_hold_next`]
+    /// applied. Called once a close, only with `market_vol_cycle_hold_onset`
+    /// set.
+    fn step_cycle_hold(&mut self, d: f64) -> f64 {
+        let (s, out) = self.vix_hold_next(d);
+        self.cycle_hold = self.cycle_hold_tonight();
+        self.vix_hold_log = s;
+        out
+    }
+
+    /// Whether this engine's model carries the time-held fade's clock and
+    /// the held VIX, which is when the snapshot and the state hash carry
+    /// them: only with `market_vol_cycle_hold_onset` set, and once a close
+    /// has started the clock. Off on every shipped preset.
+    pub fn carries_cycle_hold(&self) -> bool {
+        self.params.market_vol_cycle_hold_onset != 0.0 && self.cycle_hold.is_some()
+    }
+
+    /// The time-held fade's state for a snapshot and the state hash: `[the
+    /// phase's place in the cycle (0 expansion to 4 recovery), its age in
+    /// closes, 1 if the held VIX's average is kept and 0 if not, the average
+    /// or 0]`. `None` where [`Engine::carries_cycle_hold`] is false.
+    pub fn cycle_hold_words(&self) -> Option<[f64; 4]> {
+        if !self.carries_cycle_hold() {
+            return None;
+        }
+        let (phase, age) = self.cycle_hold?;
+        let place = crate::economy::cycle::phase_cycle().iter().position(|p| *p == phase)?;
+        Some(match self.vix_hold_log {
+            Some(s) => [place as f64, age as f64, 1.0, s],
+            None => [place as f64, age as f64, 0.0, 0.0],
+        })
+    }
+
+    /// Put the time-held fade's state back from [`Engine::cycle_hold_words`].
+    /// `None` is a model without it, or one no close has started.
+    pub fn set_cycle_hold_state(&mut self, words: Option<&[f64]>) -> Result<(), String> {
+        let Some(w) = words else {
+            self.cycle_hold = None;
+            self.vix_hold_log = None;
+            return Ok(());
+        };
+        if self.params.market_vol_cycle_hold_onset == 0.0 {
+            return Err(
+                "this snapshot carries cycle_hold and this model's market_vol_cycle_hold_onset is 0"
+                    .to_string());
+        }
+        let phases = crate::economy::cycle::phase_cycle();
+        let whole = |v: f64, hi: f64| v.is_finite() && v >= 0.0 && v <= hi && v.fract() == 0.0;
+        if w.len() != 4 || !whole(w[0], (phases.len() - 1) as f64) || !whole(w[1], 9.0e15) || w[1] < 1.0
+            || !(w[2] == 0.0 || w[2] == 1.0) || !w[3].is_finite() || (w[2] == 0.0 && w[3] != 0.0)
+        {
+            return Err(format!(
+                "this snapshot's cycle_hold is {w:?}: it is the held phase's place in the cycle \
+                 (0 to 4), its age in closes (1 or more), 1 or 0 for whether the held VIX's \
+                 average is kept, and the average (0 when it is not)"));
+        }
+        self.cycle_hold = Some((phases[w[0] as usize], w[1] as i64));
+        self.vix_hold_log = if w[2] == 1.0 { Some(w[3]) } else { None };
+        Ok(())
     }
 
     /// `exp(d l)`: the cycle multiplier to a power, which the VIX
@@ -11614,6 +11791,13 @@ impl Engine {
                 let m = crate::mathx::exp(l);
                 (level * m * m, denominator * scale, scale)
             }
+        };
+        // The held VIX as the close will apply it
+        // (`market_vol_vix_hold_half_life`); a branch at 0.0.
+        let denominator = if self.params.market_vol_cycle_hold_onset == 0.0 {
+            denominator
+        } else {
+            self.vix_hold_next(denominator).1
         };
         let _ = mv.close_day_scaled(&self.params, denominator, self.economy.vix, level);
         let index_variance = if self.params.vix_level_identity == 0.0 {
@@ -13301,6 +13485,15 @@ impl Engine {
         // `treasury_term_premium_sd` is set, behind its own tag.
         if let Some(words) = self.term_premium_words() {
             hash_f64(&mut buf, 60.0);
+            for value in words {
+                hash_f64(&mut buf, value);
+            }
+        }
+        // The time-held fade's clock and the held VIX, only while
+        // `market_vol_cycle_hold_onset` is set and a close has started the
+        // clock, behind its own tag.
+        if let Some(words) = self.cycle_hold_words() {
+            hash_f64(&mut buf, 84.0);
             for value in words {
                 hash_f64(&mut buf, value);
             }
@@ -15283,6 +15476,160 @@ mod tests {
             let mut other = e.clone();
             other.set_market_vol_cycle_log(Some(e.market_vol_cycle_log().unwrap() + 0.01));
             assert_ne!(other.state_hash(1, false), before);
+        }
+    }
+
+    /// The time-held fade (`market_vol_cycle_hold_onset`,
+    /// `market_vol_cycle_hold_fade`, `market_vol_vix_hold_half_life`): the
+    /// clock counts a phase the host writes, the onset is the phase's own
+    /// sojourn quantile, and off it nothing is kept, read or hashed.
+    mod cycle_hold {
+        use super::*;
+        use crate::economy::CyclePhase;
+
+        fn with(dials: impl FnOnce(&mut crate::params::ModelParams)) -> Engine {
+            let mut params = crate::params::PT_V21;
+            dials(&mut params);
+            params.invariants().unwrap();
+            Engine::with_params(
+                11,
+                vec![company("A", 100.0), company("B", 50.0), company("C", 220.0)],
+                create_initial_economy_state(&InitialEconomyOptions::default()),
+                create_initial_central_bank_state(0),
+                sectors(),
+                params,
+            )
+        }
+
+        fn on(fade: f64, fade_half_life: f64, vix_half_life: f64) -> Engine {
+            with(|p| {
+                p.market_vol_cycle_hold_onset = 0.9;
+                p.market_vol_cycle_hold_fade = fade;
+                p.market_vol_cycle_hold_half_life = fade_half_life;
+                p.market_vol_vix_hold_half_life = vix_half_life;
+            })
+        }
+
+        #[test]
+        fn the_onset_is_the_phases_own_ninetieth_percentile() {
+            let e = on(0.335, 295.0, 198.0);
+            let spec = e.cycle_spec();
+            let q = |p| crate::economy::cycle::sojourn_quantile_days_for(p, &spec, 0.9);
+            // pt-v21's US table on the session calendar: 158 and 111 sessions.
+            assert_eq!(q(CyclePhase::Contraction), 158);
+            assert_eq!(q(CyclePhase::Trough), 111);
+            // No sooner than the phase's minimum (four and two months).
+            assert!(crate::economy::cycle::sojourn_quantile_days_for(CyclePhase::Trough, &spec, 0.0001) >= 42);
+        }
+
+        #[test]
+        fn off_nothing_is_counted_kept_or_hashed() {
+            let mut e = with(|_| {});
+            let plain = with(|_| {});
+            for day in 1..=5 {
+                e.economy_mut().cycle_phase = CyclePhase::Trough;
+                e.close_day(day);
+            }
+            assert_eq!(e.cycle_hold, None);
+            assert_eq!(e.vix_hold_log, None);
+            assert!(e.cycle_hold_words().is_none());
+            assert_eq!(e.market_vol_cycle_held_target(0.4).to_bits(), 0.4f64.to_bits());
+            assert_eq!(plain.vix_hold_next(23.0), (None, 23.0));
+        }
+
+        #[test]
+        fn a_written_phase_is_counted_and_a_turn_restarts_the_clock() {
+            let mut e = on(0.335, 295.0, 198.0);
+            for day in 1..=30 {
+                // Written as a host writes it, before the close; the economy's
+                // own step may turn it after.
+                e.economy_mut().cycle_phase = CyclePhase::Trough;
+                e.close_day(day);
+                assert_eq!(e.cycle_hold, Some((CyclePhase::Trough, day)));
+            }
+            e.economy_mut().cycle_phase = CyclePhase::Recovery;
+            e.close_day(31);
+            assert_eq!(e.cycle_hold, Some((CyclePhase::Recovery, 1)));
+        }
+
+        #[test]
+        fn the_multiplier_fades_only_past_the_onset() {
+            let mut e = on(0.5, 0.0, 198.0);
+            e.economy_mut().cycle_phase = CyclePhase::Trough;
+            // Tonight's age is the held age plus one.
+            e.cycle_hold = Some((CyclePhase::Trough, 110));
+            assert_eq!(e.market_vol_cycle_held_target(0.4), 0.4, "age 111 is the onset itself");
+            e.cycle_hold = Some((CyclePhase::Trough, 111));
+            assert_eq!(e.market_vol_cycle_held_target(0.4), 0.2, "the whole share at half-life 0");
+            assert_eq!(e.market_vol_cycle_held_target(-0.1), -0.1, "a calm multiplier is left alone");
+            e.economy_mut().cycle_phase = CyclePhase::Recovery;
+            assert_eq!(e.market_vol_cycle_held_target(0.4), 0.4, "a new phase starts its own clock");
+            // At a half-life, half the share is gone that many closes past.
+            let mut h = on(0.5, 10.0, 198.0);
+            h.economy_mut().cycle_phase = CyclePhase::Trough;
+            h.cycle_hold = Some((CyclePhase::Trough, 120));
+            assert!((h.market_vol_cycle_held_target(0.4) - 0.4 * (1.0 - 0.5 * 0.5)).abs() < 1e-15);
+        }
+
+        #[test]
+        fn the_denominator_follows_a_held_vix_and_never_falls_below_its_own() {
+            let mut e = on(0.335, 295.0, 10.0);
+            e.economy_mut().cycle_phase = CyclePhase::Trough;
+            e.cycle_hold = Some((CyclePhase::Trough, 50));
+            assert_eq!(e.vix_hold_next(23.0), (None, 23.0), "before the onset");
+            e.cycle_hold = Some((CyclePhase::Trough, 111));
+            e.economy.vix = 34.0;
+            let (s, d) = e.vix_hold_next(23.0);
+            assert_eq!((s, d), (Some(crate::mathx::log(23.0)), 23.0), "opens at the close's own denominator");
+            e.vix_hold_log = s;
+            e.cycle_hold = Some((CyclePhase::Trough, 112));
+            let (s2, d2) = e.vix_hold_next(23.0);
+            let a = 1.0 - crate::mathx::pow(0.5, 0.1);
+            let want = crate::mathx::log(23.0) + a * (crate::mathx::log(34.0) - crate::mathx::log(23.0));
+            assert_eq!(s2, Some(want));
+            assert_eq!(d2, crate::mathx::exp(want));
+            // A VIX under the denominator moves the average but never the
+            // denominator below its own.
+            e.economy.vix = 12.0;
+            let (_, d3) = e.vix_hold_next(23.0);
+            assert_eq!(d3, 23.0);
+        }
+
+        #[test]
+        fn the_state_round_trips_and_is_hashed() {
+            let mut e = on(0.335, 295.0, 198.0);
+            assert!(!e.carries_cycle_hold(), "unset before the first close");
+            e.economy_mut().cycle_phase = CyclePhase::Trough;
+            e.close_day(1);
+            assert!(e.carries_cycle_hold());
+            e.cycle_hold = Some((CyclePhase::Trough, 140));
+            e.vix_hold_log = Some(3.3);
+            let words = e.cycle_hold_words().unwrap();
+            assert_eq!(words, [3.0, 140.0, 1.0, 3.3]);
+            let before = e.state_hash(1, false);
+            let mut other = e.clone();
+            other.set_cycle_hold_state(Some(&words)).unwrap();
+            assert_eq!(other.state_hash(1, false), before);
+            other.vix_hold_log = Some(3.31);
+            assert_ne!(other.state_hash(1, false), before);
+            assert!(other.set_cycle_hold_state(Some(&[5.0, 1.0, 0.0, 0.0])).is_err());
+            assert!(other.set_cycle_hold_state(Some(&[3.0, 0.0, 0.0, 0.0])).is_err());
+            assert!(other.set_cycle_hold_state(Some(&[3.0, 2.0, 0.0, 1.0])).is_err());
+            let mut plain = with(|_| {});
+            assert!(plain.set_cycle_hold_state(Some(&words)).is_err());
+        }
+
+        #[test]
+        fn the_fades_need_the_onset() {
+            let mut p = crate::params::PT_V21;
+            p.market_vol_cycle_hold_fade = 0.335;
+            assert!(p.invariants().is_err());
+            let mut p = crate::params::PT_V21;
+            p.market_vol_vix_hold_half_life = 198.0;
+            assert!(p.invariants().is_err());
+            let mut p = crate::params::PT_V21;
+            p.market_vol_cycle_hold_onset = 1.0;
+            assert!(p.invariants().is_err());
         }
     }
 

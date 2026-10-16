@@ -435,6 +435,25 @@ pub fn mean_sojourn_days_for(phase: CyclePhase, spec: &CycleSpec) -> f64 {
     walk_survival(phase, spec, |_, _| true)
 }
 
+/// The `q` quantile of one phase's sojourn, in DAYS, on the hazard alone:
+/// the smallest `d` with `P(T <= d) >= q`, on the same daily transition
+/// probabilities [`mean_sojourn_days_for`] walks. The time-held fade's onset
+/// (`market_vol_cycle_hold_onset`). `q` in [0, 1); a walk that never
+/// reaches it (a hazard that is zero for good) returns `i64::MAX`.
+pub fn sojourn_quantile_days_for(phase: CyclePhase, spec: &CycleSpec, q: f64) -> i64 {
+    // `s` is P(T > d) after the d-th check.
+    let mut s = 1.0;
+    let mut d = 0i64;
+    while d < 1_000_000 {
+        d += 1;
+        s *= 1.0 - hazard_only_transition_probability(phase, d, spec);
+        if 1.0 - s >= q {
+            return d;
+        }
+    }
+    i64::MAX
+}
+
 /// The stationary share of DAYS the chain spends in each phase, in
 /// [`phase_cycle`] order, as unnormalised weights and their total.
 ///

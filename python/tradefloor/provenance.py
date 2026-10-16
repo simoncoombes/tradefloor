@@ -605,6 +605,23 @@ OUT_OF_SCOPE = {
     "treasury_term_premium_half_life":
         "inert at 0.0 and read only with `treasury_term_premium_sd` set; at "
         "0.0 it is also left out of the model's digest",
+    "market_vol_cycle_hold_onset":
+        "inert at 0.0: no phase age is counted and the multiplier's target "
+        "and the coupling's denominator are the expressions that stood (a "
+        "branch on `== 0.0`); the clock is neither snapshotted nor hashed; at "
+        "0.0 it is also left out of the model's digest",
+    "market_vol_cycle_hold_fade":
+        "inert at 0.0: the multiplier's target is returned as it stood (a "
+        "branch on `== 0.0`); read only with `market_vol_cycle_hold_onset` "
+        "set; at 0.0 it is also left out of the model's digest",
+    "market_vol_cycle_hold_half_life":
+        "inert at 0.0 and read only with `market_vol_cycle_hold_fade` set; at "
+        "0.0 it is also left out of the model's digest",
+    "market_vol_vix_hold_half_life":
+        "inert at 0.0: the coupling's denominator is the one that stood and "
+        "no held average is kept (a branch on `== 0.0`); read only with "
+        "`market_vol_cycle_hold_onset` set; at 0.0 it is also left out of the "
+        "model's digest",
     "cycle_inflation_hazard":
         "inert at 0.0: an expansion adds the legacy 0.1 a month with "
         "inflation above 4 (a branch on `== 0.0` in the cycle's ladder); at "

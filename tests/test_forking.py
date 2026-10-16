@@ -1155,6 +1155,12 @@ def _nothing_dormant():
                    # ratios), on its own keyed draws.
                    treasury_term_premium_sd=0.06,
                    treasury_term_premium_half_life=49.0,
+                   # The time-held fade (issue #303): the onset, the
+                   # multiplier's fade and the held VIX's half-life.
+                   market_vol_cycle_hold_onset=0.9,
+                   market_vol_cycle_hold_fade=0.335,
+                   market_vol_cycle_hold_half_life=295.0,
+                   market_vol_vix_hold_half_life=198.0,
                    # The expansion's inflation and rate hazards (NBER fit).
                    cycle_inflation_hazard=0.0219,
                    cycle_rate_hazard=0.0013,
@@ -1388,6 +1394,15 @@ REQUIRED_SNAPSHOT_KEYS = ("columns", "rng", "tickers", "tick_components")
 #: dials put the scenario in reach of them: `fed_drawdown_mcap_prev`,
 #: `night_market_factor` and `market_vol_cycle_log`.
 UNREACHED_SNAPSHOT_FIELDS = {
+    "cycle_hold":
+        "the time-held fade's clock and held VIX "
+        "(`market_vol_cycle_hold_onset`). Both fades act only past a "
+        "contraction's or trough's onset, 111 sessions of a trough at the "
+        "earliest, and this scenario's market is days long, so dropping the "
+        "clock restarts a count no price reads yet. What it takes to see it "
+        "is a phase held past its onset. The engine's own tests "
+        "(`cycle_hold`) hold the clock, the fades and the state hash across "
+        "a restore.",
     "vix_anchor":
         "the VIX anchor `vix_level_identity` derives from the roster the "
         "engine was built on. Every copy here is built on the original's "
