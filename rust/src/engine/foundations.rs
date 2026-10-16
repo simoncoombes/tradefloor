@@ -748,7 +748,8 @@ impl Engine {
         // `oil_forecast_clamp`: the level carriers' log variance about the
         // expected path (the long factor's and the dollar's), and the
         // dollar's own variance, for the clamped expectation the forecast
-        // publishes. Nothing is read with the switch off.
+        // publishes; `oil_forecast_opec_spread` reads them too. Nothing is
+        // read with both switches off.
         let (mut carry_var, mut usd_var) = (0.0f64, 0.0f64);
         // Under the long factor a bound's truncation moves the factor, so the
         // expected truncation at one horizon joins the factor's expected path
@@ -1010,8 +1011,20 @@ impl Engine {
             };
             next.oil_price += pushed;
             if next.oil_last_opec_day != opec_day {
-                let opec = crate::economy::daily::opec_expected_impact(
-                    oil_before, crate::mathx::sqrt(var_oil), p.oil_opec_symmetry);
+                // `oil_forecast_opec_spread`: the decision over the price's
+                // whole spread at the step's start (the clamp's log variance,
+                // every part as it stood before this step), read lognormal.
+                // A branch, so 0.0 keeps the short factor's normal to the bit.
+                let opec = if p.oil_forecast_opec_spread != 0.0 {
+                    let log_var = if oil_before > 0.0 { var_oil / (oil_before * oil_before) } else { 0.0 }
+                        + carry_var
+                        + p.oil_convenience_yield * p.oil_convenience_yield * (sd_before * sd_before) / (50.0 * 50.0)
+                        + p.oil_dollar_elasticity * p.oil_dollar_elasticity * usd_var / (100.0 * 100.0);
+                    crate::economy::daily::opec_expected_impact_lognormal(oil_before, log_var, p.oil_opec_symmetry)
+                } else {
+                    crate::economy::daily::opec_expected_impact(
+                        oil_before, crate::mathx::sqrt(var_oil), p.oil_opec_symmetry)
+                };
                 next.oil_price += opec;
                 pushed += opec;
             }
@@ -1071,7 +1084,9 @@ impl Engine {
             // `oil_forecast_clamp`: publish the expectation truncated at the
             // clamps over the price's spread; the recursion keeps stepping
             // the unclamped expectation, so the clamp is read once.
-            if p.oil_forecast_clamp != 0.0 {
+            // The carriers' variances step under the clamp and under
+            // `oil_forecast_opec_spread`, which reads them at the next step.
+            if p.oil_forecast_clamp != 0.0 || p.oil_forecast_opec_spread != 0.0 {
                 let sigma = p.oil_target_drift_sd;
                 let pull = 1.0 - p.oil_target_drift_reversion;
                 carry_var = pull * pull * carry_var + sigma * sigma;
@@ -1080,6 +1095,8 @@ impl Engine {
                 let usd_keep = 1.0 - if p.usd_mean_reversion == 0.0 { 0.02 } else { p.usd_mean_reversion };
                 let usd_noise = if p.usd_noise_sd == 0.0 { 0.3 } else { p.usd_noise_sd };
                 usd_var = usd_keep * usd_keep * usd_var + usd_noise * usd_noise;
+            }
+            if p.oil_forecast_clamp != 0.0 {
                 let s = econ.oil_price;
                 let kappa_c = p.oil_convenience_yield;
                 let inventory_log_var = var_inventory / (50.0 * 50.0);

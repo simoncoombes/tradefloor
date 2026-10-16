@@ -1061,6 +1061,19 @@ pub struct ModelParams {
     /// plus the level carriers' (the long factor, the premium over
     /// inventory's spread, the dollar over its own) at the price.
     pub oil_forecast_clamp: f64,
+    /// The spread the forecast's expected OPEC decision reads, a switch. 0.0,
+    /// on every shipped preset, reads the price as normal with the short
+    /// factor's spread alone (its reversion and noise), as it stood. Once the
+    /// long factor carries most of the price's spread, that undercounts the
+    /// rule's cuts below its band (worth more than its raises above it), so
+    /// the forecast sits low and the oil futures inherit it (row OF4). At 1.0
+    /// the expected decision reads the price as lognormal, its mean the
+    /// expected price and its log variance the clamp's: the short factor's
+    /// over the price squared plus the level carriers' (the long factor, the
+    /// premium over inventory's spread, the dollar), as they stand at the
+    /// step's start, which is the price the rule reads. It reads the forecast
+    /// only; the law is unchanged.
+    pub oil_forecast_opec_spread: f64,
     /// The share of the dollar index's gap to its target closed each
     /// session. 0.0, on every shipped preset, is the standing 0.02, and a
     /// value of 0.0 is left out of the model's digest.
@@ -8301,6 +8314,7 @@ impl ModelParams {
             oil_dollar_elasticity: 0.0,
             oil_inventory_noise_sd: 0.0,
             oil_forecast_clamp: 0.0,
+            oil_forecast_opec_spread: 0.0,
             usd_mean_reversion: 0.0,
             usd_noise_sd: 0.0,
             usd_safe_haven_gain: 0.0,
@@ -10950,6 +10964,7 @@ impl ModelParams {
             "oil_dollar_elasticity" => self.oil_dollar_elasticity,
             "oil_inventory_noise_sd" => self.oil_inventory_noise_sd,
             "oil_forecast_clamp" => self.oil_forecast_clamp,
+            "oil_forecast_opec_spread" => self.oil_forecast_opec_spread,
             "usd_mean_reversion" => self.usd_mean_reversion,
             "usd_noise_sd" => self.usd_noise_sd,
             "usd_safe_haven_gain" => self.usd_safe_haven_gain,
@@ -11364,6 +11379,7 @@ impl ModelParams {
             "oil_dollar_elasticity" => out.oil_dollar_elasticity = value,
             "oil_inventory_noise_sd" => out.oil_inventory_noise_sd = value,
             "oil_forecast_clamp" => out.oil_forecast_clamp = value,
+            "oil_forecast_opec_spread" => out.oil_forecast_opec_spread = value,
             "usd_mean_reversion" => out.usd_mean_reversion = value,
             "usd_noise_sd" => out.usd_noise_sd = value,
             "usd_safe_haven_gain" => out.usd_safe_haven_gain = value,
@@ -12947,6 +12963,12 @@ impl ModelParams {
                  unclamped expectation) or 1 (the expectation truncated at the clamps).",
                 self.oil_forecast_clamp));
         }
+        if !(self.oil_forecast_opec_spread == 0.0 || self.oil_forecast_opec_spread == 1.0) {
+            return Err(format!(
+                "oil_forecast_opec_spread is {}. It is a switch: 0 (the forecast's expected OPEC \
+                 decision reads the short factor's spread) or 1 (the price's whole spread).",
+                self.oil_forecast_opec_spread));
+        }
         if !(0.0..=5.0).contains(&self.oil_inventory_noise_sd) {
             return Err(format!(
                 "oil_inventory_noise_sd is {}. It is the sd of oil inventory's daily noise, in \
@@ -13639,6 +13661,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "oil_dollar_elasticity",
     "oil_inventory_noise_sd",
     "oil_forecast_clamp",
+    "oil_forecast_opec_spread",
     "usd_mean_reversion",
     "usd_noise_sd",
     "usd_safe_haven_gain",
@@ -13871,6 +13894,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "oil_dollar_elasticity",
         "oil_inventory_noise_sd",
         "oil_forecast_clamp",
+        "oil_forecast_opec_spread",
         "usd_mean_reversion",
         "usd_noise_sd",
         "usd_safe_haven_gain",
