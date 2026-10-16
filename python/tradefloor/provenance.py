@@ -439,7 +439,7 @@ OUT_OF_SCOPE = {
         "`basis_sd` by tools/calibration/basis_dials.py; at 0.0 it is also "
         "left out of the model's digest",
     "basis_night_share":
-        "a branch at 0.0: `futures_step` decays the basis noise evenly over "
+        "inert at 0.0: `futures_step` decays the basis noise evenly over "
         "the day's steps, as without it; off zero the night's steps carry this "
         "share of the day's decay, with the noise sized to keep the basis's sd, "
         "and it reads only the futures' own noise, so no price of the "
