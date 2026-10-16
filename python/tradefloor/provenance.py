@@ -626,6 +626,11 @@ OUT_OF_SCOPE = {
         "meeting's every close, as it stood (a branch on `== 0.0` in "
         "`reprice_anticipated_meeting`); at 0.0 it is also left out of the "
         "model's digest",
+    "flight_to_quality_reversal_cut":
+        "inert at 0.0: `close_yields` branches on `== 0.0` and moves the "
+        "curve by the whole reversed flight to quality over 4 per cent "
+        "inflation, as it stood; at 0.0 it is also left out of the model's "
+        "digest",
     "treasury_2y_meeting_carry":
         "inert at 0.0: the meeting sets the 2-year from the rate as it stood "
         "(a branch on `== 0.0` in the meeting and in the anticipated "

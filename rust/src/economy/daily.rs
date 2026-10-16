@@ -399,6 +399,9 @@ pub struct YieldDials {
     /// Percentage points of yield per per cent of index return. See
     /// [`crate::params::ModelParams::flight_to_quality_gain`].
     pub flight_to_quality_gain: f64,
+    /// The share of the reversed flight to quality (inflation over 4) taken
+    /// away. See [`crate::params::ModelParams::flight_to_quality_reversal_cut`].
+    pub flight_to_quality_reversal_cut: f64,
     /// A switch: 1.0 reads the session's own index return. See
     /// [`crate::params::ModelParams::flight_to_quality_day`].
     pub flight_to_quality_day: f64,
@@ -526,6 +529,7 @@ impl Default for YieldDials {
             treasury_10y_noise: 0.03,
             treasury_2y_noise: 0.0,
             flight_to_quality_gain: 0.02,
+            flight_to_quality_reversal_cut: 0.0,
             flight_to_quality_day: 0.0,
             corporate_yield_daily: 0.0,
             vix_pinned: false,
@@ -1463,8 +1467,15 @@ fn close_yields(
     let ftq_gain = inputs.yields.flight_to_quality_gain;
     if prev_mkt_ret.abs() > ftq_gate {
         let bond_stock_yield_shift = if curve_inflation > 4.0 {
-            // Positive correlation: stocks down, yields up.
-            -prev_mkt_ret * ftq_gain
+            // Positive correlation: stocks down, yields up. THE REVERSAL'S
+            // SIZE (`flight_to_quality_reversal_cut`): off zero only `1 - cut`
+            // of the gain. Guarded, so at 0.0 the shift is the expression
+            // that stood.
+            if inputs.yields.flight_to_quality_reversal_cut != 0.0 {
+                -prev_mkt_ret * ftq_gain * (1.0 - inputs.yields.flight_to_quality_reversal_cut)
+            } else {
+                -prev_mkt_ret * ftq_gain
+            }
         } else if curve_inflation < 3.0 {
             // Flight to quality.
             prev_mkt_ret * ftq_gain

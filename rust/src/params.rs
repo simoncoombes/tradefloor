@@ -1823,6 +1823,21 @@ pub struct ModelParams {
     /// through pt-v19; pt-v20 ships 0.008.
     /// pt-v21 ships 0.013.
     pub flight_to_quality_gain: f64,
+    /// The share of the flight to quality's reversed move that is taken away
+    /// while the curve's inflation is over 4 per cent. 0.0, on every shipped
+    /// preset, moves the 10-year (and the 2-year) up by the full
+    /// `flight_to_quality_gain` times a fall in the index, as it stood, and a
+    /// value of 0.0 is left out of the model's digest.
+    ///
+    /// Off zero the reversed shift over 4 is `(1 - this)` of the gain's; the
+    /// flight to quality under 3 is unchanged. Anchor: FRED DGS10 against the
+    /// S&P 500 (GSPC), 1990-2025, sessions off the zero bound (DFF over
+    /// 0.25) with core CPI (CPILFESL, year on year, as published the month
+    /// before) over 4: the daily correlation of the index's log return with
+    /// minus the 10-year's change is +0.266 (987 sessions; +0.183 at 3 to 4,
+    /// where the rule moves nothing, and -0.212 under 3). At 0.0 the rule
+    /// took the model's to about +0.52. In [0, 1].
+    pub flight_to_quality_reversal_cut: f64,
     /// Which return the flight to quality reads, a switch. 0.0, on every
     /// preset through pt-v19, reads the previous session's closing minute;
     /// pt-v20 ships 1.0, which reads this session's index return.
@@ -8307,6 +8322,7 @@ impl ModelParams {
             treasury_10y_noise: 0.03,
             treasury_2y_noise: 0.0,
             flight_to_quality_gain: 0.02,
+            flight_to_quality_reversal_cut: 0.0,
             flight_to_quality_day: 0.0,
             corporate_yield_daily: 0.0,
             cycle_nowcast_accuracy: 0.0,
@@ -10953,6 +10969,7 @@ impl ModelParams {
             "treasury_10y_noise" => self.treasury_10y_noise,
             "treasury_2y_noise" => self.treasury_2y_noise,
             "flight_to_quality_gain" => self.flight_to_quality_gain,
+            "flight_to_quality_reversal_cut" => self.flight_to_quality_reversal_cut,
             "flight_to_quality_day" => self.flight_to_quality_day,
             "corporate_yield_daily" => self.corporate_yield_daily,
             "cycle_nowcast_accuracy" => self.cycle_nowcast_accuracy,
@@ -11364,6 +11381,7 @@ impl ModelParams {
             "treasury_10y_noise" => out.treasury_10y_noise = value,
             "treasury_2y_noise" => out.treasury_2y_noise = value,
             "flight_to_quality_gain" => out.flight_to_quality_gain = value,
+            "flight_to_quality_reversal_cut" => out.flight_to_quality_reversal_cut = value,
             "flight_to_quality_day" => out.flight_to_quality_day = value,
             "corporate_yield_daily" => out.corporate_yield_daily = value,
             "cycle_nowcast_accuracy" => out.cycle_nowcast_accuracy = value,
@@ -12802,6 +12820,12 @@ impl ModelParams {
                  shadow's change every close, as it stood.",
                 self.policy_anticipation_half_life));
         }
+        if !(0.0..=1.0).contains(&self.flight_to_quality_reversal_cut) {
+            return Err(format!(
+                "flight_to_quality_reversal_cut is {}. It is the share of the reversed flight to quality \
+                 taken away over 4 per cent inflation, in [0, 1].",
+                self.flight_to_quality_reversal_cut));
+        }
         if !(0.0..=1.0).contains(&self.treasury_2y_meeting_carry) {
             return Err(format!(
                 "treasury_2y_meeting_carry is {}. It is the share of the 2-year's standing gap to \
@@ -13584,6 +13608,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "corporate_spread_noise_sd",
     "corporate_spread_noise_half_life",
     "treasury_2y_meeting_carry",
+    "flight_to_quality_reversal_cut",
     "policy_anticipation_half_life",
     "treasury_path_anticipated",
     "policy_anticipation_guidance",
@@ -13813,6 +13838,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "corporate_spread_noise_sd",
         "corporate_spread_noise_half_life",
         "treasury_2y_meeting_carry",
+        "flight_to_quality_reversal_cut",
         "policy_anticipation_half_life",
         "treasury_path_anticipated",
         "policy_anticipation_guidance",
