@@ -1624,6 +1624,25 @@ pub struct ModelParams {
     /// `basis_sd` to read it, 0.429 (the estimator's window of 252 sessions
     /// reads an AR(1) about 0.008 low). In [0, 1).
     pub basis_persistence: f64,
+    /// The share of a day's basis decay that the night carries
+    /// (`basis_night_share`). 0.0, on every shipped preset, is a branch: the
+    /// basis noise decays evenly over the session's ticks and the night's
+    /// steps, so the night carries `basis_persistence` to the power of its
+    /// share of the day's steps (about 0.98 of a close's deviation reaches
+    /// the next morning at ten night steps), and a value of 0.0 is left out
+    /// of the model's digest.
+    ///
+    /// Off zero, the night's steps carry `basis_persistence` to the power
+    /// of this share and the session's ticks the rest, each step's noise
+    /// sized so the basis keeps its sd (`basis_sd`): the close's basis and
+    /// its close-to-close autocorrelation are the same at any value. On the
+    /// tape most of a close's deviation is gone by the next 09:45 (ES
+    /// against the S&P 500 at five minutes, 2026: the correlation of the
+    /// close's basis with the next 09:45's is 0.35, with the next close's
+    /// 0.25, a share of 0.76). Reads only the futures' own noise, so no
+    /// price of the underlying moves. Requires `futures_index_listed` and
+    /// `night_session_steps`. In [0, 1].
+    pub basis_night_share: f64,
     /// How many steps the night session for index futures takes, from the
     /// close to the next open. 0.0, on every shipped preset, walks no night:
     /// between sessions a future holds its closing mark and moves to the
@@ -8335,6 +8354,7 @@ impl ModelParams {
             futures_index_listed: 0.0,
             basis_sd: 0.0,
             basis_persistence: 0.0,
+            basis_night_share: 0.0,
             night_session_steps: 0.0,
             futures_impact_memory: 0.0,
             futures_impact_memory_half_life: 0.0,
@@ -10983,6 +11003,7 @@ impl ModelParams {
             "futures_index_listed" => self.futures_index_listed,
             "basis_sd" => self.basis_sd,
             "basis_persistence" => self.basis_persistence,
+            "basis_night_share" => self.basis_night_share,
             "night_session_steps" => self.night_session_steps,
             "futures_impact_memory" => self.futures_impact_memory,
             "futures_impact_memory_half_life" => self.futures_impact_memory_half_life,
@@ -11396,6 +11417,7 @@ impl ModelParams {
             "futures_index_listed" => out.futures_index_listed = value,
             "basis_sd" => out.basis_sd = value,
             "basis_persistence" => out.basis_persistence = value,
+            "basis_night_share" => out.basis_night_share = value,
             "night_session_steps" => out.night_session_steps = value,
             "futures_impact_memory" => out.futures_impact_memory = value,
             "futures_impact_memory_half_life" => out.futures_impact_memory_half_life = value,
@@ -13042,6 +13064,19 @@ impl ModelParams {
                  one close to the next, in [0, 1).",
                 self.basis_persistence));
         }
+        if !(0.0..=1.0).contains(&self.basis_night_share) {
+            return Err(format!(
+                "basis_night_share is {}. It is the share of a day's basis decay the night \
+                 carries, in [0, 1]; 0.0 decays it evenly over the day's steps.",
+                self.basis_night_share));
+        }
+        if self.basis_night_share != 0.0 && self.night_session_steps == 0.0 {
+            return Err(format!(
+                "night_session_steps is 0 but basis_night_share is {}. The share is carried by \
+                 the night session's steps: with basis_night_share set, night_session_steps is \
+                 above 0.",
+                self.basis_night_share));
+        }
         if !(self.night_session_steps >= 0.0
             && self.night_session_steps <= 390.0
             && self.night_session_steps.fract() == 0.0)
@@ -13679,6 +13714,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "futures_index_listed",
     "basis_sd",
     "basis_persistence",
+    "basis_night_share",
     "futures_vix_listed",
     "futures_vix_live_fast_share",
     "futures_vix_live_fast_half_life",
@@ -13911,6 +13947,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "futures_index_listed",
         "basis_sd",
         "basis_persistence",
+        "basis_night_share",
         "night_session_steps",
         "futures_impact_memory",
         "futures_impact_memory_half_life",
