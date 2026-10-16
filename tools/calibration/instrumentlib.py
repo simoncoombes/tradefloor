@@ -887,6 +887,7 @@ PARAM_SPECS: dict[str, dict] = {
     "cycle_rate_hazard": {"kind": "abs", "step_unit": 0.005, "hard_range": (0.0, 0.5)},
     "core_trend_persistence": {"kind": "abs", "step_unit": 0.001, "hard_range": (0.0, 1.0)},
     "treasury_2y_meeting_carry": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 1.0)},
+    "flight_to_quality_reversal_cut": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 1.0)},
     "policy_anticipation_half_life": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 252.0)},
     "treasury_path_anticipated": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0), "derived": False},
     "policy_anticipation_guidance": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 1.0)},

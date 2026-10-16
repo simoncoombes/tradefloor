@@ -9738,6 +9738,7 @@ impl Engine {
                 treasury_10y_noise: self.params.treasury_10y_noise,
                 treasury_2y_noise: self.params.treasury_2y_noise,
                 flight_to_quality_gain: self.params.flight_to_quality_gain,
+                flight_to_quality_reversal_cut: self.params.flight_to_quality_reversal_cut,
                 flight_to_quality_day: self.params.flight_to_quality_day,
                 corporate_yield_daily: self.params.corporate_yield_daily,
                 vix_pinned: self.macro_pins_today & PIN_VIX != 0,

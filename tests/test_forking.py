@@ -1160,6 +1160,8 @@ def _nothing_dormant():
                    treasury_path_owed_excluded=1.0,
                    # The 2-year's carry through a meeting (a share).
                    treasury_2y_meeting_carry=1.0,
+                   # The reversed flight to quality's cut over 4 (a share).
+                   flight_to_quality_reversal_cut=0.5,
                    # The priced meeting's half-life (policy_anticipation is
                    # on above), in sessions.
                    policy_anticipation_half_life=10.0,
