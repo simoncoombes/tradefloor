@@ -1134,6 +1134,7 @@ def _nothing_dormant():
                    # at WTI's real-terms range (each only widens).
                    oil_pushes_in_target=1.0,
                    oil_forecast_clamp=1.0,
+                   oil_forecast_opec_spread=1.0,
                    # The bank's and the curve's core inflation: switches,
                    # and both on so the oil part of headline is carried.
                    fed_core_inflation=1.0,

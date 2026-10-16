@@ -668,6 +668,11 @@ OUT_OF_SCOPE = {
         "inert at 0.0: the forecast publishes the unclamped expectation it "
         "steps, as it stood; it reads the forecast only, so no price moves at "
         "any value, and at 0.0 it is also left out of the model's digest",
+    "oil_forecast_opec_spread":
+        "inert at 0.0: the forecast's expected OPEC decision reads the short "
+        "factor's spread as it stood (a branch on `== 0.0`); it reads the "
+        "forecast only, so the law moves no price at any value, and at 0.0 it "
+        "is also left out of the model's digest",
     "oil_dollar_elasticity":
         "inert at 0.0: `update_economy_daily` branches on `== 0.0` and takes "
         "the dollar's daily drag as it stood, and rescales nothing after the "

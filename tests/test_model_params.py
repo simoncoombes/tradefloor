@@ -1244,6 +1244,9 @@ PERTURBATIONS = [
     # The forecast's clamped oil (`oil_forecast_clamp`): INERT for the same
     # reason, it changes only what the forecast publishes.
     ("oil_forecast_clamp", 1.0, False),
+    # The spread the forecast's expected OPEC decision reads: INERT for the
+    # same reason.
+    ("oil_forecast_opec_spread", 1.0, False),
     # The forecast's derived dials: INERT for the same reason, and read only
     # with the horizon set.
     ("forecast_vix_dispersion", 0.3, False),

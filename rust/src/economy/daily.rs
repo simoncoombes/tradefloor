@@ -1821,6 +1821,24 @@ pub fn opec_expected_impact(mean: f64, sd: f64, symmetry: f64) -> f64 {
     cut_p * (cut_lo + 1.5) * p_below - raise_p * (raise_lo + 1.5) * p_above
 }
 
+/// [`opec_expected_impact`] with the price read as lognormal: its mean
+/// `mean` and its log variance `log_var`, so `ln S` is normal with mean
+/// `ln mean - log_var / 2`. For the forecast under
+/// `oil_forecast_opec_spread`, whose spread is the clamp's (the short
+/// factor's and the level carriers'). At `log_var` 0.0 it is the rule's
+/// expectation at `mean` itself.
+pub fn opec_expected_impact_lognormal(mean: f64, log_var: f64, symmetry: f64) -> f64 {
+    if !(mean > 0.0) || !(log_var > 0.0) {
+        return opec_expected_impact(mean, 0.0, symmetry);
+    }
+    let (cut_p, cut_lo, raise_p, raise_lo) = opec_rule(symmetry);
+    let mu = mathx::log(mean) - 0.5 * log_var;
+    let s = mathx::sqrt(2.0 * log_var);
+    let p_below = 0.5 * mathx::erfc((mu - mathx::log(OPEC_TARGET - OPEC_BAND)) / s);
+    let p_above = 0.5 * mathx::erfc((mathx::log(OPEC_TARGET + OPEC_BAND) - mu) / s);
+    cut_p * (cut_lo + 1.5) * p_below - raise_p * (raise_lo + 1.5) * p_above
+}
+
 /// The (2-year, 10-year, corporate) yields, in per cent, that
 /// [`update_economy_daily`] would publish from `economy` on `inputs` with its
 /// draws at their means ([`MeanDraws`]) and no active shock: the VIX and

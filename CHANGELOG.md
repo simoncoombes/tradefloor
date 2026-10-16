@@ -22,6 +22,16 @@ same with them on as off.
 
 <!-- release-note-ends -->
 
+### Oil's forecast
+
+- `oil_forecast_opec_spread` is a new switch, 0.0 on every preset and left
+  out of the digest there. At 1.0 the forecast's expected OPEC decision reads
+  the oil price's whole spread (the short factor's and the level carriers',
+  as the clamp does), lognormal, in place of the short factor's alone. With
+  the long factor carrying most of the spread, the short factor's undercounts
+  the rule's cuts, which are worth more than its raises, and the forecast
+  sits low. It changes what the forecast publishes and nothing in the law.
+
 ### Index futures
 
 - `futures_index_listed` and `night_session_steps` are new dials, with
