@@ -8453,30 +8453,50 @@ impl Engine {
         // which moves it but does not apply it: the VIX a scenario pinned
         // already carries the phase, and the forced level is the one that
         // VIX implies.
+        // `free_pair` is the level and denominator a free close would read;
+        // it differs from the pair below only on a forced close with the
+        // cycle multiplier on, and only `pinned_vix_forced_lag` reads it.
+        let mut free_pair = (market_vol_level, vix_ratio_denominator);
         let (market_vol_level, vix_ratio_denominator) = if self.params.market_vol_cycle_ratio == 0.0 {
             (market_vol_level, vix_ratio_denominator)
         } else {
             let l = self.step_market_vol_cycle();
+            // As the session applied it: one on a session a caller's
+            // pins cover (`market_vol_cycle_pin_neutral`,
+            // `market_vol_cycle_pin_phase`), `l` itself otherwise.
+            let m = crate::mathx::exp(self.market_vol_cycle_applied_log(l));
+            free_pair = (market_vol_level * m * m, vix_ratio_denominator * self.market_vol_cycle_vix_scale());
             if self.vix_sets_variance_pending {
                 (market_vol_level, vix_ratio_denominator)
             } else {
-                // As the session applied it: one on a session a caller's
-                // pins cover (`market_vol_cycle_pin_neutral`,
-                // `market_vol_cycle_pin_phase`), `l` itself otherwise.
-                let m = crate::mathx::exp(self.market_vol_cycle_applied_log(l));
-                (market_vol_level * m * m, vix_ratio_denominator * self.market_vol_cycle_vix_scale())
+                free_pair
             }
         };
         self.last_market_targets = Some(if self.vix_sets_variance_pending {
             self.vix_sets_variance_pending = false;
             let denominator =
                 self.forced_vix_denominator(vix_ratio_denominator, market_vol_level);
-            self.market_vol.close_day_forced(
-                &self.params,
-                denominator,
-                self.economy.vix,
-                market_vol_level,
-            )
+            // THE FORCED CLOSE'S LAG (`pinned_vix_forced_lag`): off zero the
+            // components keep that share of the free close's step. A branch,
+            // so the forced close is the one that stood at 0.0.
+            if self.params.pinned_vix_forced_lag != 0.0 {
+                self.market_vol.close_day_forced_lagged(
+                    &self.params,
+                    denominator,
+                    market_vol_level,
+                    free_pair.1,
+                    free_pair.0,
+                    self.economy.vix,
+                    self.params.pinned_vix_forced_lag,
+                )
+            } else {
+                self.market_vol.close_day_forced(
+                    &self.params,
+                    denominator,
+                    self.economy.vix,
+                    market_vol_level,
+                )
+            }
         } else {
             self.market_vol.close_day_scaled(
                 &self.params,

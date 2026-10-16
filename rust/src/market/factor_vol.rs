@@ -1179,6 +1179,39 @@ impl MarketVarianceState {
         (target, Some(slow_target))
     }
 
+    /// A forced close that keeps a share of the free close's step
+    /// (`pinned_vix_forced_lag`): the components end `lag` of the way from the
+    /// law's fixed point at the forced VIX ([`Self::close_day_forced`]) back
+    /// to where the free close ([`Self::close_day_scaled`], on the free
+    /// close's own level and denominator) would have stepped them. 0.0 is the
+    /// forced close; 1.0 the free close's components. Everything else (the
+    /// return memory, the smoothed VIX, the day accumulator) is the forced
+    /// close's. No draw.
+    #[allow(clippy::too_many_arguments)]
+    pub fn close_day_forced_lagged(
+        &mut self,
+        params: &crate::params::ModelParams,
+        forced_denominator: f64,
+        forced_level: f64,
+        free_denominator: f64,
+        free_level: f64,
+        vix: f64,
+        lag: f64,
+    ) -> (f64, Option<f64>) {
+        let mut free = *self;
+        let _ = free.close_day_scaled(params, free_denominator, vix, free_level);
+        let targets = self.close_day_forced(params, forced_denominator, vix, forced_level);
+        self.fast_variance = clamp_variance(params, self.fast_variance + lag * (free.fast_variance - self.fast_variance));
+        if params.market_vol_slow_weight == 0.0 {
+            self.variance = self.fast_variance;
+        } else {
+            let w = params.market_vol_slow_weight;
+            self.slow_variance = clamp_variance(params, self.slow_variance + lag * (free.slow_variance - self.slow_variance));
+            self.variance = clamp_variance(params, (1.0 - w) * self.fast_variance + w * self.slow_variance);
+        }
+        targets
+    }
+
     /// Warm the variance components to the slow LEVEL the run opens on,
     /// before session one.
     ///

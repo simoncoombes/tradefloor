@@ -2328,6 +2328,18 @@ pub struct ModelParams {
     /// February high read 0.32 (S&P 500 0.34, stepped 0.27) and its
     /// drawdown over the path 0.33 (0.34, stepped 0.38).
     pub pinned_vix_sets_variance: f64,
+    /// The share of a forced close's move to the variance law's fixed point
+    /// that is left undone (`pinned_vix_sets_variance`, a scenario's
+    /// `vix_sets_variance`). 0.0, on every shipped preset, is the forced close
+    /// as it stood: both variance components set to the law's fixed point at
+    /// the forced VIX, and a value of 0.0 is left out of the model's digest.
+    ///
+    /// Off zero the components end this share of the way back from that
+    /// fixed point toward where the free close would have stepped them, on
+    /// the free close's own level and denominator; the return memory, the
+    /// smoothed VIX and the day's accumulator are the forced close's. No
+    /// draw, no state. In [0, 1].
+    pub pinned_vix_forced_lag: f64,
     /// A ceiling on the annual buyback yield `buyback_payout_share * eps /
     /// price` that the buyback term compounds over the elapsed years. In
     /// [0, 1], and 0.0 means no ceiling.
@@ -8381,6 +8393,7 @@ impl ModelParams {
             pinned_vix_calm_share: 0.0,
             pinned_vix_priced_cap: 0.0,
             pinned_vix_sets_variance: 0.0,
+            pinned_vix_forced_lag: 0.0,
             buyback_yield_cap: 0.0,
             buyback_accrual: 0.0,
             rate_close_remark: 0.0,
@@ -11030,6 +11043,7 @@ impl ModelParams {
             "pinned_vix_calm_share" => self.pinned_vix_calm_share,
             "pinned_vix_priced_cap" => self.pinned_vix_priced_cap,
             "pinned_vix_sets_variance" => self.pinned_vix_sets_variance,
+            "pinned_vix_forced_lag" => self.pinned_vix_forced_lag,
             "buyback_yield_cap" => self.buyback_yield_cap,
             "buyback_accrual" => self.buyback_accrual,
             "rate_close_remark" => self.rate_close_remark,
@@ -11444,6 +11458,7 @@ impl ModelParams {
             "pinned_vix_calm_share" => out.pinned_vix_calm_share = value,
             "pinned_vix_priced_cap" => out.pinned_vix_priced_cap = value,
             "pinned_vix_sets_variance" => out.pinned_vix_sets_variance = value,
+            "pinned_vix_forced_lag" => out.pinned_vix_forced_lag = value,
             "buyback_yield_cap" => out.buyback_yield_cap = value,
             "buyback_accrual" => out.buyback_accrual = value,
             "rate_close_remark" => out.rate_close_remark = value,
@@ -12863,6 +12878,12 @@ impl ModelParams {
                  taken away over 4 per cent inflation, in [0, 1].",
                 self.flight_to_quality_reversal_cut));
         }
+        if !(0.0..=1.0).contains(&self.pinned_vix_forced_lag) {
+            return Err(format!(
+                "pinned_vix_forced_lag is {}. It is the share of a forced close's move to the variance \
+                 law's fixed point left undone, in [0, 1].",
+                self.pinned_vix_forced_lag));
+        }
         if !(0.0..=1.0).contains(&self.treasury_2y_meeting_carry) {
             return Err(format!(
                 "treasury_2y_meeting_carry is {}. It is the share of the 2-year's standing gap to \
@@ -13607,6 +13628,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "pinned_vix_feedback",
     "pinned_vix_priced_cap",
     "pinned_vix_sets_variance",
+    "pinned_vix_forced_lag",
     "pinned_vix_variance_share",
     "policy_anticipation",
     "policy_anticipation_cut_share",
@@ -13950,6 +13972,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "pinned_vix_calm_share",
         "pinned_vix_priced_cap",
         "pinned_vix_sets_variance",
+        "pinned_vix_forced_lag",
         "buyback_yield_cap",
         "buyback_accrual",
         "rate_close_remark",
