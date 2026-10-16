@@ -416,6 +416,11 @@ OUT_OF_SCOPE = {
         "unread while `forecast_policy_reversion` is 0.0, as every preset "
         "ships it; at its default of 2.5 it is also left out of the model's "
         "digest",
+    "forecast_policy_neutral_core":
+        "unread while `forecast_policy_reversion` is 0.0, as every preset "
+        "ships it, and at 0.0 it is a branch (the fixed neutral); the "
+        "forecast writes nothing back, so no price moves; at 0.0 it is also "
+        "left out of the model's digest",
     # The index futures and their night session (pt-v22 phase 1), inert on
     # every shipped preset. A future reads the index, the dividends and the
     # forecast and draws only on `stream::DERIVATIVES`, so off zero they

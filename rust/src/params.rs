@@ -1575,6 +1575,24 @@ pub struct ModelParams {
     /// neutral rate the curve's damping reads (`TREASURY_NEUTRAL_RATE`), it
     /// is left out of the model's digest.
     pub forecast_policy_neutral: f64,
+    /// How far the forecast's neutral rate moves with the inflation the
+    /// bank's meeting reads (`forecast_policy_neutral_core`): points of
+    /// neutral per point of that inflation above the bank's target. 0.0, on
+    /// every shipped preset, is a branch: the path reverts toward
+    /// `forecast_policy_neutral` whatever inflation stands at, and a value
+    /// of 0.0 is left out of the model's digest.
+    ///
+    /// Off zero the path reverts toward `forecast_policy_neutral` plus this
+    /// times the gap, the inflation read at the close the forecast starts
+    /// from: core under `fed_core_inflation`, headline without it. A
+    /// history's core trend (`core_trend_sd`) holds its policy rate off any
+    /// fixed neutral for years, so a fixed neutral leaves the forecast low in
+    /// high-rate histories and high in low-rate ones. Fitted with the other
+    /// policy dials on held-out histories by
+    /// tools/calibration/forecast_dials.py. Read only with
+    /// `forecast_policy_reversion` set; the forecast writes nothing back, so
+    /// no price moves. In [0, 3].
+    pub forecast_policy_neutral_core: f64,
     /// Whether the engine lists futures on its price index. 0.0, on every
     /// shipped preset, lists none: no contract, no state, nothing in the
     /// snapshot or the state hash, and a value of 0.0 is left out of the
@@ -8350,6 +8368,7 @@ impl ModelParams {
             forecast_policy_shadow_discount: 0.0,
             forecast_policy_persistence: 0.0,
             forecast_policy_reversion: 0.0,
+            forecast_policy_neutral_core: 0.0,
             forecast_policy_neutral: 2.5,
             futures_index_listed: 0.0,
             basis_sd: 0.0,
@@ -11000,6 +11019,7 @@ impl ModelParams {
             "forecast_policy_persistence" => self.forecast_policy_persistence,
             "forecast_policy_reversion" => self.forecast_policy_reversion,
             "forecast_policy_neutral" => self.forecast_policy_neutral,
+            "forecast_policy_neutral_core" => self.forecast_policy_neutral_core,
             "futures_index_listed" => self.futures_index_listed,
             "basis_sd" => self.basis_sd,
             "basis_persistence" => self.basis_persistence,
@@ -11414,6 +11434,7 @@ impl ModelParams {
             "forecast_policy_persistence" => out.forecast_policy_persistence = value,
             "forecast_policy_reversion" => out.forecast_policy_reversion = value,
             "forecast_policy_neutral" => out.forecast_policy_neutral = value,
+            "forecast_policy_neutral_core" => out.forecast_policy_neutral_core = value,
             "futures_index_listed" => out.futures_index_listed = value,
             "basis_sd" => out.basis_sd = value,
             "basis_persistence" => out.basis_persistence = value,
@@ -13040,6 +13061,13 @@ impl ModelParams {
                  toward, per cent, in [-5, 20].",
                 self.forecast_policy_neutral));
         }
+        if !(0.0..=3.0).contains(&self.forecast_policy_neutral_core) {
+            return Err(format!(
+                "forecast_policy_neutral_core is {}. It is the points the forecast's neutral \
+                 rate moves per point of the meeting's inflation above target, in [0, 3]; 0.0 \
+                 keeps the neutral fixed.",
+                self.forecast_policy_neutral_core));
+        }
         if !(self.futures_index_listed == 0.0 || self.futures_index_listed == 1.0) {
             return Err(format!(
                 "futures_index_listed is {}. It is a switch, 0.0 off or 1.0 on.",
@@ -13711,6 +13739,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "forecast_policy_shadow_discount",
     "forecast_policy_persistence",
     "forecast_policy_reversion",
+    "forecast_policy_neutral_core",
     "futures_index_listed",
     "basis_sd",
     "basis_persistence",
@@ -13944,6 +13973,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "forecast_policy_persistence",
         "forecast_policy_reversion",
         "forecast_policy_neutral",
+        "forecast_policy_neutral_core",
         "futures_index_listed",
         "basis_sd",
         "basis_persistence",

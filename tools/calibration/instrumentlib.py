@@ -219,6 +219,7 @@ PARAM_SPECS: dict[str, dict] = {
                                     "hard_range": (0.0, 0.999), "derived": True},
     "forecast_policy_reversion": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 1.0),
                                   "derived": True},
+    "forecast_policy_neutral_core": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 3.0), "derived": True},
     "forecast_policy_neutral": {"kind": "abs", "step_unit": 0.1, "hard_range": (-5.0, 20.0),
                                 "derived": True},
     # The index futures and their night session (pt-v22 phase 1). Each hard
