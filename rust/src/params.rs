@@ -1543,6 +1543,23 @@ pub struct ModelParams {
     /// the expectation of every power of the VIX stays finite. In
     /// [-0.99, 0.99], the skew-normal's reach.
     pub forecast_vix_dispersion_skew: f64,
+    /// Whether the forecast reads the VIX's slow level (`forecast_vix_level`).
+    /// 0.0, on every shipped preset, is a branch: the forecast takes the
+    /// level's multiplier on the VIX's target and anchor at its mean, 1.0,
+    /// whatever the level stands at, and a value of 0.0 is left out of the
+    /// model's digest.
+    ///
+    /// At 1.0 the forecast takes the multiplier's expectation at each close
+    /// it projects, from the level the last close left:
+    /// `exp(phi^h x - phi^(2h) V / 2)` at `h` closes ahead, `x` the level,
+    /// `phi` its persistence and `V` its stationary variance, which is 1.0
+    /// far ahead and the multiplier itself at none. The level is persistent
+    /// (a half-life of about 330 sessions at 0.9979), so a forecast that
+    /// sets it to its mean misreads where the VIX is heading for as long as
+    /// the level stays off it. Read only with `forecast_horizon_sessions`
+    /// and `vix_level_sigma` set; the forecast writes nothing back, so no
+    /// price moves. A switch, 0.0 or 1.0.
+    pub forecast_vix_level: f64,
     /// The share of the next meeting's shadow change the forecast's policy
     /// path leaves out. The shadow is the change the meeting function makes
     /// on the economy as published, the change `policy_anticipation` prices.
@@ -8355,6 +8372,7 @@ impl ModelParams {
             forecast_vix_dispersion: 0.0,
             forecast_vix_dispersion_half_life: 0.0,
             forecast_vix_dispersion_skew: 0.0,
+            forecast_vix_level: 0.0,
             forecast_policy_shadow_discount: 0.0,
             forecast_policy_persistence: 0.0,
             forecast_policy_reversion: 0.0,
@@ -11004,6 +11022,7 @@ impl ModelParams {
             "forecast_vix_dispersion" => self.forecast_vix_dispersion,
             "forecast_vix_dispersion_half_life" => self.forecast_vix_dispersion_half_life,
             "forecast_vix_dispersion_skew" => self.forecast_vix_dispersion_skew,
+            "forecast_vix_level" => self.forecast_vix_level,
             "forecast_policy_shadow_discount" => self.forecast_policy_shadow_discount,
             "forecast_policy_persistence" => self.forecast_policy_persistence,
             "forecast_policy_reversion" => self.forecast_policy_reversion,
@@ -11418,6 +11437,7 @@ impl ModelParams {
             "forecast_vix_dispersion" => out.forecast_vix_dispersion = value,
             "forecast_vix_dispersion_half_life" => out.forecast_vix_dispersion_half_life = value,
             "forecast_vix_dispersion_skew" => out.forecast_vix_dispersion_skew = value,
+            "forecast_vix_level" => out.forecast_vix_level = value,
             "forecast_policy_shadow_discount" => out.forecast_policy_shadow_discount = value,
             "forecast_policy_persistence" => out.forecast_policy_persistence = value,
             "forecast_policy_reversion" => out.forecast_policy_reversion = value,
@@ -13047,6 +13067,12 @@ impl ModelParams {
                  spread as normal.",
                 self.forecast_vix_dispersion_skew));
         }
+        if !(self.forecast_vix_level == 0.0 || self.forecast_vix_level == 1.0) {
+            return Err(format!(
+                "forecast_vix_level is {}. It is a switch, 0.0 off or 1.0 on: the forecast \
+                 reads the VIX's slow level at 1.0 and takes it at its mean at 0.0.",
+                self.forecast_vix_level));
+        }
         if !(self.forecast_policy_persistence >= 0.0 && self.forecast_policy_persistence < 1.0) {
             return Err(format!(
                 "forecast_policy_persistence is {}. It is the share of a meeting's expected \
@@ -13714,6 +13740,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "forecast_vix_dispersion",
     "forecast_vix_dispersion_half_life",
     "forecast_vix_dispersion_skew",
+    "forecast_vix_level",
     "forecast_policy_shadow_discount",
     "forecast_policy_persistence",
     "forecast_policy_reversion",
@@ -13946,6 +13973,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "forecast_vix_dispersion",
         "forecast_vix_dispersion_half_life",
         "forecast_vix_dispersion_skew",
+        "forecast_vix_level",
         "forecast_policy_shadow_discount",
         "forecast_policy_persistence",
         "forecast_policy_reversion",

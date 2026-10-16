@@ -755,6 +755,19 @@ impl Engine {
         // at the next (`oil_expected_log_truncation`).
         let (mut absorb_pending, mut absorb_so_far) = (0.0f64, 0.0f64);
         let policy = self.forecast_policy_path(day, horizon);
+        // `forecast_vix_level`: the VIX's slow level as the last close left
+        // it, its persistence and stationary variance, for the multiplier's
+        // expectation at each close projected. 0.0 is a branch: the
+        // multiplier is taken at its mean, 1.0, and nothing here is read.
+        let level = if p.forecast_vix_level != 0.0 && p.vix_level_sigma != 0.0 && self.vix_log_level != 0.0 {
+            let phi = p.vix_level_persistence;
+            let sigma = self.vix_level_sigma_applied();
+            let one_minus = 1.0 - phi * phi;
+            let var = if one_minus > 0.0 { sigma * sigma / one_minus } else { 0.0 };
+            Some((self.vix_log_level, phi, var))
+        } else {
+            None
+        };
         let k_curve = intraday_variance_factor();
         // The spread's shape (`forecast_vix_dispersion_skew`), and the stress
         // memory's sd about its path: the memory's own average of the log
@@ -925,7 +938,22 @@ impl Engine {
                 timestamp: next_day * 24 * 60,
             };
             let mut inputs = self.daily_inputs(&request, 0.0, v_next, slow, scale_bar);
-            inputs.vix_anchor_level = self.vix_anchor * scale_bar;
+            // The slow level's multiplier expected at this close (the level
+            // advances before the close reads it): the law multiplies the
+            // identity's target and the anchor by it, and the anchor
+            // memory's ratio, where it cancels, is left as it is.
+            let mult = match level {
+                Some((x, phi, var)) => {
+                    let decay = crate::mathx::pow(phi, (step + 1) as f64);
+                    crate::mathx::exp(decay * x - 0.5 * var * decay * decay)
+                }
+                None => 1.0,
+            };
+            inputs.vix_anchor_level = if level.is_some() {
+                self.vix_anchor * scale_bar * mult
+            } else {
+                self.vix_anchor * scale_bar
+            };
             inputs.vix_target_premium = premium;
             if premium != 0.0 {
                 premium *= premium_fade;
@@ -934,7 +962,7 @@ impl Engine {
                 }
             }
             inputs.vix_implied_from_market = if p.vix_level_identity != 0.0 {
-                implied
+                if level.is_some() { implied * mult } else { implied }
             } else if p.vix_realised_vol_weight == 0.0 {
                 0.0
             } else {
