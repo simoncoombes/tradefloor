@@ -187,6 +187,12 @@ CASES = {
     # its own draws.
     "term_premium": (dict(treasury_term_premium_sd=0.06, treasury_term_premium_half_life=49.0),
                      ("term_premium",), (), (), {}),
+    # The time-held fade's clock and the held VIX, held once a close has
+    # started the clock.
+    "cycle_hold": (dict(CYCLE_VOL, market_vol_cycle_hold_onset=0.9,
+                        market_vol_cycle_hold_fade=0.335, market_vol_cycle_hold_half_life=295.0,
+                        market_vol_vix_hold_half_life=198.0),
+                   (), (), ("market_vol_cycle_log", "cycle_hold"), {}),
     "oil_target_drift": (dict(oil_target_drift_sd=0.018, oil_target_drift_reversion=0.001),
                          ("oil_target_drift",), (), (), {}),
     # The oil pushes' part of the price, in the economy, under its switch.

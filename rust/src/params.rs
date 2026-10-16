@@ -2917,6 +2917,69 @@ pub struct ModelParams {
     /// that dial set, where it must be in (0, 2]; 0.0 on every preset through
     /// pt-v20. pt-v21 ships 0.1.
     pub market_vol_cycle_recovery_scale: f64,
+    /// The quantile of a phase's own sojourn past which a held contraction or
+    /// trough begins to fade: the onset of the time-held fade. 0.0, on every
+    /// shipped preset, is no fade and no state. Nothing below reads, the
+    /// phase's age is not counted, and a value of 0.0 is left out of the
+    /// model's digest.
+    ///
+    /// Off zero the engine counts the phase's AGE, the consecutive closes
+    /// whose `cycle_phase` is the one this close trades in. It reads the
+    /// phase the session closes in, not `months_in_current_phase` and not
+    /// the pin marks, so a host that writes the phase through
+    /// `Engine::economy_mut` is counted like one that pins it or like the
+    /// engine's own cycle (a written phase leaves `months_in_current_phase`
+    /// to the engine's own clock, which may turn and restart under it). A
+    /// run's opening phase counts from the run's first close. The onset `T`
+    /// of a phase is the smallest `d` with `P(sojourn <= d) >= q`
+    /// on the cycle's hazard alone
+    /// (`economy::cycle::sojourn_quantile_days_for`, on the walk
+    /// `mean_sojourn_days_for` sums), read on the engine's own table. At 0.9
+    /// on the US table that is 158 sessions for a contraction and 111 for a
+    /// trough. Past it two things act: `market_vol_cycle_hold_fade` on the
+    /// multiplier and `market_vol_vix_hold_half_life` on the coupling's
+    /// denominator.
+    ///
+    /// Why. A host that held a downturn for hundreds of sessions (issue
+    /// #303) saw realised index volatility at 1.15 to 1.32 times the VIX
+    /// after 126 to 252 sessions held, where the tape's long stressed
+    /// stretches read about 0.9. The multiplier and the coupling's `VIX^4`
+    /// both read a held state at full strength, as if it were new, for as
+    /// long as it holds. The model's own cycle never shows this: its troughs
+    /// last 74 sessions on average. The onset is the edge of that range, so
+    /// the model's own downturns are touched only in their last tenth. In
+    /// [0, 1).
+    pub market_vol_cycle_hold_onset: f64,
+    /// The share of the cycle multiplier's excess (its log, over one) that a
+    /// contraction or trough held past its onset
+    /// (`market_vol_cycle_hold_onset`) gives up. At age `a` past the onset
+    /// `T`, the phase's target `l` becomes `l (1 - f (1 - 0.5^((a - T) /
+    /// H)))` while `l > 0`, H being `market_vol_cycle_hold_half_life`. 0.0,
+    /// on every shipped preset, is the target as it was, and a value of 0.0
+    /// is left out of the model's digest. Read only with the onset set, which
+    /// it requires. In [0, 1].
+    pub market_vol_cycle_hold_fade: f64,
+    /// The half-life, in sessions past the onset, of
+    /// `market_vol_cycle_hold_fade`. 0.0 gives up the whole share at the
+    /// onset. Read only with the fade set; 0.0 on every shipped preset and
+    /// left out of the digest there. In [0, 2520].
+    pub market_vol_cycle_hold_half_life: f64,
+    /// The half-life, in sessions, at which the VIX coupling's denominator
+    /// follows a held VIX in a contraction or trough past its onset
+    /// (`market_vol_cycle_hold_onset`). 0.0, on every shipped preset, is the
+    /// denominator as it was and no state, and a value of 0.0 is left out of
+    /// the model's digest. Read only with the onset set, which it requires.
+    ///
+    /// Off zero, from the phase's first close past its onset, the engine
+    /// keeps `s`, a slow average of the log VIX at the close. It opens at
+    /// the log of that close's own denominator `D` (`A m^d`), so the first
+    /// close moves nothing, and steps `s' = s + (1 - 0.5^(1/H)) (log VIX -
+    /// s)`. The coupling reads `max(D, exp(s))`. A VIX that stays above the
+    /// phase's normal level becomes that regime's normal at half-life H,
+    /// instead of reading as the same fresh panic (`(VIX / D)^4`) on every
+    /// session it holds. `s` is dropped when the phase turns, and the
+    /// denominator is never lowered below `D`. In [0, 2520].
+    pub market_vol_vix_hold_half_life: f64,
     /// The published VIX's stress premium: the gain `g` of a premium the QUOTE
     /// carries over the engine's VIX state while the variance read-back's
     /// memory is high. 0.0, which every preset through pt-v20 carries, is none:
@@ -8414,6 +8477,10 @@ impl ModelParams {
             market_vol_cycle_release_half_life: 0.0,
             market_vol_cycle_recovery_release: 0.0,
             market_vol_cycle_recovery_scale: 0.0,
+            market_vol_cycle_hold_onset: 0.0,
+            market_vol_cycle_hold_fade: 0.0,
+            market_vol_cycle_hold_half_life: 0.0,
+            market_vol_vix_hold_half_life: 0.0,
             vix_stress_premium: 0.0,
             vix_stress_premium_knee: 0.0,
             vix_stress_premium_cap: 0.0,
@@ -11063,6 +11130,10 @@ impl ModelParams {
             "market_vol_cycle_release_half_life" => self.market_vol_cycle_release_half_life,
             "market_vol_cycle_recovery_release" => self.market_vol_cycle_recovery_release,
             "market_vol_cycle_recovery_scale" => self.market_vol_cycle_recovery_scale,
+            "market_vol_cycle_hold_onset" => self.market_vol_cycle_hold_onset,
+            "market_vol_cycle_hold_fade" => self.market_vol_cycle_hold_fade,
+            "market_vol_cycle_hold_half_life" => self.market_vol_cycle_hold_half_life,
+            "market_vol_vix_hold_half_life" => self.market_vol_vix_hold_half_life,
             "vix_stress_premium" => self.vix_stress_premium,
             "vix_stress_premium_knee" => self.vix_stress_premium_knee,
             "vix_stress_premium_cap" => self.vix_stress_premium_cap,
@@ -11477,6 +11548,10 @@ impl ModelParams {
             "market_vol_cycle_release_half_life" => out.market_vol_cycle_release_half_life = value,
             "market_vol_cycle_recovery_release" => out.market_vol_cycle_recovery_release = value,
             "market_vol_cycle_recovery_scale" => out.market_vol_cycle_recovery_scale = value,
+            "market_vol_cycle_hold_onset" => out.market_vol_cycle_hold_onset = value,
+            "market_vol_cycle_hold_fade" => out.market_vol_cycle_hold_fade = value,
+            "market_vol_cycle_hold_half_life" => out.market_vol_cycle_hold_half_life = value,
+            "market_vol_vix_hold_half_life" => out.market_vol_vix_hold_half_life = value,
             "vix_stress_premium" => out.vix_stress_premium = value,
             "vix_stress_premium_knee" => out.vix_stress_premium_knee = value,
             "vix_stress_premium_cap" => out.vix_stress_premium_cap = value,
@@ -12349,6 +12424,40 @@ impl ModelParams {
                 "market_vol_cycle_recovery_scale is {}. It is a rally in log points of the \
                  index, in [0, 2].",
                 self.market_vol_cycle_recovery_scale));
+        }
+        if !(self.market_vol_cycle_hold_onset >= 0.0 && self.market_vol_cycle_hold_onset < 1.0) {
+            return Err(format!(
+                "market_vol_cycle_hold_onset is {}. It is the quantile of a phase's own sojourn \
+                 past which a held contraction or trough fades, in [0, 1).",
+                self.market_vol_cycle_hold_onset));
+        }
+        if !(self.market_vol_cycle_hold_fade >= 0.0 && self.market_vol_cycle_hold_fade <= 1.0) {
+            return Err(format!(
+                "market_vol_cycle_hold_fade is {}. It is the share of the cycle multiplier's \
+                 excess (in logs) a long-held contraction or trough gives up, in [0, 1].",
+                self.market_vol_cycle_hold_fade));
+        }
+        if !(self.market_vol_cycle_hold_half_life >= 0.0
+            && self.market_vol_cycle_hold_half_life <= 2520.0) {
+            return Err(format!(
+                "market_vol_cycle_hold_half_life is {}. It is the half-life in sessions past the \
+                 onset of market_vol_cycle_hold_fade, in [0, 2520].",
+                self.market_vol_cycle_hold_half_life));
+        }
+        if !(self.market_vol_vix_hold_half_life >= 0.0
+            && self.market_vol_vix_hold_half_life <= 2520.0) {
+            return Err(format!(
+                "market_vol_vix_hold_half_life is {}. It is the half-life in sessions at which \
+                 the VIX coupling's denominator follows a held VIX, in [0, 2520].",
+                self.market_vol_vix_hold_half_life));
+        }
+        if (self.market_vol_cycle_hold_fade != 0.0 || self.market_vol_vix_hold_half_life != 0.0)
+            && self.market_vol_cycle_hold_onset == 0.0 {
+            return Err(format!(
+                "market_vol_cycle_hold_fade is {} and market_vol_vix_hold_half_life is {} with \
+                 market_vol_cycle_hold_onset 0. Both act past a phase's onset, which the onset \
+                 sets, so set it too (0.9 is the edge of the model's own sojourns).",
+                self.market_vol_cycle_hold_fade, self.market_vol_vix_hold_half_life));
         }
         if !(self.vix_stress_premium >= 0.0 && self.vix_stress_premium <= 10.0) {
             return Err(format!(
@@ -13584,6 +13693,9 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "market_vol_cycle_cap_relative",
     "market_vol_cycle_expansion",
     "market_vol_cycle_half_life",
+    "market_vol_cycle_hold_fade",
+    "market_vol_cycle_hold_half_life",
+    "market_vol_cycle_hold_onset",
     "market_vol_cycle_pin_neutral",
     "market_vol_cycle_pin_phase",
     "market_vol_cycle_ratio",
@@ -13598,6 +13710,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "market_vol_leverage_half_life",
     "market_vol_leverage_standardise",
     "market_vol_slow_gamma",
+    "market_vol_vix_hold_half_life",
     "order_flow_depth_law",
     "overnight_idio_df",
     "overnight_idio_share",
@@ -13983,6 +14096,10 @@ pub fn settable_names() -> Vec<&'static str> {
         "market_vol_cycle_release_half_life",
         "market_vol_cycle_recovery_release",
         "market_vol_cycle_recovery_scale",
+        "market_vol_cycle_hold_onset",
+        "market_vol_cycle_hold_fade",
+        "market_vol_cycle_hold_half_life",
+        "market_vol_vix_hold_half_life",
         "vix_stress_premium",
         "vix_stress_premium_knee",
         "vix_stress_premium_cap",

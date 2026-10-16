@@ -714,6 +714,12 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # off to a year.
     "treasury_term_premium_sd": (0.0, 0.12),
     "treasury_term_premium_half_life": (0.0, 252.0),
+    # The time-held fade: the onset a quantile of the model's own sojourn;
+    # the fade a share; its half-lives off to two years.
+    "market_vol_cycle_hold_onset": (0.0, 0.99),
+    "market_vol_cycle_hold_fade": (0.0, 1.0),
+    "market_vol_cycle_hold_half_life": (0.0, 504.0),
+    "market_vol_vix_hold_half_life": (0.0, 504.0),
     "cycle_rate_hazard": (0.0, 0.1),
     "core_trend_persistence": (0.0, 0.998),
     # The 2-year's carry through a meeting: a share, so its own bounds.

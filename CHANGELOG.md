@@ -133,6 +133,19 @@ same with them on as off.
   the VIX it stated by weeks: replaying the real 2020-21 VIX, realized
   volatility ran about twice the S&P 500's once the VIX was back at 20-40,
   and short of it at the March peak.
+- `market_vol_cycle_hold_onset`, `market_vol_cycle_hold_fade`,
+  `market_vol_cycle_hold_half_life` and `market_vol_vix_hold_half_life` are
+  new dials, 0.0 on every preset and left out of the digest there: off zero
+  a contraction or trough held past its onset (a quantile of the phase's own
+  sojourn) fades. The cycle multiplier's excess gives up a share at a
+  half-life, and the VIX coupling's denominator follows a slow average of
+  the held VIX, so a long-held regime reads as normal rather than as fresh
+  panic. The phase's age is counted at each close from the phase the
+  session closes in, so a host that writes the phase through
+  `economy_mut()` is counted too. A host that held a trough for 454
+  sessions saw realised index volatility at 1.15 to 1.32 times the VIX
+  after 126 to 252 sessions, against about 0.9 on the tape's long stressed
+  stretches (issue #303).
 - `treasury_term_premium_sd` and `treasury_term_premium_half_life` are new
   dials, 0.0 on every preset and left out of the digest there: off zero the
   10-year carries its own term premium, an AR(1) stepped every session on its
