@@ -22,6 +22,13 @@ histories and frozen as dials, and this tool is how they were fitted:
   meeting ladder is discrete and has no expected-value step to iterate;
   with `--neutral-core` the neutral's move with the inflation the meeting
   reads above target (`forecast_policy_neutral_core`) is fitted with them.
+  The fit's objective is least squares subject to an unbiased forecast:
+  the mean squared error at each target horizon plus `BIAS_WEIGHT` (100)
+  times that horizon's squared mean error, since an unbiased forecast is the
+  forecast's job and row RF5 reads the mean error (changed 2026-10-16 from
+  plain least squares, which on the pt-v22 candidate's law left +0.38 bp at
+  63 sessions, t 1.8 on 270 histories). The policy dials want histories as
+  long as RF5's, 21 years (`--sessions 5292`).
 
 A history's policy rate level lasts its whole run, so the policy fit wants
 many histories: 40 put the neutral rate at 1.4 per cent, and the forecast
@@ -72,7 +79,12 @@ def history(args):
     core = engine.model.fed_core_inflation != 0.0
     rows = []
     for _ in range(sessions):
-        engine.run_days(1)
+        # the session by hand: the same path as `run_days(1)` (checked to the
+        # bit) without its record of every day, which a 21-year history
+        # cannot hold in memory on many processes
+        engine.open_market()
+        engine.run_session(9, 30, 3, 390)
+        engine.close_market()
         f = engine.forecast()
         econ = engine.economy()
         bank = engine.state_snapshot()["central_bank"]
@@ -178,9 +190,21 @@ def _paths(d, phi, kappa, neutral, k):
     return out
 
 
+#: The weight on each horizon's squared mean error in the policy fit's loss,
+#: against 1 on its mean squared error: the fit is least squares subject to
+#: an unbiased forecast at every target horizon (RF5 reads the mean error),
+#: the constraint held by a penalty, since five dials cannot zero six means
+#: exactly.
+BIAS_WEIGHT = 100.0
+
+
 def _loss(x):
     p = _paths(*x)
-    return sum(float(((_FIT["realised"][h] - p[h]) ** 2).mean()) for h in _FIT["targets"])
+    out = 0.0
+    for h in _FIT["targets"]:
+        e = _FIT["realised"][h] - p[h]
+        out += float((e * e).mean()) + _FIT.get("bias_weight", 0.0) * float(e.mean()) ** 2
+    return out
 
 
 def _block(points):
@@ -209,7 +233,7 @@ def _search(points, workers):
     return min(found, key=lambda b: (b[0], b[1]))
 
 
-def fit_policy(histories, burn=0, workers=1, core=False):
+def fit_policy(histories, burn=0, workers=1, core=False, bias_weight=BIAS_WEIGHT):
     """The policy projection's dials, by least squares on a grid, on every
     close from `burn` on: the shadow's discount, its persistence, the
     reversion and the neutral rate, and with `core` the neutral's move with
@@ -235,7 +259,7 @@ def fit_policy(histories, burn=0, workers=1, core=False):
                 realised[h].append(rows[t + h]["rate"])
     _FIT.update(r0=np.array(r0), shadow=np.array(shadow), first=np.array(first), gap=np.array(gap),
                 realised={h: np.array(v) for h, v in realised.items()}, targets=targets,
-                offsets=[round(j * cadence) for j in range(10)])
+                offsets=[round(j * cadence) for j in range(10)], bias_weight=bias_weight)
     ks = (0.0, 0.25, 0.5, 0.75, 1.0, 1.25) if core else (0.0,)
     # The neutral's grid reaches 4.2 per cent: a candidate law can hold its
     # rate above the 2.2 the grid once stopped at.
@@ -290,6 +314,12 @@ def main(argv=None):
     parser.add_argument("--fit-workers", type=int, default=None,
                         help="processes for the policy fit's grid (default --workers); the "
                              "histories' processes hold a run each, the grid's only arrays")
+    parser.add_argument("--bias-weight", type=float, default=BIAS_WEIGHT,
+                        help="the policy fit's weight on each horizon's squared mean error "
+                             f"(default {BIAS_WEIGHT:g}; 0 is plain least squares)")
+    parser.add_argument("--fit-both", action="store_true",
+                        help="fit the policy dials with and without forecast_policy_neutral_core "
+                             "on the same histories, one JSON line each")
     parser.add_argument("--neutral-core", action="store_true",
                         help="also fit forecast_policy_neutral_core, the neutral's move with the "
                              "inflation the meeting reads above target")
@@ -307,17 +337,18 @@ def main(argv=None):
         sd, hl, skew, spread = fit_dispersion(histories)
         print("log VIX spread about the forecast:",
               ", ".join(f"h{h} {v:.4f}" for h, v in spread.items()))
-        d, phi, kappa, neutral, core = fit_policy(
-            [by_seed[s] for s in policy_seeds], burn=args.burn,
-            workers=args.fit_workers or args.workers, core=args.neutral_core)
-        out = dict(
-            forecast_vix_dispersion=round(sd, 4), forecast_vix_dispersion_half_life=hl,
-            forecast_vix_dispersion_skew=round(skew, 2),
-            forecast_policy_shadow_discount=d, forecast_policy_persistence=phi,
-            forecast_policy_reversion=kappa, forecast_policy_neutral=neutral)
-        if args.neutral_core:
-            out["forecast_policy_neutral_core"] = core
-        print(json.dumps(out))
+        for with_core in ((False, True) if args.fit_both else (args.neutral_core,)):
+            d, phi, kappa, neutral, core = fit_policy(
+                [by_seed[s] for s in policy_seeds], burn=args.burn,
+                workers=args.fit_workers or args.workers, core=with_core, bias_weight=args.bias_weight)
+            out = dict(
+                forecast_vix_dispersion=round(sd, 4), forecast_vix_dispersion_half_life=hl,
+                forecast_vix_dispersion_skew=round(skew, 2),
+                forecast_policy_shadow_discount=d, forecast_policy_persistence=phi,
+                forecast_policy_reversion=kappa, forecast_policy_neutral=neutral)
+            if with_core:
+                out["forecast_policy_neutral_core"] = core
+            print(json.dumps(out), flush=True)
     else:
         histories = run(seeds, args.sessions, {**law, **json.loads(args.dials)}, args.preset,
                         args.workers)
