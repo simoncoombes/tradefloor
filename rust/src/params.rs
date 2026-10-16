@@ -12451,13 +12451,21 @@ impl ModelParams {
                  the VIX coupling's denominator follows a held VIX, in [0, 2520].",
                 self.market_vol_vix_hold_half_life));
         }
-        if (self.market_vol_cycle_hold_fade != 0.0 || self.market_vol_vix_hold_half_life != 0.0)
-            && self.market_vol_cycle_hold_onset == 0.0 {
+        // Each fade acts past a phase's onset, which the onset sets. The
+        // refusal leads with the onset, the dial whose value is missing.
+        if self.market_vol_cycle_hold_fade != 0.0 && self.market_vol_cycle_hold_onset == 0.0 {
             return Err(format!(
-                "market_vol_cycle_hold_fade is {} and market_vol_vix_hold_half_life is {} with \
-                 market_vol_cycle_hold_onset 0. Both act past a phase's onset, which the onset \
-                 sets, so set it too (0.9 is the edge of the model's own sojourns).",
-                self.market_vol_cycle_hold_fade, self.market_vol_vix_hold_half_life));
+                "market_vol_cycle_hold_onset is 0 but market_vol_cycle_hold_fade is {}. The fade \
+                 acts past a phase's onset, which the onset sets, so set it too (0.9 is the edge of \
+                 the model's own sojourns).",
+                self.market_vol_cycle_hold_fade));
+        }
+        if self.market_vol_vix_hold_half_life != 0.0 && self.market_vol_cycle_hold_onset == 0.0 {
+            return Err(format!(
+                "market_vol_cycle_hold_onset is 0 but market_vol_vix_hold_half_life is {}. The held \
+                 VIX acts past a phase's onset, which the onset sets, so set it too (0.9 is the edge \
+                 of the model's own sojourns).",
+                self.market_vol_vix_hold_half_life));
         }
         if !(self.vix_stress_premium >= 0.0 && self.vix_stress_premium <= 10.0) {
             return Err(format!(
