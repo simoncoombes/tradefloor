@@ -597,6 +597,14 @@ OUT_OF_SCOPE = {
     "corporate_spread_noise_half_life":
         "inert at 0.0 and read only with `corporate_spread_noise_sd` set; at "
         "0.0 it is also left out of the model's digest",
+    "treasury_term_premium_sd":
+        "inert at 0.0: the 10-year's anchor and the meeting's 10-year target "
+        "are the expressions that stood (a branch on the state's presence); "
+        "the term premium and its key are neither stepped, snapshotted nor "
+        "hashed; at 0.0 it is also left out of the model's digest",
+    "treasury_term_premium_half_life":
+        "inert at 0.0 and read only with `treasury_term_premium_sd` set; at "
+        "0.0 it is also left out of the model's digest",
     "cycle_inflation_hazard":
         "inert at 0.0: an expansion adds the legacy 0.1 a month with "
         "inflation above 4 (a branch on `== 0.0` in the cycle's ladder); at "

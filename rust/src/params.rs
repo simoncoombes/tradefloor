@@ -1805,6 +1805,37 @@ pub struct ModelParams {
     /// At 0.03, with the pull toward the policy rate, it gives a daily change
     /// of about 3.1 bp against the tape's 5.4 (FRED DGS10, 2015-2025).
     pub treasury_10y_noise: f64,
+    /// The innovation sd, percentage points a session, of the 10-year's own
+    /// term premium, a persistent state added to its anchor. 0.0, on every
+    /// shipped preset, is no state (the anchor is the policy path, the
+    /// inflation premium and the havens), and a value of 0.0 is left out of
+    /// the model's digest.
+    ///
+    /// Off zero the state x follows an AR(1), `x' = phi x + sd z` with
+    /// `phi = 0.5^(1/H)`, H `treasury_term_premium_half_life`, stepped once
+    /// a session on its own key (`GameRng::keyed(key, TERM_PREMIUM_TAG,
+    /// day)`, so no stream moves) and opened at a draw from its stationary
+    /// distribution. x is added to the 10-year's anchor at the close (and in
+    /// the live mark's projection of it, which reads the same x) and to the
+    /// meeting's 10-year target, so a meeting keeps it.
+    ///
+    /// Why: the 10-year's only noise was iid, and its anchor pulls 5 per
+    /// cent a session, so the yield mean-reverted within the month where the
+    /// tape's does not. DGS10's variance ratio (the h-session change's
+    /// variance over h times the daily's, 1990-2025) is 0.974 at 21 sessions
+    /// and 0.950 at 63; the model's read 0.70 and 0.55, so a month held too
+    /// little of the 10-year's variance that the index does not explain and
+    /// the monthly stock-bond correlation read too strong while the daily
+    /// matched. The pair is solved, with `treasury_10y_noise` re-solved to
+    /// keep the daily sd, so the model's 21- and 63-session ratios meet the
+    /// tape's: sd 0.060 and H 49 (stationary sd 0.36 points). x and its key
+    /// are snapshotted and hashed only with this set. In [0, 0.5].
+    pub treasury_term_premium_sd: f64,
+    /// The half-life, sessions, of the 10-year's own term premium
+    /// (`treasury_term_premium_sd`). 0.0, on every shipped preset, is read by
+    /// nothing, and a value of 0.0 is left out of the model's digest. With
+    /// the sd set, 0.0 is no persistence (`phi` 0). In [0, 2520].
+    pub treasury_term_premium_half_life: f64,
     /// The 2-year Treasury yield's own daily noise, in percentage points.
     /// 0.0, on every preset through pt-v19, makes the 2-year a fixed blend
     /// of the policy rate and the 10-year; pt-v20 ships 0.022.
@@ -8320,6 +8351,8 @@ impl ModelParams {
             fear_greed_published_inputs: 0.0,
             macro_publication_repricing: 0.0,
             treasury_10y_noise: 0.03,
+            treasury_term_premium_sd: 0.0,
+            treasury_term_premium_half_life: 0.0,
             treasury_2y_noise: 0.0,
             flight_to_quality_gain: 0.02,
             flight_to_quality_reversal_cut: 0.0,
@@ -10967,6 +11000,8 @@ impl ModelParams {
             "fear_greed_published_inputs" => self.fear_greed_published_inputs,
             "macro_publication_repricing" => self.macro_publication_repricing,
             "treasury_10y_noise" => self.treasury_10y_noise,
+            "treasury_term_premium_sd" => self.treasury_term_premium_sd,
+            "treasury_term_premium_half_life" => self.treasury_term_premium_half_life,
             "treasury_2y_noise" => self.treasury_2y_noise,
             "flight_to_quality_gain" => self.flight_to_quality_gain,
             "flight_to_quality_reversal_cut" => self.flight_to_quality_reversal_cut,
@@ -11379,6 +11414,8 @@ impl ModelParams {
             "fear_greed_published_inputs" => out.fear_greed_published_inputs = value,
             "macro_publication_repricing" => out.macro_publication_repricing = value,
             "treasury_10y_noise" => out.treasury_10y_noise = value,
+            "treasury_term_premium_sd" => out.treasury_term_premium_sd = value,
+            "treasury_term_premium_half_life" => out.treasury_term_premium_half_life = value,
             "treasury_2y_noise" => out.treasury_2y_noise = value,
             "flight_to_quality_gain" => out.flight_to_quality_gain = value,
             "flight_to_quality_reversal_cut" => out.flight_to_quality_reversal_cut = value,
@@ -12892,6 +12929,18 @@ impl ModelParams {
                  own state, in [0, 2520].",
                 self.corporate_spread_noise_half_life));
         }
+        if !(self.treasury_term_premium_sd >= 0.0 && self.treasury_term_premium_sd <= 0.5) {
+            return Err(format!(
+                "treasury_term_premium_sd is {}. It is the per-session innovation sd of the 10-year's \
+                 own term premium, percentage points, in [0, 0.5].",
+                self.treasury_term_premium_sd));
+        }
+        if !(self.treasury_term_premium_half_life >= 0.0 && self.treasury_term_premium_half_life <= 2520.0) {
+            return Err(format!(
+                "treasury_term_premium_half_life is {}. It is the half-life in sessions of the 10-year's \
+                 own term premium, in [0, 2520].",
+                self.treasury_term_premium_half_life));
+        }
         if !(self.oil_forecast_clamp == 0.0 || self.oil_forecast_clamp == 1.0) {
             return Err(format!(
                 "oil_forecast_clamp is {}. It is a switch: 0 (the forecast publishes the \
@@ -13607,6 +13656,8 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "corporate_spread_equity_lag",
     "corporate_spread_noise_sd",
     "corporate_spread_noise_half_life",
+    "treasury_term_premium_sd",
+    "treasury_term_premium_half_life",
     "treasury_2y_meeting_carry",
     "flight_to_quality_reversal_cut",
     "policy_anticipation_half_life",
@@ -13837,6 +13888,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "corporate_spread_equity_lag",
         "corporate_spread_noise_sd",
         "corporate_spread_noise_half_life",
+        "treasury_term_premium_sd",
+        "treasury_term_premium_half_life",
         "treasury_2y_meeting_carry",
         "flight_to_quality_reversal_cut",
         "policy_anticipation_half_life",

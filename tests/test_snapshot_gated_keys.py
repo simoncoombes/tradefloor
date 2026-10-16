@@ -183,6 +183,10 @@ CASES = {
     "spread_noise": (dict(corporate_spread_noise_sd=0.025, corporate_spread_noise_half_life=16.0,
                           corporate_yield_daily=1.0),
                      ("spread_noise",), (), (), {}),
+    # The 10-year's own term premium and its key, stepped every session on
+    # its own draws.
+    "term_premium": (dict(treasury_term_premium_sd=0.06, treasury_term_premium_half_life=49.0),
+                     ("term_premium",), (), (), {}),
     "oil_target_drift": (dict(oil_target_drift_sd=0.018, oil_target_drift_reversion=0.001),
                          ("oil_target_drift",), (), (), {}),
     # The oil pushes' part of the price, in the economy, under its switch.

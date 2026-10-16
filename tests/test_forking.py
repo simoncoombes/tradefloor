@@ -1151,6 +1151,10 @@ def _nothing_dormant():
                    # Credit's own state (LQD-IEF residual), on its own keyed draws.
                    corporate_spread_noise_sd=0.025,
                    corporate_spread_noise_half_life=16.0,
+                   # The 10-year's own term premium (DGS10's variance
+                   # ratios), on its own keyed draws.
+                   treasury_term_premium_sd=0.06,
+                   treasury_term_premium_half_life=49.0,
                    # The expansion's inflation and rate hazards (NBER fit).
                    cycle_inflation_hazard=0.0219,
                    cycle_rate_hazard=0.0013,

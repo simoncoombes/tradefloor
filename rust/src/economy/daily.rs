@@ -486,6 +486,10 @@ pub struct YieldDials {
     /// spread formula's base ([`crate::params::ModelParams::corporate_spread_noise_sd`]);
     /// `None`, on every preset, is no state.
     pub spread_noise: Option<(f64, f64)>,
+    /// The 10-year's own term premium tonight, percentage points added to
+    /// its anchor ([`crate::params::ModelParams::treasury_term_premium_sd`]);
+    /// `None`, on every preset, is no state.
+    pub term_premium: Option<f64>,
 }
 
 /// The largest move the corporate yield takes in one session under
@@ -550,6 +554,7 @@ impl Default for YieldDials {
             spread_equity_decay: 0.0,
             spread_priced_keep: 0.0,
             spread_noise: None,
+            term_premium: None,
         }
     }
 }
@@ -1393,6 +1398,14 @@ fn close_yields(
         fed_rate_for_10y + inputs.yields.priced_anticipation
     } else {
         fed_rate_for_10y
+    };
+    // THE 10-YEAR'S OWN TERM PREMIUM (`treasury_term_premium_sd`): a
+    // persistent state on its own key, added to the anchor. Guarded, so with
+    // no state the premium is the expression above.
+    let term_premium_10y = if let Some(x) = inputs.yields.term_premium {
+        term_premium_10y + x
+    } else {
+        term_premium_10y
     };
     let current_10y = new_state.treasury_yield_10y;
     // THE DAMPED PASS-THROUGH (`treasury_policy_damping`): the 10-year's
