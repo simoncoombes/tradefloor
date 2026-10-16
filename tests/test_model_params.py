@@ -1173,6 +1173,8 @@ PERTURBATIONS = [
     ("futures_index_listed", 1.0, False),
     ("basis_sd", 3.7, False),
     ("basis_persistence", 0.42, False),
+    # The basis's night share: the futures' own noise, no price moves.
+    ("basis_night_share", 0.76, False),
     ("night_session_steps", 10.0, False),
     # The VIX futures (pt-v22 phase 1). INERT by construction: a VIX future
     # reads the published and live VIX and the forecast, draws nothing and
@@ -2046,6 +2048,7 @@ COMPANIONS: dict[str, dict[str, float]] = {
     # futures: each is refused without the switch it reads.
     "futures_index_listed": {"index_level_listed": 1.0},
     "night_session_steps": {"index_level_listed": 1.0, "futures_index_listed": 1.0},
+    "basis_night_share": {"index_level_listed": 1.0, "futures_index_listed": 1.0, "night_session_steps": 10.0},
     # A VIX future is priced on the forecast, out to its sixth contract's
     # 126 sessions; the loading's dials are refused without the switch.
     "futures_vix_listed": {"forecast_horizon_sessions": 126.0},

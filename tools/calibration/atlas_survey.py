@@ -471,6 +471,7 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "futures_index_listed": (0.0, 1.0),
     "basis_sd": (0.0, 10.0),
     "basis_persistence": (0.0, 0.9),
+    "basis_night_share": (0.0, 1.0),
     "night_session_steps": (0.0, 30.0),
     # The VIX futures (pt-v22 phase 1): a switch and the intraday loading's
     # share and half-lives (sessions). None of them moves a stock price.

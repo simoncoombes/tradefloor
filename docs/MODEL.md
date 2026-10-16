@@ -3897,6 +3897,13 @@ A future is priced at `F = (S - PV(D)) * exp(r * tau) + b`:
   agents' net flow against the house, `0.15 * sigma * flow / V`, decaying at
   a 30-step half-life. Both are scaled by `min(1, n / 6)`, with `n` the
   sessions to expiry, so a future converges on the index over its roll.
+  The basis decays evenly over a day's steps, so the night carries about
+  0.98 of a close's deviation to the next morning. Under
+  `basis_night_share` (0.0 on every shipped preset) the night's steps carry
+  that share of the day's decay and the session's ticks the rest, with the
+  basis's sd and close-to-close persistence unchanged. On ES against the
+  S&P 500 at five minutes most of a close's deviation is gone by the next
+  09:45, a share of about 0.76.
 
 Each close marks every contract at `F` on the close's index. At its expiry
 session's open a contract settles in cash on the index of the opening

@@ -228,6 +228,7 @@ PARAM_SPECS: dict[str, dict] = {
     "basis_sd": {"kind": "abs", "step_unit": 0.25, "hard_range": (0.0, 100.0), "derived": True},
     "basis_persistence": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 0.999),
                           "derived": True},
+    "basis_night_share": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0), "derived": True},
     "night_session_steps": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 390.0),
                             "derived": True},
     # The VIX futures (pt-v22 phase 1), the same: none moves a price.

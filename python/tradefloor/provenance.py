@@ -438,6 +438,14 @@ OUT_OF_SCOPE = {
         "run, and at 0.0 each step's noise is independent. Fitted with "
         "`basis_sd` by tools/calibration/basis_dials.py; at 0.0 it is also "
         "left out of the model's digest",
+    "basis_night_share":
+        "a branch at 0.0: `futures_step` decays the basis noise evenly over "
+        "the day's steps, as without it; off zero the night's steps carry this "
+        "share of the day's decay, with the noise sized to keep the basis's sd, "
+        "and it reads only the futures' own noise, so no price of the "
+        "underlying moves; refused without `night_session_steps`; measured on "
+        "ES against the S&P 500 at five minutes; at 0.0 it is also left out of "
+        "the model's digest",
     "night_session_steps":
         "inert at 0.0: `Engine::night_tick` returns 0 and "
         "`futures_night_setup` and `futures_retarget` return at once, so no "
