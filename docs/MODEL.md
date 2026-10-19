@@ -4742,6 +4742,7 @@ changes, so it waits for a new preset.
 - A permanent change on the corporate yield freezes it: after that, no policy, inflation, VIX or cycle move reaches the discount rate.
 - The effect sizes in four of the seven scenario files were measured before pt-v20, and some docstrings describe an older VIX anchor, an older crisis threshold and the switched-off crisis blend. The `macro.treasury_2y` note says the 2-year is recomputed at every close, which is pt-v19's law.
 - A pinned change of phase does not get the growth shock a natural phase change gets.
+- In the recession scenario the index rises too little from its low: about 58% in the 252 sessions after it, against 69% after the 2009 low (pt-v21: 70%). The cause is `pinned_vix_sets_variance`. The scenario pins the VIX through the recovery, every pin sets the variance, and the recovery is calmer than under the stepped law, so the index climbs less. The scenario's band was measured under the stepped law. With the switch off the rise ties pt-v21, but the 2020 crash replay loses its depth and timing. A pin that only raises the variance ties the rise but makes the crash's drawdown path worse. *Next preset.*
 - `World.run` builds a fresh scenario on every call, so a hold or ramp added with `World.apply` loses its anchor between calls. `pin_macro(epicentre=None)` does not clear an epicentre pin.
 
 **Records.** The provenance ledger labels `crisis_epicentre_end_sessions` as
