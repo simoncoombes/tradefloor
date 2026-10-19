@@ -450,6 +450,31 @@ payload, Arrow and WASM show them; agents trade by symbol.
   their dials, and the state hash and `manifest.state_hash` cover them only
   then. Every known-answer digest is where it was.
 
+### The flow check's cycle channel
+
+- `ExternalFlow::record_cycle_phase(phase)` counts, once a session, the
+  sessions in each cycle phase and the longest unbroken run of each, and of
+  a contraction and trough together (#303). The tally is outside once a run
+  passes `CYCLE_RUN_QUANTILE` (0.99) of the preset's own sojourn in that
+  phase on the cycle's hazard: on pt-v21, 246 sessions for a contraction,
+  170 for a trough and 338 for the two together. The share of sessions in
+  each phase is reported beside the preset's own share and not judged.
+- `CalibratedFlow` gains `phase_shares`, `phase_mean_sessions`,
+  `phase_sd_sessions`, `phase_run_limit`, `downturn_share`,
+  `downturn_mean_sessions` and `downturn_run_limit`; `ExternalFlow` gains
+  `phase_sessions`, `phase_longest`, `downturn_longest`, the runs under way
+  and `cycle_sessions()`; `FlowAssessment` gains `phase_shares`,
+  `downturn_share`, `phase_longest` and `downturn_longest`. The per-phase
+  arrays follow the new `flow::CYCLE_PHASES`. A tally with no phase recorded
+  assesses as before.
+- `economy::cycle` gains `sojourn_quantile_days_for`, `sojourn_sd_days_for`
+  and `downturn_quantile_days_for`, on the walk `mean_sojourn_days_for`
+  sums. No engine reads them, so no draw and no known-answer digest moves.
+- In Python, `envelope.external_flow` takes `cycle_phases`, one phase name a
+  session, and `assess_external_flow` reads it from the tally;
+  `CALIBRATED_FLOW` gains `<phase>_share`, `<phase>_mean_sessions`,
+  `<phase>_sd_sessions`, `<phase>_run_limit` and the `downturn_` figures.
+
 ### Dividends in sessions
 
 - MCP sessions never called `Portfolio.collect_dividends` (#260). Every

@@ -900,6 +900,16 @@ fn calibrated_flow(
     d.set_item("macro_steps_per_session", f.macro_steps_per_session)?;
     d.set_item("off_session_ticks_per_session", f.off_session_ticks_per_session)?;
     d.set_item("news_drift", f.news_drift)?;
+    for (k, phase) in crate::flow::CYCLE_PHASES.iter().enumerate() {
+        let name = phase.as_str();
+        d.set_item(format!("{name}_share"), f.phase_shares[k])?;
+        d.set_item(format!("{name}_mean_sessions"), f.phase_mean_sessions[k])?;
+        d.set_item(format!("{name}_sd_sessions"), f.phase_sd_sessions[k])?;
+        d.set_item(format!("{name}_run_limit"), f.phase_run_limit[k])?;
+    }
+    d.set_item("downturn_share", f.downturn_share)?;
+    d.set_item("downturn_mean_sessions", f.downturn_mean_sessions)?;
+    d.set_item("downturn_run_limit", f.downturn_run_limit)?;
     Ok(d.into_py(py))
 }
 
@@ -912,12 +922,13 @@ const FLOW_TALLY_KEYS: [&str; 16] = [
 ];
 
 /// The keys it reads when present and takes as zero when not: the signed
-/// sums behind the drift, the ticks outside the regular session, and the
-/// host's input to the VIX target. Added after 0.10.0, so a tally written
-/// for 0.10.0 still reads.
-const FLOW_TALLY_OPTIONAL_KEYS: [&str; 8] = [
+/// sums behind the drift, the ticks outside the regular session, the
+/// host's input to the VIX target, and `cycle_phases`, the phase name each
+/// session traded in, in order. Added after 0.10.0, so a tally written for
+/// 0.10.0 still reads.
+const FLOW_TALLY_OPTIONAL_KEYS: [&str; 9] = [
     "company_sum", "sector_sum", "market_sum", "fundamental_sum", "off_session_ticks",
-    "vix_target_writes", "vix_target_write_abs", "vix_target_floor_sessions",
+    "vix_target_writes", "vix_target_write_abs", "vix_target_floor_sessions", "cycle_phases",
 ];
 
 /// `tradefloor.flow::ExternalFlow::assess`, from a tally a caller kept.
@@ -1006,6 +1017,18 @@ fn assess_external_flow(
     obs.macro_steps = count("macro_steps")?;
     obs.macro_shock_steps = count("macro_shock_steps")?;
     obs.macro_shock_load = real("macro_shock_load")?;
+    if let Some(v) = tally.get_item("cycle_phases")? {
+        let names: Vec<String> = v.extract().map_err(|_| ValidationError::new_err(
+            "cycle_phases must be a list of phase names, one a session"))?;
+        for name in names {
+            let phase = crate::economy::CyclePhase::from_name(&name).ok_or_else(|| {
+                ValidationError::new_err(format!(
+                    "unknown cycle phase {name:?} in cycle_phases; the phases are {:?}",
+                    crate::flow::CYCLE_PHASES.map(|p| p.as_str())))
+            })?;
+            obs.record_cycle_phase(phase);
+        }
+    }
     let a = obs.assess(&params);
     let d = pyo3::types::PyDict::new_bound(py);
     d.set_item("inside", a.inside)?;
@@ -1021,6 +1044,12 @@ fn assess_external_flow(
     d.set_item("off_session_ticks_per_session", a.off_session_ticks_per_session)?;
     d.set_item("news_drift", a.news_drift)?;
     d.set_item("fundamental_drift", a.fundamental_drift)?;
+    for (k, phase) in crate::flow::CYCLE_PHASES.iter().enumerate() {
+        d.set_item(format!("{}_share", phase.as_str()), a.phase_shares[k])?;
+        d.set_item(format!("{}_longest", phase.as_str()), a.phase_longest[k])?;
+    }
+    d.set_item("downturn_share", a.downturn_share)?;
+    d.set_item("downturn_longest", a.downturn_longest)?;
     d.set_item("findings", a.findings)?;
     Ok(d.into_py(py))
 }
