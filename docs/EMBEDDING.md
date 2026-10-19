@@ -161,6 +161,7 @@ what you add to it:
 | `record_vix_write(delta)` | every change you make to the economy's VIX |
 | `record_vix_target_premium(delta)` | every change you make to the VIX target's premium with `set_vix_target_premium` |
 | `record_vix_target_floor_session()` | every session you close with a floor set by `set_vix_target_floor` |
+| `record_cycle_phase(phase)` | once a trading session, with the cycle phase it traded in |
 | `record_session()` | once a trading session |
 
 `tally.assess(engine.params())` says which channels are outside the fitted
@@ -173,6 +174,43 @@ game flow was outside on every channel it uses: its company news carried
 a session, it ticked 390 times a session outside the regular session, and
 its split-driven earnings revisions moved fair value down by 9% to 21% a
 year.
+
+### The business cycle
+
+The cycle runs itself in a free run, and every statistic the model states
+pools its own mix of phases. A host can change that mix without passing a
+shock: by writing the phase through `economy_mut()`, by pinning it, or by
+opening and driving the economy so that a phase lasts much longer than it
+does on the preset's own cycle. On a preset with `market_vol_cycle_ratio`
+a contraction or trough raises the market's variance for as long as it
+holds. `record_cycle_phase` counts the sessions in each phase and the
+longest unbroken run of each, and of a contraction and trough together.
+The tally is outside once a run is longer than 99 in 100 of the preset's
+own sojourns in that phase (`CYCLE_RUN_QUANTILE`), on the cycle's hazard.
+`CalibratedFlow` gives those figures for any preset. On pt-v21 they are:
+
+| phase | share of sessions | mean run | 99 in 100 end by |
+|---|---|---|---|
+| expansion | 75.0% | 1,701 | 4,440 |
+| peak | 5.6% | 126 | 285 |
+| contraction | 5.1% | 116 | 246 |
+| trough | 3.2% | 74 | 170 |
+| recovery | 11.1% | 252 | 734 |
+| contraction and trough | 8.3% | 189 | 338 |
+
+These are on the hazard alone. The state ladder (rates, unemployment, the
+curve) shortens a contraction or trough, so the preset's own downturns end
+sooner than the table says, and the market's own hazard
+(`cycle_equity_hazard`) shortens expansions. The share of sessions in each
+phase is reported against the table's share and is not judged. A run of a
+few years holds one or two cycles, so its share is mostly where it opened:
+a game that opens in a contraction spends a large share of its sessions in
+one, and is inside while each run stays within the preset's own range.
+
+Record the phase the session traded in. A host that reads the phase back
+after each macro step and writes the same value into the next records the
+value it wrote. In Python, pass the phases in order as
+`external_flow(cycle_phases=[...])`.
 
 ### Economic shocks
 

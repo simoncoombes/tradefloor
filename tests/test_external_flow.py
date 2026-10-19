@@ -151,3 +151,55 @@ def test_bad_input_is_refused() -> None:
                           macro_shock_loads=[1.0, 1.0])
     with pytest.raises(tf.ValidationError):
         env.external_flow(sessions=10, names=40, preset="pt-v99")
+
+
+PHASES = ("expansion", "peak", "contraction", "trough", "recovery")
+
+
+def test_the_calibrated_flow_states_the_presets_own_cycle() -> None:
+    fit = env.CALIBRATED_FLOW["pt-v21"]
+    assert abs(sum(fit[f"{p}_share"] for p in PHASES) - 1.0) < 1e-12
+    # The US table on a 21-session month: a trough of 3.5 months on average,
+    # and 99 in 100 over by session 170.
+    assert abs(fit["trough_mean_sessions"] - 73.5) < 0.05
+    assert fit["trough_run_limit"] == 170
+    assert fit["contraction_run_limit"] == 246
+    assert fit["downturn_run_limit"] == 338
+    assert abs(fit["downturn_share"] - (fit["contraction_share"]
+                                        + fit["trough_share"])) < 1e-15
+
+
+def test_a_phase_held_past_the_presets_own_sojourns_is_outside() -> None:
+    own = (["contraction"] * 104 + ["trough"] * 66 + ["recovery"] * 252
+           + ["expansion"] * 334)
+    v = env.external_flow(sessions=756, names=108, cycle_phases=own)
+    assert v, v.reasons
+    assert "22% of its 756 sessions with a phase were in a contraction or " \
+           "trough, against 8%" in v.warnings[0]
+
+    held = (["expansion"] * 126 + ["contraction"] * 126 + ["trough"] * 454
+            + ["recovery"] * 50)
+    v = env.external_flow(sessions=756, names=108, cycle_phases=held)
+    assert not v
+    assert [g.id for g in v.gaps] == ["external-flow"]
+    assert v.reasons[0].startswith("a trough ran 454 sessions unbroken")
+    assert "together ran 580 sessions" in v.reasons[1]
+
+    a = env.assess_external_flow({
+        "names": 108, "sessions": 756, "company_events": 0,
+        "company_sum_sq": 0.0, "sector_events": 0, "sector_sum_sq": 0.0,
+        "market_events": 0, "market_sum_sq": 0.0, "fundamental_events": 0,
+        "fundamental_sum_sq": 0.0, "vix_writes": 0, "vix_write_abs": 0.0,
+        "vix_write_max": 0.0, "macro_steps": 756, "macro_shock_steps": 0,
+        "macro_shock_load": 0.0, "cycle_phases": held}, "pt-v21")
+    assert a["trough_longest"] == 454
+    assert a["downturn_longest"] == 580
+    assert abs(a["trough_share"] - 454 / 756) < 1e-12
+
+
+def test_a_tally_without_phases_reads_as_before() -> None:
+    v = env.external_flow(sessions=252, names=40)
+    assert v
+    assert "contraction or trough" not in v.warnings[0]
+    with pytest.raises(tf.ValidationError):
+        env.external_flow(sessions=10, names=40, cycle_phases=["slump"])

@@ -1883,6 +1883,7 @@ def external_flow(
     off_session_ticks: int = 0,
     vix_target_premiums: Iterable[float] = (),
     vix_target_floor_sessions: int = 0,
+    cycle_phases: Iterable[str] = (),
     preset: str | None = None,
 ) -> Verdict:
     """Is the news and shock flow a caller adds inside the flow the preset
@@ -1909,7 +1910,15 @@ def external_flow(
     `Engine.set_vix_target_premium` made to the premium standing, and
     `vix_target_floor_sessions` counts the sessions closed with a floor set
     by `Engine.set_vix_target_floor`; the preset is fitted with neither, so
-    any is outside.
+    any is outside. `cycle_phases` is the cycle phase each session traded
+    in, in order, one name a session (`"expansion"`, `"peak"`,
+    `"contraction"`, `"trough"` or `"recovery"`): a run of one phase longer
+    than 99 in 100 of the preset's own sojourns in it, or a contraction and
+    trough together longer than 99 in 100 of the preset's own, is outside.
+    The share of sessions in each phase is reported against the preset's own
+    share (`CALIBRATED_FLOW`'s `<phase>_share`) and not judged, since a run
+    of a few years holds one or two cycles and its share is mostly where it
+    opened.
 
     Each move list is signed. Its squares give the channel's variance and
     its sum the drift it adds to fair value: the fitted news has mean zero,
@@ -1962,13 +1971,14 @@ def external_flow(
     if any(not math.isfinite(x) for x in premiums):
         raise ValidationError("vix_target_premiums holds a value that is not finite")
     premiums = [x for x in premiums if x != 0.0]
+    phases = [str(x) for x in cycle_phases]
     loads =[abs(float(x)) for x in macro_shock_loads]
     steps = sessions if macro_steps is None else int(macro_steps)
     if steps < len(loads):
         raise ValidationError(
             f"macro_shock_loads has {len(loads)} entries and macro_steps is "
             f"{steps}; each entry is one step that carried shocks")
-    a = assess_external_flow({
+    tally: dict[str, Any] = {
         "names": int(names), "sessions": int(sessions),
         "company_events": c_n, "company_sum_sq": c_sq,
         "sector_events": s_n, "sector_sum_sq": s_sq,
@@ -1983,7 +1993,10 @@ def external_flow(
         "vix_target_writes": len(premiums),
         "vix_target_write_abs": ordered_sum(premiums),
         "vix_target_floor_sessions": int(vix_target_floor_sessions),
-    }, preset)
+    }
+    if phases:
+        tally["cycle_phases"] = phases
+    a = assess_external_flow(tally, preset)
     fit = CALIBRATED_FLOW[preset]
     summary = (
         f"{preset} is fitted with company news at {fit['company_news_rate']:g} "
@@ -2008,6 +2021,16 @@ def external_flow(
             f"target premium a session and closed "
             f"{100 * a['vix_target_floor_share']:.0f}% of its sessions under a "
             f"VIX target floor")
+    if phases:
+        summary += (
+            f"; {100 * a['downturn_share']:.0f}% of its {len(phases)} sessions "
+            f"with a phase were in a contraction or trough, against "
+            f"{100 * fit['downturn_share']:.0f}% on the preset's own cycle, and "
+            f"its longest contraction ran {a['contraction_longest']} sessions, "
+            f"its longest trough {a['trough_longest']} and its longest "
+            f"recovery {a['recovery_longest']}, where 99 in 100 of the "
+            f"preset's own end by {fit['contraction_run_limit']}, "
+            f"{fit['trough_run_limit']} and {fit['recovery_run_limit']}")
     findings = tuple(a["findings"])
     if findings:
         reasons = tuple(findings) + (
