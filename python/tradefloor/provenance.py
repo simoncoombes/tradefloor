@@ -605,6 +605,16 @@ OUT_OF_SCOPE = {
     "treasury_term_premium_half_life":
         "inert at 0.0 and read only with `treasury_term_premium_sd` set; at "
         "0.0 it is also left out of the model's digest",
+    "fair_value_aggregate_jensen":
+        "inert at 0.0: the close's step of the aggregate earnings level is a "
+        "branch on `== 0.0` with `fair_value_aggregate_half_life` also 0.0, so "
+        "no level moves and the aggregate level is neither held, snapshotted "
+        "nor hashed; at 0.0 it is also left out of the model's digest",
+    "fair_value_aggregate_half_life":
+        "inert at 0.0: no reversion of the aggregate earnings level (a branch "
+        "on `== 0.0`), and with `fair_value_aggregate_jensen` also 0.0 nothing "
+        "is held, snapshotted or hashed; at 0.0 it is also left out of the "
+        "model's digest",
     "market_vol_cycle_hold_onset":
         "inert at 0.0: no phase age is counted and the multiplier's target "
         "and the coupling's denominator are the expressions that stood (a "

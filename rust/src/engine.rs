@@ -1325,6 +1325,10 @@ pub struct Engine {
     /// (`treasury_term_premium_sd`): 0.0 with the dial off, which it never
     /// leaves.
     term_premium: f64,
+    /// The aggregate earnings level after the last close's step
+    /// (`fair_value_aggregate_jensen`, `fair_value_aggregate_half_life`):
+    /// `None` before the first such close, and always with both off.
+    aggregate_level: Option<f64>,
     /// The decision the Fed's own reading implied at the last close
     /// (`fed_eve_decision`), which the next scheduled meeting delivers;
     /// `None` before the first close with the switch on, and always with it
@@ -2417,6 +2421,7 @@ impl Engine {
             spread_noise: 0.0,
             term_premium_key: crate::rng::term_premium_key(seed),
             term_premium: 0.0,
+            aggregate_level: None,
             eve_decision: None,
             population: None,
         };
@@ -8541,6 +8546,7 @@ impl Engine {
         }
         self.accrue_buybacks();
         self.pull_relative_levels();
+        self.step_aggregate_level();
         // The day's market t scale is the session's: the factor's close
         // above read the day it scaled, and the next open draws its own.
         self.market_day_scale = 1.0;
@@ -8576,6 +8582,101 @@ impl Engine {
             if v < floor {
                 c.stock.fair_value_offset = Some(v + pull * (floor - v));
             }
+        }
+    }
+
+    /// Whether the model steps the aggregate earnings level
+    /// (`fair_value_aggregate_jensen` or `fair_value_aggregate_half_life`
+    /// set), which is when the snapshot and the state hash carry it.
+    pub fn carries_aggregate_level(&self) -> bool {
+        self.params.fair_value_aggregate_jensen != 0.0 || self.params.fair_value_aggregate_half_life != 0.0
+    }
+
+    /// The aggregate earnings level `A = ln(sum shares * eps * exp(v) / sum
+    /// shares * eps)` over the public, solvent names with a mispricing state
+    /// and a positive `eps`; `None` when no name qualifies.
+    fn aggregate_level_now(&self) -> Option<f64> {
+        let (mut num, mut den) = (0.0, 0.0);
+        for c in self.companies.iter() {
+            if !c.is_public || c.is_bankrupt || c.stock.mispricing_s.is_none() {
+                continue;
+            }
+            let Some(eps) = c.eps else { continue };
+            if !(eps > 0.0 && eps.is_finite()) {
+                continue;
+            }
+            let w = c.stock.shares_outstanding * eps;
+            den += w;
+            num += w * crate::mathx::exp(c.stock.fair_value_offset.unwrap_or(0.0));
+        }
+        if den > 0.0 && num > 0.0 { Some(crate::mathx::log(num / den)) } else { None }
+    }
+
+    /// The aggregate earnings level's close step, after the relative knee
+    /// (`fair_value_aggregate_jensen`, `fair_value_aggregate_half_life`):
+    /// one shift `c` to every public, solvent name's level with a mispricing
+    /// state, `c = (dA)^2 / 2` under the switch (dA is `A` now less `A` after
+    /// the last step; the first close records `A` only) plus `-(1 - 0.5^(1/h))
+    /// A` under the half-life. `A` moves by `c` exactly, and that is the level
+    /// recorded. A branch at 0.0 on both, and nothing runs unless the model
+    /// carries the levels. No draws.
+    fn step_aggregate_level(&mut self) {
+        if !self.carries_aggregate_level() || !self.carries_fair_value_offsets() {
+            return;
+        }
+        let Some(a) = self.aggregate_level_now() else { return };
+        let mut c = 0.0;
+        if self.params.fair_value_aggregate_jensen != 0.0 {
+            if let Some(prev) = self.aggregate_level {
+                let d = a - prev;
+                c += 0.5 * d * d;
+            }
+        }
+        let h = self.params.fair_value_aggregate_half_life;
+        if h != 0.0 {
+            c -= (1.0 - crate::mathx::pow(0.5, 1.0 / h)) * a;
+        }
+        if c != 0.0 {
+            for comp in self.companies.iter_mut() {
+                if !comp.is_public || comp.is_bankrupt || comp.stock.mispricing_s.is_none() {
+                    continue;
+                }
+                let v = comp.stock.fair_value_offset.unwrap_or(0.0);
+                comp.stock.fair_value_offset = Some(v + c);
+            }
+        }
+        self.aggregate_level = Some(a + c);
+    }
+
+    /// The aggregate level's state for the snapshot and the state hash: a
+    /// presence flag and the level, while the model carries it.
+    pub fn aggregate_level_words(&self) -> Option<[f64; 2]> {
+        if !self.carries_aggregate_level() {
+            return None;
+        }
+        Some(match self.aggregate_level {
+            Some(a) => [1.0, a],
+            None => [0.0, 0.0],
+        })
+    }
+
+    /// Put the aggregate level back from [`Engine::aggregate_level_words`].
+    pub fn set_aggregate_level_state(&mut self, words: Option<&[f64]>) -> Result<(), String> {
+        match (words, self.carries_aggregate_level()) {
+            (None, false) => Ok(()),
+            (Some(w), true) => {
+                if w.len() != 2 || !(w[0] == 0.0 || w[0] == 1.0) || !w[1].is_finite() {
+                    return Err(format!(
+                        "this snapshot's aggregate_level is {w:?}: it is a presence flag and the aggregate \
+                         earnings level"));
+                }
+                self.aggregate_level = if w[0] == 1.0 { Some(w[1]) } else { None };
+                Ok(())
+            }
+            (None, true) => Err("this model sets fair_value_aggregate_jensen or fair_value_aggregate_half_life \
+                                 and the snapshot carries no aggregate_level".to_string()),
+            (Some(_), false) => Err("this snapshot carries aggregate_level and this model sets neither \
+                                     fair_value_aggregate_jensen nor fair_value_aggregate_half_life".to_string()),
         }
     }
 
@@ -13485,6 +13586,15 @@ impl Engine {
         // `treasury_term_premium_sd` is set, behind its own tag.
         if let Some(words) = self.term_premium_words() {
             hash_f64(&mut buf, 60.0);
+            for value in words {
+                hash_f64(&mut buf, value);
+            }
+        }
+        // The aggregate earnings level, only while
+        // `fair_value_aggregate_jensen` or `fair_value_aggregate_half_life`
+        // is set, behind its own tag.
+        if let Some(words) = self.aggregate_level_words() {
+            hash_f64(&mut buf, 62.0);
             for value in words {
                 hash_f64(&mut buf, value);
             }

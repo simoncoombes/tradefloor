@@ -22,6 +22,21 @@ same with them on as off.
 
 <!-- release-note-ends -->
 
+### The aggregate earnings level
+
+- `fair_value_aggregate_jensen` is a new switch and
+  `fair_value_aggregate_half_life` a new half-life in sessions, both 0.0 on
+  every preset and left out of the digest there. A name's fair-value level
+  is a level martingale, so the roster's total earnings over the nominal
+  scale are one too and their log falls by half their variance a year, a
+  profit share that drifts down for ever where the tape's ln(CP/GDP) does
+  not. At 1.0 the switch adds half the square of that aggregate's change
+  since the last close to every name's level at each close, so its log
+  innovations have mean zero; the half-life pulls it back toward the
+  roster's base earnings. Each is one shift to every name's level after the
+  relative knee, it draws nothing, and the aggregate after the step is
+  snapshotted and hashed (tag 62) only while either is set.
+
 ### Oil's forecast
 
 - `oil_forecast_opec_spread` is a new switch, 0.0 on every preset and left

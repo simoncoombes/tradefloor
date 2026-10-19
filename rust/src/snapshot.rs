@@ -1680,6 +1680,11 @@ impl Engine {
         if let Some(words) = self.term_premium_words() {
             out.put("term_premium", V::from_f64s(&words));
         }
+        // The aggregate earnings level (`fair_value_aggregate_jensen`,
+        // `fair_value_aggregate_half_life`).
+        if let Some(words) = self.aggregate_level_words() {
+            out.put("aggregate_level", V::from_f64s(&words));
+        }
         // The eve's decision (`fed_eve_decision`).
         if let Some(words) = self.eve_decision_words() {
             out.put("eve_decision", V::from_f64s(&words));
@@ -2068,6 +2073,11 @@ impl Engine {
             Gated::dial("core_trend", "core_trend_sd", p.core_trend_sd),
             Gated::dial("spread_noise", "corporate_spread_noise_sd", p.corporate_spread_noise_sd),
             Gated::dial("term_premium", "treasury_term_premium_sd", p.treasury_term_premium_sd),
+            Gated::when(
+                "aggregate_level",
+                self.carries_aggregate_level(),
+                format!("fair_value_aggregate_jensen or fair_value_aggregate_half_life is not 0, and this engine's \
+                         are {} and {}", p.fair_value_aggregate_jensen, p.fair_value_aggregate_half_life)),
             Gated::dial("eve_decision", "fed_eve_decision", p.fed_eve_decision),
             Gated::when(
                 "buyback_log_shares",
@@ -2844,6 +2854,15 @@ impl Engine {
                 None => None,
             };
             inner.set_term_premium_state(words.as_deref()).map_err(core)?;
+        }
+        // The aggregate earnings level (`fair_value_aggregate_jensen`,
+        // `fair_value_aggregate_half_life`).
+        {
+            let words = match snapshot.get("aggregate_level") {
+                Some(_) => Some(read_buffer(snapshot, "", "aggregate_level")?),
+                None => None,
+            };
+            inner.set_aggregate_level_state(words.as_deref()).map_err(core)?;
         }
         // The eve's decision (`fed_eve_decision`).
         {

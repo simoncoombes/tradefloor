@@ -1381,6 +1381,10 @@ PERTURBATIONS = [
     # contraction's or trough's onset (158 and 111 sessions on the US
     # table), which three calm sessions never reach.
     ("market_vol_cycle_hold_onset", 0.9, False),
+    # The aggregate earnings level's step: a common shift of every name's
+    # fair-value level at the close.
+    ("fair_value_aggregate_jensen", 1.0, True),
+    ("fair_value_aggregate_half_life", 1959.0, True),
     # INERT: past the onset only (its companion), which the probe never is.
     ("market_vol_cycle_hold_fade", 0.335, False),
     # INERT: read only with the fade set.
