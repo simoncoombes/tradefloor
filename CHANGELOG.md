@@ -133,6 +133,19 @@ same with them on as off.
   the VIX it stated by weeks: replaying the real 2020-21 VIX, realized
   volatility ran about twice the S&P 500's once the VIX was back at 20-40,
   and short of it at the March peak.
+- `market_vol_cycle_hold_onset`, `market_vol_cycle_hold_fade`,
+  `market_vol_cycle_hold_half_life` and `market_vol_vix_hold_half_life` are
+  new dials, 0.0 on every preset and left out of the digest there: off zero
+  a contraction or trough held past its onset (a quantile of the phase's own
+  sojourn) fades. The cycle multiplier's excess gives up a share at a
+  half-life, and the VIX coupling's denominator follows a slow average of
+  the held VIX, so a long-held regime reads as normal rather than as fresh
+  panic. The phase's age is counted at each close from the phase the
+  session closes in, so a host that writes the phase through
+  `economy_mut()` is counted too. A host that held a trough for 454
+  sessions saw realised index volatility at 1.15 to 1.32 times the VIX
+  after 126 to 252 sessions, against about 0.9 on the tape's long stressed
+  stretches (issue #303).
 - `treasury_term_premium_sd` and `treasury_term_premium_half_life` are new
   dials, 0.0 on every preset and left out of the digest there: off zero the
   10-year carries its own term premium, an AR(1) stepped every session on its
@@ -184,8 +197,8 @@ same with them on as off.
   year-on-year 1990-2025 about 2.0: 0.993 and 0.170.
 - `policy_anticipation_guidance` is a new dial, 0.0 on every preset and left
   out of the digest there: the share of the anticipated meeting's priced
-  change taken from the decision the Fed's own reading implies rather than
-  the published economy's. The tape's policy surprise at scheduled FOMC
+  change taken from the decision the Fed's own reading implies; the rest
+  comes from the published economy's. The tape's policy surprise at scheduled FOMC
   announcements has an sd of 4.8 bp (Bauer and Swanson 2022).
 - `treasury_path_anticipated` is a new switch, 0.0 on every preset and left
   out of the digest there: at 1 a meeting moves the priced policy path by
@@ -308,8 +321,8 @@ same with them on as off.
 - `vix_stress_premium_undo` is a new switch, 0.0 on every preset and left
   out of the digest there. On, the published VIX's premium is the anchor's
   pull undone above the knee, `vix_anchor_weight * max(0, m - knee)`, in
-  place of the capped hinge; the gain and the cap are then unread. Only the
-  quote moves.
+  place of the capped hinge; the gain and the cap are then unread, and only
+  the quote moves.
 
 ### The VIX's fear memory
 

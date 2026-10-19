@@ -558,6 +558,11 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "vix_stress_premium_knee": (0.0, 1.5),
     # The largest log premium of the quote over the state; 0.5 is 1.65x.
     "vix_stress_premium_cap": (0.0, 0.5),
+    # The stress memory's own rate: off (the anchor's) to 0.1 a session,
+    # about three times the pt-v22 law's 0.035 anchor rate.
+    "vix_stress_premium_memory": (0.0, 0.1),
+    # The undo form: a switch.
+    "vix_stress_premium_undo": (0.0, 1.0),
     # The VIX's fear memory: the uptake up to half the excursion a session,
     # and the half-life from a week to a year of sessions.
     "vix_fear_uptake": (0.0, 0.5),
@@ -680,9 +685,11 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "usd_noise_sd": (0.0, 0.86),
     "usd_safe_haven_gain": (0.0, 0.1),
     # Oil's bounds: WTI deflated by CPIAUCSL, 1987 to 2024, at the model's
-    # centre of 81 gives 16.4 and 279; the standing 35 and 150 inside.
+    # centre of 81 gives 16.4 and 279; the standing 35 and 150 inside. 0.0
+    # is the standing value on both, and every box contains the base
+    # preset's 0.0, as the floor's already did.
     "oil_price_floor": (0.0, 35.0),
-    "oil_price_ceiling": (150.0, 300.0),
+    "oil_price_ceiling": (0.0, 300.0),
     "oil_forecast_clamp": (0.0, 1.0),
     # Switches: the bank's and the curve's inflation, headline or core.
     "fed_core_inflation": (0.0, 1.0),
@@ -714,6 +721,12 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # off to a year.
     "treasury_term_premium_sd": (0.0, 0.12),
     "treasury_term_premium_half_life": (0.0, 252.0),
+    # The time-held fade: the onset a quantile of the model's own sojourn;
+    # the fade a share; its half-lives off to two years.
+    "market_vol_cycle_hold_onset": (0.0, 0.99),
+    "market_vol_cycle_hold_fade": (0.0, 1.0),
+    "market_vol_cycle_hold_half_life": (0.0, 504.0),
+    "market_vol_vix_hold_half_life": (0.0, 504.0),
     "cycle_rate_hazard": (0.0, 0.1),
     "core_trend_persistence": (0.0, 0.998),
     # The 2-year's carry through a meeting: a share, so its own bounds.

@@ -1373,6 +1373,17 @@ PERTURBATIONS = [
     ("market_vol_cycle_recovery_release", 1.0, False),
     # INERT: read only with the release above set.
     ("market_vol_cycle_recovery_scale", 0.1, False),
+    # INERT on this probe: the time-held fade's clock counts the phase's
+    # closes and moves no price, and both of its fades act only past a
+    # contraction's or trough's onset (158 and 111 sessions on the US
+    # table), which three calm sessions never reach.
+    ("market_vol_cycle_hold_onset", 0.9, False),
+    # INERT: past the onset only (its companion), which the probe never is.
+    ("market_vol_cycle_hold_fade", 0.335, False),
+    # INERT: read only with the fade set.
+    ("market_vol_cycle_hold_half_life", 295.0, False),
+    # INERT: past the onset only (its companion), which the probe never is.
+    ("market_vol_vix_hold_half_life", 198.0, False),
     # INERT on every column this probe reads, at any value: the premium
     # scales the PUBLISHED VIX only (`Engine::published_vix`) and nothing
     # inside the engine reads the quote, and on this probe's three calm days
@@ -2151,6 +2162,9 @@ COMPANIONS: dict[str, dict[str, float]] = {
     "core_trend_sd": {"core_trend_persistence": 0.993},
     "corporate_spread_noise_sd": {"corporate_spread_noise_half_life": 16.0},
     "treasury_term_premium_sd": {"treasury_term_premium_half_life": 49.0},
+    # Both fades act past the onset and are refused without it.
+    "market_vol_cycle_hold_fade": {"market_vol_cycle_hold_onset": 0.9},
+    "market_vol_vix_hold_half_life": {"market_vol_cycle_hold_onset": 0.9},
     "treasury_core_inflation": {"oil_inflation_passthrough": 1.0},
     # The unmet put needs the put and the priced path it decays like.
     "treasury_zlb_path": {"fed_put_gain": 3.0, "fed_put_half_life": 126.0, "treasury_put_pricing": 1.0,

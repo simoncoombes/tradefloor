@@ -2745,6 +2745,38 @@ outside one. pt-v20 reads 1.27 and about 1.0 on held-out histories.
 | $h_{r}$ | `market_vol_cycle_release_half_life` | 0 | same | | sessions, 0 is $h$; read only with $R$ set |
 | $g_{m}$ | `market_vol_cycle_recovery_release` | 0 | 0.45 | | a share in [0, 1]; read only with $R$ set |
 | $x_{m}$ | `market_vol_cycle_recovery_scale` | 0 | 0.1 | | log points of the index in (0, 2]; read only with $g_{m}$ set |
+| $q$ | `market_vol_cycle_hold_onset` | 0 | same | | a quantile of the phase's own sojourn in [0, 1); 0 keeps no clock |
+| $f$ | `market_vol_cycle_hold_fade` | 0 | same | | a share in [0, 1]; read only with $q$ set |
+| $H_{f}$ | `market_vol_cycle_hold_half_life` | 0 | same | | sessions past the onset; read only with $f$ set |
+| $H_{v}$ | `market_vol_vix_hold_half_life` | 0 | same | | sessions; read only with $q$ set |
+
+**A held downturn** (`market_vol_cycle_hold_onset`,
+`market_vol_cycle_hold_fade`, `market_vol_cycle_hold_half_life`,
+`market_vol_vix_hold_half_life`; 0.0 on every preset). A host that writes
+the phase through `economy_mut()` and holds a contraction or trough for
+hundreds of sessions gets the multiplier and the VIX coupling's
+$(\text{VIX}/A m^{d})^4$ at full strength for as long as the hold lasts: on
+pt-v21 with a held trough premium of 4 VIX points, realised index volatility
+reached 1.15 to 1.32 times the VIX after 126 to 252 sessions held, where the
+tape's long stressed stretches read about 0.9 (issue #303). With $q$ set the
+engine counts the phase's age, the consecutive closes in the phase the
+session closes in, which counts a written phase as well as a pinned one. A
+phase's onset $T$ is the $q$ quantile of its own sojourn on the cycle's
+hazard alone (`economy::cycle::sojourn_quantile_days_for`; at 0.9 on the US
+table, 158 sessions for a contraction and 111 for a trough). Past it, a
+contraction's or trough's target $\ell > 0$ becomes
+$\ell\,(1 - f(1 - 2^{-(a - T)/H_{f}}))$, and the coupling's denominator
+$D$ becomes $\max(D, e^{s})$, $s$ a slow average of the log VIX at the
+close that opens at $\log D$ on the first close past the onset and steps
+toward the log VIX at half-life $H_{v}$. A turn of phase drops $s$ and
+restarts the clock. The clock and $s$ are snapshotted and hashed (tag 84)
+only with $q$ set. Measured values: $q$ 0.9; $f$ 0.335, from the tape's
+year-long stress (the median sd of 252-session windows at a VIX median of 25
+or more is 1.718 times the sd outside NBER recessions, against 2.257 inside
+them, and $\ln 1.718 / \ln 2.257 = 0.665$ of the log excess stays);
+$H_{f}$ 295, the slow level of ^GSPC's log variance
+(`market_vol_level_persistence`'s derivation); $H_{v}$ 198, the slow pole
+of the log VIX (`vix_level_persistence`'s derivation).
 
 `fair_value_market_vol_cap`'s ceiling is in multiples of the unscaled
 `market_factor_sigma`, so a contraction's higher baseline counts as fear
@@ -4710,6 +4742,7 @@ changes, so it waits for a new preset.
 - A permanent change on the corporate yield freezes it: after that, no policy, inflation, VIX or cycle move reaches the discount rate.
 - The effect sizes in four of the seven scenario files were measured before pt-v20, and some docstrings describe an older VIX anchor, an older crisis threshold and the switched-off crisis blend. The `macro.treasury_2y` note says the 2-year is recomputed at every close, which is pt-v19's law.
 - A pinned change of phase does not get the growth shock a natural phase change gets.
+- In the recession scenario the index rises too little from its low: about 58% in the 252 sessions after it, against 69% after the 2009 low (pt-v21: 70%). The cause is `pinned_vix_sets_variance`. The scenario pins the VIX through the recovery, every pin sets the variance, and the recovery is calmer than under the stepped law, so the index climbs less. The scenario's band was measured under the stepped law. With the switch off the rise ties pt-v21, but the 2020 crash replay loses its depth and timing. A pin that only raises the variance ties the rise but makes the crash's drawdown path worse. *Next preset.*
 - `World.run` builds a fresh scenario on every call, so a hold or ramp added with `World.apply` loses its anchor between calls. `pin_macro(epicentre=None)` does not clear an epicentre pin.
 
 **Records.** The provenance ledger labels `crisis_epicentre_end_sessions` as

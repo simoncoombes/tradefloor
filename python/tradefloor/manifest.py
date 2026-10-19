@@ -602,6 +602,9 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          # The 10-year's own term premium, only while
          # `treasury_term_premium_sd` is set.
          "term_premium",
+         # The time-held fade's clock and the held VIX, only while
+         # `market_vol_cycle_hold_onset` is set and a close has started it.
+         "cycle_hold",
          # The dividend states, on a model that pays dividends, and an
          # ex-date's move in `s` waiting for its tape row.
          "dividend", "pending_dividend",
@@ -1075,10 +1078,11 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         _f64(buf, 55.0)
         for value in _column(snapshot["oil_target_drift"], 3, "oil_target_drift"):
             _f64(buf, value)
-    # Core inflation's trend (57), the eve's decision (58) and credit's own
-    # state (59), each only while its dial is set, behind its own tag.
+    # Core inflation's trend (57), the eve's decision (58), credit's own
+    # state (59), the 10-year's term premium (60) and the time-held fade's
+    # clock (84), each only while its dial is set, behind its own tag.
     for name, tag, width in (("core_trend", 57.0, 3), ("eve_decision", 58.0, 2), ("spread_noise", 59.0, 3),
-                              ("term_premium", 60.0, 3)):
+                              ("term_premium", 60.0, 3), ("cycle_hold", 84.0, 4)):
         if name in snapshot:
             _f64(buf, tag)
             for value in _column(snapshot[name], width, name):
@@ -1737,7 +1741,7 @@ _LEDGER_OPTIONAL_BUFFERS = ("fair_value_offset", "opening_z", "pending_fair_valu
                             "night_bridge", "vix_futures", "rate_futures",
                             "oil_futures", "margin", "shares_outstanding",
                             "oil_target_drift", "core_trend", "eve_decision",
-                            "spread_noise", "term_premium")
+                            "spread_noise", "term_premium", "cycle_hold")
 
 #: The ``fundamentals`` block's buffers, one per company each.
 _LEDGER_FUNDAMENTALS = ("eps", "book_value_per_share", "revenue_growth")
