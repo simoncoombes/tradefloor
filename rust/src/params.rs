@@ -2365,6 +2365,30 @@ pub struct ModelParams {
     /// February high read 0.32 (S&P 500 0.34, stepped 0.27) and its
     /// drawdown over the path 0.33 (0.34, stepped 0.38).
     pub pinned_vix_sets_variance: f64,
+    /// The share of the return memory's multiplier (`market_vol_leverage`)
+    /// that a FORCED close keeps (a scenario's `vix_sets_variance`, or any
+    /// pin under `pinned_vix_sets_variance`). 0.0, on every shipped preset,
+    /// is the forced close as it stood: the variance is the law's fixed
+    /// point at the forced VIX, without the multiplier, and a value of 0.0
+    /// is left out of the model's digest.
+    ///
+    /// Off zero the forced close's variance is that fixed point times the
+    /// memory's multiplier at the gain `share * market_vol_leverage`,
+    /// `exp(g l - g^2 s^2 / 2)` with the free close's `l` and `s^2`, clamped
+    /// as a free close clamps. The memory itself steps as it did; no draw
+    /// is taken and no state is added. Read only with `market_vol_leverage`
+    /// set. In [0, 1].
+    ///
+    /// Why. Given the VIX, realised variance still answers the market's own
+    /// recent fall. On ^GSPC and the Cboe VIX the slope of the next
+    /// session's log squared return on the model's memory (half-life 15,
+    /// z-scored), with 2 log VIX in the regression, is 2.71 (se 0.85) pooled
+    /// over 2008-09 to 2010-06 and 2020-01 to 2021-06 (2.17 and 3.40 apart),
+    /// against the free law's gain of 2.25; the past month's realised
+    /// variance adds little once the VIX is known. A pinned VIX does not
+    /// answer the model's own path, so a forced close without the memory
+    /// drops that channel.
+    pub pinned_vix_forced_memory: f64,
     /// A ceiling on the annual buyback yield `buyback_payout_share * eps /
     /// price` that the buyback term compounds over the elapsed years. In
     /// [0, 1], and 0.0 means no ceiling.
@@ -4322,7 +4346,8 @@ pub struct ModelParams {
     ///
     /// A FORCED close (a scenario's `vix_sets_variance`) moves the memory
     /// with the day's factor but sets the variance to the law's level
-    /// without the multiplier, so a scenario's asserted fear is the fear the
+    /// without the multiplier (unless `pinned_vix_forced_memory` keeps a
+    /// share of it), so a scenario's asserted fear is the fear the
     /// session draws at; the first free close after it applies the memory.
     ///
     /// This is a return-path memory (Black 1976; Christie 1982; the
@@ -8484,6 +8509,7 @@ impl ModelParams {
             pinned_vix_calm_share: 0.0,
             pinned_vix_priced_cap: 0.0,
             pinned_vix_sets_variance: 0.0,
+            pinned_vix_forced_memory: 0.0,
             buyback_yield_cap: 0.0,
             buyback_accrual: 0.0,
             rate_close_remark: 0.0,
@@ -11140,6 +11166,7 @@ impl ModelParams {
             "pinned_vix_calm_share" => self.pinned_vix_calm_share,
             "pinned_vix_priced_cap" => self.pinned_vix_priced_cap,
             "pinned_vix_sets_variance" => self.pinned_vix_sets_variance,
+            "pinned_vix_forced_memory" => self.pinned_vix_forced_memory,
             "buyback_yield_cap" => self.buyback_yield_cap,
             "buyback_accrual" => self.buyback_accrual,
             "rate_close_remark" => self.rate_close_remark,
@@ -11561,6 +11588,7 @@ impl ModelParams {
             "pinned_vix_calm_share" => out.pinned_vix_calm_share = value,
             "pinned_vix_priced_cap" => out.pinned_vix_priced_cap = value,
             "pinned_vix_sets_variance" => out.pinned_vix_sets_variance = value,
+            "pinned_vix_forced_memory" => out.pinned_vix_forced_memory = value,
             "buyback_yield_cap" => out.buyback_yield_cap = value,
             "buyback_accrual" => out.buyback_accrual = value,
             "rate_close_remark" => out.rate_close_remark = value,
@@ -12296,6 +12324,12 @@ impl ModelParams {
                 "pinned_vix_sets_variance is {}. It is a switch: 0 (a pin reaches the variance one \
                  step a close) or 1 (every pin sets it, as vix_sets_variance does).",
                 self.pinned_vix_sets_variance));
+        }
+        if !(0.0..=1.0).contains(&self.pinned_vix_forced_memory) {
+            return Err(format!(
+                "pinned_vix_forced_memory is {}. It is the share of the return memory's multiplier a \
+                 forced close keeps, in [0, 1].",
+                self.pinned_vix_forced_memory));
         }
         if !(self.market_vol_slow_gamma >= 0.0 && self.market_vol_slow_gamma <= 1.0) {
             return Err(format!(
@@ -13791,6 +13825,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "pinned_vix_calm_knee",
     "pinned_vix_calm_share",
     "pinned_vix_feedback",
+    "pinned_vix_forced_memory",
     "pinned_vix_priced_cap",
     "pinned_vix_sets_variance",
     "pinned_vix_variance_share",
@@ -14140,6 +14175,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "pinned_vix_calm_share",
         "pinned_vix_priced_cap",
         "pinned_vix_sets_variance",
+        "pinned_vix_forced_memory",
         "buyback_yield_cap",
         "buyback_accrual",
         "rate_close_remark",

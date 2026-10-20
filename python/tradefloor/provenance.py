@@ -582,6 +582,11 @@ OUT_OF_SCOPE = {
         "the spread's leverage term reads the gap itself, as it stood; the "
         "priced gap is neither stepped, snapshotted nor hashed; at 0.0 it is "
         "also left out of the model's digest",
+    "pinned_vix_forced_memory":
+        "inert at 0.0: a forced close sets the variance to the law's fixed "
+        "point at the forced VIX without the return memory's multiplier, "
+        "as it stood (a branch at the close); no draw is taken and no state "
+        "is added; at 0.0 it is also left out of the model's digest",
     "pinned_vix_sets_variance":
         "inert at 0.0: a pinned VIX marks tonight's close forced only when "
         "the caller asks (`vix_sets_variance`), as it stood (a branch in "

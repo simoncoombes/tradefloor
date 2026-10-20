@@ -1464,6 +1464,8 @@ PERTURBATIONS = [
     ("corporate_spread_noise_sd", 0.025, True),
     # INERT: read only by a VIX pin; the probe pins nothing.
     ("pinned_vix_sets_variance", 1.0, False),
+    # INERT: read only on a forced close; the probe forces nothing.
+    ("pinned_vix_forced_memory", 1.0, False),
     # INERT: the half-life alone is read by nothing (the sd is 0).
     ("corporate_spread_noise_half_life", 16.0, False),
     # The 10-year's own term premium: its opening draw moves the 10-year's

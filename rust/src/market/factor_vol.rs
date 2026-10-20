@@ -655,7 +655,13 @@ impl MarketVarianceState {
     /// [`crate::params::ModelParams::market_vol_leverage`]. Read only while
     /// the dial is set.
     fn leverage_multiplier(params: &crate::params::ModelParams, l: f64) -> f64 {
-        let k = params.market_vol_leverage;
+        Self::leverage_multiplier_at(params, l, params.market_vol_leverage)
+    }
+
+    /// [`Self::leverage_multiplier`] at gain `k` in place of
+    /// `market_vol_leverage`: the forced close's share of it
+    /// (`pinned_vix_forced_memory`) reads it.
+    fn leverage_multiplier_at(params: &crate::params::ModelParams, l: f64, k: f64) -> f64 {
         let phi = leverage_phi(params);
         let a = params.market_vol_leverage_down;
         let var_u = 0.5 * (1.0 + (1.0 - a) * (1.0 - a))
@@ -1157,7 +1163,8 @@ impl MarketVarianceState {
         // The return memory remembers a forced session's factor like any
         // other -- the returns happened -- but the variance below is the
         // law's level at the forced VIX, without the memory's multiplier:
-        // the scenario asserted that fear. A branch, so nothing moves at
+        // the scenario asserted that fear (unless `pinned_vix_forced_memory`
+        // keeps a share of it). A branch, so nothing moves at
         // `market_vol_leverage` 0.0.
         if params.market_vol_leverage != 0.0 {
             self.step_leverage_memory(params);
@@ -1169,6 +1176,7 @@ impl MarketVarianceState {
             // where a free close leaves it, untouched.
             self.variance = clamp_variance(params, target);
             self.fast_variance = self.variance;
+            self.apply_forced_memory(params);
             return (target, None);
         }
         let fast = clamp_variance(params, target);
@@ -1176,7 +1184,23 @@ impl MarketVarianceState {
         self.fast_variance = fast;
         self.slow_variance = slow;
         self.variance = clamp_variance(params, (1.0 - w) * fast + w * slow);
+        self.apply_forced_memory(params);
         (target, Some(slow_target))
+    }
+
+    /// THE FORCED CLOSE'S RETURN MEMORY (`pinned_vix_forced_memory`): off
+    /// zero, and with the memory on, the variance a forced close set (the
+    /// mixture of the components it set) times the memory's multiplier at
+    /// that share of `market_vol_leverage`'s gain, clamped as a free close
+    /// clamps. The components stay at the law's fixed point. A branch, so
+    /// at 0.0 the forced close is the one that stood.
+    fn apply_forced_memory(&mut self, params: &crate::params::ModelParams) {
+        if params.pinned_vix_forced_memory == 0.0 || params.market_vol_leverage == 0.0 {
+            return;
+        }
+        let g = params.pinned_vix_forced_memory * params.market_vol_leverage;
+        self.variance = clamp_variance(
+            params, self.mixture(params) * Self::leverage_multiplier_at(params, self.leverage_memory, g));
     }
 
     /// Warm the variance components to the slow LEVEL the run opens on,
