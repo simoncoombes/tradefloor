@@ -610,6 +610,18 @@ OUT_OF_SCOPE = {
         "branch on `== 0.0` with `fair_value_aggregate_half_life` also 0.0, so "
         "no level moves and the aggregate level is neither held, snapshotted "
         "nor hashed; at 0.0 it is also left out of the model's digest",
+    "flight_to_quality_half_life":
+        "inert at 0.0: the flight to quality's shift is the increment the "
+        "10-year's pull erases, as it stood (a branch on `== 0.0`), and with "
+        "`treasury_haven_day_gain` also 0.0 no shift state is held, "
+        "snapshotted or hashed; at 0.0 it is also left out of the model's digest",
+    "treasury_haven_day_gain":
+        "inert at 0.0: no same-day haven (a branch on `== 0.0`), and with "
+        "`flight_to_quality_half_life` also 0.0 no shift state is held, "
+        "snapshotted or hashed; at 0.0 it is also left out of the model's digest",
+    "treasury_haven_day_decay":
+        "inert at 0.0 and read only with `treasury_haven_day_gain` set; at "
+        "0.0 it is also left out of the model's digest",
     "fair_value_aggregate_half_life":
         "inert at 0.0: no reversion of the aggregate earnings level (a branch "
         "on `== 0.0`), and with `fair_value_aggregate_jensen` also 0.0 nothing "

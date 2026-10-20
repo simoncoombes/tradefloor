@@ -22,6 +22,21 @@ same with them on as off.
 
 <!-- release-note-ends -->
 
+### The 10-year's same-day haven and the flight to quality's own decay
+
+- `flight_to_quality_half_life`, `treasury_haven_day_gain` and
+  `treasury_haven_day_decay` are new dials, 0.0 on every preset and left out
+  of the digest there. The haven moved the 10-year's anchor, which the yield
+  reaches at 5 per cent a session, and the flight to quality's shift was an
+  increment the same pull erased in about 14 sessions, while the tape's
+  10-year moves with the VIX on the day and keeps its move with the index for
+  the 63 sessions measured. Off zero the flight to quality's shift reads the
+  return less its running mean and goes into a state with its own half-life,
+  and the same-day haven carries minus the gain times max(0, VIX - 20) under
+  the inflation gate, each outside the pull and in the meeting's target. They
+  draw nothing, and the state is snapshotted and hashed (tag 76) only while a
+  dial is set.
+
 ### The aggregate earnings level
 
 - `fair_value_aggregate_jensen` is a new switch and

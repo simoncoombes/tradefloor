@@ -606,6 +606,9 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          # `fair_value_aggregate_jensen` or `fair_value_aggregate_half_life`
          # is set.
          "aggregate_level",
+         # The 10-year's shifts outside its pull, only while
+         # `flight_to_quality_half_life` or `treasury_haven_day_gain` is set.
+         "treasury_shift",
          # The time-held fade's clock and the held VIX, only while
          # `market_vol_cycle_hold_onset` is set and a close has started it.
          "cycle_hold",
@@ -1083,11 +1086,13 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         for value in _column(snapshot["oil_target_drift"], 3, "oil_target_drift"):
             _f64(buf, value)
     # Core inflation's trend (57), the eve's decision (58), credit's own
-    # state (59), the 10-year's term premium (60), the aggregate earnings
-    # level (62) and the time-held fade's clock (84), each only while its
-    # dial is set, behind its own tag.
+    # state (59), the 10-year's term premium (60), the 10-year's shifts
+    # outside its pull (76), the aggregate earnings level (62) and the
+    # time-held fade's clock (84), each only while its dial is set, behind
+    # its own tag.
     for name, tag, width in (("core_trend", 57.0, 3), ("eve_decision", 58.0, 2), ("spread_noise", 59.0, 3),
-                              ("term_premium", 60.0, 3), ("aggregate_level", 62.0, 2), ("cycle_hold", 84.0, 4)):
+                              ("term_premium", 60.0, 3), ("treasury_shift", 76.0, 5), ("aggregate_level", 62.0, 2),
+                              ("cycle_hold", 84.0, 4)):
         if name in snapshot:
             _f64(buf, tag)
             for value in _column(snapshot[name], width, name):
@@ -1747,7 +1752,7 @@ _LEDGER_OPTIONAL_BUFFERS = ("fair_value_offset", "opening_z", "pending_fair_valu
                             "oil_futures", "margin", "shares_outstanding",
                             "oil_target_drift", "core_trend", "eve_decision",
                             "spread_noise", "term_premium", "aggregate_level",
-                            "cycle_hold")
+                            "treasury_shift", "cycle_hold")
 
 #: The ``fundamentals`` block's buffers, one per company each.
 _LEDGER_FUNDAMENTALS = ("eps", "book_value_per_share", "revenue_growth")

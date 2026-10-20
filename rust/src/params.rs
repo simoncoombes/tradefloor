@@ -1882,6 +1882,53 @@ pub struct ModelParams {
     /// where the rule moves nothing, and -0.212 under 3). At 0.0 the rule
     /// took the model's to about +0.52. In [0, 1].
     pub flight_to_quality_reversal_cut: f64,
+    /// The flight to quality's own half-life, sessions. 0.0, on every
+    /// shipped preset, adds the shift (`flight_to_quality_gain` times the
+    /// session's return, in and beside its gates) to the 10-year as an
+    /// increment, which the anchor's 5 per cent daily pull erases (a
+    /// half-life of about 13.5 sessions); a value of 0.0 is left out of the
+    /// model's digest.
+    ///
+    /// Off zero the shift reads the session's return less the history's
+    /// running mean session return (over sessions whose return is not 0.0)
+    /// and goes into a state `F' = 0.5^(1/H) F + shift` carried outside the
+    /// pull (the pull acts on the 10-year less `F` and the same-day haven,
+    /// `treasury_haven_day_gain`) and in the meeting's 10-year target. The
+    /// 2-year takes the shift as it stands.
+    ///
+    /// Why: the tape's 10-year does not give its same-day move with the
+    /// index back at the pull's rate. Local projections of DGS10 on the
+    /// S&P 500's return and the change in max(0, VIX - 20), off the zero
+    /// bound with core CPI under 4, beyond the realised policy path
+    /// (1990-2025, 5101 sessions): the slope under core 3 is +0.0043 (se
+    /// 0.0018) on the day and +0.0074 (0.0092) 63 sessions on, flat
+    /// between, so the fitted half-life is past the 63 sessions measured.
+    /// The running mean takes the place of the projection's constant, so the
+    /// state does not integrate the return's mean. No draw. The state is
+    /// snapshotted and hashed (tag 76) while this or
+    /// `treasury_haven_day_gain` is set. In [0, 2520].
+    pub flight_to_quality_half_life: f64,
+    /// The same-day Treasury haven: percentage points off the 10-year per
+    /// point of the session's change in max(0, VIX - 20) under the curve's
+    /// inflation gate (under 4), carried outside the anchor's pull and in
+    /// the meeting's 10-year target. 0.0, on every shipped preset, is none,
+    /// and a value of 0.0 is left out of the model's digest.
+    ///
+    /// Off zero a state `S' = (1 - d) S - g (u' - u)`, `u = max(0, VIX - 20)
+    /// x 1[curve inflation < 4]` and `d` `treasury_haven_day_decay`, opens at
+    /// `-g u` and is added to the 10-year, so at `d` 0.0 the 10-year carries
+    /// `-g u` on the day it is published. Why: the haven
+    /// (`treasury_haven_gain`) moves the anchor, which the 10-year reaches
+    /// at 5 per cent a session, while the tape's 10-year moves with the VIX
+    /// on the day and follows its path: in the same projections the change
+    /// in max(0, VIX - 20) loads -0.0053 (se 0.0017) on the day, and the
+    /// fitted form has g 0.0051 and d 0.0 (se 0.18). No draw. In [0, 0.05].
+    pub treasury_haven_day_gain: f64,
+    /// The same-day haven's own decay, the share of `S` lost each session
+    /// (`treasury_haven_day_gain`). 0.0, on every shipped preset, keeps it
+    /// with the VIX's own path; read only with the gain set; a value of 0.0
+    /// is left out of the model's digest. In [0, 1].
+    pub treasury_haven_day_decay: f64,
     /// Which return the flight to quality reads, a switch. 0.0, on every
     /// preset through pt-v19, reads the previous session's closing minute;
     /// pt-v20 ships 1.0, which reads this session's index return.
@@ -8457,6 +8504,9 @@ impl ModelParams {
             treasury_2y_noise: 0.0,
             flight_to_quality_gain: 0.02,
             flight_to_quality_reversal_cut: 0.0,
+            flight_to_quality_half_life: 0.0,
+            treasury_haven_day_gain: 0.0,
+            treasury_haven_day_decay: 0.0,
             flight_to_quality_day: 0.0,
             corporate_yield_daily: 0.0,
             cycle_nowcast_accuracy: 0.0,
@@ -11113,6 +11163,9 @@ impl ModelParams {
             "treasury_2y_noise" => self.treasury_2y_noise,
             "flight_to_quality_gain" => self.flight_to_quality_gain,
             "flight_to_quality_reversal_cut" => self.flight_to_quality_reversal_cut,
+            "flight_to_quality_half_life" => self.flight_to_quality_half_life,
+            "treasury_haven_day_gain" => self.treasury_haven_day_gain,
+            "treasury_haven_day_decay" => self.treasury_haven_day_decay,
             "flight_to_quality_day" => self.flight_to_quality_day,
             "corporate_yield_daily" => self.corporate_yield_daily,
             "cycle_nowcast_accuracy" => self.cycle_nowcast_accuracy,
@@ -11534,6 +11587,9 @@ impl ModelParams {
             "treasury_2y_noise" => out.treasury_2y_noise = value,
             "flight_to_quality_gain" => out.flight_to_quality_gain = value,
             "flight_to_quality_reversal_cut" => out.flight_to_quality_reversal_cut = value,
+            "flight_to_quality_half_life" => out.flight_to_quality_half_life = value,
+            "treasury_haven_day_gain" => out.treasury_haven_day_gain = value,
+            "treasury_haven_day_decay" => out.treasury_haven_day_decay = value,
             "flight_to_quality_day" => out.flight_to_quality_day = value,
             "corporate_yield_daily" => out.corporate_yield_daily = value,
             "cycle_nowcast_accuracy" => out.cycle_nowcast_accuracy = value,
@@ -13031,6 +13087,24 @@ impl ModelParams {
                  shadow's change every close, as it stood.",
                 self.policy_anticipation_half_life));
         }
+        if !(0.0..=2520.0).contains(&self.flight_to_quality_half_life) {
+            return Err(format!(
+                "flight_to_quality_half_life is {}. It is the flight to quality's own half-life in sessions, \
+                 in [0, 2520]; 0 is the increment the 10-year's pull erases.",
+                self.flight_to_quality_half_life));
+        }
+        if !(0.0..=0.05).contains(&self.treasury_haven_day_gain) {
+            return Err(format!(
+                "treasury_haven_day_gain is {}. It is percentage points off the 10-year per point of the \
+                 session's change in max(0, VIX - 20), in [0, 0.05].",
+                self.treasury_haven_day_gain));
+        }
+        if !(0.0..=1.0).contains(&self.treasury_haven_day_decay) {
+            return Err(format!(
+                "treasury_haven_day_decay is {}. It is the share of the same-day haven lost each session, \
+                 in [0, 1].",
+                self.treasury_haven_day_decay));
+        }
         if !(0.0..=1.0).contains(&self.flight_to_quality_reversal_cut) {
             return Err(format!(
                 "flight_to_quality_reversal_cut is {}. It is the share of the reversed flight to quality \
@@ -13847,6 +13921,9 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "treasury_term_premium_half_life",
     "treasury_2y_meeting_carry",
     "flight_to_quality_reversal_cut",
+    "flight_to_quality_half_life",
+    "treasury_haven_day_gain",
+    "treasury_haven_day_decay",
     "policy_anticipation_half_life",
     "treasury_path_anticipated",
     "policy_anticipation_guidance",
@@ -14080,6 +14157,9 @@ pub fn settable_names() -> Vec<&'static str> {
         "treasury_term_premium_half_life",
         "treasury_2y_meeting_carry",
         "flight_to_quality_reversal_cut",
+        "flight_to_quality_half_life",
+        "treasury_haven_day_gain",
+        "treasury_haven_day_decay",
         "policy_anticipation_half_life",
         "treasury_path_anticipated",
         "policy_anticipation_guidance",

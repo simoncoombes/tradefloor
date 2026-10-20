@@ -1176,6 +1176,11 @@ def _nothing_dormant():
                    treasury_2y_meeting_carry=1.0,
                    # The reversed flight to quality's cut over 4 (a share).
                    flight_to_quality_reversal_cut=0.5,
+                   # The flight to quality's own state and the same-day haven,
+                   # outside the 10-year's pull.
+                   flight_to_quality_half_life=2520.0,
+                   treasury_haven_day_gain=0.005,
+                   treasury_haven_day_decay=0.1,
                    # The priced meeting's half-life (policy_anticipation is
                    # on above), in sessions.
                    policy_anticipation_half_life=10.0,

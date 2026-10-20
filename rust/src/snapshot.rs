@@ -1685,6 +1685,11 @@ impl Engine {
         if let Some(words) = self.aggregate_level_words() {
             out.put("aggregate_level", V::from_f64s(&words));
         }
+        // The 10-year's shifts outside its pull (`flight_to_quality_half_life`,
+        // `treasury_haven_day_gain`).
+        if let Some(words) = self.treasury_shift_words() {
+            out.put("treasury_shift", V::from_f64s(&words));
+        }
         // The eve's decision (`fed_eve_decision`).
         if let Some(words) = self.eve_decision_words() {
             out.put("eve_decision", V::from_f64s(&words));
@@ -2073,6 +2078,11 @@ impl Engine {
             Gated::dial("core_trend", "core_trend_sd", p.core_trend_sd),
             Gated::dial("spread_noise", "corporate_spread_noise_sd", p.corporate_spread_noise_sd),
             Gated::dial("term_premium", "treasury_term_premium_sd", p.treasury_term_premium_sd),
+            Gated::when(
+                "treasury_shift",
+                self.carries_treasury_shifts(),
+                format!("flight_to_quality_half_life or treasury_haven_day_gain is not 0, and this engine's \
+                         are {} and {}", p.flight_to_quality_half_life, p.treasury_haven_day_gain)),
             Gated::when(
                 "aggregate_level",
                 self.carries_aggregate_level(),
@@ -2863,6 +2873,15 @@ impl Engine {
                 None => None,
             };
             inner.set_aggregate_level_state(words.as_deref()).map_err(core)?;
+        }
+        // The 10-year's shifts outside its pull (`flight_to_quality_half_life`,
+        // `treasury_haven_day_gain`).
+        {
+            let words = match snapshot.get("treasury_shift") {
+                Some(_) => Some(read_buffer(snapshot, "", "treasury_shift")?),
+                None => None,
+            };
+            inner.set_treasury_shift_state(words.as_deref()).map_err(core)?;
         }
         // The eve's decision (`fed_eve_decision`).
         {

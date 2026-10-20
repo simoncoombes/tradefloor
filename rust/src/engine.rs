@@ -2435,6 +2435,14 @@ impl Engine {
         // a draw from its stationary distribution on its own key. Nothing at
         // 0.0.
         engine.term_premium = engine.term_premium_opening();
+        // THE SAME-DAY HAVEN OPENING (`treasury_haven_day_gain`): the state
+        // opens at `-g u` on the opening economy, so the 10-year carries the
+        // haven from the first close. Nothing at 0.0.
+        if engine.params.treasury_haven_day_gain != 0.0 {
+            let u = crate::economy::daily::haven_day_level(&engine.economy, engine.params.treasury_core_inflation);
+            engine.economy.treasury_haven_day = -engine.params.treasury_haven_day_gain * u;
+            engine.economy.treasury_haven_day_level = u;
+        }
         engine.vix_anchor = engine.derive_vix_anchor();
         engine.cycle_nowcast_terms = engine.derive_cycle_nowcast_terms();
         // The front two index futures (`futures_index_listed`); nothing with
@@ -9665,6 +9673,7 @@ impl Engine {
             },
             zlb_path: self.priced_zlb_path(),
             zlb_haven_gain: self.params.treasury_zlb_haven_gain,
+            treasury_shifts: self.carries_treasury_shifts(),
             neutral_real_rate: self.params.fed_neutral_real_rate,
             two_year_carry: self.params.treasury_2y_meeting_carry,
             path_carry: self.anticipated_path_carry(),
@@ -9922,6 +9931,11 @@ impl Engine {
                 core_inflation: self.params.treasury_core_inflation,
                 zlb_path: self.priced_zlb_path(),
                 zlb_haven_gain: self.params.treasury_zlb_haven_gain,
+                // The shifts outside the pull (`flight_to_quality_half_life`,
+                // `treasury_haven_day_gain`); 0.0 and 0.0 off.
+                ftq_keep: self.ftq_keep(),
+                haven_day_gain: self.params.treasury_haven_day_gain,
+                haven_day_keep: 1.0 - self.params.treasury_haven_day_decay,
                 // Credit's VIX slope and leverage term
                 // (`corporate_spread_vix_cut`, `corporate_spread_equity_gain`),
                 // 0.0 unless set; the projection reads them as the close does.
@@ -10398,6 +10412,58 @@ impl Engine {
     /// (`treasury_term_premium_sd`); 0.0 off.
     pub fn term_premium_level(&self) -> f64 {
         self.term_premium
+    }
+
+    /// Whether the 10-year carries shifts outside its pull
+    /// (`flight_to_quality_half_life` or `treasury_haven_day_gain` set),
+    /// which is when the snapshot and the state hash carry their state.
+    pub fn carries_treasury_shifts(&self) -> bool {
+        self.params.flight_to_quality_half_life != 0.0 || self.params.treasury_haven_day_gain != 0.0
+    }
+
+    /// The flight to quality's keep per session, `0.5^(1/H)`; 0.0 with
+    /// `flight_to_quality_half_life` at 0.0.
+    fn ftq_keep(&self) -> f64 {
+        let h = self.params.flight_to_quality_half_life;
+        if h == 0.0 { 0.0 } else { crate::mathx::pow(0.5, 1.0 / h) }
+    }
+
+    /// The shifts' state, `[flight to quality, its running mean return, its
+    /// count, same-day haven, the level it last stepped on]`, or `None` with
+    /// both dials at 0.0.
+    pub fn treasury_shift_words(&self) -> Option<[f64; 5]> {
+        if !self.carries_treasury_shifts() {
+            return None;
+        }
+        let e = &self.economy;
+        Some([e.treasury_ftq_shift, e.treasury_ftq_mean, e.treasury_ftq_count, e.treasury_haven_day,
+              e.treasury_haven_day_level])
+    }
+
+    /// Put the shifts' state back from [`Engine::treasury_shift_words`].
+    pub fn set_treasury_shift_state(&mut self, words: Option<&[f64]>) -> Result<(), String> {
+        match (words, self.carries_treasury_shifts()) {
+            (None, false) => Ok(()),
+            (Some(w), true) => {
+                if w.len() != 5 || w.iter().any(|x| !x.is_finite()) || w[2] < 0.0 {
+                    return Err(format!(
+                        "this snapshot's treasury_shift is {w:?}: it is the 10-year's flight to quality state, \
+                         its running mean return and count, the same-day haven and its level, five finite numbers"));
+                }
+                self.economy.treasury_ftq_shift = w[0];
+                self.economy.treasury_ftq_mean = w[1];
+                self.economy.treasury_ftq_count = w[2];
+                self.economy.treasury_haven_day = w[3];
+                self.economy.treasury_haven_day_level = w[4];
+                Ok(())
+            }
+            (None, true) => Err(
+                "this model sets flight_to_quality_half_life or treasury_haven_day_gain and the snapshot carries \
+                 no treasury_shift".to_string()),
+            (Some(_), false) => Err(
+                "this snapshot carries treasury_shift and this model's flight_to_quality_half_life and \
+                 treasury_haven_day_gain are 0".to_string()),
+        }
     }
 
     /// Put the term premium back from [`Engine::term_premium_words`].
@@ -13586,6 +13652,15 @@ impl Engine {
         // `treasury_term_premium_sd` is set, behind its own tag.
         if let Some(words) = self.term_premium_words() {
             hash_f64(&mut buf, 60.0);
+            for value in words {
+                hash_f64(&mut buf, value);
+            }
+        }
+        // The 10-year's shifts outside its pull, only while
+        // `flight_to_quality_half_life` or `treasury_haven_day_gain` is set,
+        // behind their own tag.
+        if let Some(words) = self.treasury_shift_words() {
+            hash_f64(&mut buf, 76.0);
             for value in words {
                 hash_f64(&mut buf, value);
             }

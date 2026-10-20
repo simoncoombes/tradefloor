@@ -735,6 +735,10 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # The 2-year's carry through a meeting: a share, so its own bounds.
     "treasury_2y_meeting_carry": (0.0, 1.0),
     "flight_to_quality_reversal_cut": (0.0, 1.0),
+    # The flight to quality's own half-life: off at the bottom, the cap at the top.
+    "flight_to_quality_half_life": (0.0, 2520.0),
+    "treasury_haven_day_gain": (0.0, 0.02),
+    "treasury_haven_day_decay": (0.0, 1.0),
     # The priced meeting's half-life: off at the bottom, a quarter at the top.
     "policy_anticipation_half_life": (0.0, 63.0),
     # A switch.

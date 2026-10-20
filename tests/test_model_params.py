@@ -1015,6 +1015,13 @@ PERTURBATIONS = [
     # The reversed flight to quality's cut. INERT on the probe: pt-v20's curve
     # reads headline, which the probe's path keeps under 4.
     ("flight_to_quality_reversal_cut", 0.5, False),
+    # The flight to quality's own state outside the 10-year's pull: the
+    # shift reads the return less its running mean, which moves the curve.
+    ("flight_to_quality_half_life", 2520.0, True),
+    # The same-day haven: the 10-year carries -g max(0, VIX - 20).
+    ("treasury_haven_day_gain", 0.005, True),
+    # INERT without the gain.
+    ("treasury_haven_day_decay", 0.1, False),
     # The priced meeting's half-life. INERT on the probe: pt-v20 has
     # policy_anticipation off, so no change is priced to smooth.
     ("policy_anticipation_half_life", 10.0, False),

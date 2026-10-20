@@ -470,6 +470,24 @@ pub struct EconomyState {
     /// only with that lag and the credit gain set; 0.0, and never written,
     /// on every preset.
     pub spread_priced_gap: f64,
+    /// The flight to quality's state outside the 10-year's pull
+    /// (`ModelParams::flight_to_quality_half_life`), percentage points of
+    /// 10-year yield. Written only with that half-life or
+    /// `treasury_haven_day_gain` set; 0.0, and never written, on every preset.
+    pub treasury_ftq_shift: f64,
+    /// The running mean session return (per cent) the flight to quality's
+    /// state reads its shift against, and its count of sessions (sessions
+    /// whose return is not 0.0). Written as `treasury_ftq_shift` is.
+    pub treasury_ftq_mean: f64,
+    /// See `treasury_ftq_mean`.
+    pub treasury_ftq_count: f64,
+    /// The same-day haven's state outside the 10-year's pull
+    /// (`ModelParams::treasury_haven_day_gain`), percentage points of 10-year
+    /// yield (0.0 or below). Written as `treasury_ftq_shift` is.
+    pub treasury_haven_day: f64,
+    /// The level `u = max(0, VIX - 20) x 1[curve inflation < 4]` the
+    /// same-day haven last stepped on. Written as `treasury_ftq_shift` is.
+    pub treasury_haven_day_level: f64,
     /// What the valuation reads beyond `earnings_cycle`: the anticipated
     /// level of the earnings cycle over the valuation's horizon minus the
     /// current one (`ModelParams::earnings_anticipation_half_life`). Derived
@@ -681,6 +699,11 @@ pub fn create_initial_economy_state(options: &InitialEconomyOptions) -> EconomyS
         fed_put_mcap_prev: 0.0,
         spread_equity_gap: 0.0,
         spread_priced_gap: 0.0,
+        treasury_ftq_shift: 0.0,
+        treasury_ftq_mean: 0.0,
+        treasury_ftq_count: 0.0,
+        treasury_haven_day: 0.0,
+        treasury_haven_day_level: 0.0,
         earnings_anticipation: 0.0,
         unemployment_impulse: 0.0,
         oil_push_level: 0.0,

@@ -232,6 +232,11 @@ pub struct PolicyOptions {
     /// `treasury_zlb_haven_gain`: the zero bound's term-premium fall per VIX
     /// point above 20 in the meeting's 10-year target. 0.0 is none.
     pub zlb_haven_gain: f64,
+    /// The shifts carried outside the 10-year's pull
+    /// (`flight_to_quality_half_life`, `treasury_haven_day_gain`): when set,
+    /// the meeting's 10-year target carries the economy's two states, so the
+    /// meeting does not halve them. false is the target as it stood.
+    pub treasury_shifts: bool,
     /// `fed_neutral_real_rate`: points added to the Taylor rule's neutral
     /// rate, the real rate it sets at target. 0.0, on every preset, is the
     /// neutral that stood (a nominal 2.0 at target, a real rate of 0).
@@ -294,6 +299,7 @@ impl PolicyOptions {
             curve_inflation: None,
             zlb_path: 0.0,
             zlb_haven_gain: 0.0,
+            treasury_shifts: false,
             neutral_real_rate: 0.0,
             two_year_carry: 0.0,
             path_carry: None,
@@ -812,6 +818,13 @@ pub fn update_central_bank_with(
     // target too, as the daily anchor adds it. Guarded.
     let treasury_target_10y = if let Some(x) = options.term_premium {
         treasury_target_10y + x
+    } else {
+        treasury_target_10y
+    };
+    // The shifts outside the pull (`flight_to_quality_half_life`,
+    // `treasury_haven_day_gain`) in the target too. A branch.
+    let treasury_target_10y = if options.treasury_shifts {
+        treasury_target_10y + economy.treasury_ftq_shift + economy.treasury_haven_day
     } else {
         treasury_target_10y
     };

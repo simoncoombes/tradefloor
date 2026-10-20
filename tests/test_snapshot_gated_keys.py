@@ -187,6 +187,9 @@ CASES = {
     # its own draws.
     "term_premium": (dict(treasury_term_premium_sd=0.06, treasury_term_premium_half_life=49.0),
                      ("term_premium",), (), (), {}),
+    # The 10-year's shifts outside its pull, carried whenever a dial is set.
+    "treasury_shift": (dict(flight_to_quality_half_life=2520.0, treasury_haven_day_gain=0.005),
+                       ("treasury_shift",), (), (), {}),
     # The time-held fade's clock and the held VIX, held once a close has
     # started the clock.
     "cycle_hold": (dict(CYCLE_VOL, market_vol_cycle_hold_onset=0.9,

@@ -466,6 +466,13 @@ pub struct YieldDials {
     /// The term premium's fall per VIX point above 20 at the zero bound
     /// (`treasury_zlb_haven_gain`); 0.0 is none.
     pub zlb_haven_gain: f64,
+    /// The flight to quality's own keep per session, `0.5^(1/H)` with H
+    /// `flight_to_quality_half_life`; 0.0 is the increment the pull erases.
+    pub ftq_keep: f64,
+    /// The same-day haven's gain (`treasury_haven_day_gain`); 0.0 is none.
+    pub haven_day_gain: f64,
+    /// The same-day haven's keep per session, `1 - treasury_haven_day_decay`.
+    pub haven_day_keep: f64,
     /// The share of the VIX slope taken out of the corporate spread's
     /// formula. See [`crate::params::ModelParams::corporate_spread_vix_cut`].
     pub spread_vix_cut: f64,
@@ -523,6 +530,22 @@ pub const TREASURY_NEUTRAL_RATE: f64 = 2.5;
 /// `treasury_zlb_haven_gain`: the QE condition's 0.25.
 pub const ZLB_RATE: f64 = 0.25;
 
+/// The same-day haven's level per unit of gain (`treasury_haven_day_gain`):
+/// `max(0, VIX - 20)` while the curve's inflation (core with
+/// `treasury_core_inflation` set, else headline) is under 4, else 0.
+pub fn haven_day_level(state: &EconomyState, core_inflation: f64) -> f64 {
+    let inflation = if core_inflation != 0.0 {
+        state.inflation_rate - state.oil_inflation_level
+    } else {
+        state.inflation_rate
+    };
+    if inflation < crate::economy::central_bank::FED_PUT_INFLATION_CEILING {
+        mathx::max(0.0, state.vix - TREASURY_HAVEN_VIX)
+    } else {
+        0.0
+    }
+}
+
 pub fn haven_term_cut(gain: f64, vix: f64) -> f64 {
     gain * mathx::max(0.0, vix - TREASURY_HAVEN_VIX)
 }
@@ -549,6 +572,9 @@ impl Default for YieldDials {
             core_inflation: 0.0,
             zlb_path: 0.0,
             zlb_haven_gain: 0.0,
+            ftq_keep: 0.0,
+            haven_day_gain: 0.0,
+            haven_day_keep: 1.0,
             spread_vix_cut: 0.0,
             spread_equity_gain: 0.0,
             spread_equity_decay: 0.0,
@@ -1430,9 +1456,20 @@ fn close_yields(
     // circuits and this normal is never taken — a consequence of `??`, not a
     // modelling choice. Dropping it would also flip the Box-Muller spare
     // parity for every later normal in the engine.
+    // THE SHIFTS OUTSIDE THE PULL (`flight_to_quality_half_life`,
+    // `treasury_haven_day_gain`): the pull acts on the 10-year less the
+    // flight to quality's state and the same-day haven's, so neither is
+    // erased at the anchor's rate; the session's change in both is added
+    // below. A branch: off, the pull reads the yield as it stood.
+    let shifts_on = inputs.yields.ftq_keep != 0.0 || inputs.yields.haven_day_gain != 0.0;
+    let pulled_10y = if shifts_on {
+        current_10y - economy.treasury_ftq_shift - economy.treasury_haven_day
+    } else {
+        current_10y
+    };
     new_state.treasury_yield_10y = clamp(
         current_10y
-            + (rate_for_10y_anchor + term_premium_10y - current_10y) * 0.05
+            + (rate_for_10y_anchor + term_premium_10y - pulled_10y) * 0.05
             + random_normal(rng, 0.0, inputs.yields.treasury_10y_noise * volatility),
         0.5,
         12.0,
@@ -1478,7 +1515,23 @@ fn close_yields(
         (economy.previous_day_market_return, 0.5)
     };
     let ftq_gain = inputs.yields.flight_to_quality_gain;
+    // THE FLIGHT TO QUALITY'S OWN STATE (`flight_to_quality_half_life`): the
+    // shift reads the return less the history's running mean, and the
+    // 10-year takes the state's change below instead of the increment.
+    let ftq_state = inputs.yields.ftq_keep != 0.0;
+    let (ftq_ret, ftq_mean, ftq_count) = if ftq_state {
+        let (m, n) = (economy.treasury_ftq_mean, economy.treasury_ftq_count);
+        if prev_mkt_ret != 0.0 {
+            (prev_mkt_ret - m, m + (prev_mkt_ret - m) / (n + 1.0), n + 1.0)
+        } else {
+            (prev_mkt_ret - m, m, n)
+        }
+    } else {
+        (prev_mkt_ret, 0.0, 0.0)
+    };
+    let mut ftq_shift_today = 0.0;
     if prev_mkt_ret.abs() > ftq_gate {
+        let prev_mkt_ret = ftq_ret;
         let bond_stock_yield_shift = if curve_inflation > 4.0 {
             // Positive correlation: stocks down, yields up. THE REVERSAL'S
             // SIZE (`flight_to_quality_reversal_cut`): off zero only `1 - cut`
@@ -1495,7 +1548,9 @@ fn close_yields(
         } else {
             0.0
         };
-        if !inputs.yields.treasury_10y_pinned {
+        if ftq_state {
+            ftq_shift_today = bond_stock_yield_shift;
+        } else if !inputs.yields.treasury_10y_pinned {
             new_state.treasury_yield_10y = clamp(
                 new_state.treasury_yield_10y + bond_stock_yield_shift,
                 0.5,
@@ -1508,6 +1563,38 @@ fn close_yields(
             } else {
                 new_state.federal_funds_rate * 0.85 + new_state.treasury_yield_10y * 0.15
             };
+        }
+    }
+
+    // THE SHIFTS' STATES (`flight_to_quality_half_life`,
+    // `treasury_haven_day_gain`), stepped after the pull: the flight to
+    // quality keeps `0.5^(1/H)` of its state and adds tonight's shift; the
+    // same-day haven keeps `1 - d` and moves by `-g` times the change in
+    // `u = max(0, VIX - 20) x 1[curve inflation < 4]` from the `u` it last
+    // stepped on (held with it), so at `d` 0.0 it is `-g u` exactly. The 10-year takes
+    // the change in both. A branch: off, nothing is written.
+    if shifts_on {
+        let f_before = economy.treasury_ftq_shift;
+        let s_before = economy.treasury_haven_day;
+        let f_after = if ftq_state { inputs.yields.ftq_keep * f_before + ftq_shift_today } else { 0.0 };
+        let (s_after, u_after) = if inputs.yields.haven_day_gain != 0.0 {
+            let u_after = haven_day_level(new_state, inputs.yields.core_inflation);
+            (inputs.yields.haven_day_keep * s_before
+                - inputs.yields.haven_day_gain * (u_after - economy.treasury_haven_day_level), u_after)
+        } else {
+            (0.0, 0.0)
+        };
+        new_state.treasury_haven_day_level = u_after;
+        new_state.treasury_ftq_shift = f_after;
+        new_state.treasury_ftq_mean = ftq_mean;
+        new_state.treasury_ftq_count = ftq_count;
+        new_state.treasury_haven_day = s_after;
+        if !inputs.yields.treasury_10y_pinned {
+            new_state.treasury_yield_10y = clamp(
+                new_state.treasury_yield_10y + (f_after - f_before) + (s_after - s_before),
+                0.5,
+                12.0,
+            );
         }
     }
 
