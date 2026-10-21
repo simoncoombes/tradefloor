@@ -2242,6 +2242,22 @@ pub struct ModelParams {
     /// is a branch: no pull. The tape's ln(CP/GDP), 1947-2025, has an AR(1)
     /// half-life of 7.77 years (1959 sessions). In [0, 25200].
     pub fair_value_aggregate_half_life: f64,
+    /// The aggregate level's step priced at the close, a switch. 0.0, on
+    /// every shipped preset, is a branch: the shift `fair_value_aggregate_jensen`
+    /// and `fair_value_aggregate_half_life` add to every name's level at the
+    /// close reaches the price at the next opening print, so the open gaps
+    /// by it, and since the step is `(dA)^2 / 2` the gap is largest after the
+    /// most volatile closes and predictable from them (on pt-v22's
+    /// R22O5czNU-R1FTJ, paired against the switch off, the open moves +0.28
+    /// bp after a session whose index moved under 1 per cent, +2.2 after 2 to
+    /// 4 and +4.8 after more than 4; R7a's first bar after a cut reads +0.57
+    /// bp of it). At 1.0 each name the shift moves is re-marked at the close
+    /// to the price its premium over fair value implies after the shift
+    /// (`Engine::reprice_to_published_macro`, as the close's macro re-mark),
+    /// so the move sits between the close and the next open, where a level
+    /// known at the close lands. The shift itself is unchanged. No draw and
+    /// no state. Read only with either aggregate dial set.
+    pub fair_value_aggregate_remark: f64,
     /// How much of a pinned VIX is priced the moment it is published: the share
     /// of the gap between the smoothed exposure and the pinned VIX's own excess
     /// that the pin closes. 0.0, which every preset through pt-v20 carries,
@@ -8478,6 +8494,7 @@ impl ModelParams {
             fair_value_relative_half_life: 0.0,
             fair_value_aggregate_jensen: 0.0,
             fair_value_aggregate_half_life: 0.0,
+            fair_value_aggregate_remark: 0.0,
             pinned_vix_feedback: 0.0,
             pinned_vix_variance_share: 0.0,
             pinned_vix_calm_knee: 0.0,
@@ -11134,6 +11151,7 @@ impl ModelParams {
             "fair_value_relative_half_life" => self.fair_value_relative_half_life,
             "fair_value_aggregate_jensen" => self.fair_value_aggregate_jensen,
             "fair_value_aggregate_half_life" => self.fair_value_aggregate_half_life,
+            "fair_value_aggregate_remark" => self.fair_value_aggregate_remark,
             "pinned_vix_feedback" => self.pinned_vix_feedback,
             "pinned_vix_variance_share" => self.pinned_vix_variance_share,
             "pinned_vix_calm_knee" => self.pinned_vix_calm_knee,
@@ -11555,6 +11573,7 @@ impl ModelParams {
             "fair_value_relative_half_life" => out.fair_value_relative_half_life = value,
             "fair_value_aggregate_jensen" => out.fair_value_aggregate_jensen = value,
             "fair_value_aggregate_half_life" => out.fair_value_aggregate_half_life = value,
+            "fair_value_aggregate_remark" => out.fair_value_aggregate_remark = value,
             "pinned_vix_feedback" => out.pinned_vix_feedback = value,
             "pinned_vix_variance_share" => out.pinned_vix_variance_share = value,
             "pinned_vix_calm_knee" => out.pinned_vix_calm_knee = value,
@@ -12820,6 +12839,12 @@ impl ModelParams {
                  martingale) or 1 (its log drift is undone at each close).",
                 self.fair_value_aggregate_jensen));
         }
+        if !(self.fair_value_aggregate_remark == 0.0 || self.fair_value_aggregate_remark == 1.0) {
+            return Err(format!(
+                "fair_value_aggregate_remark is {}. It is a switch: 0 (the aggregate level's step reaches the price \
+                 at the next open) or 1 (it is priced at the close).",
+                self.fair_value_aggregate_remark));
+        }
         if !(self.fair_value_aggregate_half_life >= 0.0 && self.fair_value_aggregate_half_life <= 25200.0) {
             return Err(format!(
                 "fair_value_aggregate_half_life is {}. It is a half-life in sessions, in [0, 25200]; 0 is no reversion.",
@@ -13735,6 +13760,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "earnings_volume_multiple",
     "fair_value_aggregate_half_life",
     "fair_value_aggregate_jensen",
+    "fair_value_aggregate_remark",
     "fair_value_market_excess_share",
     "fair_value_relative_half_life",
     "fair_value_relative_knee",
@@ -14134,6 +14160,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "fair_value_relative_half_life",
         "fair_value_aggregate_jensen",
         "fair_value_aggregate_half_life",
+        "fair_value_aggregate_remark",
         "pinned_vix_feedback",
         "pinned_vix_variance_share",
         "pinned_vix_calm_knee",

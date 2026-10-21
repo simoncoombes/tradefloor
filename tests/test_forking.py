@@ -1158,6 +1158,7 @@ def _nothing_dormant():
                    # The aggregate earnings level's step at the close.
                    fair_value_aggregate_jensen=1.0,
                    fair_value_aggregate_half_life=1959.0,
+                   fair_value_aggregate_remark=1.0,
                    treasury_term_premium_half_life=49.0,
                    # The time-held fade (issue #303): the onset, the
                    # multiplier's fade and the held VIX's half-life.

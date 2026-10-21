@@ -727,6 +727,7 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "market_vol_cycle_hold_onset": (0.0, 0.99),
     "fair_value_aggregate_jensen": (0.0, 1.0),
     "fair_value_aggregate_half_life": (0.0, 5040.0),
+    "fair_value_aggregate_remark": (0.0, 1.0),
     "market_vol_cycle_hold_fade": (0.0, 1.0),
     "market_vol_cycle_hold_half_life": (0.0, 504.0),
     "market_vol_vix_hold_half_life": (0.0, 504.0),

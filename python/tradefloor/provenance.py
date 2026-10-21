@@ -615,6 +615,10 @@ OUT_OF_SCOPE = {
         "on `== 0.0`), and with `fair_value_aggregate_jensen` also 0.0 nothing "
         "is held, snapshotted or hashed; at 0.0 it is also left out of the "
         "model's digest",
+    "fair_value_aggregate_remark":
+        "inert at 0.0: the aggregate level's close step re-marks no price (a "
+        "branch on `== 0.0`), and with both aggregate dials at 0.0 there is no "
+        "step to price; at 0.0 it is also left out of the model's digest",
     "market_vol_cycle_hold_onset":
         "inert at 0.0: no phase age is counted and the multiplier's target "
         "and the coupling's denominator are the expressions that stood (a "

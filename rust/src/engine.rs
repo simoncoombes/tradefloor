@@ -8637,12 +8637,25 @@ impl Engine {
             c -= (1.0 - crate::mathx::pow(0.5, 1.0 / h)) * a;
         }
         if c != 0.0 {
+            // THE STEP PRICED AT THE CLOSE (`fair_value_aggregate_remark`):
+            // the fair values before the shift, so each name is re-marked
+            // to the price its premium over fair value implies after it, as
+            // the close's macro re-mark does. A branch: off, the shift
+            // reaches the price at the next opening print.
+            let marks = if self.params.fair_value_aggregate_remark != 0.0 {
+                Some(self.fair_value_marks_now())
+            } else {
+                None
+            };
             for comp in self.companies.iter_mut() {
                 if !comp.is_public || comp.is_bankrupt || comp.stock.mispricing_s.is_none() {
                     continue;
                 }
                 let v = comp.stock.fair_value_offset.unwrap_or(0.0);
                 comp.stock.fair_value_offset = Some(v + c);
+            }
+            if marks.is_some() {
+                self.reprice_to_published_macro(marks);
             }
         }
         self.aggregate_level = Some(a + c);
@@ -12070,22 +12083,27 @@ impl Engine {
         if self.params.macro_publication_repricing == 0.0 {
             return None;
         }
-        Some(
-            self.companies
-                .iter()
-                .map(|c| {
-                    if c.is_bankrupt || !c.is_public || c.stock.mispricing_s.is_none()
-                        || !(c.stock.price > 0.0)
-                    {
-                        f64::NAN
-                    } else {
-                        crate::market::tick::tick_fair_value(
-                            &self.params, &self.economy, self.nominal_output_base,
-                            self.elapsed_days, c, c.stock.price)
-                    }
-                })
-                .collect(),
-        )
+        Some(self.fair_value_marks_now())
+    }
+
+    /// [`Engine::published_macro_marks`]'s fair values whatever
+    /// `macro_publication_repricing` says: the marks the aggregate level's
+    /// re-mark (`fair_value_aggregate_remark`) takes before its shift.
+    fn fair_value_marks_now(&self) -> Vec<f64> {
+        self.companies
+            .iter()
+            .map(|c| {
+                if c.is_bankrupt || !c.is_public || c.stock.mispricing_s.is_none()
+                    || !(c.stock.price > 0.0)
+                {
+                    f64::NAN
+                } else {
+                    crate::market::tick::tick_fair_value(
+                        &self.params, &self.economy, self.nominal_output_base,
+                        self.elapsed_days, c, c.stock.price)
+                }
+            })
+            .collect()
     }
 
     /// Every company's fair value as the next tick starts from it, in roster
