@@ -213,6 +213,8 @@ PARAM_SPECS: dict[str, dict] = {
                                           "hard_range": (0.0, 2520.0), "derived": True},
     "forecast_vix_dispersion_skew": {"kind": "abs", "step_unit": 0.1,
                                      "hard_range": (-0.99, 0.99), "derived": True},
+    "forecast_vix_expected_variance": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0),
+                                       "derived": True},
     "forecast_policy_shadow_discount": {"kind": "abs", "step_unit": 0.05,
                                         "hard_range": (0.0, 1.0), "derived": True},
     "forecast_policy_persistence": {"kind": "abs", "step_unit": 0.05,
