@@ -111,6 +111,13 @@ def test_a_fall_past_the_knee_ends_the_expansion_sooner():
     # earlier than the default on some seed. The dial takes no draw of its
     # own (the knee test above), but a phase that moves sooner moves the
     # draws the new phase takes, so the counts are not compared here.
+    #
+    # The claim is that SOME seed ends sooner, so the loop stops at the
+    # first that does: the seeds after a witness cannot change the verdict.
+    # On the 0.10.2 default that is the first, seed 11 (the hazard ends its
+    # expansion at day 82; the default holds it all 504), and 11, 12 and 14
+    # all qualify, so a later move that lost seed 11 still passes on the
+    # others exactly as it did before.
     days = 504
     earlier = 0
     for seed in (11, 12, 13, 14):
@@ -120,6 +127,7 @@ def test_a_fall_past_the_knee_ends_the_expansion_sooner():
         first_l = next((i for i, p in enumerate(pl) if p != pl[0]), days)
         if pb[0] == "expansion" and first_l < first_b:
             earlier += 1
+            break
     assert earlier >= 1
 
 

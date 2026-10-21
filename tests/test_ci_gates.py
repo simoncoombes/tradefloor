@@ -17,6 +17,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 WORKFLOWS = ROOT / ".github" / "workflows"
 
 sys.path.insert(0, str(ROOT / "tools" / "ci"))
+import batches  # noqa: E402
 import kat_history  # noqa: E402
 import no_skips  # noqa: E402
 
@@ -67,8 +68,10 @@ def test_every_suite_job_is_part_of_the_required_check():
 def test_the_suite_runs_every_python_test_and_the_crate_tests():
     script = _script(SUITE["jobs"]["batch"])
     assert "tools/ci/batches.py" in script and "python -m pytest" in script
-    assert SUITE["jobs"]["batch"]["strategy"]["matrix"]["batch"] == [
-        "a-e", "f-p", "q-z", "facts"]
+    # The matrix is the batch module's list, in its order: a batch the
+    # module defines and the matrix leaves out would run nowhere.
+    assert SUITE["jobs"]["batch"]["strategy"]["matrix"]["batch"] == list(
+        batches.BATCHES)
     rust = _script(SUITE["jobs"]["rust"])
     assert "cargo test --release" in rust
     assert "cargo clippy --all-targets --all-features -- -D warnings" in rust
