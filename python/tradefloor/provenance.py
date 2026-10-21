@@ -533,6 +533,13 @@ OUT_OF_SCOPE = {
         "unread while `surface_ssvi` is 0.0: only `surface_at` reads it, and "
         "refused without the switch; at 0.0 it is also left out of the model's "
         "digest",
+    "surface_skew_noise_sd":
+        "unread at 0.0: no state, no draw and nothing in the snapshot or the "
+        "state hash; refused without `surface_ssvi` and `surface_curvature`; "
+        "at 0.0 it is also left out of the model's digest",
+    "surface_skew_noise_half_life":
+        "unread while `surface_skew_noise_sd` is 0.0, and refused without it; "
+        "at 0.0 it is also left out of the model's digest",
     "surface_curvature":
         "unread while `surface_ssvi` is 0.0: only `surface_at` and "
         "`surface_fit` read it, and refused without the switch; at 0.0 it is "

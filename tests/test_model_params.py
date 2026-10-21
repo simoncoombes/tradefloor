@@ -1206,6 +1206,8 @@ PERTURBATIONS = [
     ("surface_skew_physical_slope", 0.3, False),
     ("surface_skew_premium", -1.0, False),
     ("surface_skew_premium_slope", 0.5, False),
+    ("surface_skew_noise_sd", 1.0, False),
+    ("surface_skew_noise_half_life", 100.0, False),
     ("surface_curvature", 1.0, False),
     ("surface_curvature_exponent", 0.5, False),
     ("surface_term_premium_short", -0.03, False),
@@ -2062,6 +2064,11 @@ COMPANIONS: dict[str, dict[str, float]] = {
                     "surface_term_premium_long")},
     "surface_earnings_weight": {"index_level_listed": 1.0, "surface_ssvi": 1.0,
                                 "forecast_horizon_sessions": 21.0},
+    # The skew noise moves the skewness the curvature's smile is fitted to;
+    # its half-life is the noise's.
+    "surface_skew_noise_sd": {"index_level_listed": 1.0, "surface_ssvi": 1.0, "surface_curvature": 1.0},
+    "surface_skew_noise_half_life": {"index_level_listed": 1.0, "surface_ssvi": 1.0, "surface_curvature": 1.0,
+                                     "surface_skew_noise_sd": 1.0},
     "options_index_listed": {"index_level_listed": 1.0, "surface_ssvi": 1.0},
     "option_dealer_spread": {"index_level_listed": 1.0, "surface_ssvi": 1.0,
                              "options_index_listed": 1.0},
