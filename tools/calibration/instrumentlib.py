@@ -890,6 +890,7 @@ PARAM_SPECS: dict[str, dict] = {
     "fair_value_aggregate_jensen": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0), "derived": False},
     "fair_value_aggregate_half_life": {"kind": "abs", "step_unit": 21.0, "hard_range": (0.0, 25200.0)},
     "fair_value_aggregate_remark": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0), "derived": False},
+    "fair_value_aggregate_expected": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0), "derived": False},
     "market_vol_cycle_hold_onset": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 0.999)},
     "market_vol_cycle_hold_fade": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 1.0)},
     "market_vol_cycle_hold_half_life": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 2520.0)},

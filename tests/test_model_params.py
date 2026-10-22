@@ -1387,6 +1387,8 @@ PERTURBATIONS = [
     ("fair_value_aggregate_half_life", 1959.0, True),
     # INERT: read only with an aggregate dial set, which the probe is not.
     ("fair_value_aggregate_remark", 1.0, False),
+    # INERT: read only with fair_value_aggregate_jensen set, which the probe is not.
+    ("fair_value_aggregate_expected", 1.0, False),
     # INERT: past the onset only (its companion), which the probe never is.
     ("market_vol_cycle_hold_fade", 0.335, False),
     # INERT: read only with the fade set.

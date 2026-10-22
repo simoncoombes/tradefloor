@@ -2258,6 +2258,25 @@ pub struct ModelParams {
     /// known at the close lands. The shift itself is unchanged. No draw and
     /// no state. Read only with either aggregate dial set.
     pub fair_value_aggregate_remark: f64,
+    /// The aggregate level's step from the expected variance, a switch. 0.0,
+    /// on every shipped preset, is a branch: `fair_value_aggregate_jensen`'s
+    /// step is `(dA)^2 / 2`, pathwise in the aggregate's own realised squared
+    /// change. A's drift under the law is `-V / 2` a session, with `V` the
+    /// session's conditional variance of the aggregate's move, and the
+    /// realised square is an unbiased but noisy estimate of `V` (plus the
+    /// square of A's predictable moves, which need no correction). At 1.0 the
+    /// step is `V / 2`, with `V` computed at each open, after the morning's
+    /// pins and before the night's draws, from the coefficients the session's
+    /// draws are made at, weighted by the names' earnings weights in A: the
+    /// market factor at its permanent share (night and session), the sector
+    /// and own draws at `fair_value_news_share` (the crisis epicentre's gains
+    /// on the session), the common and own jumps, the endogenous news and the
+    /// earnings report's surprise, session and follow-through
+    /// (`Engine::aggregate_expected_variance_now`). The timing, the half-life
+    /// term and `fair_value_aggregate_remark` are unchanged. No draw; `V` is
+    /// snapshotted and hashed (tag 61) while it and the switch are set. Read
+    /// only with `fair_value_aggregate_jensen` set.
+    pub fair_value_aggregate_expected: f64,
     /// How much of a pinned VIX is priced the moment it is published: the share
     /// of the gap between the smoothed exposure and the pinned VIX's own excess
     /// that the pin closes. 0.0, which every preset through pt-v20 carries,
@@ -8495,6 +8514,7 @@ impl ModelParams {
             fair_value_aggregate_jensen: 0.0,
             fair_value_aggregate_half_life: 0.0,
             fair_value_aggregate_remark: 0.0,
+            fair_value_aggregate_expected: 0.0,
             pinned_vix_feedback: 0.0,
             pinned_vix_variance_share: 0.0,
             pinned_vix_calm_knee: 0.0,
@@ -11152,6 +11172,7 @@ impl ModelParams {
             "fair_value_aggregate_jensen" => self.fair_value_aggregate_jensen,
             "fair_value_aggregate_half_life" => self.fair_value_aggregate_half_life,
             "fair_value_aggregate_remark" => self.fair_value_aggregate_remark,
+            "fair_value_aggregate_expected" => self.fair_value_aggregate_expected,
             "pinned_vix_feedback" => self.pinned_vix_feedback,
             "pinned_vix_variance_share" => self.pinned_vix_variance_share,
             "pinned_vix_calm_knee" => self.pinned_vix_calm_knee,
@@ -11574,6 +11595,7 @@ impl ModelParams {
             "fair_value_aggregate_jensen" => out.fair_value_aggregate_jensen = value,
             "fair_value_aggregate_half_life" => out.fair_value_aggregate_half_life = value,
             "fair_value_aggregate_remark" => out.fair_value_aggregate_remark = value,
+            "fair_value_aggregate_expected" => out.fair_value_aggregate_expected = value,
             "pinned_vix_feedback" => out.pinned_vix_feedback = value,
             "pinned_vix_variance_share" => out.pinned_vix_variance_share = value,
             "pinned_vix_calm_knee" => out.pinned_vix_calm_knee = value,
@@ -12839,6 +12861,12 @@ impl ModelParams {
                  martingale) or 1 (its log drift is undone at each close).",
                 self.fair_value_aggregate_jensen));
         }
+        if !(self.fair_value_aggregate_expected == 0.0 || self.fair_value_aggregate_expected == 1.0) {
+            return Err(format!(
+                "fair_value_aggregate_expected is {}. It is a switch: 0 (the aggregate level's step is half its \
+                 realised squared change) or 1 (half its expected variance).",
+                self.fair_value_aggregate_expected));
+        }
         if !(self.fair_value_aggregate_remark == 0.0 || self.fair_value_aggregate_remark == 1.0) {
             return Err(format!(
                 "fair_value_aggregate_remark is {}. It is a switch: 0 (the aggregate level's step reaches the price \
@@ -13758,6 +13786,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "earnings_surprise_df",
     "earnings_surprise_sigma",
     "earnings_volume_multiple",
+    "fair_value_aggregate_expected",
     "fair_value_aggregate_half_life",
     "fair_value_aggregate_jensen",
     "fair_value_aggregate_remark",
@@ -14161,6 +14190,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "fair_value_aggregate_jensen",
         "fair_value_aggregate_half_life",
         "fair_value_aggregate_remark",
+        "fair_value_aggregate_expected",
         "pinned_vix_feedback",
         "pinned_vix_variance_share",
         "pinned_vix_calm_knee",

@@ -606,6 +606,10 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          # `fair_value_aggregate_jensen` or `fair_value_aggregate_half_life`
          # is set.
          "aggregate_level",
+         # The session's expected variance of the aggregate earnings level,
+         # only while `fair_value_aggregate_expected` and
+         # `fair_value_aggregate_jensen` are set.
+         "aggregate_variance",
          # The time-held fade's clock and the held VIX, only while
          # `market_vol_cycle_hold_onset` is set and a close has started it.
          "cycle_hold",
@@ -1084,10 +1088,12 @@ def state_hash(snapshot: dict[str, Any]) -> str:
             _f64(buf, value)
     # Core inflation's trend (57), the eve's decision (58), credit's own
     # state (59), the 10-year's term premium (60), the aggregate earnings
-    # level (62) and the time-held fade's clock (84), each only while its
-    # dial is set, behind its own tag.
+    # level (62), the session's expected variance of it (61) and the
+    # time-held fade's clock (84), each only while its dial is set, behind
+    # its own tag.
     for name, tag, width in (("core_trend", 57.0, 3), ("eve_decision", 58.0, 2), ("spread_noise", 59.0, 3),
-                              ("term_premium", 60.0, 3), ("aggregate_level", 62.0, 2), ("cycle_hold", 84.0, 4)):
+                              ("term_premium", 60.0, 3), ("aggregate_level", 62.0, 2),
+                              ("aggregate_variance", 61.0, 2), ("cycle_hold", 84.0, 4)):
         if name in snapshot:
             _f64(buf, tag)
             for value in _column(snapshot[name], width, name):
@@ -1747,6 +1753,7 @@ _LEDGER_OPTIONAL_BUFFERS = ("fair_value_offset", "opening_z", "pending_fair_valu
                             "oil_futures", "margin", "shares_outstanding",
                             "oil_target_drift", "core_trend", "eve_decision",
                             "spread_noise", "term_premium", "aggregate_level",
+                            "aggregate_variance",
                             "cycle_hold")
 
 #: The ``fundamentals`` block's buffers, one per company each.

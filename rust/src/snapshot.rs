@@ -1685,6 +1685,11 @@ impl Engine {
         if let Some(words) = self.aggregate_level_words() {
             out.put("aggregate_level", V::from_f64s(&words));
         }
+        // The session's expected variance of the aggregate earnings level
+        // (`fair_value_aggregate_expected`).
+        if let Some(words) = self.aggregate_variance_words() {
+            out.put("aggregate_variance", V::from_f64s(&words));
+        }
         // The eve's decision (`fed_eve_decision`).
         if let Some(words) = self.eve_decision_words() {
             out.put("eve_decision", V::from_f64s(&words));
@@ -2078,6 +2083,11 @@ impl Engine {
                 self.carries_aggregate_level(),
                 format!("fair_value_aggregate_jensen or fair_value_aggregate_half_life is not 0, and this engine's \
                          are {} and {}", p.fair_value_aggregate_jensen, p.fair_value_aggregate_half_life)),
+            Gated::when(
+                "aggregate_variance",
+                self.carries_aggregate_variance(),
+                format!("fair_value_aggregate_expected and fair_value_aggregate_jensen are both set, and this \
+                         engine's are {} and {}", p.fair_value_aggregate_expected, p.fair_value_aggregate_jensen)),
             Gated::dial("eve_decision", "fed_eve_decision", p.fed_eve_decision),
             Gated::when(
                 "buyback_log_shares",
@@ -2863,6 +2873,15 @@ impl Engine {
                 None => None,
             };
             inner.set_aggregate_level_state(words.as_deref()).map_err(core)?;
+        }
+        // The session's expected variance of the aggregate earnings level
+        // (`fair_value_aggregate_expected`).
+        {
+            let words = match snapshot.get("aggregate_variance") {
+                Some(_) => Some(read_buffer(snapshot, "", "aggregate_variance")?),
+                None => None,
+            };
+            inner.set_aggregate_variance_state(words.as_deref()).map_err(core)?;
         }
         // The eve's decision (`fed_eve_decision`).
         {

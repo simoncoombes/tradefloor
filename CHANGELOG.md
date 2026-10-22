@@ -36,6 +36,14 @@ same with them on as off.
   roster's base earnings. Each is one shift to every name's level after the
   relative knee, it draws nothing, and the aggregate after the step is
   snapshotted and hashed (tag 62) only while either is set.
+- `fair_value_aggregate_expected` is a new switch, 0.0 on every preset and
+  left out of the digest there. At 1.0 the aggregate's step is half the
+  session's expected variance of its move, computed at the open from the
+  coefficients the session's draws are made at, in place of half its
+  realised square. Both remove the log drift in expectation; the realised
+  square is the noisier of the two and also counts the aggregate's
+  predictable moves. It draws nothing, and the variance is snapshotted and
+  hashed (tag 61) only while it and `fair_value_aggregate_jensen` are set.
 
 ### Oil's forecast
 

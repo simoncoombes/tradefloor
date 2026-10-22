@@ -1329,6 +1329,11 @@ pub struct Engine {
     /// (`fair_value_aggregate_jensen`, `fair_value_aggregate_half_life`):
     /// `None` before the first such close, and always with both off.
     aggregate_level: Option<f64>,
+    /// The session's conditional variance of the aggregate earnings level's
+    /// move (`fair_value_aggregate_expected`), computed at the open and read
+    /// by the close's step: `None` before the first such open, and always
+    /// with the switch off.
+    aggregate_variance: Option<f64>,
     /// The decision the Fed's own reading implied at the last close
     /// (`fed_eve_decision`), which the next scheduled meeting delivers;
     /// `None` before the first close with the switch on, and always with it
@@ -2422,6 +2427,7 @@ impl Engine {
             term_premium_key: crate::rng::term_premium_key(seed),
             term_premium: 0.0,
             aggregate_level: None,
+            aggregate_variance: None,
             eve_decision: None,
             population: None,
         };
@@ -7112,6 +7118,14 @@ impl Engine {
         // the open's reset can move a price. Read by nothing that prices.
         self.prior_closes.clone_from(&self.last_closes);
 
+        // The session's expected variance of the aggregate earnings level's
+        // move (`fair_value_aggregate_expected`), after the morning's pins and
+        // the crisis episode's step and before the night draws: the state the
+        // session's draws are made at. Nothing runs with the switch off.
+        if self.carries_aggregate_variance() && self.carries_fair_value_offsets() {
+            self.aggregate_variance = self.aggregate_expected_variance_now();
+        }
+
         // The night, before the day's marks are set, so the session band
         // anchors on the post-gap open and the gap sits outside it.
         self.apply_overnight();
@@ -8628,8 +8642,17 @@ impl Engine {
         let mut c = 0.0;
         if self.params.fair_value_aggregate_jensen != 0.0 {
             if let Some(prev) = self.aggregate_level {
-                let d = a - prev;
-                c += 0.5 * d * d;
+                // Half the session's expected variance under
+                // `fair_value_aggregate_expected` (a branch), else half the
+                // realised squared change.
+                if self.params.fair_value_aggregate_expected != 0.0 {
+                    if let Some(v) = self.aggregate_variance {
+                        c += 0.5 * v;
+                    }
+                } else {
+                    let d = a - prev;
+                    c += 0.5 * d * d;
+                }
             }
         }
         let h = self.params.fair_value_aggregate_half_life;
@@ -8659,6 +8682,212 @@ impl Engine {
             }
         }
         self.aggregate_level = Some(a + c);
+    }
+
+    /// Whether the model holds the session's expected variance of the
+    /// aggregate earnings level (`fair_value_aggregate_expected` with
+    /// `fair_value_aggregate_jensen`), which is when the snapshot and the
+    /// state hash carry it.
+    pub fn carries_aggregate_variance(&self) -> bool {
+        self.params.fair_value_aggregate_expected != 0.0 && self.params.fair_value_aggregate_jensen != 0.0
+    }
+
+    /// The session's conditional variance of the aggregate earnings level's
+    /// move, `V`, read at the open from the coefficients the session's draws
+    /// are made at (`fair_value_aggregate_expected`). `omega_i` is name `i`'s
+    /// weight in `A` (`shares * eps * exp(v)` over the names
+    /// [`Engine::aggregate_level_now`] reads), `psi` the own share
+    /// (`fair_value_news_share`), `psim` the market's permanent share at the
+    /// session's sigma, `s_m` and `s_i` the night's shares, `K` the intraday
+    /// curve's second moment and `g_i` the crisis epicentre's gain on the
+    /// session's sector and own draws:
+    ///
+    /// ```text
+    /// V = sigma_m^2 [ s_m (psim b)^2 + (1 - s_m) K (psim b + psi x c)^2 ]   b = sum omega_i beta_i,
+    ///   + psi^2 sum_s sigma_s^2 [ s_i l_s^2 + (1 - s_i) K h^2 lg_s^2 ]       c = sum omega_i L_i g_i
+    ///   + psi^2 sum_i omega_i^2 idio_i^2 r_i (s_i + (1 - s_i) K g_i^2)
+    ///   + psim^2 (lambda_m (mu^2 + sigma_m,J^2) - (lambda_m mu)^2)
+    ///   + psi^2 sum_i omega_i^2 lambda_i (1 + h_i) sigma_J^2
+    ///   + psi^2 nu sigma_news^2 sum_i omega_i^2
+    ///   + sum_i omega_i^2 (sigma_E^2 u_i'^2 1[report] + (sigma_S^2 1[reacts] + sigma_F^2 1[reacted]) u_i^2)
+    /// ```
+    ///
+    /// with `l_s` and `lg_s` the sector's loaded weight without and with the
+    /// gains, `x` the crisis blend's leak `spike (1 - source)` and `h = 1 - x`
+    /// (`market::tick`'s `kept`), and `u_i'` and `u_i` the report's and the
+    /// walks' units (`apply_night_split`, `earnings_unit_sigma`). The session
+    /// block is `market::index_var`'s identity at these weights and shares.
+    /// Left out, as there: the extended-hours ticks and caller-injected
+    /// market news; and the crash amplifier, tilt and injection, which reach
+    /// the level only off `fair_value_market_linear` (the plain loading is
+    /// priced). `None` when no name qualifies. No draws.
+    fn aggregate_expected_variance_now(&self) -> Option<f64> {
+        let p = &self.params;
+        let mut ws: Vec<(usize, f64)> = Vec::new();
+        let mut den = 0.0;
+        for (i, c) in self.companies.iter().enumerate() {
+            if !c.is_public || c.is_bankrupt || c.stock.mispricing_s.is_none() {
+                continue;
+            }
+            let Some(eps) = c.eps else { continue };
+            if !(eps > 0.0 && eps.is_finite()) {
+                continue;
+            }
+            let w = c.stock.shares_outstanding * eps * crate::mathx::exp(c.stock.fair_value_offset.unwrap_or(0.0));
+            if !(w > 0.0 && w.is_finite()) {
+                continue;
+            }
+            den += w;
+            ws.push((i, w));
+        }
+        if !(den > 0.0) {
+            return None;
+        }
+        let psi = p.fair_value_news_share;
+        let sigma_m = self.market_sigma_before_day_scale();
+        let psim = if p.fair_value_market_share == 0.0 {
+            0.0
+        } else {
+            crate::market::tick::market_permanent_share(p, sigma_m, self.market_vol_cycle_cap_scale())
+        };
+        let sm = p.overnight_market_share;
+        let si = p.overnight_idio_share;
+        let night = self.night_split_on();
+        let (sm, si) = if night { (sm, si) } else { (0.0, 0.0) };
+        let k = crate::market::index_var::intraday_variance_factor();
+        let shared_sigma = crate::market::tick::sector_sigma_at(p, &self.economy, self.vix_anchor);
+        let sector_sigmas = self.sector_sigmas_now();
+        let n_sectors = self.sector_keys.len();
+        let spike = crate::market::tick::crisis_spike_for(p, self.economy.vix, self.universe_stress);
+        let leak = spike * (1.0 - p.crisis_blend_source);
+        let keep = 1.0 - leak;
+        let epicentre = self.crisis_epicentre_key();
+        let (g_up, g_down) = crate::market::factors::crisis_epicentre_gains(p.crisis_epicentre_extra);
+        let idio_on = self.idio_state_on();
+        let ratio = self.economy.vix / self.vix_anchor;
+        let rate_scale = if p.jump_vix_coupling == 0.0 { 1.0 } else { (1.0 - p.jump_vix_coupling) + ((p.jump_vix_coupling * ratio) * ratio) };
+        let intensity_market = if p.jump_vix_coupling == 0.0 { p.jump_intensity_market } else { p.jump_intensity_market * rate_scale };
+        let intensity_idio = if p.jump_vix_coupling == 0.0 { p.jump_intensity_idio } else if p.jump_idio_vix_decoupled != 0.0 { p.jump_intensity_idio } else { p.jump_intensity_idio * rate_scale };
+        let earnings = self.carries_earnings();
+        let key = self.earnings_key;
+        let day = self.elapsed_days;
+        let (se, ss, sf) = (p.earnings_surprise_sigma, p.earnings_session_sigma, p.earnings_followthrough_sigma);
+
+        let mut b = 0.0; // sum omega beta
+        let mut lc = 0.0; // sum omega L g, the blend's leak loading
+        let mut l_night = vec![0.0; n_sectors];
+        let mut l_day = vec![0.0; n_sectors];
+        let mut own = 0.0; // psi^2 sum omega^2 idio^2 r (s_i + (1 - s_i) K g^2)
+        let mut wsq = 0.0;
+        let mut jumps_own = 0.0;
+        let mut earn = 0.0;
+        for (i, w) in ws {
+            let c = &self.companies[i];
+            let omega = w / den;
+            let beta = c.stock.beta.unwrap_or(1.0);
+            let sector = self.sector_keys.iter().position(|key| *key == c.sector);
+            let g = match (epicentre, sector) {
+                (Some(e), Some(_)) => if c.sector.as_str() == e { g_up } else { g_down },
+                _ => 1.0,
+            };
+            b += omega * beta;
+            let loading = crate::market::factors::sector_loading_for(p, beta);
+            if let Some(s) = sector {
+                l_night[s] += omega * loading;
+                l_day[s] += omega * loading * g;
+                lc += omega * loading * g;
+            }
+            let daily_sigma = crate::mathx::sqrt(crate::mathx::max(c.stock.garch_variance, p.idio_sigma_floor));
+            let unit = crate::market::factors::idio_scale_for(p, beta)
+                * crate::market::factors::cap_size_multiplier_with(p, c.stock.market_cap);
+            let r = if idio_on { self.idio_ratio_at(i) } else { 1.0 };
+            let idio2 = daily_sigma * unit * daily_sigma * unit * r;
+            own += omega * omega * idio2 * (si + (1.0 - si) * k * g * g);
+            wsq += omega * omega;
+            let rate = if p.jump_idio_excitation != 0.0 {
+                crate::mathx::min(intensity_idio * (1.0 + self.jump_excitation.get(i).copied().unwrap_or(0.0)), 1.0)
+            } else {
+                crate::mathx::min(intensity_idio, 1.0)
+            };
+            jumps_own += omega * omega * rate * p.jump_sigma_idio * p.jump_sigma_idio;
+            if earnings {
+                let name = crate::earnings::id_hash(&c.id);
+                let today = crate::earnings::reacts_on(key, name, day).is_some();
+                let yesterday = crate::earnings::reacts_on(key, name, day - 1).is_some();
+                if today || yesterday {
+                    let sector_sigma = match sector {
+                        Some(s) => loading * sector_sigmas.get(s).copied().unwrap_or(shared_sigma),
+                        None => 0.0,
+                    };
+                    let own_unit = daily_sigma * unit;
+                    let mut e2 = 0.0;
+                    if today && se != 0.0 && night {
+                        // The report's surprise, at the night's unit (its own
+                        // draw at the idiosyncratic ratio).
+                        let u2 = own_unit * own_unit * r + sector_sigma * sector_sigma;
+                        e2 += se * se * u2;
+                    }
+                    let u2 = own_unit * own_unit + sector_sigma * sector_sigma;
+                    if today && ss != 0.0 {
+                        e2 += ss * ss * u2;
+                    }
+                    if yesterday && sf != 0.0 {
+                        e2 += sf * sf * u2;
+                    }
+                    earn += omega * omega * e2;
+                }
+            }
+        }
+        let m_night = psim * b;
+        let m_day = psim * b + psi * leak * lc;
+        let mut v = sigma_m * sigma_m * (sm * m_night * m_night + (1.0 - sm) * k * m_day * m_day);
+        for s in 0..n_sectors {
+            let sigma = sector_sigmas.get(s).copied().unwrap_or(shared_sigma);
+            v += psi * psi * sigma * sigma
+                * (si * l_night[s] * l_night[s] + (1.0 - si) * k * keep * keep * l_day[s] * l_day[s]);
+        }
+        v += psi * psi * own;
+        let mu = p.jump_mean_market;
+        let sj = p.jump_sigma_market;
+        let lm = crate::mathx::min(intensity_market, 1.0);
+        v += psim * psim * (lm * (mu * mu + sj * sj) - (lm * mu) * (lm * mu));
+        v += psi * psi * jumps_own;
+        v += psi * psi * p.endogenous_news_intensity * p.endogenous_news_sigma * p.endogenous_news_sigma * wsq;
+        v += earn;
+        if v.is_finite() { Some(v) } else { None }
+    }
+
+    /// The session's expected variance for the snapshot and the state hash:
+    /// a presence flag and the variance, while the model carries it.
+    pub fn aggregate_variance_words(&self) -> Option<[f64; 2]> {
+        if !self.carries_aggregate_variance() {
+            return None;
+        }
+        Some(match self.aggregate_variance {
+            Some(v) => [1.0, v],
+            None => [0.0, 0.0],
+        })
+    }
+
+    /// Put the session's expected variance back from
+    /// [`Engine::aggregate_variance_words`].
+    pub fn set_aggregate_variance_state(&mut self, words: Option<&[f64]>) -> Result<(), String> {
+        match (words, self.carries_aggregate_variance()) {
+            (None, false) => Ok(()),
+            (Some(w), true) => {
+                if w.len() != 2 || !(w[0] == 0.0 || w[0] == 1.0) || !w[1].is_finite() {
+                    return Err(format!(
+                        "this snapshot's aggregate_variance is {w:?}: it is a presence flag and the session's \
+                         expected variance of the aggregate earnings level"));
+                }
+                self.aggregate_variance = if w[0] == 1.0 { Some(w[1]) } else { None };
+                Ok(())
+            }
+            (None, true) => Err("this model sets fair_value_aggregate_expected and fair_value_aggregate_jensen \
+                                 and the snapshot carries no aggregate_variance".to_string()),
+            (Some(_), false) => Err("this snapshot carries aggregate_variance and this model does not set both \
+                                     fair_value_aggregate_expected and fair_value_aggregate_jensen".to_string()),
+        }
     }
 
     /// The aggregate level's state for the snapshot and the state hash: a
@@ -13613,6 +13842,15 @@ impl Engine {
         // is set, behind its own tag.
         if let Some(words) = self.aggregate_level_words() {
             hash_f64(&mut buf, 62.0);
+            for value in words {
+                hash_f64(&mut buf, value);
+            }
+        }
+        // The session's expected variance of the aggregate earnings level,
+        // only while `fair_value_aggregate_expected` and
+        // `fair_value_aggregate_jensen` are set, behind its own tag.
+        if let Some(words) = self.aggregate_variance_words() {
+            hash_f64(&mut buf, 61.0);
             for value in words {
                 hash_f64(&mut buf, value);
             }

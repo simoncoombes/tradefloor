@@ -615,6 +615,12 @@ OUT_OF_SCOPE = {
         "on `== 0.0`), and with `fair_value_aggregate_jensen` also 0.0 nothing "
         "is held, snapshotted or hashed; at 0.0 it is also left out of the "
         "model's digest",
+    "fair_value_aggregate_expected":
+        "inert at 0.0: the aggregate level's step is half its realised "
+        "squared change (a branch on `== 0.0`), no expected variance is "
+        "computed, snapshotted or hashed, and with `fair_value_aggregate_jensen` "
+        "at 0.0 there is no step; at 0.0 it is also left out of the model's "
+        "digest",
     "fair_value_aggregate_remark":
         "inert at 0.0: the aggregate level's close step re-marks no price (a "
         "branch on `== 0.0`), and with both aggregate dials at 0.0 there is no "
