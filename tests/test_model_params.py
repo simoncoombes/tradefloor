@@ -1264,6 +1264,8 @@ PERTURBATIONS = [
     ("futures_index_listed", 1.0, False),
     ("basis_sd", 3.7, False),
     ("basis_persistence", 0.42, False),
+    # The basis's night share: the futures' own noise, no price moves.
+    ("basis_night_share", 0.76, False),
     ("night_session_steps", 10.0, False),
     # The index futures' metaorder memory (pt-v22). INERT untraded: it reads
     # only agents' futures flow, so with no agent trading a contract every
@@ -2225,6 +2227,7 @@ COMPANIONS: dict[str, dict[str, float]] = {
     "futures_impact_memory": {"index_level_listed": 1.0, "futures_index_listed": 1.0},
     "futures_impact_memory_half_life": {"index_level_listed": 1.0, "futures_index_listed": 1.0,
                                         "futures_impact_memory": 0.65},
+    "basis_night_share": {"index_level_listed": 1.0, "futures_index_listed": 1.0, "night_session_steps": 10.0},
     # A VIX future is priced on the forecast, out to its sixth contract's
     # 126 sessions; the loading's dials are refused without the switch.
     "futures_vix_listed": {"forecast_horizon_sessions": 126.0},

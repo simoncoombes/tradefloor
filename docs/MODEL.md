@@ -4035,6 +4035,13 @@ A future is priced at `F = (S - PV(D)) * exp(r * tau) + b`:
   equity's fast half-life) the futures' memory's fast part fades at its own
   half-life in open ticks instead, and the cost of a day's TWAP grows with
   it toward the square-root law's.
+  The basis decays evenly over a day's steps, so the night carries about
+  0.98 of a close's deviation to the next morning. Under
+  `basis_night_share` (0.0 on every shipped preset) the night's steps carry
+  that share of the day's decay and the session's ticks the rest, with the
+  basis's sd and close-to-close persistence unchanged. On ES against the
+  S&P 500 at five minutes most of a close's deviation is gone by the next
+  09:45, a share of about 0.76.
 
 Each close marks every contract at `F` on the close's index. At its expiry
 session's open a contract settles in cash on the index of the opening
