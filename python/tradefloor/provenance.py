@@ -615,6 +615,23 @@ OUT_OF_SCOPE = {
         "on `== 0.0`), and with `fair_value_aggregate_jensen` also 0.0 nothing "
         "is held, snapshotted or hashed; at 0.0 it is also left out of the "
         "model's digest",
+    "earnings_lookthrough_half_life":
+        "inert at 0.0: nothing is held, read, snapshotted or hashed (a branch "
+        "on `== 0.0`) and a `market.earnings` write is valued in full; at "
+        "0.0 it is also left out of the model's digest. Off zero, measured: "
+        "598 sessions, the reverting part's half-life in an unobserved-"
+        "components fit of ln(S&P 500 EPS / nominal GDP), Shiller's 12-month "
+        "EPS and FRED GDP, 1947Q1-2019Q4 (phi 0.9296 a quarter)",
+    "earnings_lookthrough_gain":
+        "inert at 0.0 and read only with `earnings_lookthrough_half_life` "
+        "set; at 0.0 it is also left out of the model's digest. Off zero, "
+        "measured: 0.1605, the same fit's steady-state gain on the permanent "
+        "part, run per session",
+    "earnings_lookthrough_discount_half_life":
+        "inert at 0.0 and read only with `earnings_lookthrough_half_life` "
+        "set; at 0.0 it is also left out of the model's digest. Off zero, "
+        "measured: 5267 sessions, ln 2 over the Gordon model's r - g, "
+        "Shiller's mean dividend yield 1947-2019 (3.32 per cent a year)",
     "fair_value_aggregate_expected":
         "inert at 0.0: the aggregate level's step is half its realised "
         "squared change (a branch on `== 0.0`), no expected variance is "

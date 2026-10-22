@@ -22,6 +22,23 @@ same with them on as off.
 
 <!-- release-note-ends -->
 
+### The earnings look-through
+
+- `earnings_lookthrough_half_life`, `earnings_lookthrough_gain` and
+  `earnings_lookthrough_discount_half_life` are new, all 0.0 on every preset
+  and left out of the digest there. A `market.earnings` write was valued at
+  once and in full. Off zero, the scenario target passes the write's common
+  factor to the engine (`Engine.note_market_earnings`), which holds its log
+  `m` and an anchor `a`, and the valuation reads `a + c (m - a)` of it:
+  `c = rho / (rho + kappa)`, the deviation's expected path discounted, as
+  the cycle's anticipation is derived. The anchor takes the gain's share of
+  each write at once and of the reversion the valuation expected and did not
+  see at each close, so a permanent write is valued in full in the end. A
+  direct `set_fundamentals` is a name's own news and is valued in full. A
+  run that never writes `market.earnings` is the same with the dials on as
+  off. It draws nothing; `m` and `a` are snapshotted and hashed (tag 65)
+  only while the half-life is set.
+
 ### The aggregate earnings level
 
 - `fair_value_aggregate_jensen` is a new switch and

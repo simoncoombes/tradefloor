@@ -1389,6 +1389,11 @@ PERTURBATIONS = [
     ("fair_value_aggregate_remark", 1.0, False),
     # INERT: read only with fair_value_aggregate_jensen set, which the probe is not.
     ("fair_value_aggregate_expected", 1.0, False),
+    # INERT: the look-through reads only a `market.earnings` write, which the
+    # probe never makes; its companions are read only with it set.
+    ("earnings_lookthrough_half_life", 598.0, False),
+    ("earnings_lookthrough_gain", 0.1605, False),
+    ("earnings_lookthrough_discount_half_life", 5267.0, False),
     # INERT: past the onset only (its companion), which the probe never is.
     ("market_vol_cycle_hold_fade", 0.335, False),
     # INERT: read only with the fade set.

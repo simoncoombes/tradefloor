@@ -1334,6 +1334,12 @@ pub struct Engine {
     /// by the close's step: `None` before the first such open, and always
     /// with the switch off.
     aggregate_variance: Option<f64>,
+    /// The earnings look-through's state (`earnings_lookthrough_half_life`):
+    /// `m`, the log of the common multiplier `market.earnings` has written
+    /// (`Engine::note_market_earnings`), and `a`, its anchor. Both 0.0 with
+    /// the dial off, which they never leave, and in a run that never writes.
+    lookthrough_written: f64,
+    lookthrough_anchor: f64,
     /// The decision the Fed's own reading implied at the last close
     /// (`fed_eve_decision`), which the next scheduled meeting delivers;
     /// `None` before the first close with the switch on, and always with it
@@ -2428,6 +2434,8 @@ impl Engine {
             term_premium: 0.0,
             aggregate_level: None,
             aggregate_variance: None,
+            lookthrough_written: 0.0,
+            lookthrough_anchor: 0.0,
             eve_decision: None,
             population: None,
         };
@@ -3181,6 +3189,9 @@ impl Engine {
             self.anticipation_raw = raw;
             self.economy.earnings_anticipation = raw - self.anticipation_drift;
         }
+        // The look-through rides beside it, so whatever refreshes the
+        // anticipation after the economy is rebuilt refreshes it too.
+        self.refresh_earnings_lookthrough();
     }
 
     /// Whether the engine keeps `D` (`earnings_anticipation_drift_share`):
@@ -8561,6 +8572,7 @@ impl Engine {
         self.accrue_buybacks();
         self.pull_relative_levels();
         self.step_aggregate_level();
+        self.step_earnings_lookthrough();
         // The day's market t scale is the session's: the factor's close
         // above read the day it scaled, and the next open draws its own.
         self.market_day_scale = 1.0;
@@ -8900,6 +8912,118 @@ impl Engine {
             Some(a) => [1.0, a],
             None => [0.0, 0.0],
         })
+    }
+
+    /// Whether the model looks through the written earnings
+    /// (`earnings_lookthrough_half_life` set), which is when the snapshot and
+    /// the state hash carry its state.
+    pub fn carries_earnings_lookthrough(&self) -> bool {
+        self.params.earnings_lookthrough_half_life != 0.0
+    }
+
+    /// The look-through's weight on the written deviation, `c = rho / (rho +
+    /// kappa)` with `rho = ln 2 / earnings_lookthrough_discount_half_life` and
+    /// `kappa = ln 2 / earnings_lookthrough_half_life`; `None` with the dial
+    /// off.
+    ///
+    /// # The derivation
+    ///
+    /// The written log level is `m = tau + x`, a permanent part and a
+    /// deviation that reverts at `kappa`. The valuation reads the expected
+    /// path discounted at `rho`, `E[ integral rho e^(-rho s) m(t+s) ds ] = a +
+    /// c (m - a)`, with `a` the filtered permanent part: the generator
+    /// equation `earnings_anticipation_terms` solves, with no phases.
+    pub fn earnings_lookthrough_share(&self) -> Option<f64> {
+        if !self.carries_earnings_lookthrough() {
+            return None;
+        }
+        let h_kappa = self.params.earnings_lookthrough_half_life;
+        let h_rho = self.params.earnings_lookthrough_discount_half_life;
+        // rho / (rho + kappa) with both as ln 2 over their half-lives; a
+        // discount half-life of 0 is an immediate discount, c = 1.
+        Some(h_kappa / (h_kappa + h_rho))
+    }
+
+    /// Record a `market.earnings` write: `log_factor` is the log of the common
+    /// factor it scaled every name's earnings by. The written level moves by
+    /// it and the anchor by `earnings_lookthrough_gain` of it, and the
+    /// valuation's look-through is refreshed. A branch with the dial off: the
+    /// call changes nothing. Refused for a factor that is not finite.
+    pub fn note_market_earnings(&mut self, log_factor: f64) -> Result<(), String> {
+        if !log_factor.is_finite() {
+            return Err(format!(
+                "note_market_earnings takes the log of a positive, finite factor; this one is {log_factor}"));
+        }
+        if !self.carries_earnings_lookthrough() {
+            return Ok(());
+        }
+        self.lookthrough_written += log_factor;
+        self.lookthrough_anchor += self.params.earnings_lookthrough_gain * log_factor;
+        self.refresh_earnings_lookthrough();
+        Ok(())
+    }
+
+    /// The look-through's close step: the anchor takes
+    /// `earnings_lookthrough_gain` of the reversion the valuation expected
+    /// over the session and did not see, `(1 - 0.5^(1/h)) (m - a)`. A branch
+    /// with the dial off, and nothing moves while `m == a`. No draws.
+    fn step_earnings_lookthrough(&mut self) {
+        if !self.carries_earnings_lookthrough() {
+            return;
+        }
+        let gap = self.lookthrough_written - self.lookthrough_anchor;
+        if gap != 0.0 {
+            let h = self.params.earnings_lookthrough_half_life;
+            let expected = (1.0 - crate::mathx::pow(0.5, 1.0 / h)) * gap;
+            self.lookthrough_anchor += self.params.earnings_lookthrough_gain * expected;
+        }
+        self.refresh_earnings_lookthrough();
+    }
+
+    /// Keep `economy.earnings_lookthrough` current: `-(1 - c) (m - a)`, and
+    /// exactly 0.0 with the dial off or while `m == a`.
+    pub fn refresh_earnings_lookthrough(&mut self) {
+        let look = match self.earnings_lookthrough_share() {
+            None => 0.0,
+            Some(c) => {
+                let gap = self.lookthrough_written - self.lookthrough_anchor;
+                if gap == 0.0 { 0.0 } else { -(1.0 - c) * gap }
+            }
+        };
+        self.economy.earnings_lookthrough = look;
+    }
+
+    /// The look-through's state for the snapshot and the state hash, `[m,
+    /// a]`, while the dial is set.
+    pub fn earnings_lookthrough_words(&self) -> Option<[f64; 2]> {
+        if !self.carries_earnings_lookthrough() {
+            return None;
+        }
+        Some([self.lookthrough_written, self.lookthrough_anchor])
+    }
+
+    /// Put the look-through's state back from
+    /// [`Engine::earnings_lookthrough_words`], and the valuation's reading of
+    /// it with it.
+    pub fn set_earnings_lookthrough_state(&mut self, words: Option<&[f64]>) -> Result<(), String> {
+        match (words, self.carries_earnings_lookthrough()) {
+            (None, false) => Ok(()),
+            (Some(w), true) => {
+                if w.len() != 2 || !w[0].is_finite() || !w[1].is_finite() {
+                    return Err(format!(
+                        "this snapshot's earnings_lookthrough is {w:?}: it is the written log level and its \
+                         anchor"));
+                }
+                self.lookthrough_written = w[0];
+                self.lookthrough_anchor = w[1];
+                self.refresh_earnings_lookthrough();
+                Ok(())
+            }
+            (None, true) => Err("this model sets earnings_lookthrough_half_life and the snapshot carries no \
+                                 earnings_lookthrough".to_string()),
+            (Some(_), false) => Err("this snapshot carries earnings_lookthrough and this model does not set \
+                                     earnings_lookthrough_half_life".to_string()),
+        }
     }
 
     /// Put the aggregate level back from [`Engine::aggregate_level_words`].
@@ -13855,6 +13979,14 @@ impl Engine {
                 hash_f64(&mut buf, value);
             }
         }
+        // The earnings look-through's written level and anchor, only while
+        // `earnings_lookthrough_half_life` is set, behind its own tag.
+        if let Some(words) = self.earnings_lookthrough_words() {
+            hash_f64(&mut buf, 65.0);
+            for value in words {
+                hash_f64(&mut buf, value);
+            }
+        }
         // The time-held fade's clock and the held VIX, only while
         // `market_vol_cycle_hold_onset` is set and a close has started the
         // clock, behind its own tag.
@@ -18254,6 +18386,92 @@ mod host_tests {
         let last_print = e.prices();
         e.close_day(day);
         last_print
+    }
+
+    fn lookthrough_params() -> ModelParams {
+        let mut p = ModelParams::preset("pt-v20").unwrap();
+        p.earnings_lookthrough_half_life = 598.0;
+        p.earnings_lookthrough_gain = 0.1605;
+        p.earnings_lookthrough_discount_half_life = 5267.0;
+        p
+    }
+
+    fn lookthrough_engine(p: ModelParams) -> Engine {
+        Engine::with_params(
+            13, roster(13), create_initial_economy_state(&Default::default()),
+            create_initial_central_bank_state(0), sector_keys(), p,
+        )
+    }
+
+    #[test]
+    fn earnings_lookthrough_is_inert_off_and_without_a_write() {
+        // Off: a noted write changes nothing. On: a run with no write prints
+        // what the run with the dials off prints, bit for bit.
+        let mut off = lookthrough_engine(ModelParams::preset("pt-v20").unwrap());
+        let mut noted = lookthrough_engine(ModelParams::preset("pt-v20").unwrap());
+        let mut on = lookthrough_engine(lookthrough_params());
+        noted.note_market_earnings(-0.2).unwrap();
+        assert_eq!(noted.economy().earnings_lookthrough, 0.0);
+        assert_eq!(noted.earnings_lookthrough_words(), None);
+        let mut buffer = SessionBuffer::new();
+        for day in 1..=4 {
+            let a = run_day(&mut off, day, &mut buffer);
+            let b = run_day(&mut noted, day, &mut buffer);
+            let c = run_day(&mut on, day, &mut buffer);
+            assert_eq!(a, b);
+            assert_eq!(a, c);
+        }
+        assert_eq!(on.earnings_lookthrough_words(), Some([0.0, 0.0]));
+        assert_eq!(on.economy().earnings_lookthrough, 0.0);
+        assert_eq!(off.state_hash(4, false), noted.state_hash(4, false));
+    }
+
+    #[test]
+    fn earnings_lookthrough_values_a_share_of_a_write_and_its_anchor_follows() {
+        let p = lookthrough_params();
+        let (h, k, hr) = (p.earnings_lookthrough_half_life, p.earnings_lookthrough_gain,
+                          p.earnings_lookthrough_discount_half_life);
+        let c = h / (h + hr);
+        let mut e = lookthrough_engine(p);
+        e.note_market_earnings(-0.2).unwrap();
+        let [m, a] = e.earnings_lookthrough_words().unwrap();
+        assert_eq!(m, -0.2);
+        assert!((a - (-0.2 * k)).abs() < 1e-15);
+        // The valuation reads a + c (m - a): the look-through is -(1 - c)(m - a).
+        let look = e.economy().earnings_lookthrough;
+        assert!((look - (1.0 - c) * (1.0 - k) * 0.2).abs() < 1e-15, "{look}");
+        // A close moves the anchor by K of the reversion expected and not seen.
+        let mut buffer = SessionBuffer::new();
+        run_day(&mut e, 1, &mut buffer);
+        let [m1, a1] = e.earnings_lookthrough_words().unwrap();
+        let expected = a + k * (1.0 - 0.5f64.powf(1.0 / h)) * (m - a);
+        assert_eq!(m1, m);
+        assert!((a1 - expected).abs() < 1e-15);
+        assert!(e.note_market_earnings(f64::NAN).is_err());
+    }
+
+    #[test]
+    fn earnings_lookthrough_survives_a_restore_and_is_hashed() {
+        let mut a = lookthrough_engine(lookthrough_params());
+        let mut b = lookthrough_engine(lookthrough_params());
+        let mut buffer = SessionBuffer::new();
+        run_day(&mut a, 1, &mut buffer);
+        run_day(&mut b, 1, &mut buffer);
+        assert_eq!(a.state_hash(1, false), b.state_hash(1, false));
+        a.note_market_earnings(-0.1).unwrap();
+        assert_ne!(a.state_hash(1, false), b.state_hash(1, false));
+        let saved = a.snapshot().to_bytes();
+        let mut resumed = lookthrough_engine(lookthrough_params());
+        resumed.restore(&crate::snapshot::EngineSnapshot::from_bytes(&saved).unwrap()).unwrap();
+        assert_eq!(resumed.earnings_lookthrough_words(), a.earnings_lookthrough_words());
+        assert_eq!(resumed.economy().earnings_lookthrough, a.economy().earnings_lookthrough);
+        assert_eq!(resumed.state_hash(1, false), a.state_hash(1, false));
+        let x = run_day(&mut a, 2, &mut buffer);
+        let y = run_day(&mut resumed, 2, &mut buffer);
+        assert_eq!(x, y);
+        // A model without the dial refuses the key, and one with it needs it.
+        let mut plain = lookthrough_engine(ModelParams::preset("pt-v20").unwrap());
+        assert!(plain.restore(&crate::snapshot::EngineSnapshot::from_bytes(&saved).unwrap()).is_err());
     }
 
     #[test]

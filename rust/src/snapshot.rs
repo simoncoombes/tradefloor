@@ -1690,6 +1690,11 @@ impl Engine {
         if let Some(words) = self.aggregate_variance_words() {
             out.put("aggregate_variance", V::from_f64s(&words));
         }
+        // The earnings look-through's written level and anchor
+        // (`earnings_lookthrough_half_life`).
+        if let Some(words) = self.earnings_lookthrough_words() {
+            out.put("earnings_lookthrough", V::from_f64s(&words));
+        }
         // The eve's decision (`fed_eve_decision`).
         if let Some(words) = self.eve_decision_words() {
             out.put("eve_decision", V::from_f64s(&words));
@@ -2088,6 +2093,7 @@ impl Engine {
                 self.carries_aggregate_variance(),
                 format!("fair_value_aggregate_expected and fair_value_aggregate_jensen are both set, and this \
                          engine's are {} and {}", p.fair_value_aggregate_expected, p.fair_value_aggregate_jensen)),
+            Gated::dial("earnings_lookthrough", "earnings_lookthrough_half_life", p.earnings_lookthrough_half_life),
             Gated::dial("eve_decision", "fed_eve_decision", p.fed_eve_decision),
             Gated::when(
                 "buyback_log_shares",
@@ -2882,6 +2888,15 @@ impl Engine {
                 None => None,
             };
             inner.set_aggregate_variance_state(words.as_deref()).map_err(core)?;
+        }
+        // The earnings look-through's written level and anchor
+        // (`earnings_lookthrough_half_life`).
+        {
+            let words = match snapshot.get("earnings_lookthrough") {
+                Some(_) => Some(read_buffer(snapshot, "", "earnings_lookthrough")?),
+                None => None,
+            };
+            inner.set_earnings_lookthrough_state(words.as_deref()).map_err(core)?;
         }
         // The eve's decision (`fed_eve_decision`).
         {

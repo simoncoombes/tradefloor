@@ -476,6 +476,13 @@ pub struct EconomyState {
     /// from the phase and `earnings_cycle` and kept current by the engine
     /// after every change to either, so neither hashed nor snapshotted.
     pub earnings_anticipation: f64,
+    /// What the valuation reads of the common multiplier `market.earnings`
+    /// has written, less the multiplier itself: `-(1 - c) (m - a)` in logs
+    /// (`ModelParams::earnings_lookthrough_half_life`). Derived from the
+    /// engine's written level and anchor and kept current by the engine after
+    /// every change to either, so neither hashed nor snapshotted. 0.0, and
+    /// never written, while that dial is 0.0, which every preset carries.
+    pub earnings_lookthrough: f64,
     /// The monthly change the unemployment rate is making from its cyclical
     /// drivers (the phase's trend and Okun's law), partially adjusted toward
     /// what they ask for at `ModelParams::unemployment_adjustment_half_life`.
@@ -682,6 +689,7 @@ pub fn create_initial_economy_state(options: &InitialEconomyOptions) -> EconomyS
         spread_equity_gap: 0.0,
         spread_priced_gap: 0.0,
         earnings_anticipation: 0.0,
+        earnings_lookthrough: 0.0,
         unemployment_impulse: 0.0,
         oil_push_level: 0.0,
         usd_haven_level: 0.0,

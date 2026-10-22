@@ -1160,6 +1160,10 @@ def _nothing_dormant():
                    fair_value_aggregate_half_life=1959.0,
                    fair_value_aggregate_remark=1.0,
                    fair_value_aggregate_expected=1.0,
+                   # The earnings look-through's written level and anchor.
+                   earnings_lookthrough_half_life=598.0,
+                   earnings_lookthrough_gain=0.1605,
+                   earnings_lookthrough_discount_half_life=5267.0,
                    treasury_term_premium_half_life=49.0,
                    # The time-held fade (issue #303): the onset, the
                    # multiplier's fade and the held VIX's half-life.
@@ -1400,6 +1404,14 @@ REQUIRED_SNAPSHOT_KEYS = ("columns", "rng", "tickers", "tick_components")
 #: dials put the scenario in reach of them: `fed_drawdown_mcap_prev`,
 #: `night_market_factor` and `market_vol_cycle_log`.
 UNREACHED_SNAPSHOT_FIELDS = {
+    "earnings_lookthrough":
+        "the earnings look-through's written level and anchor "
+        "(`earnings_lookthrough_half_life`). Only a `market.earnings` write "
+        "moves them off zero, and this scenario's market writes none, so "
+        "dropping the key restores the zeros the run holds. What it takes to "
+        "see it is a scenario that writes `market.earnings` before the fork. "
+        "rust's `earnings_lookthrough` tests hold the state across a restore "
+        "and in the state hash.",
     "cycle_hold":
         "the time-held fade's clock and held VIX "
         "(`market_vol_cycle_hold_onset`). Both fades act only past a "

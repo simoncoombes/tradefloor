@@ -4295,6 +4295,22 @@ impl PyEngine {
         Ok(())
     }
 
+    /// Record a market-wide earnings write: ``log_factor`` is the log of the
+    /// common factor every company's earnings were scaled by, which the
+    /// ``market.earnings`` scenario target passes after its
+    /// ``set_fundamentals``. With ``earnings_lookthrough_half_life`` set the
+    /// valuation looks through part of it (the model's
+    /// ``earnings_lookthrough_*`` dials); with it 0.0, on every preset, the
+    /// call changes nothing and is not logged. A direct ``set_fundamentals``
+    /// is a name's own news and is valued in full.
+    fn note_market_earnings(&mut self, log_factor: f64) -> PyResult<()> {
+        self.inner.note_market_earnings(log_factor).map_err(ValidationError::new_err)?;
+        if self.inner.carries_earnings_lookthrough() {
+            self.log.push(crate::python_log::LogEntry::NoteMarketEarnings { log_factor });
+        }
+        Ok(())
+    }
+
     /// Every company's share count, in roster order. The equities only;
     /// rate instruments carry no share count. `set_shares_outstanding`
     /// writes them.

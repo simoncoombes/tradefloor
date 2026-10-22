@@ -83,6 +83,7 @@ from __future__ import annotations
 import difflib
 import hashlib
 import json
+import math
 import struct
 from typing import Any, Callable, Sequence
 
@@ -798,10 +799,24 @@ def _earnings_write(engine: Engine, values: Sequence[float]) -> None:
     # its book.
     eps, book, growth = engine.fundamentals()
     new_book = []
+    factors = []
     for old, new, b in zip(eps, values, book):
         factor = (new / old) if (old == old and old != 0.0 and new == new) else 1.0
+        if old == old and old != 0.0 and new == new and factor > 0.0:
+            factors.append(factor)
         new_book.append(b * factor if b == b else b)
     engine.set_fundamentals(list(values), new_book, list(growth))
+    # The write's common factor, for the valuation's look-through
+    # (`earnings_lookthrough_half_life`): a `multiply` scales every name by
+    # one factor, equal across names up to rounding, so the median of the
+    # names with a finite, non-zero EPS. The engine ignores it with the dial
+    # off, on every preset.
+    if factors:
+        factors.sort()
+        n = len(factors)
+        middle = (factors[n // 2] if n % 2 else
+                  0.5 * (factors[n // 2 - 1] + factors[n // 2]))
+        engine.note_market_earnings(math.log(middle))
 
 
 def _earnings_check(operation: str, value: Any) -> None:

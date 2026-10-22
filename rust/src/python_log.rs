@@ -123,6 +123,14 @@ pub enum LogEntry {
     SetVixTargetFloor {
         floor: Option<f64>,
     },
+    /// A `market.earnings` write's common factor, in logs, as
+    /// `Engine.note_market_earnings` took it. An input for the reason
+    /// `SetFundamentals` is: the look-through's written level is held from
+    /// it. Logged only while `earnings_lookthrough_half_life` is set, so every
+    /// log of a run with the dial off is the one it was.
+    NoteMarketEarnings {
+        log_factor: f64,
+    },
     ListInstrument {
         ticker: String,
         sector: String,
@@ -338,6 +346,10 @@ impl LogEntry {
             LogEntry::SetVixTargetFloor { floor } => {
                 d.set_item("op", "set_vix_target_floor")?;
                 d.set_item("floor", floor)?;
+            }
+            LogEntry::NoteMarketEarnings { log_factor } => {
+                d.set_item("op", "note_market_earnings")?;
+                d.set_item("log_factor", log_factor)?;
             }
             LogEntry::Delist { index } => {
                 d.set_item("op", "delist")?;

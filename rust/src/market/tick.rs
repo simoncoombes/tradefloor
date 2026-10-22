@@ -532,10 +532,19 @@ pub fn nominal_scale(p: &ModelParams, economy: &EconomyState, base: f64) -> f64 
     // Under `earnings_anticipation_half_life` the valuation prices the
     // earnings path it expects, not only today's point on it.
     let level = economy.earnings_cycle + economy.earnings_anticipation;
-    if p.earnings_cycle_depth == 0.0 || level == 0.0 {
+    let scale = if p.earnings_cycle_depth == 0.0 || level == 0.0 {
         scale
     } else {
         scale * mathx::exp(level)
+    };
+    // The look-through of the written earnings
+    // (`earnings_lookthrough_half_life`): a branch at exactly zero, which it
+    // is with the dial off and in any run that never wrote `market.earnings`.
+    let look = economy.earnings_lookthrough;
+    if look == 0.0 {
+        scale
+    } else {
+        scale * mathx::exp(look)
     }
 }
 

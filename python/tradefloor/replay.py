@@ -35,6 +35,8 @@ _OPS = frozenset({
     "list_instrument", "delist",
     # The host's input to the VIX target.
     "set_vix_target_premium", "set_vix_target_floor",
+    # A market-wide earnings write's common factor, for the look-through.
+    "note_market_earnings",
     "draw_uniform", "draw_normal", "record",
     # Agents' orders against the book, and the collection of what they
     # produced.
@@ -201,6 +203,8 @@ def apply_log(
             engine.set_vix_target_premium(entry["points"], entry["half_life_sessions"])
         elif op == "set_vix_target_floor":
             engine.set_vix_target_floor(entry["floor"])
+        elif op == "note_market_earnings":
+            engine.note_market_earnings(entry["log_factor"])
         elif op == "tick":
             engine.tick(
                 entry["hour"], entry["minute"], entry["day_of_week"],

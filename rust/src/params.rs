@@ -2277,6 +2277,41 @@ pub struct ModelParams {
     /// snapshotted and hashed (tag 61) while it and the switch are set. Read
     /// only with `fair_value_aggregate_jensen` set.
     pub fair_value_aggregate_expected: f64,
+    /// The earnings look-through's reversion half-life, in sessions: how fast
+    /// the valuation expects a market-wide earnings deviation to revert. 0.0,
+    /// on every shipped preset, is a branch: nothing is held, read,
+    /// snapshotted or hashed, and a `market.earnings` write is valued at once
+    /// and in full, as it always was. Off zero the engine holds `m`, the log of
+    /// the common multiplier `market.earnings` has written
+    /// (`Engine::note_market_earnings`), and an anchor `a`, and the valuation
+    /// reads `a + c (m - a)` of it, `c = rho / (rho + kappa)`, with `kappa =
+    /// ln 2 / this` and `rho = ln 2 / earnings_lookthrough_discount_half_life`:
+    /// the deviation's expected path, discounted, as
+    /// `earnings_anticipation_half_life` values the cycle's. The anchor takes
+    /// `earnings_lookthrough_gain` of each write at once and that share of the
+    /// reversion the valuation expected and did not see at each close, so a
+    /// permanent write is valued in full in the end. A direct
+    /// `set_fundamentals` is not recorded and is valued in full. No draws;
+    /// `m` and `a` are snapshotted and hashed (tag 65) while this is set. The
+    /// tape's S&P 500 earnings over nominal GDP, 1947-2019, revert at a
+    /// half-life of 598 sessions. In [0, 25200].
+    pub earnings_lookthrough_half_life: f64,
+    /// The anchor's gain on a surprise in the written multiplier, a share in
+    /// [0, 1]: each write moves the anchor by this share of itself, and each
+    /// close by this share of the reversion `earnings_lookthrough_half_life`
+    /// expected. 1.0 values every write in full at once. The tape's
+    /// steady-state filter on S&P 500 earnings over nominal GDP, 1947-2019,
+    /// has 0.1605. Read only with `earnings_lookthrough_half_life` set.
+    pub earnings_lookthrough_gain: f64,
+    /// The look-through's discount, a half-life in sessions: the rate at
+    /// which the valuation discounts the written deviation's expected path,
+    /// `rho = ln 2 / this`. At 0.0 the discount is immediate, so `c` is 1
+    /// and the written level is valued in full, as `earnings_anticipation_half_life`
+    /// at 0.0 prices today's level alone. The Gordon model's `r - g` is the
+    /// dividend yield; Shiller's mean D/P, 1947-2019, is 3.32 per cent, a
+    /// half-life of 5267 sessions. Read only with
+    /// `earnings_lookthrough_half_life` set. In [0, 252000].
+    pub earnings_lookthrough_discount_half_life: f64,
     /// How much of a pinned VIX is priced the moment it is published: the share
     /// of the gap between the smoothed exposure and the pinned VIX's own excess
     /// that the pin closes. 0.0, which every preset through pt-v20 carries,
@@ -8515,6 +8550,9 @@ impl ModelParams {
             fair_value_aggregate_half_life: 0.0,
             fair_value_aggregate_remark: 0.0,
             fair_value_aggregate_expected: 0.0,
+            earnings_lookthrough_half_life: 0.0,
+            earnings_lookthrough_gain: 0.0,
+            earnings_lookthrough_discount_half_life: 0.0,
             pinned_vix_feedback: 0.0,
             pinned_vix_variance_share: 0.0,
             pinned_vix_calm_knee: 0.0,
@@ -11173,6 +11211,9 @@ impl ModelParams {
             "fair_value_aggregate_half_life" => self.fair_value_aggregate_half_life,
             "fair_value_aggregate_remark" => self.fair_value_aggregate_remark,
             "fair_value_aggregate_expected" => self.fair_value_aggregate_expected,
+            "earnings_lookthrough_half_life" => self.earnings_lookthrough_half_life,
+            "earnings_lookthrough_gain" => self.earnings_lookthrough_gain,
+            "earnings_lookthrough_discount_half_life" => self.earnings_lookthrough_discount_half_life,
             "pinned_vix_feedback" => self.pinned_vix_feedback,
             "pinned_vix_variance_share" => self.pinned_vix_variance_share,
             "pinned_vix_calm_knee" => self.pinned_vix_calm_knee,
@@ -11596,6 +11637,9 @@ impl ModelParams {
             "fair_value_aggregate_half_life" => out.fair_value_aggregate_half_life = value,
             "fair_value_aggregate_remark" => out.fair_value_aggregate_remark = value,
             "fair_value_aggregate_expected" => out.fair_value_aggregate_expected = value,
+            "earnings_lookthrough_half_life" => out.earnings_lookthrough_half_life = value,
+            "earnings_lookthrough_gain" => out.earnings_lookthrough_gain = value,
+            "earnings_lookthrough_discount_half_life" => out.earnings_lookthrough_discount_half_life = value,
             "pinned_vix_feedback" => out.pinned_vix_feedback = value,
             "pinned_vix_variance_share" => out.pinned_vix_variance_share = value,
             "pinned_vix_calm_knee" => out.pinned_vix_calm_knee = value,
@@ -12867,6 +12911,23 @@ impl ModelParams {
                  realised squared change) or 1 (half its expected variance).",
                 self.fair_value_aggregate_expected));
         }
+        if !(self.earnings_lookthrough_half_life >= 0.0 && self.earnings_lookthrough_half_life <= 25200.0) {
+            return Err(format!(
+                "earnings_lookthrough_half_life is {}. It is a half-life in sessions, in [0, 25200]; 0 is off.",
+                self.earnings_lookthrough_half_life));
+        }
+        if !(self.earnings_lookthrough_gain >= 0.0 && self.earnings_lookthrough_gain <= 1.0) {
+            return Err(format!(
+                "earnings_lookthrough_gain is {}. It is a share, in [0, 1].",
+                self.earnings_lookthrough_gain));
+        }
+        if !(self.earnings_lookthrough_discount_half_life >= 0.0
+            && self.earnings_lookthrough_discount_half_life <= 252000.0)
+        {
+            return Err(format!(
+                "earnings_lookthrough_discount_half_life is {}. It is a half-life in sessions, in [0, 252000].",
+                self.earnings_lookthrough_discount_half_life));
+        }
         if !(self.fair_value_aggregate_remark == 0.0 || self.fair_value_aggregate_remark == 1.0) {
             return Err(format!(
                 "fair_value_aggregate_remark is {}. It is a switch: 0 (the aggregate level's step reaches the price \
@@ -13782,6 +13843,9 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "earnings_anticipation_drift_share",
     "earnings_cycle_report_share",
     "earnings_followthrough_sigma",
+    "earnings_lookthrough_discount_half_life",
+    "earnings_lookthrough_gain",
+    "earnings_lookthrough_half_life",
     "earnings_session_sigma",
     "earnings_surprise_df",
     "earnings_surprise_sigma",
@@ -14191,6 +14255,9 @@ pub fn settable_names() -> Vec<&'static str> {
         "fair_value_aggregate_half_life",
         "fair_value_aggregate_remark",
         "fair_value_aggregate_expected",
+        "earnings_lookthrough_half_life",
+        "earnings_lookthrough_gain",
+        "earnings_lookthrough_discount_half_life",
         "pinned_vix_feedback",
         "pinned_vix_variance_share",
         "pinned_vix_calm_knee",

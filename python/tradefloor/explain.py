@@ -1481,6 +1481,8 @@ def _replay_inputs(engine: Engine, inputs: Sequence[dict],
         elif op == "set_vix_target_floor":
             floor = entry["floor"]
             engine.set_vix_target_floor(None if floor is None else float(floor))
+        elif op == "note_market_earnings":
+            engine.note_market_earnings(float(entry["log_factor"]))
         elif op == "draw_uniform":
             engine.draw_uniform()
         elif op == "draw_normal":
