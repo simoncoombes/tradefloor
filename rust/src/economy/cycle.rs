@@ -454,6 +454,52 @@ pub fn sojourn_quantile_days_for(phase: CyclePhase, spec: &CycleSpec, q: f64) ->
     i64::MAX
 }
 
+/// The standard deviation of one phase's sojourn, in DAYS, on the hazard
+/// alone: `E[T^2] = sum_{d>=1} (2d - 1) S(d)` less the square of
+/// [`mean_sojourn_days_for`], on the same walk and the same stopping rule.
+pub fn sojourn_sd_days_for(phase: CyclePhase, spec: &CycleSpec) -> f64 {
+    let mut prev = 0.0;
+    let mut second = 0.0;
+    let mean = walk_survival(phase, spec, |a, c| {
+        // C(a) - C(a - 1) is S(a + 1), the chance the sojourn reaches day a + 1.
+        second += (2.0 * a as f64 + 1.0) * (c - prev);
+        prev = c;
+        true
+    });
+    mathx::sqrt(mathx::max(0.0, second - mean * mean))
+}
+
+/// The `q` quantile, in DAYS, of a contraction and the trough after it
+/// taken together, on the hazard alone: the smallest `d` with
+/// `P(T_c + T_t <= d) >= q`, the two sojourns independent as the hazard
+/// draws them. `i64::MAX` when the walk never reaches `q`.
+pub fn downturn_quantile_days_for(spec: &CycleSpec, q: f64) -> i64 {
+    if !(q < 1.0) {
+        return i64::MAX;
+    }
+    // pmf of the contraction, and the trough's CDF, grown together a day at a time.
+    let (mut sc, mut st) = (1.0, 1.0);
+    let mut pc: Vec<f64> = vec![0.0];
+    let mut ft: Vec<f64> = vec![0.0];
+    let mut d = 0usize;
+    while d < 100_000 {
+        d += 1;
+        let p = hazard_only_transition_probability(CyclePhase::Contraction, d as i64, spec);
+        pc.push(sc * p);
+        sc *= 1.0 - p;
+        st *= 1.0 - hazard_only_transition_probability(CyclePhase::Trough, d as i64, spec);
+        ft.push(1.0 - st);
+        let mut cdf = 0.0;
+        for c in 1..d {
+            cdf += pc[c] * ft[d - c];
+        }
+        if cdf >= q {
+            return d as i64;
+        }
+    }
+    i64::MAX
+}
+
 /// The stationary share of DAYS the chain spends in each phase, in
 /// [`phase_cycle`] order, as unnormalised weights and their total.
 ///
@@ -917,6 +963,59 @@ mod stationary_law {
         }
         let zero = CycleSpec { equity_opening: 0.0, ..on };
         assert_eq!(stationary_phase_shares_for(&zero), stationary_phase_shares_for(&base));
+    }
+
+    #[test]
+    fn the_sojourn_quantiles_and_spread_are_the_walks_own_law() {
+        // Against the pmf written out day by day, on the shipped clock and on
+        // pt-v21's (the US table on a 21-session month).
+        let us = CycleSpec { per_month: 1.0, month_days: 21.0, us: true, ..CycleSpec::shipped(1.0) };
+        for spec in [CycleSpec::shipped(1.0), us] {
+            let pmf = |phase| {
+                let (mut s, mut out) = (1.0, vec![0.0]);
+                for d in 1..200_000i64 {
+                    let p = hazard_only_transition_probability(phase, d, &spec);
+                    out.push(s * p);
+                    s *= 1.0 - p;
+                    if s < 1e-18 {
+                        break;
+                    }
+                }
+                out
+            };
+            for phase in phase_cycle() {
+                let f = pmf(phase);
+                let mean: f64 = f.iter().enumerate().map(|(d, p)| d as f64 * p).sum();
+                let second: f64 = f.iter().enumerate().map(|(d, p)| (d * d) as f64 * p).sum();
+                let sd = (second - mean * mean).sqrt();
+                let walked = mean_sojourn_days_for(phase, &spec);
+                assert!((walked - mean).abs() < 1e-6 * mean, "{phase:?}: {walked} against {mean}");
+                let got = sojourn_sd_days_for(phase, &spec);
+                assert!((got - sd).abs() < 1e-6 * sd, "{phase:?}: sd {got} against {sd}");
+                for q in [0.5, 0.9, 0.99] {
+                    let mut c = 0.0;
+                    let want = f.iter().position(|p| { c += p; c >= q }).unwrap() as i64;
+                    assert_eq!(sojourn_quantile_days_for(phase, &spec, q), want, "{phase:?} {q}");
+                }
+            }
+            let (c, t) = (pmf(CyclePhase::Contraction), pmf(CyclePhase::Trough));
+            let mut sum = vec![0.0; c.len() + t.len()];
+            for (i, a) in c.iter().enumerate() {
+                for (j, b) in t.iter().enumerate() {
+                    sum[i + j] += a * b;
+                }
+            }
+            for q in [0.5, 0.99] {
+                let mut acc = 0.0;
+                let want = sum.iter().position(|p| { acc += p; acc >= q }).unwrap() as i64;
+                assert_eq!(downturn_quantile_days_for(&spec, q), want, "{q}");
+            }
+            assert_eq!(downturn_quantile_days_for(&spec, 1.0), i64::MAX);
+        }
+        // pt-v21's own figures, as docs/EMBEDDING.md quotes them.
+        assert_eq!(sojourn_quantile_days_for(CyclePhase::Trough, &us, 0.99), 170);
+        assert_eq!(sojourn_quantile_days_for(CyclePhase::Contraction, &us, 0.99), 246);
+        assert_eq!(downturn_quantile_days_for(&us, 0.99), 338);
     }
 
     /// An economy on which no ladder condition fires, so the hazard alone

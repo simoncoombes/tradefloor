@@ -44,6 +44,9 @@ _OPS = frozenset({
     # The night session for index futures, between a close and the next
     # open (`night_session_steps`).
     "run_night",
+    # An agent's instruction to exercise a single-name option at the close,
+    # and its withdrawal (`options_names_listed`).
+    "exercise", "cancel_exercise",
 })
 
 
@@ -240,6 +243,10 @@ def apply_log(
             engine.take_impacts(entry.get("agent"))
         elif op == "run_night":
             engine.run_night(entry.get("steps"))
+        elif op == "exercise":
+            engine.exercise(entry["agent"], entry["symbol"], entry["quantity"])
+        elif op == "cancel_exercise":
+            engine.cancel_exercise(entry["agent"], entry["symbol"])
 
     return engine
 

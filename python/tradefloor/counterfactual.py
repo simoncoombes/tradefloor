@@ -197,7 +197,7 @@ from ._core import (Engine, Instrument, Macro, ModelParams, OrderError,
 from .checkpoint import Checkpoint, branch
 from .harness import History, Observation, _warm_up, session_clock
 from .manifest import RunManifest, market_digest
-from .portfolio import Cancel, Limit, Portfolio, check_order, order_items
+from .portfolio import Cancel, Exercise, Limit, Portfolio, check_order, order_items
 from .sandbox import (HiddenState, MarketView, PortfolioView, TamperGuard,
                       declares_hidden_state)
 from .interventions import Intervention
@@ -1119,6 +1119,11 @@ class World:
                     continue
                 if isinstance(quantity, Cancel):
                     portfolio.cancel(self.engine, ticker=ticker)
+                    continue
+                if isinstance(quantity, Exercise):
+                    # An instruction for the close: the shares move at
+                    # settle_close, and nothing trades now.
+                    portfolio.exercise(self.engine, ticker, quantity.quantity)
                     continue
                 # The step's arrival mid: the book's before ANY agent's order
                 # this step, read once per name. Off a live book every agent

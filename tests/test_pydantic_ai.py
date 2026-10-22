@@ -396,7 +396,7 @@ def test_a_schema_violation_is_a_decision_error_carrying_its_cause():
     assert isinstance(excinfo.value.__cause__, UnexpectedModelBehavior)
     assert isinstance(excinfo.value.__cause__.__cause__,
                       PydanticValidationError)
-    assert "'BUY', 'SELL', 'HOLD' or 'CANCEL'" in str(
+    assert "'BUY', 'SELL', 'HOLD', 'CANCEL' or 'EXERCISE'" in str(
         excinfo.value.__cause__.__cause__)
 
 

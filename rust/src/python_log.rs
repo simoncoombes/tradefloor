@@ -191,6 +191,19 @@ pub enum LogEntry {
     RunNight {
         steps: u32,
     },
+    /// An agent's instruction to exercise a single-name option at the next
+    /// close (`options_names_listed`). Logged because it moves the close's
+    /// deliveries and positions.
+    Exercise {
+        agent: String,
+        symbol: String,
+        quantity: f64,
+    },
+    /// An agent's exercise instructions on a symbol withdrawn.
+    CancelExercise {
+        agent: String,
+        symbol: String,
+    },
 }
 
 fn news_to_py(py: Python<'_>, news: &[(Option<String>, Option<String>, f64)]) -> PyResult<PyObject> {
@@ -387,6 +400,17 @@ impl LogEntry {
                 d.set_item("op", "run_night")?;
                 // The rest of the night is None, which JSON can carry.
                 d.set_item("steps", if *steps == u32::MAX { None } else { Some(*steps) })?;
+            }
+            LogEntry::Exercise { agent, symbol, quantity } => {
+                d.set_item("op", "exercise")?;
+                d.set_item("agent", agent)?;
+                d.set_item("symbol", symbol)?;
+                d.set_item("quantity", quantity)?;
+            }
+            LogEntry::CancelExercise { agent, symbol } => {
+                d.set_item("op", "cancel_exercise")?;
+                d.set_item("agent", agent)?;
+                d.set_item("symbol", symbol)?;
             }
         }
         Ok(d.into())

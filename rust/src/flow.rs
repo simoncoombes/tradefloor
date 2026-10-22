@@ -75,8 +75,25 @@
 //!   estimate, so a flow of mean zero is not flagged for its sampling noise.
 //!   A stock split written as an earnings cut, without dividing the
 //!   engine's price, is a revision of `-ln(ratio)`.
+//! - The business cycle runs itself in a free run, and every preset's
+//!   realism statements pool its own mix of phases. A host that writes the
+//!   phase, pins it, or opens and drives the economy so that a phase lasts
+//!   far longer than the preset's own, runs a market the preset was not
+//!   fitted on: on a coupled preset a contraction or trough raises the
+//!   market's variance for as long as it holds. [`ExternalFlow::record_cycle_phase`]
+//!   counts the sessions in each phase and the longest unbroken run of
+//!   each, and of a contraction and trough together, and the tally is
+//!   outside once a run passes the [`CYCLE_RUN_QUANTILE`] quantile of the
+//!   preset's own sojourn on the cycle's hazard. The share of sessions in
+//!   each phase is reported against the preset's stationary share, and
+//!   not judged: a run of a few years holds one or two cycles, so its share
+//!   is mostly where it opened.
 
-use crate::economy::EconomicShock;
+use crate::economy::cycle::{
+    downturn_quantile_days_for, mean_sojourn_days_for, sojourn_quantile_days_for,
+    sojourn_sd_days_for,
+};
+use crate::economy::{CyclePhase, CycleSpec, EconomicShock, MacroCalendar};
 use crate::market::{GameTime, NewsEvent};
 use crate::params::ModelParams;
 
@@ -123,8 +140,53 @@ pub const DRIFT_TOLERANCE: f64 = 0.01;
 /// the moves' sum of squares, scaled as the drift is.
 pub const DRIFT_STANDARD_ERRORS: f64 = 3.0;
 
+/// The quantile of the preset's own sojourn in a phase past which a run held
+/// in it is outside. Chosen, not fitted: one sojourn in a hundred on the
+/// preset's own cycle runs longer, so a tally of a few cycles' phases is
+/// flagged now and then on the preset's own cycle, as the drift check is.
+pub const CYCLE_RUN_QUANTILE: f64 = 0.99;
+
 /// Trading sessions a year, for the drift's annual rate.
 const SESSIONS_A_YEAR: f64 = 252.0;
+
+/// The phases in [`crate::economy::cycle::phase_cycle`] order, the order of every per-phase array
+/// in this module: expansion, peak, contraction, trough, recovery.
+pub const CYCLE_PHASES: [CyclePhase; 5] = [
+    CyclePhase::Expansion,
+    CyclePhase::Peak,
+    CyclePhase::Contraction,
+    CyclePhase::Trough,
+    CyclePhase::Recovery,
+];
+
+/// `phase`'s place in [`CYCLE_PHASES`].
+fn phase_slot(phase: CyclePhase) -> usize {
+    match phase {
+        CyclePhase::Expansion => 0,
+        CyclePhase::Peak => 1,
+        CyclePhase::Contraction => 2,
+        CyclePhase::Trough => 3,
+        CyclePhase::Recovery => 4,
+    }
+}
+
+/// The cycle's clock and table under `params`, as the engine reads them in a
+/// session ([`crate::engine::Engine::cycle_spec`]; the opening's hazard is
+/// not read in a session). The economy steps once a session, so its days are
+/// sessions.
+fn cycle_spec_of(params: &ModelParams) -> CycleSpec {
+    CycleSpec {
+        per_month: params.cycle_hazard_per_month,
+        month_days: MacroCalendar::from_days_per_year(params.macro_calendar_days_per_year)
+            .month_f64(),
+        us: params.cycle_us_calibration != 0.0,
+        equity_hazard: params.cycle_equity_hazard,
+        equity_knee: params.cycle_equity_hazard_knee,
+        equity_opening: 0.0,
+        inflation_hazard: params.cycle_inflation_hazard,
+        rate_hazard: params.cycle_rate_hazard,
+    }
+}
 
 /// The shocks a preset generates for itself, which is the flow its fitted
 /// statistics were measured under.
@@ -166,11 +228,44 @@ pub struct CalibratedFlow {
     /// Mean log move a year the fitted news adds to a name's fair value.
     /// Zero: each event's size is a draw of mean zero.
     pub news_drift: f64,
+    /// The share of sessions the preset's own cycle spends in each phase, in
+    /// [`CYCLE_PHASES`] order, on the cycle's hazard alone
+    /// ([`crate::economy::cycle::stationary_phase_shares_for`]). The state
+    /// ladder (rates, unemployment, the curve) and the market's own hazard
+    /// (`cycle_equity_hazard`) are left out, as the stationary opening
+    /// leaves them out.
+    pub phase_shares: [f64; 5],
+    /// The mean sojourn in each phase, in sessions, on the hazard alone.
+    pub phase_mean_sessions: [f64; 5],
+    /// The standard deviation of each phase's sojourn, in sessions.
+    pub phase_sd_sessions: [f64; 5],
+    /// The [`CYCLE_RUN_QUANTILE`] quantile of each phase's sojourn, in
+    /// sessions: a run held longer is outside.
+    pub phase_run_limit: [i64; 5],
+    /// The share of sessions in a contraction or a trough.
+    pub downturn_share: f64,
+    /// The mean of a contraction and its trough together, in sessions.
+    pub downturn_mean_sessions: f64,
+    /// The [`CYCLE_RUN_QUANTILE`] quantile of a contraction and its trough
+    /// together, in sessions.
+    pub downturn_run_limit: i64,
 }
 
 impl CalibratedFlow {
     /// The flow `params` generates for itself.
     pub fn of(params: &ModelParams) -> Self {
+        let spec = cycle_spec_of(params);
+        let mut phase_mean_sessions = [0.0; 5];
+        let mut phase_sd_sessions = [0.0; 5];
+        let mut phase_run_limit = [0i64; 5];
+        for (k, &phase) in CYCLE_PHASES.iter().enumerate() {
+            phase_mean_sessions[k] = mean_sojourn_days_for(phase, &spec);
+            phase_sd_sessions[k] = sojourn_sd_days_for(phase, &spec);
+            phase_run_limit[k] = sojourn_quantile_days_for(phase, &spec, CYCLE_RUN_QUANTILE);
+        }
+        let cycle: f64 = phase_mean_sessions.iter().sum();
+        let phase_shares = phase_mean_sessions.map(|m| m / cycle);
+        let (c, t) = (phase_slot(CyclePhase::Contraction), phase_slot(CyclePhase::Trough));
         CalibratedFlow {
             company_news_rate: params.endogenous_news_intensity,
             company_news_sigma: params.endogenous_news_sigma,
@@ -188,6 +283,13 @@ impl CalibratedFlow {
             macro_steps_per_session: 1.0,
             off_session_ticks_per_session: 0.0,
             news_drift: 0.0,
+            phase_shares,
+            phase_mean_sessions,
+            phase_sd_sessions,
+            phase_run_limit,
+            downturn_share: phase_shares[c] + phase_shares[t],
+            downturn_mean_sessions: phase_mean_sessions[c] + phase_mean_sessions[t],
+            downturn_run_limit: downturn_quantile_days_for(&spec, CYCLE_RUN_QUANTILE),
         }
     }
 
@@ -218,8 +320,10 @@ impl CalibratedFlow {
 /// rewrites, [`ExternalFlow::record_vix_write`] for each VIX it writes,
 /// [`ExternalFlow::record_vix_target_premium`] for each premium it writes on
 /// the VIX target, [`ExternalFlow::record_vix_target_floor_session`] for each
-/// session it closes under a floor, and
-/// [`ExternalFlow::record_session`] once per trading session. The tally then
+/// session it closes under a floor,
+/// [`ExternalFlow::record_cycle_phase`] with the cycle phase each session
+/// traded in, and [`ExternalFlow::record_session`] once per trading
+/// session. The tally then
 /// holds rates and sizes [`ExternalFlow::assess`] can compare with the
 /// fitted flow.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -271,6 +375,18 @@ pub struct ExternalFlow {
     pub vix_target_write_abs: f64,
     /// Sessions closed with a floor under the VIX target.
     pub vix_target_floor_sessions: u64,
+    /// Sessions recorded in each cycle phase, in [`CYCLE_PHASES`] order.
+    pub phase_sessions: [u64; 5],
+    /// The longest unbroken run of sessions in each phase, the run under way
+    /// included.
+    pub phase_longest: [u64; 5],
+    /// The longest unbroken run of sessions in a contraction or a trough.
+    pub downturn_longest: u64,
+    /// The phase last recorded, and the runs under way: in it, and in a
+    /// contraction or trough.
+    pub cycle_last: Option<CyclePhase>,
+    pub phase_run: u64,
+    pub downturn_run: u64,
 }
 
 impl ExternalFlow {
@@ -391,6 +507,34 @@ impl ExternalFlow {
         self.macro_shock_load += load.abs();
     }
 
+    /// One session traded in `phase`. Call it once a session, with the
+    /// phase the economy held while the session traded: read before the
+    /// close's macro step, or, for a host that reads the phase back after
+    /// each step and writes it into the next, the phase it wrote. Either
+    /// reading works if it is the same one every session.
+    pub fn record_cycle_phase(&mut self, phase: CyclePhase) {
+        let k = phase_slot(phase);
+        self.phase_sessions[k] += 1;
+        self.phase_run = if self.cycle_last == Some(phase) { self.phase_run + 1 } else { 1 };
+        self.cycle_last = Some(phase);
+        if self.phase_run > self.phase_longest[k] {
+            self.phase_longest[k] = self.phase_run;
+        }
+        if matches!(phase, CyclePhase::Contraction | CyclePhase::Trough) {
+            self.downturn_run += 1;
+            if self.downturn_run > self.downturn_longest {
+                self.downturn_longest = self.downturn_run;
+            }
+        } else {
+            self.downturn_run = 0;
+        }
+    }
+
+    /// Sessions recorded with a cycle phase.
+    pub fn cycle_sessions(&self) -> u64 {
+        self.phase_sessions.iter().sum()
+    }
+
     /// One trading session traded.
     pub fn record_session(&mut self) {
         self.sessions += 1;
@@ -440,6 +584,19 @@ pub struct FlowAssessment {
     /// Mean log move a year the host's earnings revisions add to a name's
     /// fair value.
     pub fundamental_drift: f64,
+    /// The share of the sessions recorded with a phase that were in each
+    /// phase, in [`CYCLE_PHASES`] order, against
+    /// [`CalibratedFlow::phase_shares`]. All zero with none recorded.
+    pub phase_shares: [f64; 5],
+    /// The share in a contraction or a trough, against
+    /// [`CalibratedFlow::downturn_share`].
+    pub downturn_share: f64,
+    /// The longest run held in each phase, in sessions, against
+    /// [`CalibratedFlow::phase_run_limit`].
+    pub phase_longest: [u64; 5],
+    /// The longest run in a contraction or trough, against
+    /// [`CalibratedFlow::downturn_run_limit`].
+    pub downturn_longest: u64,
     /// One sentence per channel outside the fitted flow.
     pub findings: Vec<String>,
 }
@@ -518,6 +675,16 @@ fn assess(fit: &CalibratedFlow, obs: &ExternalFlow) -> FlowAssessment {
                 + obs.market_sum_sq * fit.news_market_weight * fit.news_market_weight,
         );
     let fundamental_se = year * crate::mathx::sqrt(obs.fundamental_sum_sq) / names;
+
+    let cycle_sessions = obs.cycle_sessions();
+    let (phase_shares, downturn_share) = if cycle_sessions > 0 {
+        let n = cycle_sessions as f64;
+        let shares = obs.phase_sessions.map(|k| k as f64 / n);
+        let (c, t) = (phase_slot(CyclePhase::Contraction), phase_slot(CyclePhase::Trough));
+        (shares, shares[c] + shares[t])
+    } else {
+        ([0.0; 5], 0.0)
+    };
 
     let mut findings = Vec::new();
     if company_news_ratio > 1.0 {
@@ -634,6 +801,42 @@ fn assess(fit: &CalibratedFlow, obs: &ExternalFlow) -> FlowAssessment {
             obs.fundamental_events,
         ));
     }
+    for (k, &phase) in CYCLE_PHASES.iter().enumerate() {
+        let limit = fit.phase_run_limit[k];
+        if limit < i64::MAX && obs.phase_longest[k] as i64 > limit {
+            findings.push(format!(
+                "a {} ran {} sessions unbroken, where the preset's own {} lasts {:.0} \
+                 sessions on average and {} of every 100 end by session {}; {:.0}% of the {} \
+                 sessions recorded were in a {}, against {:.0}% on the preset's own cycle",
+                phase.as_str(),
+                obs.phase_longest[k],
+                phase.as_str(),
+                fit.phase_mean_sessions[k],
+                (100.0 * CYCLE_RUN_QUANTILE).round(),
+                limit,
+                100.0 * phase_shares[k],
+                cycle_sessions,
+                phase.as_str(),
+                100.0 * fit.phase_shares[k],
+            ));
+        }
+    }
+    if fit.downturn_run_limit < i64::MAX && obs.downturn_longest as i64 > fit.downturn_run_limit {
+        findings.push(format!(
+            "a contraction and trough together ran {} sessions unbroken, where the preset's own \
+             last {:.0} on average and {} of every 100 end by session {}; {:.0}% of the {} \
+             sessions recorded were in a contraction or trough, against {:.0}% on the preset's \
+             own cycle, and on a preset with `market_vol_cycle_ratio` both phases raise the \
+             market's variance for as long as they hold",
+            obs.downturn_longest,
+            fit.downturn_mean_sessions,
+            (100.0 * CYCLE_RUN_QUANTILE).round(),
+            fit.downturn_run_limit,
+            100.0 * downturn_share,
+            cycle_sessions,
+            100.0 * fit.downturn_share,
+        ));
+    }
     FlowAssessment {
         inside: findings.is_empty(),
         company_news_ratio,
@@ -648,6 +851,10 @@ fn assess(fit: &CalibratedFlow, obs: &ExternalFlow) -> FlowAssessment {
         off_session_ticks_per_session,
         news_drift,
         fundamental_drift,
+        phase_shares,
+        downturn_share,
+        phase_longest: obs.phase_longest,
+        downturn_longest: obs.downturn_longest,
         findings,
     }
 }
@@ -917,6 +1124,93 @@ mod tests {
         assert!(!a.inside);
         assert!((a.fundamental_drift + 0.5 * (2.0f64).ln()).abs() < 1e-12);
         assert!(a.findings.iter().any(|f| f.contains("-ln(ratio)")));
+    }
+
+    #[test]
+    fn the_calibrated_flow_states_the_presets_own_cycle() {
+        assert_eq!(CYCLE_PHASES, crate::economy::cycle::phase_cycle());
+        let f = CalibratedFlow::of(&ModelParams::preset("pt-v21").unwrap());
+        let (c, t) = (phase_slot(CyclePhase::Contraction), phase_slot(CyclePhase::Trough));
+        assert!((f.phase_shares.iter().sum::<f64>() - 1.0).abs() < 1e-12);
+        // The US table on a 21-session month: a contraction of 5.5 months, a
+        // trough of 3.5, and a contraction and trough a twelfth of sessions.
+        assert!((f.phase_mean_sessions[c] - 115.5).abs() < 0.05, "{}", f.phase_mean_sessions[c]);
+        assert!((f.phase_mean_sessions[t] - 73.5).abs() < 0.05, "{}", f.phase_mean_sessions[t]);
+        assert_eq!(f.phase_run_limit[c], 246);
+        assert_eq!(f.phase_run_limit[t], 170);
+        assert_eq!(f.downturn_run_limit, 338);
+        assert!((f.downturn_share - 0.0833).abs() < 5e-4, "{}", f.downturn_share);
+        assert!((f.downturn_mean_sessions - 189.0).abs() < 0.1);
+        assert!(f.phase_sd_sessions.iter().all(|&x| x > 0.0 && x.is_finite()));
+        // A preset on the shipped table and clock reads its own figures.
+        let old = CalibratedFlow::of(&v20());
+        assert!((old.phase_shares.iter().sum::<f64>() - 1.0).abs() < 1e-12);
+        assert!(old.phase_run_limit.iter().all(|&d| d > 0 && d < i64::MAX));
+    }
+
+    /// A tally of `profile`, one session a step, every session with a macro
+    /// step and its phase.
+    fn cycle_tally(profile: &[(CyclePhase, u64)]) -> ExternalFlow {
+        let mut t = ExternalFlow::new(108);
+        for &(phase, n) in profile {
+            for _ in 0..n {
+                t.record_session();
+                t.record_macro_step(&[]);
+                t.record_cycle_phase(phase);
+            }
+        }
+        t
+    }
+
+    #[test]
+    fn a_phase_run_past_the_presets_own_99th_percentile_is_outside() {
+        use CyclePhase::*;
+        let p = ModelParams::preset("pt-v21").unwrap();
+        let (c, t) = (phase_slot(Contraction), phase_slot(Trough));
+        // Median sojourns on the preset's own cycle are inside.
+        let own = cycle_tally(&[(Contraction, 104), (Trough, 66), (Recovery, 252), (Expansion, 334)]);
+        let a = own.assess(&p);
+        assert!(a.inside, "{:?}", a.findings);
+        assert_eq!(a.phase_longest[t], 66);
+        assert_eq!(a.downturn_longest, 170);
+        assert!((a.downturn_share - 170.0 / 756.0).abs() < 1e-12);
+        assert!((a.phase_shares.iter().sum::<f64>() - 1.0).abs() < 1e-12);
+        // A trough at the 99th percentile is inside, and one session longer is not.
+        assert!(cycle_tally(&[(Trough, 170)]).assess(&p).inside);
+        let a = cycle_tally(&[(Trough, 171)]).assess(&p);
+        assert!(!a.inside);
+        assert!(a.findings[0].starts_with("a trough ran 171 sessions unbroken"), "{:?}", a.findings);
+        // The held profile of issue #303: the trough and the downturn are outside.
+        let held = cycle_tally(&[(Expansion, 126), (Contraction, 126), (Trough, 454), (Recovery, 50)]);
+        let a = held.assess(&p);
+        assert_eq!(a.findings.len(), 2, "{:?}", a.findings);
+        assert!(a.findings[1].contains("together ran 580 sessions"), "{:?}", a.findings);
+        // A long contraction from a weak opening, and its trough.
+        let a = cycle_tally(&[(Contraction, 305), (Trough, 69), (Recovery, 382)]).assess(&p);
+        assert!(!a.inside);
+        assert!(a.findings[0].starts_with("a contraction ran 305"), "{:?}", a.findings);
+        assert_eq!(a.downturn_longest, 374);
+        // A run broken by another phase starts again.
+        let broken = cycle_tally(&[(Contraction, 200), (Recovery, 1), (Contraction, 200)]);
+        assert_eq!(broken.phase_sessions[c], 400);
+        assert_eq!(broken.phase_longest[c], 200);
+        assert_eq!(broken.downturn_longest, 200);
+        assert!(broken.assess(&p).inside);
+    }
+
+    #[test]
+    fn a_tally_without_phases_reports_no_cycle() {
+        let mut t = ExternalFlow::new(10);
+        for _ in 0..100 {
+            t.record_session();
+            t.record_macro_step(&[]);
+        }
+        let a = t.assess(&ModelParams::preset("pt-v21").unwrap());
+        assert!(a.inside);
+        assert_eq!(t.cycle_sessions(), 0);
+        assert_eq!(a.phase_shares, [0.0; 5]);
+        assert_eq!(a.downturn_share, 0.0);
+        assert_eq!(a.phase_longest, [0; 5]);
     }
 
     #[test]

@@ -289,14 +289,7 @@ impl RateFuturesState {
 /// A rate future settled at the close of `session` at `price`, 100 less the
 /// period's realised rate.
 fn rate_settlement(kind: ContractKind, session: i64, price: f64) -> Settlement {
-    Settlement {
-        symbol: rate_future_symbol(kind, session),
-        kind,
-        root: kind.root().to_string(),
-        session,
-        value: price,
-        reference: price,
-    }
+    Settlement::new(rate_future_symbol(kind, session), kind, kind.root().to_string(), session, price, price)
 }
 
 /// What a rate future is worth now, and from what.
@@ -749,6 +742,8 @@ impl Engine {
                     tick: spec.tick,
                     settlement: c.kind.settlement(),
                     front: k == 0 || self.rate_futures.contracts[k - 1].kind != c.kind,
+                    right: None,
+                    strike: None,
                 }
             })
             .collect()

@@ -201,6 +201,10 @@ CASES = {
     # The dollar's safe-haven bid, in the economy, under the measured dollar.
     "usd_haven_level": (dict(usd_mean_reversion=0.00095, usd_noise_sd=0.43),
                         (), ("usd_haven_level",), (), {}),
+    # The index options and the surface's clock, carried whenever the
+    # surface's switch is set.
+    "options": (dict(index_level_listed=1.0, surface_ssvi=1.0, options_index_listed=1.0,
+                     option_dealer_spread=0.004), ("index_divisor", "options"), (), (), {}),
     "every_r21_dial": (dict(EVERY_R21_DIAL, **MACRO),
                        ("market_vol_leverage_memory", "vix_stress_memory",
                         "cycle_nowcast_rng", "fed_stress_vix_max", "fed_stress_hold_age",

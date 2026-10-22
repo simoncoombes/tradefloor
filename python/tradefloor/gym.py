@@ -37,6 +37,16 @@ growing, so moving 1.9x out of one name and into another sells the first and
 then buys the second. Before 0.8.5 the purchase came first whenever the new
 name was earlier in the roster, and the cap refused it.
 
+## A target is the whole holding
+
+A weight is the target for everything the account holds in a name,
+whatever put it there. On a model that lists single-name options (pt-v22
+phase 3) an option's exercise or assignment can hand an account shares it
+did not order, or leave it short; the env's actions name stocks only, so
+its own account is never assigned, but the rule is the same for any
+holding: the next step trades the difference between the target and the
+position as it stands.
+
 ## The reward is P&L for the step
 
 The reward is the step's change in net worth in dollars, the same units as

@@ -4373,6 +4373,302 @@ its symbol in the mapping `act` returns. The scorecard's impact reads the
 names' prices, which no contract moves. Stock is not liquidated: with the
 futures closed the requirement is nil.
 
+## Index options
+
+Three switches, each 0.0 on every shipped preset and left out of the model's
+digest there, list European options on the price index and quote them:
+`surface_ssvi` keeps an implied-volatility surface on the index,
+`options_index_listed` lists calls and puts, and `option_dealer_spread` is
+the half-spread of the dealer that quotes them. The surface's companions,
+`surface_skew_physical`, `surface_skew_physical_slope`,
+`surface_skew_premium`, `surface_skew_premium_slope`, `surface_curvature`, `surface_curvature_exponent`,
+`surface_term_premium_short`, `surface_term_premium_long` and
+`surface_earnings_weight`, are 0.0 on every shipped preset too and refused
+without the surface. None of them has been fitted: the physical skew is a
+derived dial still to be measured on the model's own histories, and the
+premia and the spread are to be screened on rows SV3 to SV9 and OB1 to OB6
+with the owner's approval. The surface and the options read public state,
+draw nothing and write only their own state, so a model with all of them on
+prints the same stock prices as one with them off, and an untraded run
+computes no option price (`tests/test_index_options.py`).
+
+**The surface.** SSVI (Gatheral and Jacquier, "Arbitrage-free SVI
+volatility surfaces", Quantitative Finance 14(1), 2014,
+`derivatives::surface`): total implied variance at log-moneyness
+$k = \ln(K/F)$ and $T$ sessions out is
+
+$$w(k, T) = \frac{\theta_T}{2}\left(1 + \rho\,\varphi(\theta_T)\,k + \sqrt{(\varphi(\theta_T)\,k + \rho)^2 + 1 - \rho^2}\right),
+\qquad \varphi(\theta) = \eta\,\theta^{-\gamma}(1 + \theta)^{\gamma - 1},$$
+
+with $\eta$ `surface_curvature` and $\gamma$ `surface_curvature_exponent`.
+The paper's sufficient conditions (its Theorems 4.1 and 4.2) are checked at
+every knot of every surface: no butterfly arbitrage needs
+$\theta\varphi(1 + |\rho|) < 4$ and $\theta\varphi^2(1 + |\rho|) \le 4$, and
+no calendar arbitrage needs $\theta_T$ non-decreasing and
+$0 \le \partial_\theta(\theta\varphi) \le (1 + \sqrt{1 - \rho^2})\varphi/\rho^2$.
+With $\gamma \le 1/2$ (the dial's bound) and $\eta(1 + |\rho|) \le 2$ (the
+paper's Remark 4.4) all hold at every $\theta$, so the fit keeps $|\rho|$
+inside $2/\eta - 1$ and $\eta$ is refused at 2 or above. Its parts are tied
+to the model:
+
+- The level. $\theta$ at 21 sessions is the one whose strip, priced by the
+  Cboe VIX formula, returns the VIX: the live VIX within a session under
+  `vix_intraday_live`, the published VIX otherwise. The strip is 400
+  out-of-the-money prices spread evenly in log-moneyness over eight
+  at-the-money sds either side of the forward, each strike's width half the
+  distance between its neighbours, $K_0$ the forward, the strip the pt-v22
+  measurement reads. So row SV1 holds by construction: the
+  fit solves the strip's VIX to a relative $10^{-13}$, and the surface's
+  21-session strip reads the published VIX at every close to within
+  $10^{-6}$ points.
+- The skew. $\rho$ is the one whose 21-session strip has, by the Cboe SKEW
+  formula, the risk-neutral skewness
+  $S = s_0 + s_1 \ln(\mathrm{VIX}/20) + p_0 + p_1 \ln(\mathrm{VIX}/20)$:
+  $s_0$ and $s_1$ the physical skewness of 21-session log returns as a
+  function of the VIX (`surface_skew_physical`,
+  `surface_skew_physical_slope`) and $p_0$ and $p_1$ the skew premium and
+  its slope (`surface_skew_premium`, `surface_skew_premium_slope`). On the
+  model's histories the physical skewness deepens as the VIX rises, while
+  on the tape the SKEW index falls as the VIX rises; a constant premium
+  would carry the model's direction into the surface, and $p_1$ lets the
+  premium shrink with the VIX instead. SKEW is $100 - 10S$. The skewness rises
+  with $\rho$, which is found by regula falsi with $\theta$ re-solved at each
+  step; a skewness beyond what $|\rho|$ at its bound gives is met at the
+  bound. How far that reaches depends on the curvature: at $\eta = 1$ and
+  $\gamma = 1/2$ the 21-session SKEW spans about 69 to 131; at $\gamma = 1/4$
+  about 95 to 105. With $\eta$ at 0 the smile is flat and $\rho$ is 0.
+- The term structure. $\theta_T$ is $\theta_{21}$ times a shape: the
+  forecast's expected index variance summed to $T$ (`forecast_horizon_sessions`;
+  a constant variance without the forecast), times
+  $e^{\pi(T)}$, plus the weighted variance of the earnings reports before
+  $T$, all over the same at 21 sessions. $\pi$ is a log premium, 0 at 21
+  sessions, `surface_term_premium_short` at 6 and
+  `surface_term_premium_long` at 252, log-linear in $\ln T$ between and
+  beyond. A report the calendar (`Engine.earnings_calendar`) puts at an open
+  before $T$ adds the name's index weight squared times
+  `earnings_surprise_sigma` squared times the forecast's expected
+  one-session variance of the name at the report, times
+  `surface_earnings_weight` (which requires the forecast); the surprise
+  itself is not read. The shape is held non-decreasing (a running maximum)
+  so the calendar condition holds. Knot $n$ is the open of the $n$th session
+  after the last, so an option expiring there reads its tenor's knot
+  exactly, and a report printing at that open is in it.
+
+The forward to an expiry is the index futures' carry,
+$F = (S - \mathrm{PV}(D))\,e^{r\tau}$, with the dividends going ex before it
+(declared within 21 sessions, the Lintner projection beyond) and $r$ the
+mean policy rate the forecast expects to it.
+
+**The chain.** Options are listed at the next six monthly expiries (session
+15 of each 21-session month, the VIX futures' expiries) and the quarterly
+expiries after them, eight in all, reaching between 190 and 273 sessions.
+Each is European and cash-settled at $100 a point, AM-settled at its expiry
+session's open on the index of the opening prints, as SPX is; symbols are
+`IDX.O0035.C1050.00`. An expiry's strike grid is fixed when it is listed: a
+fifth of the at-the-money sd to expiry at the VIX then, in index points,
+rounded in log to 1, 2, 2.5 or 5 times a power of ten. Twenty strikes are
+listed either side of the index, and the range widens at each open to keep
+twenty either side, so a symbol listed once trades until it expires. At an
+expiry every listed strike and right settles at its intrinsic value on the
+opening prints (`settlements(day)`), and the expiry's waiting orders and
+positions go.
+
+**The dealer.** There is no order book per option (`derivatives::dealer`).
+One dealer quotes every option from the surface and takes the other side of
+every trade, as a listed market's makers quote from a volatility surface;
+quotes from one surface meet put-call parity and the butterfly and calendar
+bounds by construction. Its mid is Black's price at the surface's volatility
+moved by its inventory. Its half-spread in volatility is
+`option_dealer_spread` times the equity maker's VIX multiplier
+($1 + \max(0, (\mathrm{VIX} - 15)/30)$) times $1 + 0.25|z|$, $z$ the strike's
+distance from the forward in at-the-money total sds, so in price it grows
+with vega, moneyness, tenor and the VIX. Each side shows ten levels of 50
+contracts, each a further half of the half-spread out, on Cboe's SPX grid
+(0.05 below 3.00, 0.10 at or above); a bid under one tick is not shown, and
+a larger order walks the ladder. Every trade leaves the dealer a pressure
+on its expiry, the contracts it sold less those it bought, each weighted by
+its vega over the expiry's at-the-money vega, which halves every 15 open
+ticks (the rate maker's inventory half-life). The pressure moves the
+expiry's at-the-money volatility by half an at-the-money half-spread per 50
+contracts, up when the dealer is short, capped at four half-spreads, through
+the expiry's $\theta$; the shifted thetas are held non-decreasing across
+expiries. So a strike's call and put move together and parity holds through
+the inventory. Row SV2 reads every quoted chain (`Engine.option_arbitrage`):
+call mids falling and put mids rising in the strike, both convex, each
+strike's mids within half a tick of parity, and total variance rising with
+the tenor at a fixed log-moneyness; on 45 closes and within a session
+(`tests/test_index_options.py`) there are none.
+
+Agents trade options in the session only, by symbol, through `submit`,
+`Portfolio.execute` and the mapping `act` returns: a market order takes what
+the ladder shows, a limit order what it shows at the limit or better, and
+the rest waits outside any book until the dealer's quote crosses it (mode
+`range`), then fills against the ladder. Open interest is every holder's
+long contracts, the dealer's among them. `Engine.chain(root, expiry)` quotes
+an expiry (bid, ask and their sizes, the dealer's mid and volatility, the
+surface's price and volatility, Black's Greeks at the mid against the index
+level with the dividends held: delta and gamma per point, vega per unit of
+volatility, theta per session; the carry and open interest), `quote(symbol)`
+one option, and `Engine.surface("IDX")` the surface (`iv(k, t)`,
+`total_variance`, `forward`, `rate`, `dividends`, `strip_vix` and
+`strip_skew`).
+
+**Margin.** Options are margined by a scan, as SPAN and OCC's TIMS margin
+them (`Engine.option_margin`): an option portfolio's initial margin is its
+worst loss over seven index moves, $0$, $\pm 1/3$, $\pm 2/3$ and $\pm 1$
+times $z\,t\,\sigma_1 S$, each at the implied volatility unchanged and moved
+by $\pm z\,t \times 0.07$ of itself, $\sigma_1$ the index's one-session sd the
+VIX implies ($\mathrm{VIX} = 100(1 + 0.252)\sqrt{252V}$ on pt-v21's premium),
+$z$ and $t$ the coverage's quantile and tail allowance
+(`margin_scan_coverage`, `margin_scan_tail`). The 0.07 is a stated
+constant, about the published VIX's daily log sd, not fitted to any row. A
+long option's margin is at most its premium, a spread's at most its width,
+and offsetting positions margin net. Maintenance is initial over 1.1. A
+`Portfolio` pays an option's premium when it trades, marks it at the
+dealer's mid, is paid its settlement at expiry (`Portfolio.settled`), counts
+it at its delta-notional against the leverage limit, adds the scan to
+`margin_requirement`, and closes options as well as futures on an unmet
+margin call.
+
+**State.** A snapshot carries `options` (the listing, each expiry's strike
+grid and range, the dealer's pressure and the settled expiries) while
+`surface_ssvi` is set, and `options_book` (waiting orders, undelivered fills
+and each agent's contracts bought and sold, from which open interest is read)
+once an agent has traded an option; the state hash covers them behind tags
+80 and 81 only then, as `manifest.state_hash` does. Every known-answer digest
+is where it was.
+
+Not built yet: the measurement of the physical skew and the screening of
+the premia and the spread.
+
+## Single-name options
+
+A switch, 0.0 on every shipped preset and left out of the model's digest
+there, lists American options on every name: `options_names_listed`, which
+needs `surface_ssvi` (a name's smile takes the index surface's curvature
+and a share of its correlation) and `forecast_horizon_sessions` (a name's
+level is the forecast's expected variance of the name). Its companions,
+`surface_name_premium` and `surface_name_skew`, are 0.0 on every shipped
+preset too and refused without it; `option_dealer_spread` reads it as it
+reads the index options. None is fitted: the premium and the skew are to be
+screened on rows SS1 to SS4 and EV1 to EV3 with the owner's approval. An
+option, its surface and a delivery read public state, draw nothing and write
+only their own state, so a model with the switch on prints the same stock
+prices as one with it off, traded or not, and an untraded run prices no
+option (`tests/test_name_options.py`).
+
+**The chain.** From the first close every public name lists calls and puts
+at the next three monthly expiries and the three quarterlies after them,
+on the index options' sessions, reaching 189 to 251 sessions
+(`calendar::name_option_expiries`). Each is American and physically
+settled, 100 shares a contract, settling at its expiry session's close, so
+it trades through its last session; symbols are `ACME.O0035.C42.50`. An
+expiry's strikes sit on the name's price tier when it lists, in dollars:
+0.50 apart under 5, 1 under 50, 2.50 under 100, 5 under 200 and 10 above. Ten strikes
+are listed either side of the price, and the range widens at each open and
+close to keep ten. A name whose ticker is a contract family's root lists
+none.
+
+**The surface.** A name's at-the-money total variance to $T$ sessions is
+the forecast's expected one-session variance of the name summed to $T$ (its
+GJR, sector and market parts, `Engine.forecast()["name_variance"]`), times
+$(1 + p)^2$ with $p$ `surface_name_premium`, times the index's term premium
+$e^{\pi(T)}$, plus `surface_earnings_weight` times
+`earnings_surprise_sigma` squared times the name's expected one-session
+variance at each of its own reports before $T$. A report printing at an
+open counts for an option settling at that session's close and not the one
+before. The shape is held non-decreasing. Its smile is SSVI with the index
+surface's $\eta$ and $\gamma$ and $
+ho$ `surface_name_skew` times the
+index's fitted $
+ho$, so a name's skew is flatter than the index's for a
+skew share below 1 and, with $|
+ho|$ no larger than the index's, every
+smile stays inside the paper's Remark 4.4. `Engine.surface("ACME")` reads
+it, with the escrowed price's forward.
+
+**The price.** An option settling at the close of session $E$ has
+$E + 1 - t$ sessions left at time $t$, a close counting as the next
+session's start. The dealer quotes the American value of a Leisen-Reimer
+binomial tree (`derivatives::american`, at least 101 steps and two a
+session) on the escrowed price $S - \mathrm{PV}(D)$: $D$ the dividends
+going ex before expiry, declared within 21 sessions of an ex-date and the
+Lintner rule's projection beyond (`market::dividends::lookahead`), each
+held by the tree to the close before its ex-date, so exercising there
+captures it; $r$ the mean policy rate the forecast expects to expiry; the
+volatility the surface's at the strike's log-moneyness on the escrowed
+forward, moved by the dealer's pressure as the index dealer's is. A tree is
+priced when a quote, an order or a margin asks and kept for the session.
+The quote's delta and gamma are the tree's, its vega and theta the
+European's; its ladder is the American mid moved by the European price's
+change across the volatility ladder, ten levels of 20 contracts a side on
+the equity options' grid (a cent below 3.00, five cents at or above).
+
+**Exercise and assignment.** The dealer is the other side of every trade,
+and each agent's position is its contracts bought less sold. At each close,
+in this order: every exercise instruction an agent gave
+(`Engine.exercise`, `tf.Exercise`) is exercised up to the long position it
+still holds; the dealer exercises its net long in a contract where its own
+tree, at the surface's volatility, says exercising now beats holding
+(`american::early_exercise`): a call only on the eve of an ex-date whose
+dividend is worth more than its time value, a put when it is deep enough
+that the interest on the strike outweighs the insurance left; and at an
+expiry session's close every option in the money by a cent or more on the
+closing print is exercised, the OCC's exercise by exception. The contracts
+exercised are assigned to every short position, agents' and the dealer's,
+pro rata: whole contracts by largest remainder where every position is
+whole, exact shares otherwise. A call's holder receives 100 shares a
+contract and pays the strike for them, a put's delivers them and is paid;
+the writer the reverse. Each side is a `settlements(day)` row (`event`
+`"exercise"` or `"assignment"`, the party, the contracts, the shares and
+the cash), the dealer's beside the agents', so a close's rows sum to no
+shares and no cash. Nothing trades in the stock's book: a delivery moves no
+price and takes no draw. A name that leaves the roster takes its options
+with it, each position paid in cash at its intrinsic value on the last
+price.
+
+**Rows AX1 and AX2.** `Engine.exercise_violations()` reads both at the last
+close: each delivery moves 100 shares a contract and the strike times the
+shares to the cent, and a close's rows sum to nothing (AX2); and, between
+that close and the next open, every early exercise of the dealer's is one
+its tree, priced again, still makes, a call's only on an ex-date's eve,
+every long it still holds is one its tree holds, and every option held is
+worth at least the European on the same tree (AX1). The tests read both at
+every close of traded runs.
+
+**Accounts.** `Portfolio.settle_close` delivers the close's exercises and
+assignments: the option closes at no premium, the shares join or leave the
+name's stock position at the strike, and the cash moves, each recorded in
+`Portfolio.deliveries`. An assignment can leave an account short the stock.
+Shares an agent did not order are holdings like any other: valued at the
+price, counted in leverage, paid or charged dividends, and traded by the
+next order, the gym's next target weights included. They are not trades,
+so a scorecard's trades, turnover and impact leave them out. The scan
+margin scans a name's options with the stock held in it, less the stock's
+own worst loss and floored at 0, so a covered call or a protective put asks
+nothing a naked option does; each option is revalued as a European on its
+escrowed price over moves sized to the name's one-session sd.
+
+**Position limits.** `option_position_limit`, 0.0 on every shipped preset
+(no limit), caps each agent's position in each listed option, the index's
+and the names', at the dial times the dealer's displayed depth on one side:
+500 contracts of an index option, 200 of a name's, at 1.0. An order that
+would take the position past it, with the agent's waiting orders on the
+contract counted as filled, is refused; one that brings the position toward
+zero never is, and an exercise or an assignment is not an order. It is a
+stated simplification of an exchange's limits, there so that an agent cannot
+hold an unlimited stake in a contract whose settlement print it can push.
+`Engine.position_limit(symbol)` reads it, and an option's `quote` carries it
+as `position_limit` while it is set. Futures have no limit yet.
+
+**State.** A snapshot carries `name_options` (each name's listed expiries,
+strike grids and the dealer's pressure, and the settled expiries) while the
+switch is set, `name_options_book` once an agent has traded one, and
+`name_options_exercise` (instructions waiting for the close and every
+exercise and assignment) once there is any; the state hash covers them
+behind tags 70 to 72 only then, as `manifest.state_hash` does. Every
+known-answer digest is where it was.
+
 ## Scenarios
 
 A scenario is a file of changes to the economy or the market, applied once
