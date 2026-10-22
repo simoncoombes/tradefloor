@@ -1803,6 +1803,10 @@ impl Engine {
         if let Some(book) = self.options_book_state() {
             out.put("options_book", book_value(book));
         }
+        // The skew premium's noise and its key (`surface_skew_noise_sd`).
+        if let Some(words) = self.skew_noise_words() {
+            out.put("skew_noise", V::from_f64s(&words));
+        }
         // The single-name options (`options_names_listed`), their book once
         // an agent has traded one, and their instructions and exercises
         // once there are any.
@@ -2213,6 +2217,7 @@ impl Engine {
             Gated::dial("eve_decision", "fed_eve_decision", p.fed_eve_decision),
             Gated::dial("options", "surface_ssvi", p.surface_ssvi),
             Gated::held("options_book", "options_index_listed", p.options_index_listed),
+            Gated::dial("skew_noise", "surface_skew_noise_sd", p.surface_skew_noise_sd),
             Gated::dial("name_options", "options_names_listed", p.options_names_listed),
             Gated::held("name_options_book", "options_names_listed", p.options_names_listed),
             Gated::held("name_options_exercise", "options_names_listed", p.options_names_listed),
@@ -3038,6 +3043,14 @@ impl Engine {
                 None => None,
             };
             inner.set_options_state(words.as_deref(), book).map_err(core)?;
+        }
+        // The skew premium's noise (`surface_skew_noise_sd`).
+        {
+            let words = match snapshot.get("skew_noise") {
+                Some(_) => Some(read_buffer(snapshot, "", "skew_noise")?),
+                None => None,
+            };
+            inner.set_skew_noise_words(words.as_deref()).map_err(core)?;
         }
         // The single-name options (`options_names_listed`).
         {

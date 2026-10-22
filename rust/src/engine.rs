@@ -724,6 +724,12 @@ pub struct Engine {
     /// `earnings_surprise_sigma` set, which is also when the snapshot and
     /// the state hash carry it.
     earnings_key: u64,
+    /// The key of the skew premium's noise draws (`surface_skew_noise_sd`),
+    /// derived from the root seed and carried by a snapshot that holds it.
+    skew_noise_key: u64,
+    /// The skew premium's noise, skewness units (`surface_skew_noise_sd`):
+    /// 0.0 with the dial off, which it never leaves.
+    skew_noise: f64,
     /// The earnings surprise each name's opening print realised at the last
     /// open, in roster order, 0.0 where none did. Per-day output like
     /// `overnight_moves`, recomputed at every open and read by nothing.
@@ -2320,6 +2326,8 @@ impl Engine {
             dividend_moves: vec![0.0; companies_len],
             distribution_log: Vec::new(),
             earnings_key: GameRng::earnings_key(seed),
+            skew_noise_key: crate::rng::skew_noise_key(seed),
+            skew_noise: 0.0,
             earnings_moves: vec![0.0; companies_len],
             earnings_withheld: vec![0.0; companies_len],
             night_market_factor: 0.0,
@@ -2509,6 +2517,9 @@ impl Engine {
         }
         // The market opens knowing the phase it opens in.
         engine.seed_cycle_nowcast();
+        // THE SKEW NOISE OPENING (`surface_skew_noise_sd`): a draw from its
+        // stationary distribution on its own key. Nothing at 0.0.
+        engine.skew_noise = engine.skew_noise_opening();
         // The burn-in's accumulated drift is not the run's: `D` opens at
         // zero (`earnings_anticipation_drift_share`).
         engine.anticipation_drift = 0.0;
@@ -2611,6 +2622,8 @@ impl Engine {
         pre.params.surface_skew_physical_slope = 0.0;
         pre.params.surface_skew_premium = 0.0;
         pre.params.surface_skew_premium_slope = 0.0;
+        pre.params.surface_skew_noise_sd = 0.0;
+        pre.params.surface_skew_noise_half_life = 0.0;
         pre.params.surface_curvature = 0.0;
         pre.params.surface_curvature_exponent = 0.0;
         pre.params.surface_term_premium_short = 0.0;
@@ -14089,6 +14102,14 @@ impl Engine {
         if let Some(book) = self.options_book_state() {
             hash_f64(&mut buf, 81.0);
             hash_book(&mut buf, book);
+        }
+        // The skew premium's noise and its key, only while
+        // `surface_skew_noise_sd` is set, behind their own tag.
+        if let Some(words) = self.skew_noise_words() {
+            hash_f64(&mut buf, 82.0);
+            for value in words {
+                hash_f64(&mut buf, value);
+            }
         }
         // The single-name options, only while `options_names_listed` is
         // set, behind their own tag (70 to 72: 55 to 60 are taken on other

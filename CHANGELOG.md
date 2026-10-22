@@ -75,6 +75,22 @@ payload, Arrow and WASM show them; agents trade by symbol.
   the long factor carrying most of the spread, the short factor's undercounts
   the rule's cuts, which are worth more than its raises, and the forecast
   sits low. It changes what the forecast publishes and nothing in the law.
+### The skew noise
+
+- `surface_skew_noise_sd` and `surface_skew_noise_half_life` are new dials,
+  0.0 on every preset and left out of the digest there. Off zero the
+  skewness the index surface's 21-session strip is fitted to carries an
+  AR(1) of its own: it opens at a draw from its stationary distribution and
+  steps at each close, with the sd and half-life asked. The Cboe SKEW the
+  strip prices then moves apart from the VIX, as it does on the tape, and
+  the names' skew, a share of the index's, moves with it. Its draws are
+  keyed on the root seed and take nothing from any stream; stock prices are
+  the same with it on as off.
+- `Engine.skew_noise` reads the noise (None off). A snapshot carries
+  `skew_noise` (the level and its key) while the dial is set, hashed behind
+  tag 82, as `manifest.state_hash` does. Every known-answer digest is where
+  it was.
+
 ### Single-name options
 
 - `options_names_listed` is a new switch, with `surface_name_premium` and

@@ -4463,6 +4463,20 @@ to the model:
   bound. How far that reaches depends on the curvature: at $\eta = 1$ and
   $\gamma = 1/2$ the 21-session SKEW spans about 69 to 131; at $\gamma = 1/4$
   about 95 to 105. With $\eta$ at 0 the smile is flat and $\rho$ is 0.
+- The skew noise. Without it SKEW is a function of the VIX alone, so its
+  correlation with the VIX is 1 or -1 in every window, and its spread is
+  the VIX's times the slope. On the tape SKEW moves apart from the VIX: its
+  residual on $\ln(\mathrm{VIX}/20)$ has a sd of 1.16 in skewness (11.6
+  SKEW points) over 1990 to 2026. `surface_skew_noise_sd` adds an AR(1)
+  $x$ to $S$, with that stationary sd and the half-life
+  `surface_skew_noise_half_life`: it opens at a draw from its stationary
+  distribution and steps at each close,
+  $x' = \phi x + \sigma\sqrt{1 - \phi^2}\,z$, $\phi = 0.5^{1/H}$, each $z$ the
+  first normal of a generator keyed on the root seed's own key, so it takes
+  nothing from any stream. A draw beyond the curvature's reach holds the
+  strip at the bound, as any skewness does. The names' correlation, a share
+  of the index's, moves with it. Both dials are 0.0 on every shipped preset
+  (`tests/test_skew_noise.py`).
 - The term structure. $\theta_T$ is $\theta_{21}$ times a shape: the
   forecast's expected index variance summed to $T$ (`forecast_horizon_sessions`;
   a constant variance without the forecast), times

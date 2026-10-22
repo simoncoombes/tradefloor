@@ -384,6 +384,10 @@ class Engine:
     # outside one. None with the switch off.
     @property
     def live_vix(self) -> float | None: ...
+    # The skew premium's noise now (`surface_skew_noise_sd`), skewness units
+    # (a SKEW move is -10 times it). None with the dial at 0.0.
+    @property
+    def skew_noise(self) -> float | None: ...
     # Whether the model lists futures of any family: a property of the
     # model, True before the first close lists a VIX future. False on every
     # shipped preset.

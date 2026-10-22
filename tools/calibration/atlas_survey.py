@@ -497,6 +497,8 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "surface_skew_physical_slope": (-1.0, 1.0),
     "surface_skew_premium": (-2.0, 0.0),
     "surface_skew_premium_slope": (0.0, 2.0),
+    "surface_skew_noise_sd": (0.0, 2.0),
+    "surface_skew_noise_half_life": (0.0, 500.0),
     "surface_curvature": (0.0, 1.5),
     "surface_curvature_exponent": (0.0, 0.5),
     "surface_term_premium_short": (-0.3, 0.3),

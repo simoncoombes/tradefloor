@@ -1471,6 +1471,13 @@ UNREACHED_SNAPSHOT_FIELDS = {
         "waits on a trade, and the settled expiries, which wait on an expiry "
         "inside the window. tests/test_index_options.py holds each in the "
         "state hash and across a restore.",
+    "skew_noise":
+        "the skew premium's noise and its key (`surface_skew_noise_sd`). It "
+        "moves no price: only the index surface's skewness reads it, and a "
+        "quote is computed from public state when asked. What the key alone "
+        "carries is the noise's level, which a read of the surface would see. "
+        "tests/test_skew_noise.py holds it in the state hash and across a "
+        "restore, a fork and a replay.",
     "oil_futures":
         "the oil futures (`futures_oil_listed`). They move no price, and every "
         "close marks them afresh from the forecast. What the key alone "
