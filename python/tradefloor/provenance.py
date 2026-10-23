@@ -522,10 +522,11 @@ OUT_OF_SCOPE = {
         "tools/calibration/margin_dials.py; at 0.0 it is also left out of the "
         "model's digest",
     "margin_scan_option_tail":
-        "a branch at 0.0: the option scan takes `margin_scan_tail`, as the "
-        "futures' margin does; off zero it sizes the option scan's price move "
-        "and volatility shift instead, and the scan reads quotes and writes "
-        "nothing, so no price moves; refused without `margin_scan_coverage`. "
+        "unread while `margin_scan_coverage` is 0.0, as every preset ships it, "
+        "and refused without the coverage; at 0.0 the option scan takes "
+        "`margin_scan_tail`, as the futures' margin does; off zero it sizes the "
+        "option scan's price move and volatility shift instead, and the scan "
+        "reads quotes and writes nothing, so no price moves. "
         "A projection fitted on the model's held-out histories, as "
         "`margin_scan_tail` is: a short strangle's one-session change over its "
         "scan margin at an allowance of 1, at the coverage's quantile; at 0.0 "
