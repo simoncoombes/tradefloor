@@ -521,6 +521,15 @@ OUT_OF_SCOPE = {
         "projection fitted on the model's held-out histories by "
         "tools/calibration/margin_dials.py; at 0.0 it is also left out of the "
         "model's digest",
+    "margin_scan_option_tail":
+        "a branch at 0.0: the option scan takes `margin_scan_tail`, as the "
+        "futures' margin does; off zero it sizes the option scan's price move "
+        "and volatility shift instead, and the scan reads quotes and writes "
+        "nothing, so no price moves; refused without `margin_scan_coverage`. "
+        "A projection fitted on the model's held-out histories, as "
+        "`margin_scan_tail` is: a short strangle's one-session change over its "
+        "scan margin at an allowance of 1, at the coverage's quantile; at 0.0 "
+        "it is also left out of the model's digest",
     # The index options, their surface and their dealer (pt-v22 phase 2),
     # inert on every shipped preset. An option and the surface read public
     # state, draw nothing and write only their own state, so off zero they

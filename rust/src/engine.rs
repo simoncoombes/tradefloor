@@ -2615,6 +2615,7 @@ impl Engine {
         pre.params.futures_oil_listed = 0.0;
         pre.params.margin_scan_coverage = 0.0;
         pre.params.margin_scan_tail = 0.0;
+        pre.params.margin_scan_option_tail = 0.0;
         pre.params.options_index_listed = 0.0;
         pre.params.option_dealer_spread = 0.0;
         pre.params.surface_ssvi = 0.0;

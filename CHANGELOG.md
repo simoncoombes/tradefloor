@@ -1,5 +1,10 @@
 ## Unreleased
 
+`margin_scan_option_tail` is a new dial, 0.0 on every preset and left out of
+the digest there: off zero it is the option scan's own tail allowance, in
+place of `margin_scan_tail` on the scan's price move and volatility shift.
+The futures' margin is unchanged, and no price moves.
+
 An MCP market session now pays dividends. On pt-v21 a holder in a session
 took the ex-date price drop and was never paid, so its net worth and P&L
 read low; the session now collects them at each open, reinvested in the

@@ -488,6 +488,7 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # The contracts' margin (pt-v22 phase 1): its coverage and tail allowance.
     "margin_scan_coverage": (0.0, 0.995),
     "margin_scan_tail": (0.0, 2.0),
+    "margin_scan_option_tail": (0.0, 2.0),
     # The index options, their surface and their dealer (pt-v22 phase 2):
     # two switches, the surface's skew, curvature, term premia and earnings
     # weight, and the dealer's half-spread. None of them moves a stock price.

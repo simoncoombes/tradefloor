@@ -1295,6 +1295,7 @@ PERTURBATIONS = [
     # tail allowance carries the coverage it requires.
     ("margin_scan_coverage", 0.99, False),
     ("margin_scan_tail", 1.3, False),
+    ("margin_scan_option_tail", 0.8, False),
     # The index options, their surface and their dealer (pt-v22 phase 2).
     # INERT by construction: the surface and the options read public state,
     # draw nothing and write only their own state, so no stock price moves
@@ -2235,6 +2236,7 @@ COMPANIONS: dict[str, dict[str, float]] = {
     "futures_vix_listed": {"forecast_horizon_sessions": 126.0},
     # The tail allowance scales the margin, which the coverage sets.
     "margin_scan_tail": {"margin_scan_coverage": 0.99},
+    "margin_scan_option_tail": {"margin_scan_coverage": 0.99},
     # The convenience premium unwinds as inventory refills, which only the
     # inventory's reversion gives it; refused without it.
     "oil_convenience_yield": {"oil_inventory_reversion": 0.002},

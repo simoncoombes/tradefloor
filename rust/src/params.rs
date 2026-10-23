@@ -1832,6 +1832,23 @@ pub struct ModelParams {
     /// contracts' moves past it read the coverage's complement (row MG1). In
     /// [0, 5].
     pub margin_scan_tail: f64,
+    /// The option scan's own tail allowance (`margin_scan_option_tail`).
+    /// 0.0, on every shipped preset, is a branch: the option scan takes
+    /// `margin_scan_tail`, as the futures' margin does, and a value of 0.0 is
+    /// left out of the model's digest.
+    ///
+    /// Off zero it replaces `margin_scan_tail` in the option scan alone: both
+    /// the scan's price move (`z * t` times the one-session sd) and its
+    /// volatility shift (`z * t` times the scan's 0.07), for the index and
+    /// the single-name options. The futures' initial margin keeps
+    /// `margin_scan_tail`. A scan that moves price and volatility together
+    /// covers more than the quantile names, so the option leg needs an
+    /// allowance of its own. A projection fitted on the model's own held-out
+    /// histories, as `margin_scan_tail` is: the quantile, at the coverage, of
+    /// a short strangle's one-session change over its scan margin at an
+    /// allowance of 1. The scan reads quotes and writes nothing, so no price
+    /// moves. Requires `margin_scan_coverage`. In [0, 5].
+    pub margin_scan_option_tail: f64,
     /// Whether the engine lists European options on its price index. 0.0,
     /// on every shipped preset, lists none: no contract, no state, nothing in
     /// the snapshot or the state hash, and a value of 0.0 is left out of the
@@ -8781,6 +8798,7 @@ impl ModelParams {
             futures_oil_listed: 0.0,
             margin_scan_coverage: 0.0,
             margin_scan_tail: 0.0,
+            margin_scan_option_tail: 0.0,
             options_index_listed: 0.0,
             surface_ssvi: 0.0,
             surface_skew_physical: 0.0,
@@ -11463,6 +11481,7 @@ impl ModelParams {
             "futures_oil_listed" => self.futures_oil_listed,
             "margin_scan_coverage" => self.margin_scan_coverage,
             "margin_scan_tail" => self.margin_scan_tail,
+            "margin_scan_option_tail" => self.margin_scan_option_tail,
             "options_index_listed" => self.options_index_listed,
             "surface_ssvi" => self.surface_ssvi,
             "surface_skew_physical" => self.surface_skew_physical,
@@ -11910,6 +11929,7 @@ impl ModelParams {
             "futures_oil_listed" => out.futures_oil_listed = value,
             "margin_scan_coverage" => out.margin_scan_coverage = value,
             "margin_scan_tail" => out.margin_scan_tail = value,
+            "margin_scan_option_tail" => out.margin_scan_option_tail = value,
             "options_index_listed" => out.options_index_listed = value,
             "surface_ssvi" => out.surface_ssvi = value,
             "surface_skew_physical" => out.surface_skew_physical = value,
@@ -13808,6 +13828,19 @@ impl ModelParams {
                  first.",
                 self.margin_scan_tail));
         }
+        if !(0.0..=5.0).contains(&self.margin_scan_option_tail) {
+            return Err(format!(
+                "margin_scan_option_tail is {}. It is the option scan's tail allowance on the margin's \
+                 normal quantile, in [0, 5]; 0 takes margin_scan_tail's.",
+                self.margin_scan_option_tail));
+        }
+        if self.margin_scan_option_tail != 0.0 && self.margin_scan_coverage == 0.0 {
+            return Err(format!(
+                "margin_scan_coverage is 0 but margin_scan_option_tail is {}. The allowance scales the \
+                 option scan's margin, which only margin_scan_coverage sets: set margin_scan_coverage \
+                 first.",
+                self.margin_scan_option_tail));
+        }
         for (name, v) in [("options_index_listed", self.options_index_listed), ("surface_ssvi", self.surface_ssvi)] {
             if !(v == 0.0 || v == 1.0) {
                 return Err(format!("{name} is {v}. It is a switch, 0.0 off or 1.0 on."));
@@ -14487,6 +14520,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "futures_oil_listed",
     "margin_scan_coverage",
     "margin_scan_tail",
+    "margin_scan_option_tail",
     "night_session_steps",
     "futures_impact_memory",
     "futures_impact_memory_half_life",
@@ -14745,6 +14779,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "futures_oil_listed",
         "margin_scan_coverage",
         "margin_scan_tail",
+        "margin_scan_option_tail",
         "options_index_listed",
         "surface_ssvi",
         "surface_skew_physical",

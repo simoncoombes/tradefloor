@@ -68,6 +68,18 @@ pub const SCAN_VOL_SHIFTS: [f64; 3] = [-1.0, 0.0, 1.0];
 /// allowance `margin_scan_tail` scales it with the index's move.
 pub const SCAN_VOL_SD: f64 = 0.07;
 
+/// The option scan's tail allowance `t`: `margin_scan_option_tail` off
+/// zero, else `margin_scan_tail`'s (1 at 0.0), so at 0.0 the option scan is
+/// sized as the futures' margin is.
+pub(crate) fn option_scan_tail(p: &crate::params::ModelParams) -> f64 {
+    let t = if p.margin_scan_option_tail != 0.0 { p.margin_scan_option_tail } else { p.margin_scan_tail };
+    if t == 0.0 {
+        1.0
+    } else {
+        t
+    }
+}
+
 /// One option position an option scan revalues.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct ScanOption {
@@ -292,8 +304,7 @@ impl Engine {
     /// and the volatility shift, `z * t` times [`SCAN_VOL_SD`].
     pub(super) fn option_scan_size(&self, vix: f64, index: f64) -> (f64, f64) {
         let p = &self.params;
-        let tail = if p.margin_scan_tail == 0.0 { 1.0 } else { p.margin_scan_tail };
-        let z = normal_quantile(0.5 + 0.5 * p.margin_scan_coverage) * tail;
+        let z = normal_quantile(0.5 + 0.5 * p.margin_scan_coverage) * option_scan_tail(p);
         let sigma = vix / (100.0 * (1.0 + p.vix_variance_premium) * crate::mathx::sqrt(252.0));
         (z * sigma * index, z * SCAN_VOL_SD)
     }

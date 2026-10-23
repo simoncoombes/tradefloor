@@ -828,8 +828,8 @@ impl Engine {
         let clock = self.options_clock();
         let index = self.surface_at(&clock)?;
         let p = &self.params;
-        let tail = if p.margin_scan_tail == 0.0 { 1.0 } else { p.margin_scan_tail };
-        let z = super::margin::normal_quantile(0.5 + 0.5 * p.margin_scan_coverage) * tail;
+        let z = super::margin::normal_quantile(0.5 + 0.5 * p.margin_scan_coverage)
+            * super::margin::option_scan_tail(p);
         let mut total = 0.0;
         for (chain, held) in by_chain {
             let ctx = self.name_context(&clock, chain, &index)?;

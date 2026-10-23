@@ -4561,7 +4561,12 @@ by $\pm z\,t \times 0.07$ of itself, $\sigma_1$ the index's one-session sd the
 VIX implies ($\mathrm{VIX} = 100(1 + 0.252)\sqrt{252V}$ on pt-v21's premium),
 $z$ and $t$ the coverage's quantile and tail allowance
 (`margin_scan_coverage`, `margin_scan_tail`). The 0.07 is a stated
-constant, about the published VIX's daily log sd, not fitted to any row. A
+constant, about the published VIX's daily log sd, not fitted to any row.
+Under `margin_scan_option_tail` (0.0 on every shipped preset, where the scan
+takes `margin_scan_tail`) the option scan has a tail allowance of its own,
+in place of $t$ on both the move and the volatility shift: a scan that moves
+both together covers more than the quantile names. It is a projection on the
+model's held-out histories, as `margin_scan_tail` is. A
 long option's margin is at most its premium, a spread's at most its width,
 and offsetting positions margin net. Maintenance is initial over 1.1. A
 `Portfolio` pays an option's premium when it trades, marks it at the
