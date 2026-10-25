@@ -767,6 +767,11 @@ pub struct Engine {
     /// `run_session` are two spellings of the same day and both must read
     /// the same events; when this was a local in `run_session` they did not.
     session_news: Vec<crate::market::NewsEvent>,
+    /// The day's endogenous news released before the open
+    /// (`news_preopen_share`): drawn with the day's news in `open_market`
+    /// and priced by the night that follows it there, which empties it. So
+    /// it is empty between calls and is neither snapshotted nor hashed.
+    preopen_news: Vec<crate::market::NewsEvent>,
     companies: Vec<TickCompany>,
     economy: EconomyState,
     central_bank: CentralBankState,
@@ -2391,6 +2396,7 @@ impl Engine {
             pinned_vix_jump: 0.0,
             market_day_scale: 1.0,
             session_news: Vec::new(),
+            preopen_news: Vec::new(),
             volume_idio: vec![0.0; companies_len],
             jump_move: vec![0.0; companies_len],
             sector_variance: vec![0.0; sector_keys.len()],
@@ -7184,20 +7190,31 @@ impl Engine {
         // session agree. It takes no other draws, so moving the generation
         // here left the NEWS stream's own order untouched.
         self.session_news.clear();
+        self.preopen_news.clear();
         if self.params.endogenous_news_intensity != 0.0 {
             let intensity = self.params.endogenous_news_intensity;
             let sigma = self.params.endogenous_news_sigma;
+            // Released before the open (`news_preopen_share`): the occurrence
+            // uniform below `share * intensity`. Given an event, `u /
+            // intensity` is uniform and independent of `z`, so no draw is
+            // added. At 0.0 the branch is never taken.
+            let preopen = self.params.news_preopen_share;
             for i in 0..self.companies.len() {
                 self.news_rng.site(Site::NewsU, i as u32);
                 let u = self.news_rng.next_f64();
                 self.news_rng.site(Site::NewsZ, i as u32);
                 let z = self.news_rng.next_normal();
                 if u < intensity {
-                    self.session_news.push(crate::market::NewsEvent {
+                    let event = crate::market::NewsEvent {
                         company_id: Some(self.companies[i].id.clone()),
                         sector: Some(self.companies[i].sector.clone()),
                         price_impact: Some(sigma * z),
-                    });
+                    };
+                    if preopen != 0.0 && u < preopen * intensity {
+                        self.preopen_news.push(event);
+                    } else {
+                        self.session_news.push(event);
+                    }
                 }
             }
         }
@@ -7895,6 +7912,15 @@ impl Engine {
         } else {
             Vec::new()
         };
+        // The news released before the open (`news_preopen_share`), composed
+        // for each name as the session composes news, at the open's crisis
+        // spike. EMPTY with the dial at 0.0, and then nothing below reads it.
+        let preopen_news = std::mem::take(&mut self.preopen_news);
+        let preopen_spike = if preopen_news.is_empty() {
+            0.0
+        } else {
+            crate::market::tick::crisis_spike_for(p, self.economy.vix, self.universe_stress)
+        };
         for (index, company) in self.companies.iter_mut().enumerate() {
             if company.is_bankrupt || !company.is_public {
                 continue;
@@ -7924,7 +7950,19 @@ impl Engine {
             let idio = si * daily_sigma * own_unit * z_idio[index] * t;
             let own = sector + idio;
             let night = market + own;
-            let after = crate::market::tick::clamp_s(p, s + night);
+            // The pre-open news: an endogenous event names a company, so it
+            // carries no market-wide part, and all of it is the name's own.
+            let news = if preopen_news.is_empty() {
+                0.0
+            } else {
+                crate::market::factors::news_terms(
+                    &company.id, &company.sector, &preopen_news, preopen_spike, p).0
+            };
+            let after = if news == 0.0 {
+                crate::market::tick::clamp_s(p, s + night)
+            } else {
+                crate::market::tick::clamp_s(p, s + night + news)
+            };
             let moved = after - s;
             if let Some(prev) = company.stock.mispricing_s_prev_close {
                 company.stock.mispricing_s_prev_close = Some(prev + moved);
@@ -7959,6 +7997,8 @@ impl Engine {
                 } else {
                     psi * own + psim * market_perm
                 };
+                // The pre-open news at the session news's own share.
+                let dv = if news == 0.0 { dv } else { dv + psi * news };
                 if dv != 0.0 {
                     let s_new = crate::market::tick::clamp_s(p, after - dv);
                     if let Some(prev) = company.stock.mispricing_s_prev_close {

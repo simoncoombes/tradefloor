@@ -773,43 +773,27 @@ pub fn cap_size_multiplier(market_cap: f64) -> f64 {
     }
 }
 
-/// Compute the live factor subset.
-///
-/// `shared_factors` is required rather than optional. The fallback branch in
-/// the original exists for callers that predate shared factors, and the live
-/// tick is not one of them — it always supplies them. Both branches take one
-/// normal draw, so this narrowing cannot change the draw COUNT; it removes a
-/// path the live model never takes.
-///
-/// `params` carries the coefficients that used to be read as consts here
-/// (the runtime seam). Passing
-/// [`crate::params::PT_V1`] reproduces the const build bit for bit: same
-/// values, same operations, same order.
-pub fn calculate_live_factors(
-    company: &FactorCompany,
+/// The news one name takes from a set of events, as `(company_news,
+/// company_news_market)`: an event naming it at full weight, a sector peer's
+/// at the transfer weight, a sector-wide one at `news_sector_weight` and a
+/// market-wide one at `news_market_weight` (the second figure is that last
+/// part alone). The tick's composition ([`calculate_live_factors`]), and the
+/// open's for the news released before it (`news_preopen_share`).
+pub fn news_terms(
+    id: &str,
+    sector: &str,
     news: &[NewsEvent],
-    order_imbalance: f64,
-    volatility_multiplier: f64,
-    shared: &SharedFactors,
+    crisis_spike: f64,
     params: &crate::params::ModelParams,
-    rng: &mut impl crate::rng::Rng,
-) -> LiveFactors {
-    // ── News ──────────────────────────────────────────────────────────────
-    // Company-specific at full weight, a sector PEER's news at the transfer
-    // weight, sector-wide at half, market-wide at 0.3. The branches are
-    // exclusive and ORDERED, and the order carries the meaning: an event
-    // naming this company counts once, as company news, whatever sector it
-    // also carries. The same event reaches OTHER names in that sector
-    // through the peer arm, which is off in every shipped preset — so
-    // before pt-v4 an event with a companyId moved exactly one name.
+) -> (f64, f64) {
     let mut company_news = 0.0;
     let mut company_news_market = 0.0;
     for event in news {
         let impact = truthy(event.price_impact);
-        if event.company_id.as_deref() == Some(company.id.as_str()) {
+        if event.company_id.as_deref() == Some(id) {
             company_news += impact;
         } else if event.company_id.is_some()
-            && event.sector.as_deref() == Some(company.sector.as_str())
+            && event.sector.as_deref() == Some(sector)
         {
             // Information transfer: a surprise at a PEER, not at this name.
             // Before this branch existed the chain fell straight through
@@ -842,7 +826,7 @@ pub fn calculate_live_factors(
             let weight = if params.news_peer_vix_coupling == 0.0 {
                 base
             } else {
-                base * (1.0 + params.news_peer_vix_coupling * shared.crisis_spike)
+                base * (1.0 + params.news_peer_vix_coupling * crisis_spike)
             };
             // Guarded rather than multiplied through: at zero weight this
             // adds nothing at all, so the accumulator is untouched and the
@@ -851,7 +835,7 @@ pub fn calculate_live_factors(
             if weight != 0.0 {
                 company_news += impact * weight;
             }
-        } else if event.sector.as_deref() == Some(company.sector.as_str())
+        } else if event.sector.as_deref() == Some(sector)
             && event.company_id.is_none()
         {
             company_news += impact * params.news_sector_weight;
@@ -860,6 +844,40 @@ pub fn calculate_live_factors(
             company_news_market += impact * params.news_market_weight;
         }
     }
+    (company_news, company_news_market)
+}
+
+/// Compute the live factor subset.
+///
+/// `shared_factors` is required rather than optional. The fallback branch in
+/// the original exists for callers that predate shared factors, and the live
+/// tick is not one of them — it always supplies them. Both branches take one
+/// normal draw, so this narrowing cannot change the draw COUNT; it removes a
+/// path the live model never takes.
+///
+/// `params` carries the coefficients that used to be read as consts here
+/// (the runtime seam). Passing
+/// [`crate::params::PT_V1`] reproduces the const build bit for bit: same
+/// values, same operations, same order.
+pub fn calculate_live_factors(
+    company: &FactorCompany,
+    news: &[NewsEvent],
+    order_imbalance: f64,
+    volatility_multiplier: f64,
+    shared: &SharedFactors,
+    params: &crate::params::ModelParams,
+    rng: &mut impl crate::rng::Rng,
+) -> LiveFactors {
+    // ── News ──────────────────────────────────────────────────────────────
+    // Company-specific at full weight, a sector PEER's news at the transfer
+    // weight, sector-wide at half, market-wide at 0.3. The branches are
+    // exclusive and ORDERED, and the order carries the meaning: an event
+    // naming this company counts once, as company news, whatever sector it
+    // also carries. The same event reaches OTHER names in that sector
+    // through the peer arm, which is off in every shipped preset — so
+    // before pt-v4 an event with a companyId moved exactly one name.
+    let (company_news, company_news_market) = news_terms(
+        company.id.as_str(), company.sector.as_str(), news, shared.crisis_spike, params);
 
     // ── Order flow ────────────────────────────────────────────────────────
     // `order_imbalance` is already participation: flow over this name's

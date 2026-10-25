@@ -708,6 +708,11 @@ OUT_OF_SCOPE = {
         "the spread's leverage term reads the gap itself, as it stood; the "
         "priced gap is neither stepped, snapshotted nor hashed; at 0.0 it is "
         "also left out of the model's digest",
+    "news_preopen_share":
+        "inert at 0.0: every endogenous news event is priced through the "
+        "session from its first tick, as it stood; no draw of its own (the "
+        "occurrence uniform decides) and no state carried between days; at "
+        "0.0 it is also left out of the model's digest",
     "corporate_spread_equity_lag_gain":
         "inert at 0.0 and read only with `corporate_spread_equity_gain` set; "
         "refused without `corporate_spread_equity_lag`: the spread's leverage "
