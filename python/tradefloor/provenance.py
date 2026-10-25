@@ -708,6 +708,12 @@ OUT_OF_SCOPE = {
         "the spread's leverage term reads the gap itself, as it stood; the "
         "priced gap is neither stepped, snapshotted nor hashed; at 0.0 it is "
         "also left out of the model's digest",
+    "corporate_spread_equity_lag_gain":
+        "inert at 0.0 and read only with `corporate_spread_equity_gain` set; "
+        "refused without `corporate_spread_equity_lag`: the spread's leverage "
+        "term is the lag's own (the priced gap in place of the gap), as it "
+        "stood; no draw and no state of its own; at 0.0 it is also left out of "
+        "the model's digest",
     "pinned_vix_sets_variance":
         "inert at 0.0: a pinned VIX marks tonight's close forced only when "
         "the caller asks (`vix_sets_variance`), as it stood (a branch in "

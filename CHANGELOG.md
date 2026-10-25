@@ -26,6 +26,18 @@ payload, Arrow and WASM show them; agents trade by symbol.
 
 <!-- release-note-ends -->
 
+### Credit's lagged leverage term
+
+- `corporate_spread_equity_lag_gain` is a new dial, 0.0 on every preset and
+  left out of the digest there: points of the corporate spread's base per
+  unit of the gap credit has priced (`corporate_spread_equity_lag`), beside
+  the leverage term on the gap itself, so the spread widens on the day of an
+  index fall and keeps widening for about two weeks. Refused without the lag;
+  read only with `corporate_spread_equity_gain` set. No draw and no state of
+  its own. The IG closing-price spread (LQD less IEF on SPY, 2015-2025) moves
+  -2.25 bp per 1% on the day and -3.2 by nine sessions; with the gap alone
+  the model's moves -2.46 and then eases.
+
 ### The option scan's tail
 
 - `margin_scan_option_tail` is new, 0.0 on every preset and left out of the

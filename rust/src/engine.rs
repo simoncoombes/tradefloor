@@ -2784,7 +2784,14 @@ impl Engine {
             let vix = self.economy.vix;
             // Under `corporate_spread_equity_lag` the spread's term is the
             // priced gap's, carried with it.
-            let (then, now) = if self.carries_spread_priced_gap() {
+            let lagged = self.params.corporate_spread_equity_lag_gain;
+            let (then, now) = if self.carries_spread_priced_gap() && lagged != 0.0 {
+                // Credit's lagged leverage term (`corporate_spread_equity_lag_gain`):
+                // the gap itself beside the priced gap, as one gap.
+                let k = lagged / gain;
+                (gap + k * pre.economy.spread_priced_gap,
+                 self.economy.spread_equity_gap + k * self.economy.spread_priced_gap)
+            } else if self.carries_spread_priced_gap() {
                 (pre.economy.spread_priced_gap, self.economy.spread_priced_gap)
             } else if self.carries_spread_equity_gap() {
                 (gap, self.economy.spread_equity_gap)
@@ -2801,7 +2808,7 @@ impl Engine {
                 self.economy.spread_equity_gap = gap;
             }
             if self.carries_spread_priced_gap() {
-                self.economy.spread_priced_gap = then;
+                self.economy.spread_priced_gap = pre.economy.spread_priced_gap;
             }
             if noise {
                 self.spread_noise = pre.spread_noise;
@@ -10098,6 +10105,11 @@ impl Engine {
             spread_vix_cut: self.params.corporate_spread_vix_cut,
             spread_equity_gain: self.params.corporate_spread_equity_gain,
             spread_priced_gap: self.carries_spread_priced_gap(),
+            spread_priced_gain: if self.carries_spread_priced_gap() {
+                self.params.corporate_spread_equity_lag_gain
+            } else {
+                0.0
+            },
             // Credit's own state (`corporate_spread_noise_sd`); `None` off.
             spread_noise: if self.carries_spread_noise() { Some(self.spread_noise) } else { None },
             // The 10-year's own term premium (`treasury_term_premium_sd`);
@@ -10389,6 +10401,12 @@ impl Engine {
                 // Credit's repricing lag (`corporate_spread_equity_lag`).
                 spread_priced_keep: if self.carries_spread_priced_gap() {
                     crate::mathx::pow(0.5, 1.0 / self.params.corporate_spread_equity_lag)
+                } else {
+                    0.0
+                },
+                // Credit's lagged leverage term (`corporate_spread_equity_lag_gain`).
+                spread_priced_gain: if self.carries_spread_priced_gap() {
+                    self.params.corporate_spread_equity_lag_gain
                 } else {
                     0.0
                 },

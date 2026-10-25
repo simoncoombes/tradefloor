@@ -210,6 +210,11 @@ pub struct PolicyOptions {
     /// `EconomyState::spread_priced_gap` in place of `spread_equity_gap`.
     /// `false`, on every preset, is the gap itself.
     pub spread_priced_gap: bool,
+    /// `corporate_spread_equity_lag_gain`: with `spread_priced_gap`, the
+    /// leverage term reads the gap itself beside the priced gap,
+    /// `spread_equity_gain * D + this * P`. 0.0, on every preset, is the
+    /// priced gap alone.
+    pub spread_priced_gain: f64,
     /// `corporate_spread_noise_sd`: credit's own state, points added to the
     /// formula's base beside the leverage term. `None`, on every preset, is
     /// no state.
@@ -288,6 +293,7 @@ impl PolicyOptions {
             spread_vix_cut: 0.0,
             spread_equity_gain: 0.0,
             spread_priced_gap: false,
+            spread_priced_gain: 0.0,
             spread_noise: None,
             term_premium: None,
             policy_inflation: None,
@@ -869,7 +875,15 @@ pub fn update_central_bank_with(
     // the daily move keeps. Guarded: with both at 0.0 the base is the
     // expression that stood. Under `corporate_spread_equity_lag` the
     // leverage term reads the gap the spread has priced.
-    let spread_gap = if options.spread_priced_gap { economy.spread_priced_gap } else { economy.spread_equity_gap };
+    // Under `corporate_spread_equity_lag_gain` it reads the gap itself and the
+    // priced gap together, as one gap the gain multiplies.
+    let spread_gap = if options.spread_priced_gap && options.spread_priced_gain != 0.0 {
+        economy.spread_equity_gap + options.spread_priced_gain / options.spread_equity_gain * economy.spread_priced_gap
+    } else if options.spread_priced_gap {
+        economy.spread_priced_gap
+    } else {
+        economy.spread_equity_gap
+    };
     // Credit's own state (`corporate_spread_noise_sd`) joins the base the
     // same way, so the meeting re-anchors the level the close's move made.
     let base_corporate_spread = if let Some(x) = options.spread_noise {

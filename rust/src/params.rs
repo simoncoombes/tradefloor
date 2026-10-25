@@ -1289,6 +1289,28 @@ pub struct ModelParams {
     /// 0.17 (design PR #9, r22o5czN-B/inflation addendum K). No draw. The
     /// priced gap is snapshotted and hashed only with this set. In [0, 252].
     pub corporate_spread_equity_lag: f64,
+    /// Credit's lagged leverage term: points added to the corporate spread
+    /// formula's base per unit of the priced gap (`EconomyState::spread_priced_gap`,
+    /// which follows credit's leverage gap at the half-life
+    /// `corporate_spread_equity_lag`), beside the leverage term on the gap
+    /// itself. Off zero the term is `corporate_spread_equity_gain * D + G * P`
+    /// wherever it is read: the close's daily move, the meeting's re-anchor and
+    /// the restore's re-mark. 0.0, on every shipped preset, is the term as it
+    /// stood (with the lag set, the priced gap read in place of the gap), and a
+    /// value of 0.0 is left out of the model's digest. Refused without
+    /// `corporate_spread_equity_lag`; read only with
+    /// `corporate_spread_equity_gain` set. No draw and no state of its own.
+    ///
+    /// The synchronous tape's spread keeps widening for about two weeks after
+    /// an index fall: the IG closing-price spread (LQD's return less 0.913
+    /// IEF's at duration 8.5) on SPY, 2015-2025, by distributed-lag OLS, moves
+    /// -2.25 bp per 1% on the day (se 0.06), -2.86 by four sessions, -3.20 by
+    /// nine (0.22), -3.09 by 20 and -3.21 by 41 (0.47); 2003-2014 reads -2.08,
+    /// -3.30 at nine. With the gap read whole the model's moves -2.46 on the
+    /// day and -2.31 by nine, -1.92 by 41. Least squares on the 42 lags, the
+    /// term added to 180 held-out histories' spreads, gives G 0.9 at a lag of
+    /// 8 sessions (loss 3.1 against 37.1 without it). In [0, 10].
+    pub corporate_spread_equity_lag_gain: f64,
     /// The per-session innovation sd of credit's own state, points of the
     /// corporate spread's base. 0.0, on every shipped preset, is no state
     /// (the spread moves only with the VIX, the cycle and the leverage gap),
@@ -8763,6 +8785,7 @@ impl ModelParams {
             fed_eve_decision: 0.0,
             treasury_path_owed_excluded: 0.0,
             corporate_spread_equity_lag: 0.0,
+            corporate_spread_equity_lag_gain: 0.0,
             corporate_spread_noise_sd: 0.0,
             corporate_spread_noise_half_life: 0.0,
             treasury_2y_meeting_carry: 0.0,
@@ -11446,6 +11469,7 @@ impl ModelParams {
             "fed_eve_decision" => self.fed_eve_decision,
             "treasury_path_owed_excluded" => self.treasury_path_owed_excluded,
             "corporate_spread_equity_lag" => self.corporate_spread_equity_lag,
+            "corporate_spread_equity_lag_gain" => self.corporate_spread_equity_lag_gain,
             "corporate_spread_noise_sd" => self.corporate_spread_noise_sd,
             "corporate_spread_noise_half_life" => self.corporate_spread_noise_half_life,
             "treasury_2y_meeting_carry" => self.treasury_2y_meeting_carry,
@@ -11894,6 +11918,7 @@ impl ModelParams {
             "fed_eve_decision" => out.fed_eve_decision = value,
             "treasury_path_owed_excluded" => out.treasury_path_owed_excluded = value,
             "corporate_spread_equity_lag" => out.corporate_spread_equity_lag = value,
+            "corporate_spread_equity_lag_gain" => out.corporate_spread_equity_lag_gain = value,
             "corporate_spread_noise_sd" => out.corporate_spread_noise_sd = value,
             "corporate_spread_noise_half_life" => out.corporate_spread_noise_half_life = value,
             "treasury_2y_meeting_carry" => out.treasury_2y_meeting_carry = value,
@@ -13547,6 +13572,18 @@ impl ModelParams {
                  0 is the spread reading the leverage gap itself.",
                 self.corporate_spread_equity_lag));
         }
+        if !(self.corporate_spread_equity_lag_gain >= 0.0 && self.corporate_spread_equity_lag_gain <= 10.0) {
+            return Err(format!(
+                "corporate_spread_equity_lag_gain is {}. It is points of the corporate spread's \
+                 base per unit of the priced gap, in [0, 10]; 0 is no lagged term.",
+                self.corporate_spread_equity_lag_gain));
+        }
+        if self.corporate_spread_equity_lag_gain != 0.0 && self.corporate_spread_equity_lag == 0.0 {
+            return Err(format!(
+                "corporate_spread_equity_lag is 0 but corporate_spread_equity_lag_gain is {}. The \
+                 lagged term reads the priced gap, which follows the gap at that half-life; set it too.",
+                self.corporate_spread_equity_lag_gain));
+        }
         if !(self.corporate_spread_noise_sd >= 0.0 && self.corporate_spread_noise_sd <= 0.5) {
             return Err(format!(
                 "corporate_spread_noise_sd is {}. It is the per-session innovation sd of credit's \
@@ -14487,6 +14524,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "fed_eve_decision",
     "treasury_path_owed_excluded",
     "corporate_spread_equity_lag",
+    "corporate_spread_equity_lag_gain",
     "corporate_spread_noise_sd",
     "corporate_spread_noise_half_life",
     "treasury_term_premium_sd",
@@ -14742,6 +14780,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "fed_eve_decision",
         "treasury_path_owed_excluded",
         "corporate_spread_equity_lag",
+        "corporate_spread_equity_lag_gain",
         "corporate_spread_noise_sd",
         "corporate_spread_noise_half_life",
         "treasury_term_premium_sd",

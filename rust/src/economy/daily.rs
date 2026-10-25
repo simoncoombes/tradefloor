@@ -482,6 +482,12 @@ pub struct YieldDials {
     /// off, the spread reading the gap itself. Read only with
     /// `spread_equity_gain` set.
     pub spread_priced_keep: f64,
+    /// Credit's lagged leverage term, points of the spread formula's base per
+    /// unit of the priced gap, beside the term on the gap itself
+    /// ([`crate::params::ModelParams::corporate_spread_equity_lag_gain`]); 0.0
+    /// is off, the priced gap read in place of the gap. Read only with
+    /// `spread_priced_keep` set.
+    pub spread_priced_gain: f64,
     /// Credit's own state before and after tonight's step, points of the
     /// spread formula's base ([`crate::params::ModelParams::corporate_spread_noise_sd`]);
     /// `None`, on every preset, is no state.
@@ -553,6 +559,7 @@ impl Default for YieldDials {
             spread_equity_gain: 0.0,
             spread_equity_decay: 0.0,
             spread_priced_keep: 0.0,
+            spread_priced_gain: 0.0,
             spread_noise: None,
             term_premium: None,
         }
@@ -1534,7 +1541,17 @@ fn close_yields(
         let p = economy.spread_priced_gap;
         let q = p + (1.0 - inputs.yields.spread_priced_keep) * (gap_after - p);
         new_state.spread_priced_gap = q;
-        (p, q)
+        // Credit's lagged leverage term (`corporate_spread_equity_lag_gain`):
+        // the gap itself beside the priced gap, `gain * D + G * P`, as one
+        // gap `D + (G / gain) P` that the term multiplies by the gain.
+        // Guarded, so with it at 0.0 the pair is the priced gap's.
+        let lagged = inputs.yields.spread_priced_gain;
+        if lagged != 0.0 {
+            let k = lagged / equity_gain;
+            (gap_before + k * p, gap_after + k * q)
+        } else {
+            (p, q)
+        }
     } else {
         (gap_before, gap_after)
     };
