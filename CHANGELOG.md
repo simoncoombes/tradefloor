@@ -35,6 +35,11 @@ payload, Arrow and WASM show them; agents trade by symbol.
   its SKEW are unchanged, and the at-the-money skew scales with the tenor as
   `T^-x` (about `T^-0.4` on the S&P). Index only; read only with
   `surface_ssvi` set.
+- `surface_index_tenor_strip` is new, 0.0 on every preset and left out of
+  the digest there. At 1.0 the term scaling holds each tenor's strip (the
+  VIX formula's variance) where SSVI's own power law puts it, in place of its
+  at-the-money variance: the VIX9D, VIX3M, VIX6M and VIX1Y strips are
+  unchanged and the scaling moves variance between the money and the wings.
 
 ### Credit's lagged leverage term
 

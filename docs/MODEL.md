@@ -4496,6 +4496,15 @@ to the model:
   gives about $T^{-1/2}$ and $T^{-1}$. The S&P's at-the-money skew falls about
   as $T^{-0.4}$ (Gatheral, Jaisson and Rosenbaum, 2018). The calendar bound is
   $d(\theta\varphi)/d\theta = \varphi(1 - x)$ (`tests/test_index_tenor.py`).
+  With `surface_index_tenor_strip` at 1.0 (0.0 on every shipped preset) each
+  tenor's at-the-money total variance is moved from the curve's $\theta$ to
+  the $\theta'$ whose scaled smile prices the strip SSVI's own power law
+  prices at $\theta$. The strip's total variance is a function of the
+  total-variance smile alone, so the map is one of $\theta$: it is solved on
+  a grid of $\ln(\theta/\theta_{21})$ from $-6$ in steps of $1/2$, linear
+  between nodes, and $\theta_{21}$ maps to itself. The VIX formula's strips
+  at every tenor are then the shared power law's to about $10^{-3}$, and only
+  the split between the money and the wings changes.
 - The term structure. $\theta_T$ is $\theta_{21}$ times a shape: the
   forecast's expected index variance summed to $T$ (`forecast_horizon_sessions`;
   a constant variance without the forecast), times

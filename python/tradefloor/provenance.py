@@ -588,6 +588,10 @@ OUT_OF_SCOPE = {
         "unread while `surface_ssvi` is 0.0: only `surface_at` reads it, and "
         "refused without the switch; at 0.0 it is the shared power law and is "
         "also left out of the model's digest",
+    "surface_index_tenor_strip":
+        "unread while `surface_ssvi` is 0.0: only `surface_at` reads it, and "
+        "refused without the switch; at 0.0 the term scaling holds the "
+        "at-the-money variance and it is also left out of the model's digest",
     "surface_curvature_exponent":
         "unread while `surface_ssvi` is 0.0: only `surface_at` and "
         "`surface_fit` read it, and refused without the switch; at 0.0 it is "

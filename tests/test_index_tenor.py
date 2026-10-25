@@ -6,6 +6,10 @@ at the 21-session fit's total variance and falls from there as `theta^-x`: the
 21-session smile, so its VIX and SKEW, is unchanged, and the at-the-money skew
 scales with the tenor as `T^-x`. These tests hold that, the names' smiles,
 rows SV1 and SV2, and the stock prices, which no surface moves.
+
+`surface_index_tenor_strip` 1.0 holds each tenor's strip instead of its
+at-the-money variance: the VIX formula's strips at every tenor are SSVI's own,
+and the term scaling moves variance between the money and the wings.
 """
 from __future__ import annotations
 
@@ -33,9 +37,9 @@ def day(engine):
     engine.close_market()
 
 
-def engines(x, seed=3, days=3):
+def engines(x, seed=3, days=3, **more):
     shared = tf.Engine(seed=seed, universe=SMALL, model=model(**ON))
-    own = tf.Engine(seed=seed, universe=SMALL, model=model(**dict(ON, surface_index_tenor_exponent=x)))
+    own = tf.Engine(seed=seed, universe=SMALL, model=model(**dict(ON, surface_index_tenor_exponent=x, **more)))
     for _ in range(days):
         day(shared)
         day(own)
@@ -46,17 +50,20 @@ def skew(s, t, h=0.005):
     return (s.iv(h, t) - s.iv(-h, t)) / (2 * h)
 
 
-def test_off_on_every_shipped_preset_and_silent_in_the_digest():
+@pytest.mark.parametrize("dial", ["surface_index_tenor_exponent", "surface_index_tenor_strip"])
+def test_off_on_every_shipped_preset_and_silent_in_the_digest(dial):
     for name in tf.preset_names():
-        assert tf.ModelParams.from_preset(name).surface_index_tenor_exponent == 0.0, name
-    assert "surface_index_tenor_exponent" in set(tf.ModelParams.digest_silent_at_zero())
-    assert model(**ON).fingerprint == model(**dict(ON, surface_index_tenor_exponent=0.0)).fingerprint
+        assert getattr(tf.ModelParams.from_preset(name), dial) == 0.0, name
+    assert dial in set(tf.ModelParams.digest_silent_at_zero())
+    assert model(**ON).fingerprint == model(**dict(ON, **{dial: 0.0})).fingerprint
 
 
 @pytest.mark.parametrize("dials, words", [
     (dict(BASE, surface_index_tenor_exponent=0.4), "surface_ssvi"),
     (dict(ON, surface_index_tenor_exponent=1.0), "surface_index_tenor_exponent"),
     (dict(ON, surface_index_tenor_exponent=-0.1), "surface_index_tenor_exponent"),
+    (dict(BASE, surface_index_tenor_strip=1.0), "surface_ssvi"),
+    (dict(ON, surface_index_tenor_strip=0.5), "surface_index_tenor_strip"),
 ])
 def test_a_value_outside_its_range_or_without_the_surface_is_refused(dials, words):
     with pytest.raises(tf.ValidationError, match=words):
@@ -82,6 +89,25 @@ def test_the_one_month_smile_is_unchanged_and_the_others_scale_from_it():
     assert own.option_arbitrage() == []
 
 
+def test_held_strips_keep_every_tenors_vix_and_move_the_money():
+    shared, own = engines(0.4, surface_index_tenor_strip=1.0)
+    _, scaled = engines(0.4)
+    a, b, c = shared.surface("IDX"), own.surface("IDX"), scaled.surface("IDX")
+    # The month is the fit's, to the bits.
+    assert b.theta(21.0) == a.theta(21.0)
+    for k in (-0.1, 0.0, 0.03):
+        assert b.iv(k, 21.0) == pytest.approx(a.iv(k, 21.0), rel=1e-12)
+    for t in (6.0, 63.0, 126.0, 252.0):
+        # The strip is SSVI's (to the map's interpolation); the scaled smile alone moves it.
+        assert b.strip_vix(t) == pytest.approx(a.strip_vix(t), rel=2e-3), t
+        assert abs(c.strip_vix(t) / a.strip_vix(t) - 1) > 3 * abs(b.strip_vix(t) / a.strip_vix(t) - 1), t
+    # Fatter long wings, so less at the money long; thinner short ones, more short.
+    assert b.iv(0.0, 126.0) < a.iv(0.0, 126.0)
+    assert b.iv(0.0, 6.0) > a.iv(0.0, 6.0)
+    assert skew(b, 10.5) / skew(b, 21.0) == pytest.approx(skew(c, 10.5) / skew(c, 21.0), rel=0.05)
+    assert own.option_arbitrage() == []
+
+
 def test_the_prices_are_the_same_with_the_tenor_exponent_set():
     def run(params):
         engine = tf.Engine(seed=7, universe=SMALL, model=params)
@@ -92,3 +118,4 @@ def test_the_prices_are_the_same_with_the_tenor_exponent_set():
             out.append((engine.prices(), repr(sorted(engine.economy().items()))))
         return out
     assert run(model(**ON)) == run(model(**dict(ON, surface_index_tenor_exponent=0.4)))
+    assert run(model(**ON)) == run(model(**dict(ON, surface_index_tenor_exponent=0.4, surface_index_tenor_strip=1.0)))

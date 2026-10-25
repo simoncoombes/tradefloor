@@ -39,7 +39,9 @@ use crate::derivatives::dealer::{
     chain_violations, dealer_thetas, ladder, pressure_after, read_smile, walk, ExpirySummary, Ladder, OptionQuote,
 };
 use crate::derivatives::pricing::{black_greeks, black_price, intrinsic};
-use crate::derivatives::surface::{fit_smile_shifted, term_shape, SmileFit, Ssvi, Surface, TermInputs, ThetaCurve, VIX_SESSIONS};
+use crate::derivatives::surface::{
+    fit_smile_shifted, term_shape, SmileFit, Ssvi, StripHold, Surface, TermInputs, ThetaCurve, VIX_SESSIONS,
+};
 use crate::derivatives::{
     index_option_symbol, ContractKind, ContractSpec, ContractSymbol, Right, Settlement, SymbolKind, INDEX_OPTION,
     INDEX_OPTION_DEALER,
@@ -155,6 +157,18 @@ impl Clone for FitCache {
     }
 }
 
+/// The strip-held map last made (`surface_index_tenor_strip`), by its
+/// smile's bits: a session's quotes read one smile.
+#[derive(Debug, Default)]
+pub(crate) struct HoldCache(std::sync::Mutex<Option<([u64; 6], StripHold)>>);
+
+impl Clone for HoldCache {
+    fn clone(&self) -> Self {
+        let held = self.0.lock().map(|g| g.clone()).unwrap_or(None);
+        HoldCache(std::sync::Mutex::new(held))
+    }
+}
+
 /// Everything the options carry.
 #[derive(Debug, Clone)]
 pub(crate) struct OptionsState {
@@ -172,6 +186,7 @@ pub(crate) struct OptionsState {
     /// its own curvature (`surface_index_curvature`): the index's VIX and
     /// skewness at the names' curvature.
     pub(crate) name_cache: FitCache,
+    pub(crate) hold_cache: HoldCache,
 }
 
 impl Default for OptionsState {
@@ -183,6 +198,7 @@ impl Default for OptionsState {
             book: BookState::default(),
             cache: FitCache::default(),
             name_cache: FitCache::default(),
+            hold_cache: HoldCache::default(),
         }
     }
 }
@@ -381,6 +397,25 @@ impl Engine {
         Some(fit)
     }
 
+    /// The strip-held map of the scaled smile `ssvi`
+    /// (`surface_index_tenor_strip`), from the cache when its smile is the
+    /// last map's.
+    fn strip_hold(&self, ssvi: &Ssvi) -> Option<StripHold> {
+        let key = [ssvi.rho, ssvi.eta, ssvi.gamma, ssvi.shift, ssvi.anchor, ssvi.tenor].map(f64::to_bits);
+        if let Ok(guard) = self.options.hold_cache.0.lock() {
+            if let Some((k, hold)) = guard.as_ref() {
+                if *k == key {
+                    return Some(hold.clone());
+                }
+            }
+        }
+        let hold = StripHold::new(ssvi)?;
+        if let Ok(mut guard) = self.options.hold_cache.0.lock() {
+            *guard = Some((key, hold.clone()));
+        }
+        Some(hold)
+    }
+
     /// The fit the names' smile reads (`surface_name_skew`): the index's own
     /// while `surface_index_curvature` is 0.0; under it, the index's VIX and
     /// skewness fitted at the names' curvature, `surface_curvature`, so a
@@ -488,15 +523,22 @@ impl Engine {
         };
         let shape = term_shape(&inputs, n_max);
         let curve = ThetaCurve::new(&shape, clock.elapsed, fit.theta)?;
+        let ssvi = Ssvi::new(fit.rho, eta, gamma)
+            .with_shift(p.surface_index_vertex)
+            .with_tenor(fit.theta, p.surface_index_tenor_exponent);
+        let hold = if p.surface_index_tenor_strip == 0.0 || ssvi.tenor == 0.0 {
+            None
+        } else {
+            Some(self.strip_hold(&ssvi)?)
+        };
         Some(Surface {
             root: ContractKind::IndexOption.root().to_string(),
-            ssvi: Ssvi::new(fit.rho, eta, gamma)
-                .with_shift(p.surface_index_vertex)
-                .with_tenor(fit.theta, p.surface_index_tenor_exponent),
+            ssvi,
             curve,
             vix,
             skewness_target: target,
             fit,
+            hold,
         })
     }
 

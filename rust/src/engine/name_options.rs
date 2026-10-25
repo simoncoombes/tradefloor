@@ -470,6 +470,7 @@ impl Engine {
             vix: index.vix,
             skewness_target: None,
             fit: reference,
+            hold: None,
         })
     }
 
