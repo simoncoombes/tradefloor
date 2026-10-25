@@ -74,11 +74,17 @@ pub struct Ssvi {
     /// smile is SSVI's at `k + shift m`, `m = -rho / phi` its vertex. 0.0 is
     /// SSVI itself.
     pub shift: f64,
+    /// The total variance `anchor` at which the power law is read, and the
+    /// exponent `tenor` it falls by from there (`surface_index_tenor_exponent`):
+    /// `phi(theta) = phi_SSVI(anchor) (theta / anchor)^-tenor`. An anchor of
+    /// 0.0 is SSVI's own power law.
+    pub anchor: f64,
+    pub tenor: f64,
 }
 
 impl Ssvi {
     pub fn new(rho: f64, eta: f64, gamma: f64) -> Self {
-        Ssvi { rho, eta, gamma, shift: 0.0 }
+        Ssvi { rho, eta, gamma, shift: 0.0, anchor: 0.0, tenor: 0.0 }
     }
 
     /// The same smile with its vertex moved a share `shift` of the way to the
@@ -87,13 +93,31 @@ impl Ssvi {
         Ssvi { shift, ..self }
     }
 
+    /// The same smile at `anchor`, with the power law falling from there by
+    /// `tenor` in place of `gamma`: the smile at `anchor` is unchanged, and
+    /// the smiles at other tenors scale from it. `tenor` 0.0 is the smile
+    /// itself.
+    pub fn with_tenor(self, anchor: f64, tenor: f64) -> Self {
+        if tenor == 0.0 {
+            return self;
+        }
+        Ssvi { anchor, tenor, ..self }
+    }
+
+    fn power_law(&self, theta: f64) -> f64 {
+        self.eta * mathx::pow(theta, -self.gamma) * mathx::pow(1.0 + theta, self.gamma - 1.0)
+    }
+
     /// The power law, `eta theta^-gamma (1 + theta)^(gamma - 1)`: 0 with `eta`
     /// at 0, where the smile is flat.
     pub fn phi(&self, theta: f64) -> f64 {
         if self.eta == 0.0 {
             return 0.0;
         }
-        self.eta * mathx::pow(theta, -self.gamma) * mathx::pow(1.0 + theta, self.gamma - 1.0)
+        if self.anchor > 0.0 {
+            return self.power_law(self.anchor) * mathx::pow(theta / self.anchor, -self.tenor);
+        }
+        self.power_law(theta)
     }
 
     /// Total implied variance at log-moneyness `k` on the smile whose
@@ -149,7 +173,7 @@ impl Ssvi {
         if !(theta > 0.0 && theta.is_finite()) {
             return Err(format!("theta is {theta}; it is finite and positive"));
         }
-        if !(r.abs() < 1.0 && (0.0..=1.0).contains(&g) && e >= 0.0 && e.is_finite()) {
+        if !(r.abs() < 1.0 && (0.0..=1.0).contains(&g) && e >= 0.0 && e.is_finite() && (0.0..1.0).contains(&self.tenor)) {
             return Err(format!("rho {r}, eta {e}, gamma {g}: |rho| < 1, eta >= 0, gamma in [0, 1]"));
         }
         let p = self.phi(theta);
@@ -160,8 +184,9 @@ impl Ssvi {
         if !(theta * p * p * a <= 4.0) {
             return Err(format!("butterfly: theta phi^2 (1 + |rho|) is {} at theta {theta}, above 4", theta * p * p * a));
         }
-        // d(theta phi)/d theta = phi (1 - gamma) / (1 + theta) for this phi.
-        let slope = p * (1.0 - g) / (1.0 + theta);
+        // d(theta phi)/d theta = phi (1 - gamma) / (1 + theta) for this phi;
+        // phi (1 - tenor) for the anchored one.
+        let slope = if self.anchor > 0.0 { p * (1.0 - self.tenor) } else { p * (1.0 - g) / (1.0 + theta) };
         if slope < 0.0 {
             return Err(format!("calendar: d(theta phi)/d theta is {slope} at theta {theta}, below 0"));
         }

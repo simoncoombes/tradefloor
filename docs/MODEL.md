@@ -4487,6 +4487,15 @@ to the model:
   volatility sits nearer the VIX; it also reaches less skew (SKEW about 121
   at $\eta = 0.65$, 124 at 0.75, 127 at 0.85, 131 at 1.0, at
   $\gamma = 1/2$) (`tests/test_index_curvature.py`).
+- The index smile's term scaling. `surface_index_tenor_exponent` $x$, 0.0 on
+  every shipped preset, is SSVI's own power law. Set, the index's $\varphi$ is
+  read at the 21-session fit's $\theta_{21}$ and falls from there,
+  $\varphi(\theta) = \varphi_{\mathrm{SSVI}}(\theta_{21})(\theta/\theta_{21})^{-x}$:
+  the 21-session smile is unchanged, the at-the-money skew scales with the
+  tenor as $T^{-x}$ and the curvature as $T^{-2x}$, where the shared power law
+  gives about $T^{-1/2}$ and $T^{-1}$. The S&P's at-the-money skew falls about
+  as $T^{-0.4}$ (Gatheral, Jaisson and Rosenbaum, 2018). The calendar bound is
+  $d(\theta\varphi)/d\theta = \varphi(1 - x)$ (`tests/test_index_tenor.py`).
 - The term structure. $\theta_T$ is $\theta_{21}$ times a shape: the
   forecast's expected index variance summed to $T$ (`forecast_horizon_sessions`;
   a constant variance without the forecast), times

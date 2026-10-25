@@ -26,6 +26,16 @@ payload, Arrow and WASM show them; agents trade by symbol.
 
 <!-- release-note-ends -->
 
+### The index smile's term scaling
+
+- `surface_index_tenor_exponent` is new, 0.0 on every preset and left out of
+  the digest there. Off zero the index's SSVI power law is read at the
+  21-session fit's total variance and falls from there as `theta^-x`, in
+  place of `surface_curvature_exponent`: the 21-session smile, its VIX and
+  its SKEW are unchanged, and the at-the-money skew scales with the tenor as
+  `T^-x` (about `T^-0.4` on the S&P). Index only; read only with
+  `surface_ssvi` set.
+
 ### Credit's lagged leverage term
 
 - `corporate_spread_equity_lag_gain` is a new dial, 0.0 on every preset and

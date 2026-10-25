@@ -1997,6 +1997,17 @@ pub struct ModelParams {
     /// Durrleman's condition on a grid and total variance rising with the
     /// tenor. Read only with `surface_ssvi` set. In [0, 1].
     pub surface_index_vertex: f64,
+    /// The index smile's term scaling: off zero, SSVI's power law for the
+    /// index is read at the 21-session fit's total variance and falls from
+    /// there as `theta^-x`, `x` this dial, in place of `surface_curvature_exponent`.
+    /// The 21-session smile is unchanged, so its VIX and SKEW are; the
+    /// at-the-money skew then scales with the tenor as `T^-x` and the
+    /// curvature as `T^-2x`. The S&P's one-month to one-year at-the-money
+    /// skew falls about as `T^-0.4` (Gatheral, Jaisson and Rosenbaum, 2018).
+    /// 0.0, on every shipped preset, is the shared power law, and a value of
+    /// 0.0 is left out of the model's digest. Index only: the names keep the
+    /// shared one. Read only with `surface_ssvi` set. In [0, 1).
+    pub surface_index_tenor_exponent: f64,
     /// The surface's curvature exponent, SSVI's `gamma`
     /// (`surface_curvature`): how fast the smile flattens with the tenor.
     /// Read only with `surface_ssvi` set; 0.0, on every shipped preset, is an
@@ -8856,6 +8867,7 @@ impl ModelParams {
             surface_curvature: 0.0,
             surface_index_curvature: 0.0,
             surface_index_vertex: 0.0,
+            surface_index_tenor_exponent: 0.0,
             surface_curvature_exponent: 0.0,
             surface_term_premium_short: 0.0,
             surface_term_premium_long: 0.0,
@@ -11542,6 +11554,7 @@ impl ModelParams {
             "surface_curvature" => self.surface_curvature,
             "surface_index_curvature" => self.surface_index_curvature,
             "surface_index_vertex" => self.surface_index_vertex,
+            "surface_index_tenor_exponent" => self.surface_index_tenor_exponent,
             "surface_curvature_exponent" => self.surface_curvature_exponent,
             "surface_term_premium_short" => self.surface_term_premium_short,
             "surface_term_premium_long" => self.surface_term_premium_long,
@@ -11993,6 +12006,7 @@ impl ModelParams {
             "surface_curvature" => out.surface_curvature = value,
             "surface_index_curvature" => out.surface_index_curvature = value,
             "surface_index_vertex" => out.surface_index_vertex = value,
+            "surface_index_tenor_exponent" => out.surface_index_tenor_exponent = value,
             "surface_curvature_exponent" => out.surface_curvature_exponent = value,
             "surface_term_premium_short" => out.surface_term_premium_short = value,
             "surface_term_premium_long" => out.surface_term_premium_long = value,
@@ -13941,6 +13955,12 @@ impl ModelParams {
                  correlation keeps every smile free of static arbitrage.",
                 self.surface_curvature));
         }
+        if !(0.0..1.0).contains(&self.surface_index_tenor_exponent) {
+            return Err(format!(
+                "surface_index_tenor_exponent is {}. It is in [0, 1).",
+                self.surface_index_tenor_exponent
+            ));
+        }
         if !(0.0..=1.0).contains(&self.surface_index_vertex) {
             return Err(format!("surface_index_vertex is {}. It is in [0, 1].", self.surface_index_vertex));
         }
@@ -13960,6 +13980,7 @@ impl ModelParams {
             ("surface_curvature", self.surface_curvature),
             ("surface_index_curvature", self.surface_index_curvature),
             ("surface_index_vertex", self.surface_index_vertex),
+            ("surface_index_tenor_exponent", self.surface_index_tenor_exponent),
             ("surface_curvature_exponent", self.surface_curvature_exponent),
             ("surface_term_premium_short", self.surface_term_premium_short),
             ("surface_term_premium_long", self.surface_term_premium_long),
@@ -14613,6 +14634,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "surface_curvature",
     "surface_index_curvature",
     "surface_index_vertex",
+    "surface_index_tenor_exponent",
     "surface_curvature_exponent",
     "surface_term_premium_short",
     "surface_term_premium_long",
@@ -14872,6 +14894,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "surface_curvature",
         "surface_index_curvature",
         "surface_index_vertex",
+        "surface_index_tenor_exponent",
         "surface_curvature_exponent",
         "surface_term_premium_short",
         "surface_term_premium_long",

@@ -490,7 +490,9 @@ impl Engine {
         let curve = ThetaCurve::new(&shape, clock.elapsed, fit.theta)?;
         Some(Surface {
             root: ContractKind::IndexOption.root().to_string(),
-            ssvi: Ssvi::new(fit.rho, eta, gamma).with_shift(p.surface_index_vertex),
+            ssvi: Ssvi::new(fit.rho, eta, gamma)
+                .with_shift(p.surface_index_vertex)
+                .with_tenor(fit.theta, p.surface_index_tenor_exponent),
             curve,
             vix,
             skewness_target: target,
