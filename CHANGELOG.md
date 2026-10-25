@@ -39,6 +39,19 @@ payload, Arrow and WASM show them; agents trade by symbol.
   variance on large non-event days; the model's, with every event in the
   session, 0.167.
 
+### The 10-year's lagged equity term
+
+- `treasury_equity_lag` and `treasury_equity_lag_gain` are new dials, 0.0 on
+  every preset and left out of the digest there. The first is the half-life
+  at which a gap the 10-year prices follows credit's leverage gap; the second
+  is the points that gap takes off the 10-year's anchor, in the daily anchor
+  and in the meeting's target, so the 10-year keeps moving with the index
+  for weeks after a fall instead of giving the move back. The gain is refused
+  without the lag; both are read only with the leverage gap carried. No draw;
+  the priced gap is snapshotted and hashed only with both set. FRED DGS10 on
+  the S&P 500, 1990-2025, moves +0.88 bp per 1% on the day and +2.70 by 62
+  sessions; the flight to quality's increment fades within the month.
+
 ### Credit's lagged leverage term
 
 - `corporate_spread_equity_lag_gain` is a new dial, 0.0 on every preset and

@@ -746,6 +746,9 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "corporate_spread_equity_lag_gain": (0.0, 2.0),
     # The share of company news released before the open.
     "news_preopen_share": (0.0, 1.0),
+    # The 10-year's repricing lag, sessions, and its term, points per unit gap.
+    "treasury_equity_lag": (0.0, 63.0),
+    "treasury_equity_lag_gain": (0.0, 4.0),
     # Credit's own state: off to twice addendum L's sd; half-life off to a year.
     "corporate_spread_noise_sd": (0.0, 0.05),
     # Every pin sets the variance: a switch.

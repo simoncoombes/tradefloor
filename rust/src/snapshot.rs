@@ -2014,6 +2014,10 @@ impl Engine {
         if self.carries_spread_priced_gap() {
             econ.put("spread_priced_gap", V::Float(economy.spread_priced_gap));
         }
+        // The gap the 10-year has priced (`treasury_equity_lag`).
+        if self.carries_treasury_equity_lag() {
+            econ.put("treasury_equity_priced_gap", V::Float(economy.treasury_equity_priced_gap));
+        }
         out.put("economy", V::Map(econ));
 
         let bank = self.central_bank();
@@ -2360,6 +2364,15 @@ impl Engine {
                     "corporate_spread_equity_lag and corporate_spread_equity_gain are both \
                      not 0, and this engine's are {} and {}",
                     p.corporate_spread_equity_lag, p.corporate_spread_equity_gain
+                ),
+            ),
+            Gated::when(
+                "treasury_equity_priced_gap",
+                self.carries_treasury_equity_lag(),
+                format!(
+                    "treasury_equity_lag and treasury_equity_lag_gain are both not 0 with the \
+                     leverage gap carried, and this engine's are {} and {}",
+                    p.treasury_equity_lag, p.treasury_equity_lag_gain
                 ),
             ),
             Gated::dial(
@@ -3132,6 +3145,10 @@ impl Engine {
         }
         if inner.carries_spread_priced_gap() {
             inner.economy_mut().spread_priced_gap = read_finite(d, "economy.", "spread_priced_gap")?;
+        }
+        if inner.carries_treasury_equity_lag() {
+            inner.economy_mut().treasury_equity_priced_gap =
+                read_finite(d, "economy.", "treasury_equity_priced_gap")?;
         }
         // The market's cycle nowcast (`cycle_nowcast_accuracy`), before the
         // anticipation that reads it: the belief, and its generator as
