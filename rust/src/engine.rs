@@ -1913,6 +1913,16 @@ impl Engine {
         self.params.corporate_spread_equity_gain != 0.0 || self.params.cycle_equity_hazard != 0.0
     }
 
+    /// Whether this engine's model carries the gap the 10-year's anchor
+    /// prices (`EconomyState::treasury_equity_priced_gap`), which is when the
+    /// snapshot and the state hash carry it: `treasury_equity_lag` and its
+    /// gain set, with credit's leverage gap carried. Off on every preset.
+    pub fn carries_treasury_equity_lag(&self) -> bool {
+        self.params.treasury_equity_lag != 0.0
+            && self.params.treasury_equity_lag_gain != 0.0
+            && self.carries_spread_equity_gap()
+    }
+
     /// Whether this engine's model carries the gap credit has priced
     /// (`EconomyState::spread_priced_gap`), which is when the snapshot and
     /// the state hash carry it: `corporate_spread_equity_lag` and
@@ -2809,6 +2819,10 @@ impl Engine {
             }
             if self.carries_spread_priced_gap() {
                 self.economy.spread_priced_gap = pre.economy.spread_priced_gap;
+            }
+            // The gap the 10-year has priced is carried with the gap.
+            if self.carries_treasury_equity_lag() {
+                self.economy.treasury_equity_priced_gap = pre.economy.treasury_equity_priced_gap;
             }
             if noise {
                 self.spread_noise = pre.spread_noise;
@@ -10105,6 +10119,12 @@ impl Engine {
             spread_vix_cut: self.params.corporate_spread_vix_cut,
             spread_equity_gain: self.params.corporate_spread_equity_gain,
             spread_priced_gap: self.carries_spread_priced_gap(),
+            // The 10-year's lagged equity term (`treasury_equity_lag_gain`).
+            treasury_equity_gain: if self.carries_treasury_equity_lag() {
+                self.params.treasury_equity_lag_gain
+            } else {
+                0.0
+            },
             spread_priced_gain: if self.carries_spread_priced_gap() {
                 self.params.corporate_spread_equity_lag_gain
             } else {
@@ -10407,6 +10427,17 @@ impl Engine {
                 // Credit's lagged leverage term (`corporate_spread_equity_lag_gain`).
                 spread_priced_gain: if self.carries_spread_priced_gap() {
                     self.params.corporate_spread_equity_lag_gain
+                } else {
+                    0.0
+                },
+                // The 10-year's repricing lag and its term (`treasury_equity_lag`).
+                treasury_equity_keep: if self.carries_treasury_equity_lag() {
+                    crate::mathx::pow(0.5, 1.0 / self.params.treasury_equity_lag)
+                } else {
+                    0.0
+                },
+                treasury_equity_gain: if self.carries_treasury_equity_lag() {
+                    self.params.treasury_equity_lag_gain
                 } else {
                     0.0
                 },
@@ -13810,6 +13841,11 @@ impl Engine {
         // and the gain set.
         if self.carries_spread_priced_gap() {
             hash_f64(&mut buf, self.economy.spread_priced_gap);
+        }
+        // The gap the 10-year has priced, only with `treasury_equity_lag` and
+        // its gain set.
+        if self.carries_treasury_equity_lag() {
+            hash_f64(&mut buf, self.economy.treasury_equity_priced_gap);
         }
         // The fair-value levels and the unspent opening draws, on the same
         // rule: only when a dial can move them.

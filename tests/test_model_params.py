@@ -1503,6 +1503,12 @@ PERTURBATIONS = [
     # INERT: the lagged term is read only with corporate_spread_equity_gain
     # non-zero, which pt-v20 leaves off (and it is refused without the lag).
     ("corporate_spread_equity_lag_gain", 0.9, False),
+    # INERT: the 10-year's priced gap needs its gain, and the term reads the
+    # leverage gap, which pt-v20 does not carry.
+    ("treasury_equity_lag", 21.0, False),
+    # INERT: read only with the leverage gap carried, which pt-v20 leaves off
+    # (and it is refused without the lag).
+    ("treasury_equity_lag_gain", 2.0, False),
     # Credit's own state: its opening draw moves the meeting's corporate
     # re-anchor, and with it the discount rate.
     ("corporate_spread_noise_sd", 0.025, True),
@@ -2242,6 +2248,8 @@ COMPANIONS: dict[str, dict[str, float]] = {
     "margin_scan_option_tail": {"margin_scan_coverage": 0.99},
     # Credit's lagged term reads the priced gap, which the lag steps.
     "corporate_spread_equity_lag_gain": {"corporate_spread_equity_lag": 5.0},
+    # The 10-year's lagged term reads the priced gap, which the lag steps.
+    "treasury_equity_lag_gain": {"treasury_equity_lag": 21.0},
     # The convenience premium unwinds as inventory refills, which only the
     # inventory's reversion gives it; refused without it.
     "oil_convenience_yield": {"oil_inventory_reversion": 0.002},
