@@ -26,6 +26,19 @@ payload, Arrow and WASM show them; agents trade by symbol.
 
 <!-- release-note-ends -->
 
+### Company news released through the session
+
+- `news_session_release_share` is a new dial, 0.0 on every preset and left
+  out of the digest there: the share of the session's endogenous company news
+  released during the session on the measured profile, rather than at its
+  first tick. An event's release minute comes from its occurrence uniform, so
+  no draw is added; from its release it is absorbed on the `news_absorption_*`
+  profile over what is left of the session. The sandbox's `news()` holds an
+  event back until `session_tick` reaches its release. On the certified
+  forty's 8-Ks without item 2.02 (2014-2025, 1,372 in-session filings), 0.6%
+  land in the first minute and 4.7% in the first half hour; the model's first
+  tick prices about 0.6 of the session's news.
+
 ### Company news released before the open
 
 - `news_preopen_share` is a new dial, 0.0 on every preset and left out of the

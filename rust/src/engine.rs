@@ -767,6 +767,11 @@ pub struct Engine {
     /// `run_session` are two spellings of the same day and both must read
     /// the same events; when this was a local in `run_session` they did not.
     session_news: Vec<crate::market::NewsEvent>,
+    /// The session minute each of `session_news` is released at
+    /// (`news_session_release_share`), in the same order; empty while the
+    /// dial is 0.0, and then nothing reads it. Per-day state like the
+    /// events: snapshotted and hashed exactly while it is carried.
+    session_news_release: Vec<f64>,
     /// The day's endogenous news released before the open
     /// (`news_preopen_share`): drawn with the day's news in `open_market`
     /// and priced by the night that follows it there, which empties it. So
@@ -2036,6 +2041,19 @@ impl Engine {
         self.session_news = news;
     }
 
+    /// The session minute each of [`Engine::session_news`] is released at
+    /// (`news_session_release_share`), in the same order; empty while the
+    /// dial is 0.0.
+    pub fn session_news_release(&self) -> &[f64] {
+        &self.session_news_release
+    }
+
+    /// Put the day's release minutes back. See
+    /// [`Engine::session_news_release`].
+    pub fn set_session_news_release(&mut self, release: Vec<f64>) {
+        self.session_news_release = release;
+    }
+
     /// The preset an engine gets when the caller names none.
     ///
     /// One definition, because the alternative is what this replaced: the
@@ -2396,6 +2414,7 @@ impl Engine {
             pinned_vix_jump: 0.0,
             market_day_scale: 1.0,
             session_news: Vec::new(),
+            session_news_release: Vec::new(),
             preopen_news: Vec::new(),
             volume_idio: vec![0.0; companies_len],
             jump_move: vec![0.0; companies_len],
@@ -4766,7 +4785,21 @@ impl Engine {
             // same for every event, so the sign, the peer transfer and the
             // day's total are unchanged. Caller-supplied news is not
             // touched: it has no release time the profile could start from.
-            if self.params.news_absorption_half_life == 0.0 {
+            //
+            // Released during the session (`news_session_release_share`):
+            // each event carries its own release minute, and the profile
+            // starts there. Empty while the dial is 0.0.
+            if !self.session_news_release.is_empty() {
+                let minutes = (request.time.hour - 9) * 60 + (request.time.minute - 30);
+                v.extend(day_news.iter().zip(self.session_news_release.iter()).map(|(e, &r)| {
+                    let w = crate::market::factors::news_release_weight(&self.params, minutes, r);
+                    NewsEvent {
+                        company_id: e.company_id.clone(),
+                        sector: e.sector.clone(),
+                        price_impact: e.price_impact.map(|x| x * w),
+                    }
+                }));
+            } else if self.params.news_absorption_half_life == 0.0 {
                 v.extend(day_news.iter().cloned());
             } else {
                 let minutes = (request.time.hour - 9) * 60 + (request.time.minute - 30);
@@ -7190,6 +7223,7 @@ impl Engine {
         // session agree. It takes no other draws, so moving the generation
         // here left the NEWS stream's own order untouched.
         self.session_news.clear();
+        self.session_news_release.clear();
         self.preopen_news.clear();
         if self.params.endogenous_news_intensity != 0.0 {
             let intensity = self.params.endogenous_news_intensity;
@@ -7214,6 +7248,22 @@ impl Engine {
                         self.preopen_news.push(event);
                     } else {
                         self.session_news.push(event);
+                        // Its release minute (`news_session_release_share`):
+                        // what is left of the occurrence uniform past the
+                        // pre-open part, over the session's part, is uniform
+                        // on [0, 1) and independent of `z`, so no draw is
+                        // added. Below the share it is released on the
+                        // measured profile; above it, at the first tick.
+                        let release = self.params.news_session_release_share;
+                        if release != 0.0 {
+                            let v = (u - preopen * intensity) / ((1.0 - preopen) * intensity);
+                            let minute = if v < release {
+                                crate::market::factors::news_release_minute(v / release)
+                            } else {
+                                0.0
+                            };
+                            self.session_news_release.push(minute);
+                        }
                     }
                 }
             }
@@ -14232,6 +14282,11 @@ impl Engine {
             hash_opt_str(&mut buf, event.company_id.as_deref());
             hash_opt_str(&mut buf, event.sector.as_deref());
             hash_opt_f64(&mut buf, event.price_impact);
+        }
+        // Their release minutes, carried only under
+        // `news_session_release_share`: nothing is hashed while it is 0.0.
+        for minute in &self.session_news_release {
+            hash_f64(&mut buf, *minute);
         }
 
         // The economy, in the order `state_snapshot` declares its fields.

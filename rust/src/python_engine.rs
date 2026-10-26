@@ -3493,7 +3493,11 @@ impl PyEngine {
             None
         };
         let mut out = Vec::new();
-        for event in self.inner.session_news() {
+        // The session minute each event is released at, while
+        // `news_session_release_share` is set: a reader that shows news to a
+        // trader must hold an event back until `session_tick` reaches it.
+        let release = self.inner.session_news_release();
+        for (k, event) in self.inner.session_news().iter().enumerate() {
             let d = PyDict::new_bound(py);
             d.set_item(
                 "ticker",
@@ -3502,6 +3506,9 @@ impl PyEngine {
             d.set_item("sector", event.sector.clone())?;
             d.set_item("price_impact", event.price_impact)?;
             d.set_item("day", day)?;
+            if let Some(minute) = release.get(k) {
+                d.set_item("release_minute", *minute)?;
+            }
             out.push(d);
         }
         Ok(out)

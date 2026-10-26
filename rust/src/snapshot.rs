@@ -1898,14 +1898,21 @@ impl Engine {
         }
         // The day's endogenous news, generated once at the open and read by
         // every tick of the day.
+        // Each carries its release minute while `news_session_release_share`
+        // is set, and only then.
+        let release = self.session_news_release();
         let news = self
             .session_news()
             .iter()
-            .map(|event| {
+            .enumerate()
+            .map(|(k, event)| {
                 let mut item = SnapshotMap::new();
                 item.put("ticker", event.company_id.clone().map_or(V::None, V::Str));
                 item.put("sector", event.sector.clone().map_or(V::None, V::Str));
                 item.put("price_impact", event.price_impact.map_or(V::None, V::Float));
+                if let Some(minute) = release.get(k) {
+                    item.put("release_minute", V::Float(*minute));
+                }
                 V::Map(item)
             })
             .collect();
@@ -2672,18 +2679,27 @@ impl Engine {
         let not_news = || core("snapshot field session_news must be a list of dicts".into());
         let items = field(snapshot, "", "session_news")?.items().ok_or_else(not_news)?;
         let mut events = Vec::with_capacity(items.len());
+        let release_share = inner.params().news_session_release_share;
+        let mut release = Vec::new();
         for item in items {
             let SnapshotValue::Map(d) = item else {
                 return Err(not_news());
             };
-            check_keys("snapshot field session_news[]", d, NEWS_KEYS)?;
+            let gated = [Gated::dial("release_minute", "news_session_release_share", release_share)];
+            if let Some(message) = key_mismatch("snapshot field session_news[]", d, NEWS_KEYS, &gated, &[]) {
+                return Err(SnapshotError::new(SnapshotErrorKind::Fields, message));
+            }
             events.push(NewsEvent {
                 company_id: read_opt_str(d, "session_news[].", "ticker")?,
                 sector: read_opt_str(d, "session_news[].", "sector")?,
                 price_impact: read_opt_number(d, "session_news[].", "price_impact")?,
             });
+            if release_share != 0.0 {
+                release.push(read_finite(d, "session_news[].", "release_minute")?);
+            }
         }
         inner.set_session_news(events);
+        inner.set_session_news_release(release);
         inner.set_forced_flow_spent(read_finite(snapshot, "", "forced_flow_spent")?);
         inner.set_market_vol_log_level(read_finite(snapshot, "", "market_vol_log_level")?);
         inner.set_vix_log_level(read_finite(snapshot, "", "vix_log_level")?);

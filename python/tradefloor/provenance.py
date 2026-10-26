@@ -713,6 +713,12 @@ OUT_OF_SCOPE = {
         "session from its first tick, as it stood; no draw of its own (the "
         "occurrence uniform decides) and no state carried between days; at "
         "0.0 it is also left out of the model's digest",
+    "news_session_release_share":
+        "inert at 0.0: every session news event is priced from the session's "
+        "first tick, as it stood; no draw of its own (the occurrence uniform "
+        "decides the release minute) and no state carried between days, the "
+        "day's release minutes being snapshotted and hashed only while it is "
+        "set; at 0.0 it is also left out of the model's digest",
     "corporate_spread_equity_lag_gain":
         "inert at 0.0 and read only with `corporate_spread_equity_gain` set; "
         "refused without `corporate_spread_equity_lag`: the spread's leverage "

@@ -2981,6 +2981,31 @@ pub struct ModelParams {
     /// about the share it carries on ordinary days (0.266); 2005-2015 reads
     /// 0.178. With every event priced in the session the model's reads 0.167.
     pub news_preopen_share: f64,
+    /// The share of the session's endogenous company news released during
+    /// the session on the tape's profile, rather than at its first tick. 0.0,
+    /// on every shipped preset, is the engine as it stood: every event not
+    /// released before the open (`news_preopen_share`) is priced from the
+    /// session's first tick (`news_absorption_half_life`), so about 0.6 of
+    /// the day's session news is in the price after one minute. A value of
+    /// 0.0 is left out of the model's digest.
+    ///
+    /// Off zero an event's release minute comes from its occurrence uniform:
+    /// past the pre-open part and over the session's part it is uniform on
+    /// [0, 1) and independent of the event's size, so no draw is added.
+    /// Below the share the event is released at that quantile of
+    /// `market::factors::NEWS_RELEASE_PROFILE_COUNTS`; above it, at the first
+    /// tick as before. From its release the event is absorbed on the
+    /// `news_absorption_*` profile over what is left of the session, so it is
+    /// complete at the close; before it, it prices nothing. The release
+    /// minutes are per-day state, snapshotted and hashed while carried.
+    /// In [0, 1].
+    ///
+    /// The certified forty's 8-Ks without item 2.02, 2014-2025, accepted in
+    /// a full session (EDGAR acceptance times, New York; 1,372 filings): 0.6%
+    /// land in the first minute (calendar-year se 0.2%), 4.7% in the first
+    /// half hour (0.9%), the mean at minute 223. 1.0 releases all the
+    /// session's news on that profile.
+    pub news_session_release_share: f64,
     /// The earnings calendar's master switch and the surprise's size, in
     /// units of the name's current idiosyncratic daily sigma. 0.0, which
     /// every preset through pt-v20 carries, is no calendar.
@@ -8925,6 +8950,7 @@ impl ModelParams {
             overnight_idio_share: 0.0,
             overnight_idio_df: 0.0,
             news_preopen_share: 0.0,
+            news_session_release_share: 0.0,
             earnings_surprise_sigma: 0.0,
             earnings_surprise_df: 0.0,
             earnings_session_sigma: 0.0,
@@ -11610,6 +11636,7 @@ impl ModelParams {
             "overnight_idio_share" => self.overnight_idio_share,
             "overnight_idio_df" => self.overnight_idio_df,
             "news_preopen_share" => self.news_preopen_share,
+            "news_session_release_share" => self.news_session_release_share,
             "earnings_surprise_sigma" => self.earnings_surprise_sigma,
             "earnings_surprise_df" => self.earnings_surprise_df,
             "earnings_session_sigma" => self.earnings_session_sigma,
@@ -12060,6 +12087,7 @@ impl ModelParams {
             "overnight_idio_share" => out.overnight_idio_share = value,
             "overnight_idio_df" => out.overnight_idio_df = value,
             "news_preopen_share" => out.news_preopen_share = value,
+            "news_session_release_share" => out.news_session_release_share = value,
             "earnings_surprise_sigma" => out.earnings_surprise_sigma = value,
             "earnings_surprise_df" => out.earnings_surprise_df = value,
             "earnings_session_sigma" => out.earnings_session_sigma = value,
@@ -12715,6 +12743,13 @@ impl ModelParams {
                 "news_preopen_share is {}. It is the share of the day's endogenous company news \
                  released before the open, in [0, 1]; 0 prices it all in the session.",
                 self.news_preopen_share));
+        }
+        if !(self.news_session_release_share >= 0.0 && self.news_session_release_share <= 1.0) {
+            return Err(format!(
+                "news_session_release_share is {}. It is the share of the session's endogenous \
+                 company news released during the session on the measured profile, in [0, 1]; 0 \
+                 releases it all at the first tick.",
+                self.news_session_release_share));
         }
         if self.news_preopen_share != 0.0
             && self.overnight_market_share == 0.0
@@ -14516,6 +14551,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "market_vol_slow_gamma",
     "market_vol_vix_hold_half_life",
     "news_preopen_share",
+    "news_session_release_share",
     "order_flow_depth_law",
     "overnight_idio_df",
     "overnight_idio_share",
@@ -14939,6 +14975,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "overnight_idio_share",
         "overnight_idio_df",
         "news_preopen_share",
+        "news_session_release_share",
         "earnings_surprise_sigma",
         "earnings_surprise_df",
         "earnings_session_sigma",
