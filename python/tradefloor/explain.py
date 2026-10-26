@@ -238,7 +238,9 @@ MECHANISMS: tuple[Mechanism, ...] = (
                "endogenous_news_sigma"),
         sites=(("news", "news_u", "company"),
                ("news", "news_z", "company")),
-        via=("engine::Engine::open_market",),
+        # The weights are read in `news_terms`, which the tick's
+        # composition and the open's pre-open release both call.
+        via=("engine::Engine::open_market", "market::factors::news_terms"),
     ),
     Mechanism(
         factor="order_flow_impact",
