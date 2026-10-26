@@ -67,6 +67,16 @@ payload, Arrow and WASM show them; agents trade by symbol.
   -2.25 bp per 1% on the day and -3.2 by nine sessions; with the gap alone
   the model's moves -2.46 and then eases.
 
+### The night's first step
+
+- With `night_session_steps` on, the index futures' night starts on the
+  close's marks and takes the close's macro re-mark of the index whole at
+  its first step; an order on an index future before that step walks it
+  first. The after-close quote stood on the close's print while the
+  re-marked level was already public, so buying or selling the front future
+  after the close on the re-mark's sign earned about 21 bp a night. Nothing
+  moves with the switch off, and no stock price.
+
 ### The option scan's tail
 
 - `margin_option_minimum` is a new dial, 0.0 on every preset and left out of

@@ -4076,7 +4076,12 @@ its target on a Brownian bridge, one normal per step for all of them, with
 the night's share of the index's one-session variance
 (`overnight_market_share` of it on pt-v21), stepping the basis and filling
 resting orders beside it. The last step lands on the open's fair value. The
-real open takes its own draws, as it always did. A pin, a listing or
+path starts on the close's marks and takes the close's macro re-mark of the
+index (`macro_publication_repricing`), public from the close, whole at its
+first step, from the published level and each contract's carry on it; an
+order on an index future before that step walks it first and meets the book
+after it, so no one trades on the close's print once the re-mark is known.
+The real open takes its own draws, as it always did. A pin, a listing or
 delisting, a change of status, or a fundamentals write from Python between
 sessions reruns the copy and moves the path at once by the change in its
 targets; a write the copy is not rerun for reaches the futures at the open.
