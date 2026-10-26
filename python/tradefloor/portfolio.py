@@ -759,13 +759,16 @@ class Portfolio:
         return taken
 
     def _execute_in_book(self, engine: Engine, ticker: str, quantity: float,
-                         limit: float | None, report: bool = False) -> dict:
+                         limit: float | None, report: bool = False,
+                         liquidation: bool = False) -> dict:
         """:meth:`execute` and :meth:`submit_limit` against the engine's book.
 
         Priced first off the book as it stands, read-only, so an order the
         book cannot fill at all, or that would break the leverage limit, is
         refused before anything is sent: the same order of checks the
-        snapshot path makes.
+        snapshot path makes. A ``liquidation`` (:meth:`settle_open`) skips
+        the leverage limit: it takes risk off an account the limit may
+        already see as over it, or as insolvent.
         """
         side: Literal["buy", "sell"] = "buy" if quantity > 0 else "sell"
         size = abs(quantity)
@@ -781,7 +784,7 @@ class Portfolio:
             # that fills during a session cannot be refused then.
             price = limit
             expected = size
-        if self.max_leverage is not None:
+        if self.max_leverage is not None and not liquidation:
             filled = expected if side == "buy" else -expected
             if is_future_symbol(ticker) and ticker not in engine.tickers:
                 projected = self._projected_futures_leverage(engine, ticker, filled, price)
@@ -1276,7 +1279,8 @@ class Portfolio:
         for symbol, quantity in held:
             filled = 0.0
             try:
-                filled = self._execute_in_book(engine, symbol, -quantity, None)["quantity"]
+                filled = self._execute_in_book(engine, symbol, -quantity, None,
+                                               liquidation=True)["quantity"]
             except OrderError:
                 pass
             self.liquidations.append({"day": day, "symbol": symbol, "quantity": -quantity,

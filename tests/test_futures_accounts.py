@@ -174,6 +174,39 @@ def test_mg2_a_call_not_met_by_the_next_open_liquidates_the_futures():
     assert d.p.futures == {}
 
 
+def test_mg2_a_liquidation_is_not_refused_by_the_leverage_limit():
+    # An insolvent account, and a solvent one whose stock keeps it over
+    # its limit after the futures close: the limit refuses opening risk,
+    # never the liquidation that takes it off.
+    import math
+    d = Day(seed=11, max_leverage=2.0)
+    d.run(3)
+    d.open()
+    sym = _vix(d.e)
+    d.p.execute(d.e, sym, 40.0)
+    d.p.cash -= d.p.net_worth(d.e) + 2_000_000.0
+    d.close()
+    d.open()
+    assert d.p.margin_calls[-1]["met"] is False
+    assert d.p.liquidations[-1]["filled"] == -40.0
+    assert sym not in d.p.futures
+
+    d = Day(seed=11, max_leverage=2.0)
+    d.run(3)
+    d.open()
+    sym = _vix(d.e)
+    d.p.execute(d.e, sym, 10.0)
+    marks = d.p.marks(d.e)
+    for t in d.e.tickers[:4]:
+        d.p.execute(d.e, t, math.floor(200_000 / marks[t]))
+    d.p.cash -= d.p.net_worth(d.e) - 0.25 * d.p.margin_requirement(d.e, maintenance=True)
+    d.close()
+    d.open()
+    assert d.p.margin_calls[-1]["met"] is False
+    assert d.p.liquidations[-1]["filled"] == -10.0
+    assert sym not in d.p.futures
+
+
 # ── Each harness runs the hooks ─────────────────────────────────────────────
 
 class Hold:
