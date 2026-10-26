@@ -1212,6 +1212,9 @@ def _nothing_dormant():
                    # The single-name options (pt-v22 phase 3): a switch; the
                    # names' premium and skew take the blanket 0.05.
                    options_names_listed=1.0,
+                   # The name dealer's response per contract lives in
+                   # [0, 0.01], so it takes the table's value, not 0.05.
+                   option_name_inventory_slope=0.0002,
                    # Two switches read only under a macro pin (r13).
                    macro_pins_hold=1.0,
                    pinned_vix_feedback=1.0,
