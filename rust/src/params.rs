@@ -13706,7 +13706,7 @@ impl ModelParams {
         }
         if self.policy_eve_surprise_sd != 0.0 && self.fed_eve_decision == 0.0 {
             return Err(format!(
-                "policy_eve_surprise_sd is {} but fed_eve_decision is 0: the eve holds no decision to \
+                "fed_eve_decision is 0 but policy_eve_surprise_sd is {}: the eve holds no decision to \
                  price. Set fed_eve_decision to 1.",
                 self.policy_eve_surprise_sd));
         }
@@ -13718,7 +13718,7 @@ impl ModelParams {
         }
         if self.rate_premium_per_fixing != 0.0 && self.futures_rates_listed == 0.0 {
             return Err(format!(
-                "rate_premium_per_fixing is {} but futures_rates_listed is 0: no rate future to price. \
+                "futures_rates_listed is 0 but rate_premium_per_fixing is {}: no rate future to price. \
                  Set futures_rates_listed to 1.",
                 self.rate_premium_per_fixing));
         }
