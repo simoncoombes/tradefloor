@@ -6,12 +6,11 @@ futures, and American options on every name. An agent trades them by symbol
 in whole contracts, as it trades a ticker, and exercises an option at a
 close with `tf.Exercise`.
 
-Margin works as a clearing house's does. Each contract asks an initial
-margin, set at each close from its recent volatility, and a lower
-maintenance margin. A future pays its move to the day's settlement mark in
-cash at each close. A close that leaves equity under maintenance makes a
-margin call, and if equity is still under the initial margin at the next
-open, every contract held is closed at the market.
+Margin is set from a risk scan of each position at every close, with a
+lower maintenance level. A future pays its move to the day's settlement
+mark in cash at each close. If equity falls below maintenance at a close,
+the call is due by the next open: equity must be back at the initial
+margin, and if it isn't, every contract is closed at the market.
 
 `tradefloor.contracts.explain_move` says why a contract's price moved, cause
 by cause, and a strategy spec can hold the front index future as a hedge.
