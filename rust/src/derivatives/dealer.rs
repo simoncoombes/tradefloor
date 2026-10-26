@@ -249,6 +249,59 @@ fn ladder_with(spec: &OptionDealerSpec, price_at: impl Fn(f64) -> f64, vol: f64,
     Ladder { mid, bids, asks }
 }
 
+/// The ladder of a dealer that quotes in price: each side's level `j` at
+/// `mid` moved by `half` (a price) times `1 + j level_step`, with
+/// [`ladder`]'s grid, ordering and cut-off below a tick. `vol` is recorded
+/// on each level. The single-name dealer's under
+/// `option_name_spread_otm` and `option_name_spread_itm`, where a
+/// volatility ladder would set an in-the-money option's levels at
+/// volatilities far off the surface.
+pub fn price_ladder(spec: &OptionDealerSpec, mid: f64, half: f64, vol: f64) -> Ladder {
+    let mut asks: Vec<Level> = Vec::with_capacity(spec.levels);
+    let mut bids: Vec<Level> = Vec::with_capacity(spec.levels);
+    for j in 0..spec.levels {
+        let h = half * (1.0 + j as f64 * spec.level_step);
+        let mut ask = on_grid(spec, mid + h, true);
+        let floor = match asks.last() {
+            Some(prev) => prev.price + spec.tick_at(prev.price),
+            None => on_grid(spec, mid, false) + spec.tick_at(mid),
+        };
+        if ask < floor - 1e-12 {
+            ask = floor;
+        }
+        asks.push(Level { price: ask, size: spec.displayed_size, vol });
+    }
+    for j in 0..spec.levels {
+        let h = half * (1.0 + j as f64 * spec.level_step);
+        let mut bid = on_grid(spec, mathx::max(0.0, mid - h), false);
+        let cap = match bids.last() {
+            Some(prev) => prev.price - spec.tick_at(prev.price - 1e-9),
+            None => on_grid(spec, mid, true) - spec.tick_at(mid),
+        };
+        if bid > cap + 1e-12 {
+            bid = cap;
+        }
+        if bid < spec.tick - 1e-12 {
+            break;
+        }
+        bids.push(Level { price: bid, size: spec.displayed_size, vol });
+    }
+    Ladder { mid, bids, asks }
+}
+
+/// The relative half-spread's moneyness factor under
+/// `option_name_spread_otm` and `option_name_spread_itm`: 1 at an absolute
+/// delta of 0.5, `otm` at 0.25 and `itm` at 0.75, linear between and flat
+/// beyond.
+pub fn moneyness_factor(abs_delta: f64, otm: f64, itm: f64) -> f64 {
+    let a = mathx::clamp(abs_delta, 0.25, 0.75);
+    if a < 0.5 {
+        otm + (1.0 - otm) * (a - 0.25) / 0.25
+    } else {
+        1.0 + (itm - 1.0) * (a - 0.5) / 0.25
+    }
+}
+
 /// Walk a side of a ladder, best first, for `quantity` contracts at
 /// `limit` or better (a buy takes asks at or below it, a sell bids at or
 /// above): the fills, `(price, contracts)`, in order.

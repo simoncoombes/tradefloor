@@ -4708,6 +4708,24 @@ own worst loss and floored at 0, so a covered call or a protective put asks
 nothing a naked option does; each option is revalued as a European on its
 escrowed price over moves sized to the name's one-session sd.
 
+**The dealer's shape** (pt-v22, five dials, each 0.0 on every shipped preset
+and left out of the digest there; refused without `options_names_listed`).
+`option_name_inventory_slope` moves an expiry's volatility by that share of
+its at-the-money volatility per at-the-money-equivalent contract of
+pressure (at the money, the share of the premium a contract moves the mid
+by), under the same cap; off, the response is half an at-the-money
+half-spread per 20 contracts. `option_name_inventory_half_life` halves the
+pressure in that many sessions of open ticks; off, in 15 ticks.
+`option_name_spread_otm` and `option_name_spread_itm` quote the half-spread
+as a share of the option's price, the at-the-money share (the at-the-money
+half-spread in volatility over the expiry's at-the-money volatility) times a
+factor of the absolute delta that is 1 at 0.5, `otm` at 0.25 and `itm` at
+0.75, linear between and flat beyond, each side's ladder stepping in price;
+off, the half-spread is in volatility, `1 + 0.25|z|` times the
+at-the-money one. `option_name_spread_tenor_exponent` scales the half-spread
+by `(sessions / 21)` to its power; off, it is flat in tenor. None moves a
+mid at zero pressure, or any stock price (`tests/test_name_option_dealer.py`).
+
 **Position limits.** `option_position_limit`, 0.0 on every shipped preset
 (no limit), caps each agent's position in each listed option, the index's
 and the names', at the dial times the dealer's displayed depth on one side:

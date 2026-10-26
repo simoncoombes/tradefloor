@@ -518,6 +518,11 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # The options' position limit, in multiples of the dealer's displayed
     # depth: it refuses orders and moves no stock price.
     "option_position_limit": (0.0, 5.0),
+    "option_name_inventory_slope": (0.0, 0.01),
+    "option_name_inventory_half_life": (0.0, 252.0),
+    "option_name_spread_otm": (0.0, 5.0),
+    "option_name_spread_itm": (0.0, 5.0),
+    "option_name_spread_tenor_exponent": (-1.0, 1.0),
     # The central bank's stress cut, points per step: 0.5 is a half-point
     # step, two steps a point, which is 2001's and 2008's emergency size.
     "fed_stress_cut": (0.0, 0.5),

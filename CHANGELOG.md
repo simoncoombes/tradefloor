@@ -26,6 +26,17 @@ payload, Arrow and WASM show them; agents trade by symbol.
 
 <!-- release-note-ends -->
 
+### The single-name options' dealer on the tape
+
+Five dials, 0.0 on every preset, shape the single-name options' dealer:
+its inventory response per contract (`option_name_inventory_slope`, a
+share of the at-the-money volatility) and the half-life of its pressure in
+sessions (`option_name_inventory_half_life`), both constants before (half a
+half-spread per 20 contracts, 15 open ticks); and its spread as a share of
+the price by delta (`option_name_spread_otm`, `option_name_spread_itm`) and
+in tenor (`option_name_spread_tenor_exponent`). They price options only:
+stock prices and every known answer are where they were.
+
 ### Company news released before the open
 
 - `policy_eve_surprise_sd` is a new dial, 0.0 on every preset and left out of

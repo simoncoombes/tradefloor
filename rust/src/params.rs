@@ -2147,6 +2147,38 @@ pub struct ModelParams {
     /// unlimited stake in a contract whose settlement print it can push.
     /// Requires `options_index_listed` or `options_names_listed`. In [0, 100].
     pub option_position_limit: f64,
+    /// The name-option dealer's inventory response: the volatility its
+    /// pressure moves an expiry by, per at-the-money-equivalent contract, as
+    /// a share of the expiry's at-the-money volatility (so, at the money,
+    /// the share of the premium a contract moves the mid by), capped as
+    /// before at four at-the-money half-spreads. 0.0, on every shipped
+    /// preset, keeps the constant response (half an at-the-money half-spread
+    /// per 20 contracts), and is left out of the model's digest. Read only
+    /// with `options_names_listed` set. In [0, 0.01].
+    pub option_name_inventory_slope: f64,
+    /// The half-life of the name-option dealer's pressure, sessions of open
+    /// ticks. 0.0, on every shipped preset, keeps the constant 15 ticks, and
+    /// is left out of the model's digest. Read only with
+    /// `options_names_listed` set. In [0, 252].
+    pub option_name_inventory_half_life: f64,
+    /// The shape of the name-option dealer's spread in moneyness: its
+    /// half-spread as a share of the option's price, at a delta of 0.25 (out
+    /// of the money) and 0.75 (in the money) over the at-the-money one,
+    /// linear in the absolute delta between and flat beyond. The
+    /// at-the-money share is the at-the-money half-spread in volatility over
+    /// the expiry's at-the-money volatility, as `option_dealer_spread` sets
+    /// it, and each side's ladder steps in price. Either set turns this on,
+    /// the other then read as 1. Both 0.0, on every shipped preset, keep the
+    /// half-spread in volatility, `1 + 0.25 |z|` times the at-the-money one,
+    /// and are left out of the model's digest. Read only with
+    /// `options_names_listed` set. In [0, 5].
+    pub option_name_spread_otm: f64,
+    pub option_name_spread_itm: f64,
+    /// The name-option dealer's spread in tenor: the half-spread times
+    /// `(sessions / 21)` to this power. 0.0, on every shipped preset, keeps
+    /// it flat in tenor, and is left out of the model's digest. Read only
+    /// with `options_names_listed` set. In [-1, 1].
+    pub option_name_spread_tenor_exponent: f64,
     /// Switch that makes the fear/greed index read the business cycle and
     /// GDP growth as published instead of as they are. 0.0, on every preset
     /// through pt-v19, is off; pt-v20 sets 1.0.
@@ -8947,6 +8979,11 @@ impl ModelParams {
             surface_term_premium_long: 0.0,
             surface_earnings_weight: 0.0,
             option_dealer_spread: 0.0,
+            option_name_inventory_slope: 0.0,
+            option_name_inventory_half_life: 0.0,
+            option_name_spread_otm: 0.0,
+            option_name_spread_itm: 0.0,
+            option_name_spread_tenor_exponent: 0.0,
             options_names_listed: 0.0,
             surface_name_premium: 0.0,
             surface_name_skew: 0.0,
@@ -11640,6 +11677,11 @@ impl ModelParams {
             "surface_name_premium" => self.surface_name_premium,
             "surface_name_skew" => self.surface_name_skew,
             "option_position_limit" => self.option_position_limit,
+            "option_name_inventory_slope" => self.option_name_inventory_slope,
+            "option_name_inventory_half_life" => self.option_name_inventory_half_life,
+            "option_name_spread_otm" => self.option_name_spread_otm,
+            "option_name_spread_itm" => self.option_name_spread_itm,
+            "option_name_spread_tenor_exponent" => self.option_name_spread_tenor_exponent,
             "fear_greed_published_inputs" => self.fear_greed_published_inputs,
             "macro_publication_repricing" => self.macro_publication_repricing,
             "treasury_10y_noise" => self.treasury_10y_noise,
@@ -12094,6 +12136,11 @@ impl ModelParams {
             "surface_name_premium" => out.surface_name_premium = value,
             "surface_name_skew" => out.surface_name_skew = value,
             "option_position_limit" => out.option_position_limit = value,
+            "option_name_inventory_slope" => out.option_name_inventory_slope = value,
+            "option_name_inventory_half_life" => out.option_name_inventory_half_life = value,
+            "option_name_spread_otm" => out.option_name_spread_otm = value,
+            "option_name_spread_itm" => out.option_name_spread_itm = value,
+            "option_name_spread_tenor_exponent" => out.option_name_spread_tenor_exponent = value,
             "fear_greed_published_inputs" => out.fear_greed_published_inputs = value,
             "macro_publication_repricing" => out.macro_publication_repricing = value,
             "treasury_10y_noise" => out.treasury_10y_noise = value,
@@ -14176,6 +14223,22 @@ impl ModelParams {
                  depth; 0 is no limit.",
                 self.option_position_limit));
         }
+        for (name, v, lo, hi) in [
+            ("option_name_inventory_slope", self.option_name_inventory_slope, 0.0, 0.01),
+            ("option_name_inventory_half_life", self.option_name_inventory_half_life, 0.0, 252.0),
+            ("option_name_spread_otm", self.option_name_spread_otm, 0.0, 5.0),
+            ("option_name_spread_itm", self.option_name_spread_itm, 0.0, 5.0),
+            ("option_name_spread_tenor_exponent", self.option_name_spread_tenor_exponent, -1.0, 1.0),
+        ] {
+            if !(lo..=hi).contains(&v) {
+                return Err(format!("{name} is {v}. It is in [{lo}, {hi}]."));
+            }
+            if v != 0.0 && self.options_names_listed == 0.0 {
+                return Err(format!(
+                    "options_names_listed is 0 but {name} is {v}. It shapes the single-name options' \
+                     dealer, which only that switch lists: set options_names_listed to 1.0 first."));
+            }
+        }
         if self.option_position_limit != 0.0 && self.options_index_listed == 0.0 && self.options_names_listed == 0.0 {
             return Err(format!(
                 "options_index_listed is 0 but option_position_limit is {}, and options_names_listed \
@@ -14771,6 +14834,11 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "surface_name_premium",
     "surface_name_skew",
     "option_position_limit",
+    "option_name_inventory_slope",
+    "option_name_inventory_half_life",
+    "option_name_spread_otm",
+    "option_name_spread_itm",
+    "option_name_spread_tenor_exponent",
 ];
 
 #[cfg(test)]
@@ -15032,6 +15100,11 @@ pub fn settable_names() -> Vec<&'static str> {
         "surface_name_premium",
         "surface_name_skew",
         "option_position_limit",
+        "option_name_inventory_slope",
+        "option_name_inventory_half_life",
+        "option_name_spread_otm",
+        "option_name_spread_itm",
+        "option_name_spread_tenor_exponent",
         "fear_greed_published_inputs",
         "macro_publication_repricing",
         "treasury_10y_noise",
