@@ -14595,7 +14595,9 @@ impl ModelParams {
             ));
         }
         if self.surface_index_tenor_strip != 0.0 && self.surface_index_tenor_strip != 1.0 {
-            return Err(format!("surface_index_tenor_strip is {}. It is 0.0 or 1.0.", self.surface_index_tenor_strip));
+            return Err(format!(
+                "surface_index_tenor_strip is {}. It is a switch: 0.0 as shipped, 1.0 on.",
+                self.surface_index_tenor_strip));
         }
         if !(0.0..=1.0).contains(&self.surface_index_vertex) {
             return Err(format!("surface_index_vertex is {}. It is in [0, 1].", self.surface_index_vertex));
