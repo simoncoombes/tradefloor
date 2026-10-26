@@ -527,6 +527,7 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # constant of the run.
     expected = set(_SNAPSHOT_KEYS) | (
         {"vix_anchor_slow", "vix_anchor", "vix_stress_memory", "market_vol_leverage_memory",
+         "market_vol_leverage_fast_memory",
          "market_vol_cycle_log", "rates", "book", "fair_value_offset", "opening_z",
          "buyback_log_shares", "opening_carry",
          # Carried only while set: a forced close pending tonight, today's
@@ -582,6 +583,9 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          "derivatives_rng", "futures", "futures_book", "night_bridge",
          # The VIX's fear memory, only while `vix_fear_uptake` is set.
          "vix_fear",
+         # The published VIX's log average, only while
+         # `forecast_vix_level_nowcast` is set.
+         "vix_log_average",
          # The VIX futures, only while `futures_vix_listed` is set, and
          # their book once an agent has traded one.
          "vix_futures", "vix_futures_book",
@@ -801,6 +805,10 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # `market_vol_leverage` set: `Engine::state_hash`'s order and rule.
     if "market_vol_leverage_memory" in snapshot:
         _f64(buf, snapshot["market_vol_leverage_memory"])
+    # The fast return memory, only on a model with `market_vol_leverage_fast`
+    # set: `Engine::state_hash`'s order and rule.
+    if "market_vol_leverage_fast_memory" in snapshot:
+        _f64(buf, snapshot["market_vol_leverage_fast_memory"])
     # The cycle's volatility multiplier, only on a model with
     # `market_vol_cycle_ratio` set: `Engine::state_hash`'s order and rule.
     if "market_vol_cycle_log" in snapshot:
@@ -1033,6 +1041,11 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     if "vix_fear" in snapshot:
         _f64(buf, 47.0)
         _f64(buf, float(snapshot["vix_fear"]))
+    # The published VIX's log average, only while `forecast_vix_level_nowcast`
+    # is set, behind its own tag.
+    if "vix_log_average" in snapshot:
+        _f64(buf, 93.0)
+        _f64(buf, float(snapshot["vix_log_average"]))
     # The VIX futures, only while `futures_vix_listed` is set, behind their
     # own tag, length-prefixed; their book behind another once an agent has
     # traded one. `Engine::state_hash`'s order and rule.

@@ -87,6 +87,9 @@ CASES = {
                 "gdp_publication", "earnings_cycle"), (), {}),
     "garch_cascade": (dict(garch_cascade_components=3.0), ("garch_cascade",), (), (), {}),
     "market_vol_leverage": (LEVERAGE, ("market_vol_leverage_memory",), (), (), {}),
+    "market_vol_leverage_fast": (dict(market_vol_leverage_fast=2.0,
+                                      market_vol_leverage_fast_half_life=5.0),
+                                 ("market_vol_leverage_fast_memory",), (), (), {}),
     "market_vol_cycle": (CYCLE_VOL, (), (), ("market_vol_cycle_log",), {}),
     "vix_stress_premium": (dict(vix_stress_premium=3.0, vix_stress_premium_knee=0.6,
                                 vix_stress_premium_cap=0.35),
@@ -177,6 +180,11 @@ CASES = {
                       ("futures", "derivatives_rng"), (), ("night_bridge",), {}),
     # The VIX's fear memory, carried whenever its switch is set.
     "vix_fear": (dict(vix_fear_uptake=0.2, vix_fear_half_life=20.0), ("vix_fear",), (), (), {}),
+    # The published VIX's log average the slow level's nowcast reads, carried
+    # whenever its dial is set.
+    "vix_log_average": (dict(forecast_horizon_sessions=21.0, vix_level_sigma=0.0181,
+                             forecast_vix_level_nowcast=0.4, forecast_vix_level_nowcast_half_life=126.0,
+                             forecast_vix_level_nowcast_centre=2.9), ("vix_log_average",), (), (), {}),
     # The VIX futures, carried whenever their switch is set.
     "vix_futures": (dict(forecast_horizon_sessions=126.0, futures_vix_listed=1.0), ("vix_futures",), (), (), {}),
     # The rate futures, carried whenever their switch is set.

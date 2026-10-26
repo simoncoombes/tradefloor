@@ -1608,6 +1608,11 @@ centre of 81 is 16.4 and 279.
 | `corporate_spread_noise_sd`, `corporate_spread_noise_half_life` | 0 (no state: the spread moves with the VIX, the cycle and the leverage gap); sd up to 0.5 points a session, half-life up to 2520 sessions | same | not set | the IG closing-price spread (LQD's return less 0.913 IEF's at duration 8.5, on SPY, 2015-2025, off the zero bound): the part of its change the index does not explain has sd 2.54 bp a session, 11.5 over 21 and 16.7 over 63 (model 1.36, 6.4, 11.6); the 21- and 63-session pair gives a half-life of 16 sessions and a stationary sd of 8.8 bp |
 | `corporate_spread_equity_lag` | sessions: the half-life at which the gap the corporate spread prices follows credit's leverage gap; 0 is the gap itself | same | not set | FRED BAA10Y on the S&P 500, off the zero bound 1990-2025: beta -0.47 bp per 1% over one session, -0.91 over five, -2.28 over 21, -2.51 over 63; ICE BofA IG OAS -0.65 a session (2023-2025); read whole, the model's is -2.2 at every horizon |
 | `corporate_spread_equity_lag_gain` | points of the spread's base per unit of the priced gap, beside the leverage term on the gap itself; 0 is the lag's own term; refused without `corporate_spread_equity_lag` | same | not set | the IG closing-price spread (LQD less 0.913 IEF at duration 8.5) on SPY 2015-2025, distributed lags: -2.25 bp per 1% on the day, -3.20 by nine sessions, -3.21 by 41 (2003-2014: -2.08, -3.30); the model's own -2.46 on the day and -1.92 by 41; 0.9 at a lag of 8 by least squares on lags 0-41 |
+| `market_factor_reversal` | the share of yesterday's whole market factor each name gives back over today's session, moved into the fair-value level so it is permanent; 0 is no reversal | same | not set | ^GSPC daily log returns 1990-2025: lag-1 autocorrelation -0.079 (total return the same; E-mini front future 2000-2025, rolls left out, -0.064); Lo-MacKinlay variance ratios 0.92, 0.86, 0.78, 0.76 at 2, 5, 10, 21 sessions (robust se 0.02, 0.05, 0.08, 0.12), under 1 in every decade |
+| `market_factor_reversal_vix_power` | the power q of the VIX over 20 the reversal's share follows, `k (X/20)^q`; 0 is a fixed share; read only with `market_factor_reversal` | same | not set | ^GSPC 1990-2025, lag-1 slope of the daily log return by the prior close's VIX: -0.017 (under 15), +0.030 (15-20), -0.025 (20-30), -0.167 (above 30); E-mini -0.027, +0.028, -0.035, -0.116; `r_{t-1} (X/20)^2` fits best, -0.0267 (se 0.0068) |
+| `market_factor_reversal_transient` | the share tau of the market's reversal left in the mispricing instead of the fair-value level, so the level keeps every move whole and what the reversal took returns at the mispricing's pace; 0 moves it all to the level; read only with `market_factor_reversal` | same | not set | ^GSPC daily log returns 1990-2025: Lo-MacKinlay variance ratios 0.78, 0.76, 0.69, 0.73 and 0.79 at 10, 21, 63, 126 and 252 sessions (robust se 0.08 to 0.29), flat after 10; the model without the reversal reads 0.79 at 252 through its slow mispricing, and with the whole reversal in the level 0.64 |
+| `market_vol_leverage_fast`, `market_vol_leverage_fast_half_life` | a second return memory beside `market_vol_leverage`'s, at its own half-life: the next session draws at the mixture times both memories' multipliers, and the VIX's read-back takes the fast one at its mean over the next 21 sessions; 0 is off | same | not set | ^GSPC and the VIX 1990-2025, the news-impact curve of realised vol (Engle-Ng sign-size form, pre-shock controls): the asymmetry N(-2) - N(+2) of log realised vol is 0.37 (se 0.02) over sessions 1-5, 0.17 over 6-20, 0.08 over 21-60 and 0.05 over 61-120; a two-sd rise lowers the next week's realised vol by 13% |
+| `market_vol_leverage_fast_up` | the share of a fall the fast return memory ignores, re-centred; 0 counts a day as `market_vol_leverage` does, 1 counts rises only (a rally lowers the next sessions' variance); read only with `market_vol_leverage_fast` | same | not set | ^GSPC and the VIX 1990-2025, the news-impact curve: a two-sd rise lowers the log of realised vol by 0.13 (se 0.02) over the next five sessions and by 0.02 over sessions 6-20, holding the pre-shock vol and the VIX fixed |
 | `news_preopen_share` | share of the day's endogenous company news released before the open and priced by the opening print; 0 prices it all in the session; refused without a night split | same | not set | the forty names 2015-07 to 2025-07, daily bars with the open: on each name's top 5% of idiosyncratic days (its four largest a year set aside as the event proxy) the night carries 0.259 of the idiosyncratic variance (block bootstrap se 0.013), about its share on ordinary days (0.266); 2005-2015 0.178; the model's with every event in the session 0.167 |
 | `news_session_release_share` | share of the session's endogenous company news released during the session on the measured profile, rather than at its first tick; 0 releases it all at the first tick | same | not set | the certified forty's 8-Ks without item 2.02, 2014-2025, accepted 09:30-16:00 New York on full sessions (EDGAR acceptance times, 1,372 filings): 0.6% in the first minute (calendar-year se 0.2%), 4.7% in the first half hour (0.9%), mean minute 223; the model's first tick, at `news_absorption_half_life` 0.6 with drift share 0.12, prices about 0.6 of the session's news |
 | `remark_growth_open_share` | share of the growth in the close's macro re-mark (fair value on the state before the step with only nominal output brought forward, the names' own figures as the step leaves them; the aggregate level's close step whole) that the next opening print prices; the re-mark's news (rates, the VIX, the cycle and its anticipation) stays at the close; 0 prices it all at the re-mark; refused without a night split | same | not set | the forty names 2015-01 to 2025-07, daily bars with the open, the dividend added back on the ex-date's night: the night carries 0.707 of the mean daily log return (se 0.19 by year); SPY 0.630, the S&P 500 0.693 on the same years; with the whole re-mark at the close the model's night carries about 0.15 |
@@ -3930,6 +3935,24 @@ of 0.0 it is a lognormal. The stress memory at each node moves the same
 number of its own standard deviations as the log VIX, since it is an
 average of the VIX's log excursions.
 
+`forecast_vix_level_nowcast` (0.0 on every shipped preset, left out of the
+digest there; refused without `forecast_horizon_sessions` and
+`vix_level_sigma`) gives the forecast a nowcast of that slow level from
+public data. The engine keeps $x$, the published VIX's log average at
+`forecast_vix_level_nowcast_half_life` sessions, started at
+`forecast_vix_level_nowcast_centre` $c$ at the first close, and the
+forecast iterates the law with the level at $g\,(x - c)\,\phi^k$ at $k$
+closes on, $g$ the dial and $\phi$ `vix_level_persistence`: it multiplies
+the anchor and the implied VIX the step reads, as the level does. The three
+are a projection of the level on the average, fitted on the model's own
+held-out histories, where the level is the engine's state. On R22-reg19
+with the level at 0.0181 and the fear memory, 12 histories of 5,292
+sessions, the forecast's log error loads 0.8 to 1.1 on the level at 21 to
+126 sessions and realised over forecast at 63 sessions runs from 0.86 under
+a VIX of 13 to 1.10 at 20 to 32; the average at a half-life of 126 sessions
+explains 39 per cent of the level's variance. The nowcast changes only what
+the forecast publishes.
+
 The variances the forecast reports run on a second track, where each convex
 VIX coupling (the factor's target, the GARCH coupling, the sector sigma and
 the jump rate) is taken as its expectation over the same spread, and the
@@ -4154,6 +4177,23 @@ $b(n) = 0.36\,(1 - e^{-(n - 1)/148})$ its slope on the VIX's close that day,
 about the VIX's mean over those days, $c = 19.3197$. The close marks
 are the curve the pt-v22 VIX-law screen priced and read, to 1e-12 over
 every horizon from 1 to 126 sessions.
+
+`futures_vix_premium_response` (0.0 on every shipped preset, left out of
+the digest there, refused without `futures_vix_listed`) moves the slope
+$b(n)$ a share $w$ of the way to the premium's time-series response
+$g(n) = -0.0716\,(1 - e^{-(n - 1)/0.5})$, also frozen in
+`derivatives::VIX_FUTURE`: the premium is
+$a(n) + ((1 - w)\,b(n) + w\,g(n))(P - c)$, in the close marks and the
+session's roll alike. $g(n)$ is how a contract's daily change on CFE differs
+from the tape's own expected change of its settlement, per point of the
+day's VIX move: the expected change is the local projection of the VIX
+$n - 1$ closes on, on the day's move with the previous close held (Cboe VIX
+1990-2026), and the regression pools 31,643 same-contract day pairs with
+$n$ from 2 to 126 (2004-2026). It is -0.072 (se 0.053, whole years
+resampled) and flat in $n$; by contract position F1 -0.080 (0.031), F2
+-0.090 (0.062) and F4 -0.071 (0.039), where $b(n)$ is +0.023, +0.067 and
++0.140. The level slope is a cross-section across contract-days; on the day
+the VIX jumps, CFE's premium falls a little at every tenor.
 
 Within the next session a contract is `m = n - 1` sessions from expiry
 counted from tonight's close, and moves with what the session says about

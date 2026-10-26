@@ -1338,6 +1338,57 @@ pub struct ModelParams {
     /// without this term the model's response peaks near +1.0 inside the
     /// month and is about +0.8 by 62. In [0, 10].
     pub treasury_equity_lag_gain: f64,
+    /// The market's next-session reversal: the share `k` of yesterday's
+    /// whole accumulated market factor `F_{d-1}` (the plain draw, night
+    /// included) that each name gives back over today's session, as
+    /// `-k * beta * F_{d-1} / 390` on each open tick. It is booked to the
+    /// crowd's attribution slot and moved whole into the name's fair-value
+    /// level on the tick, so it is permanent: the market's day overshoots
+    /// and a share of it is taken back the next session, not later. 0.0, on
+    /// every shipped preset, adds nothing (a branch), and a value of 0.0 is
+    /// left out of the model's digest. No draw and no state of its own: it
+    /// reads `prev_day_factor`, which the market's variance state carries.
+    ///
+    /// The S&P 500's daily close-to-close log return has a lag-1
+    /// autocorrelation of -0.079 over 1990-2025 (^GSPC; the total-return
+    /// index the same; the E-mini front future, rolls left out, -0.064 over
+    /// 2000-2025), and Lo-MacKinlay variance ratios of 0.92, 0.86, 0.78 and
+    /// 0.76 at 2, 5, 10 and 21 sessions (robust se 0.02, 0.05, 0.08, 0.12),
+    /// under 1 in every decade. The certified forty's equal-weighted index
+    /// reads -0.13 at lag 1 (2015-2025). In [0, 0.5].
+    pub market_factor_reversal: f64,
+    /// The market's reversal follows the VIX: under this power `q` the
+    /// share is `market_factor_reversal * (X / 20)^q`, with X the economy's
+    /// VIX at the last close, so `market_factor_reversal` is the share at a
+    /// VIX of 20. 0.0, on every shipped preset, is the share as it stands (a
+    /// branch), and a value of 0.0 is left out of the model's digest. Read
+    /// only with `market_factor_reversal` set. No draw and no state.
+    ///
+    /// The S&P 500's next-day reversal lives in turbulent markets: the lag-1
+    /// slope of ^GSPC's daily log return, 1990-2025, is -0.017, +0.030 and
+    /// -0.025 with the prior close's VIX under 15, 15-20 and 20-30, and
+    /// -0.167 above 30 (the E-mini future -0.027, +0.028, -0.035, -0.116).
+    /// Of `r_{t-1}`, `r_{t-1} X/20` and `r_{t-1} (X/20)^2` the last fits
+    /// best: -0.0267 (se 0.0068). In [0, 4].
+    pub market_factor_reversal_vix_power: f64,
+    /// The share of the market's reversal that stays in the name's
+    /// mispricing `s` instead of moving to the fair-value level. 0.0, on
+    /// every shipped preset, moves the whole reversal into the level, as
+    /// `market_factor_reversal` stands (a branch), and a value of 0.0 is left
+    /// out of the model's digest. At 1.0 yesterday's market move is still
+    /// partly undone the next session, but the fair-value level keeps every
+    /// move whole: what the reversal took is part of the transient
+    /// mispricing and is returned at the mispricing's own pace, so a crash's
+    /// level is not taken back. Read only with `market_factor_reversal` set.
+    /// No draw and no state.
+    ///
+    /// ^GSPC's daily log returns, 1990-2025: the Lo-MacKinlay variance ratio
+    /// falls to 0.78 by 10 sessions and stays there (0.76, 0.69, 0.73 and
+    /// 0.79 at 21, 63, 126 and 252; robust se 0.12 to 0.29), and the model
+    /// without the reversal already reads 0.79 at 252 through its slow
+    /// mispricing, so the tape's fast reversal does not lower the long
+    /// horizon's variance further. In [0, 1].
+    pub market_factor_reversal_transient: f64,
     /// The per-session innovation sd of credit's own state, points of the
     /// corporate spread's base. 0.0, on every shipped preset, is no state
     /// (the spread moves only with the VIX, the cycle and the leverage gap),
@@ -1605,6 +1656,40 @@ pub struct ModelParams {
     /// the expectation of every power of the VIX stays finite. In
     /// [-0.99, 0.99], the skew-normal's reach.
     pub forecast_vix_dispersion_skew: f64,
+    /// The forecast's nowcast of the VIX's slow level (`vix_level_sigma`):
+    /// its gain on the published VIX's slow average. The slow level moves
+    /// the VIX's anchor and is not public, so the forecast, which reads
+    /// public state only, iterates the law at the level's mean, and its
+    /// error then carries the level: on R22-reg19 with the level at
+    /// `vix_level_sigma` 0.0181 and the fear memory (12 held-out histories of
+    /// 5,292 sessions), the log error at 21 to 126 sessions loads 0.8 to 1.1
+    /// on the level, and realised over forecast at 63 sessions runs from
+    /// 0.86 under a VIX of 13 to 1.10 at 20 to 32. Off zero the engine keeps
+    /// the average `x` of the log published VIX at
+    /// `forecast_vix_level_nowcast_half_life` (from
+    /// `forecast_vix_level_nowcast_centre` at the first close), and the
+    /// forecast takes the level as `q = g (x - c)`, `g` this and `c` the
+    /// centre, its expectation `phi^k q` at `k` closes on (`phi`
+    /// `vix_level_persistence`), multiplying the anchor and the implied VIX
+    /// as the level itself does. A projection fitted on the model's own
+    /// held-out histories (the level is the engine's state there):
+    /// least squares of the level on the average, its half-life on a grid.
+    /// Read only with `forecast_horizon_sessions` and `vix_level_sigma` set;
+    /// 0.0, on every shipped preset, is no nowcast (a branch, the average
+    /// neither kept, snapshotted nor hashed), and a value of 0.0 is left out
+    /// of the model's digest. In [0, 5].
+    pub forecast_vix_level_nowcast: f64,
+    /// The half-life, in sessions, of the published VIX's log average the
+    /// slow level's nowcast reads (`forecast_vix_level_nowcast`). Read only
+    /// with that dial set; 0.0, on every shipped preset, takes the average as
+    /// the last close's log VIX, and a value of 0.0 is left out of the
+    /// model's digest. In [0, 2520].
+    pub forecast_vix_level_nowcast_half_life: f64,
+    /// The log VIX at which the slow level's nowcast is 0
+    /// (`forecast_vix_level_nowcast`), and the average's start at the first
+    /// close. Read only with that dial set; 0.0, on every shipped preset, is
+    /// left out of the model's digest. In [0, 6].
+    pub forecast_vix_level_nowcast_centre: f64,
     /// The share of the next meeting's shadow change the forecast's policy
     /// path leaves out. The shadow is the change the meeting function makes
     /// on the economy as published, the change `policy_anticipation` prices.
@@ -1816,6 +1901,21 @@ pub struct ModelParams {
     /// `futures_vix_listed` set; 0.0, on every shipped preset, is a branch,
     /// and a value of 0.0 is left out of the model's digest. In [0, 2520].
     pub futures_vix_live_slow_half_life: f64,
+    /// The VIX futures premium's slope on the VIX, moved this share of the
+    /// way from the frozen level slope `b(n)` to the premium's measured
+    /// time-series response `g(n)` (`derivatives::VIX_FUTURE`'s
+    /// `VixPremium::response`): the premium of a contract `n` sessions from
+    /// expiry is `a(n) + ((1 - w) b(n) + w g(n)) (VIX - centre)`. `b(n)` is
+    /// the slope of the settlement less the final settlement on the VIX's
+    /// close across contract-days; `g(n)` is how a contract's daily change
+    /// differs from the tape's own expected change of its settlement per
+    /// point of the day's VIX move (CFE VX 2004-2026 on the Cboe VIX close,
+    /// -0.072 at every tenor, se 0.053; `b(n)` is +0.02 to +0.19). So at 1.0
+    /// a VIX jump compresses the premium, as on CFE, where under `b(n)` it
+    /// widened it. Read only with `futures_vix_listed` set; 0.0, on every
+    /// shipped preset, is the frozen premium (a branch), and a value of 0.0
+    /// is left out of the model's digest. No draw and no state. In [0, 1].
+    pub futures_vix_premium_response: f64,
     /// Whether the engine lists policy-rate and term-rate futures. 0.0, on
     /// every shipped preset, lists none: no contract, no state, nothing in
     /// the snapshot or the state hash, and a value of 0.0 is left out of the
@@ -4909,6 +5009,72 @@ pub struct ModelParams {
     /// kernel the same way).
     /// pt-v21 ships 1.0.
     pub market_vol_leverage_standardise: f64,
+    /// Gain of the market factor's variance on a FAST return memory, in log
+    /// variance per unit of the memory, beside `market_vol_leverage`'s. 0.0,
+    /// which every preset carries, is off: the memory never moves, the
+    /// snapshot and state hash do not carry it, and every close is the
+    /// arithmetic that stood, to the bit; a value of 0.0 is left out of the
+    /// model's digest.
+    ///
+    /// Off zero the engine keeps a second memory `l_f` of the day factor,
+    /// counted as `market_vol_leverage`'s is (the same unit,
+    /// `market_vol_leverage_standardise`, and the same treatment of an up
+    /// day, `market_vol_leverage_down`), at its own half-life
+    /// `market_vol_leverage_fast_half_life`:
+    ///
+    /// ```text
+    /// l_f' = phi_f * l_f + (1 - phi_f) * u,   phi_f = 0.5^(1 / half_life)
+    /// ```
+    ///
+    /// and the variance the next session draws with is the mixture times
+    /// both multipliers, `exp(k l - k^2 s^2 / 2) * exp(k_f l_f - k_f^2 s_f^2 / 2)`,
+    /// clamped, `s_f^2` the fast memory's stationary variance, so its mean
+    /// is about one. A forced close moves it with the day's factor and sets
+    /// the variance without it, as it does the slower memory.
+    ///
+    /// THE VIX READS IT OVER ITS OWN WINDOW. The identity's read-back
+    /// (`vix_level_identity`) takes the fast multiplier at its expected
+    /// mean over the next 21 sessions under the memory's own decay,
+    /// `(1/21) sum_{j=0..20} exp(k_f phi_f^j l_f - k_f^2 s_f^2 phi_f^(2j) / 2)`,
+    /// in place of tomorrow's value: the VIX prices the variance over its
+    /// 30 calendar days, and a burst that decays in a week is a fraction of
+    /// that. So the fast memory lives mostly outside the loop from the VIX
+    /// back to the variance. The forecast carries the memory's expectation
+    /// and reads it the same way.
+    ///
+    /// Why. On the S&P 500 (^GSPC and the VIX, 1990-2025) a day's return
+    /// moves the next week's realised volatility by its sign: a two-sd fall
+    /// raises the log of realised vol over the next five sessions by 0.24
+    /// and a two-sd rise lowers it by 0.13, holding the pre-shock vol, the
+    /// VIX and their trailing levels fixed (Engle and Ng 1993's sign-size
+    /// form). The asymmetry, N(-2) less N(+2), is 0.37 (se 0.02) over
+    /// sessions 1-5, 0.17 over 6-20, 0.08 over 21-60 and 0.05 over 61-120.
+    /// The one memory at a half-life of 15 sessions gives about the tape's
+    /// asymmetry beyond 20 sessions and half of it in the first week; what
+    /// is missing decays at a half-life of about five sessions. The index
+    /// leverage kernel of Bouchaud, Matacz and Potters (2001) is strong and
+    /// short-lived in the same way. In [0, 50].
+    pub market_vol_leverage_fast: f64,
+    /// Half-life of the fast return memory, in sessions. Unread at
+    /// `market_vol_leverage_fast` 0.0; must be positive off it. In [0, 2520].
+    pub market_vol_leverage_fast_half_life: f64,
+    /// How much of a FALL the fast return memory ignores, the mirror of
+    /// `market_vol_leverage_down`. 0.0, which every preset carries, counts
+    /// the day as the slower memory does (its `market_vol_leverage_down`
+    /// included), to the bit; 1.0 counts rises only, so a rally lowers the
+    /// variance the next sessions draw at and a fall moves the fast memory
+    /// only by its re-centring. The memory is re-centred on the mean the
+    /// ignored share takes away, at the variance the day was drawn at, and
+    /// its stationary spread is the half-normal one with this share. Unread
+    /// at `market_vol_leverage_fast` 0.0. In [0, 1]; a value of 0.0 is left
+    /// out of the model's digest.
+    ///
+    /// Why. On the S&P 500 and the VIX, 1990-2025, a two-sd rise lowers the
+    /// log of realised vol over the next five sessions by 0.13 (se 0.02) and
+    /// over sessions 6-20 by 0.02, holding the pre-shock vol and the VIX
+    /// fixed: a rally calms the market within a week. A model whose variance
+    /// takes a rise's squared size and a fall's alike shows almost none of it.
+    pub market_vol_leverage_fast_up: f64,
     /// Degrees of freedom of the day's market draw: each session's
     /// market-factor variance is multiplied by `m = (nu - 2) / X`, `X` a
     /// chi-square with `nu` degrees of freedom drawn once at the open, so
@@ -8757,6 +8923,9 @@ impl ModelParams {
             market_vol_leverage_half_life: 0.0,
             market_vol_leverage_down: 0.0,
             market_vol_leverage_standardise: 0.0,
+            market_vol_leverage_fast: 0.0,
+            market_vol_leverage_fast_half_life: 0.0,
+            market_vol_leverage_fast_up: 0.0,
             market_day_tail_df: 0.0,
             market_day_tail_state_share: 0.0,
             market_vol_alpha_excursion: 0.0,
@@ -8955,6 +9124,9 @@ impl ModelParams {
             corporate_spread_equity_lag_gain: 0.0,
             treasury_equity_lag: 0.0,
             treasury_equity_lag_gain: 0.0,
+            market_factor_reversal: 0.0,
+            market_factor_reversal_vix_power: 0.0,
+            market_factor_reversal_transient: 0.0,
             corporate_spread_noise_sd: 0.0,
             corporate_spread_noise_half_life: 0.0,
             treasury_2y_meeting_carry: 0.0,
@@ -8971,6 +9143,9 @@ impl ModelParams {
             forecast_vix_dispersion: 0.0,
             forecast_vix_dispersion_half_life: 0.0,
             forecast_vix_dispersion_skew: 0.0,
+            forecast_vix_level_nowcast: 0.0,
+            forecast_vix_level_nowcast_half_life: 0.0,
+            forecast_vix_level_nowcast_centre: 0.0,
             forecast_policy_shadow_discount: 0.0,
             forecast_policy_persistence: 0.0,
             forecast_policy_reversion: 0.0,
@@ -8986,6 +9161,7 @@ impl ModelParams {
             futures_vix_live_fast_share: 0.0,
             futures_vix_live_fast_half_life: 0.0,
             futures_vix_live_slow_half_life: 0.0,
+            futures_vix_premium_response: 0.0,
             futures_rates_listed: 0.0,
             futures_oil_listed: 0.0,
             margin_scan_coverage: 0.0,
@@ -11470,6 +11646,9 @@ impl ModelParams {
             "market_vol_leverage_half_life" => self.market_vol_leverage_half_life,
             "market_vol_leverage_down" => self.market_vol_leverage_down,
             "market_vol_leverage_standardise" => self.market_vol_leverage_standardise,
+            "market_vol_leverage_fast" => self.market_vol_leverage_fast,
+            "market_vol_leverage_fast_half_life" => self.market_vol_leverage_fast_half_life,
+            "market_vol_leverage_fast_up" => self.market_vol_leverage_fast_up,
             "market_day_tail_df" => self.market_day_tail_df,
             "market_day_tail_state_share" => self.market_day_tail_state_share,
             "market_vol_alpha_excursion" => self.market_vol_alpha_excursion,
@@ -11649,6 +11828,9 @@ impl ModelParams {
             "corporate_spread_equity_lag_gain" => self.corporate_spread_equity_lag_gain,
             "treasury_equity_lag" => self.treasury_equity_lag,
             "treasury_equity_lag_gain" => self.treasury_equity_lag_gain,
+            "market_factor_reversal" => self.market_factor_reversal,
+            "market_factor_reversal_vix_power" => self.market_factor_reversal_vix_power,
+            "market_factor_reversal_transient" => self.market_factor_reversal_transient,
             "corporate_spread_noise_sd" => self.corporate_spread_noise_sd,
             "corporate_spread_noise_half_life" => self.corporate_spread_noise_half_life,
             "treasury_2y_meeting_carry" => self.treasury_2y_meeting_carry,
@@ -11665,6 +11847,9 @@ impl ModelParams {
             "forecast_vix_dispersion" => self.forecast_vix_dispersion,
             "forecast_vix_dispersion_half_life" => self.forecast_vix_dispersion_half_life,
             "forecast_vix_dispersion_skew" => self.forecast_vix_dispersion_skew,
+            "forecast_vix_level_nowcast" => self.forecast_vix_level_nowcast,
+            "forecast_vix_level_nowcast_half_life" => self.forecast_vix_level_nowcast_half_life,
+            "forecast_vix_level_nowcast_centre" => self.forecast_vix_level_nowcast_centre,
             "forecast_policy_shadow_discount" => self.forecast_policy_shadow_discount,
             "forecast_policy_persistence" => self.forecast_policy_persistence,
             "forecast_policy_reversion" => self.forecast_policy_reversion,
@@ -11680,6 +11865,7 @@ impl ModelParams {
             "futures_vix_live_fast_share" => self.futures_vix_live_fast_share,
             "futures_vix_live_fast_half_life" => self.futures_vix_live_fast_half_life,
             "futures_vix_live_slow_half_life" => self.futures_vix_live_slow_half_life,
+            "futures_vix_premium_response" => self.futures_vix_premium_response,
             "futures_rates_listed" => self.futures_rates_listed,
             "futures_oil_listed" => self.futures_oil_listed,
             "margin_scan_coverage" => self.margin_scan_coverage,
@@ -11929,6 +12115,9 @@ impl ModelParams {
             "market_vol_leverage_half_life" => out.market_vol_leverage_half_life = value,
             "market_vol_leverage_down" => out.market_vol_leverage_down = value,
             "market_vol_leverage_standardise" => out.market_vol_leverage_standardise = value,
+            "market_vol_leverage_fast" => out.market_vol_leverage_fast = value,
+            "market_vol_leverage_fast_half_life" => out.market_vol_leverage_fast_half_life = value,
+            "market_vol_leverage_fast_up" => out.market_vol_leverage_fast_up = value,
             "market_day_tail_df" => out.market_day_tail_df = value,
             "market_day_tail_state_share" => out.market_day_tail_state_share = value,
             "market_vol_alpha_excursion" => out.market_vol_alpha_excursion = value,
@@ -12108,6 +12297,9 @@ impl ModelParams {
             "corporate_spread_equity_lag_gain" => out.corporate_spread_equity_lag_gain = value,
             "treasury_equity_lag" => out.treasury_equity_lag = value,
             "treasury_equity_lag_gain" => out.treasury_equity_lag_gain = value,
+            "market_factor_reversal" => out.market_factor_reversal = value,
+            "market_factor_reversal_vix_power" => out.market_factor_reversal_vix_power = value,
+            "market_factor_reversal_transient" => out.market_factor_reversal_transient = value,
             "corporate_spread_noise_sd" => out.corporate_spread_noise_sd = value,
             "corporate_spread_noise_half_life" => out.corporate_spread_noise_half_life = value,
             "treasury_2y_meeting_carry" => out.treasury_2y_meeting_carry = value,
@@ -12124,6 +12316,9 @@ impl ModelParams {
             "forecast_vix_dispersion" => out.forecast_vix_dispersion = value,
             "forecast_vix_dispersion_half_life" => out.forecast_vix_dispersion_half_life = value,
             "forecast_vix_dispersion_skew" => out.forecast_vix_dispersion_skew = value,
+            "forecast_vix_level_nowcast" => out.forecast_vix_level_nowcast = value,
+            "forecast_vix_level_nowcast_half_life" => out.forecast_vix_level_nowcast_half_life = value,
+            "forecast_vix_level_nowcast_centre" => out.forecast_vix_level_nowcast_centre = value,
             "forecast_policy_shadow_discount" => out.forecast_policy_shadow_discount = value,
             "forecast_policy_persistence" => out.forecast_policy_persistence = value,
             "forecast_policy_reversion" => out.forecast_policy_reversion = value,
@@ -12139,6 +12334,7 @@ impl ModelParams {
             "futures_vix_live_fast_share" => out.futures_vix_live_fast_share = value,
             "futures_vix_live_fast_half_life" => out.futures_vix_live_fast_half_life = value,
             "futures_vix_live_slow_half_life" => out.futures_vix_live_slow_half_life = value,
+            "futures_vix_premium_response" => out.futures_vix_premium_response = value,
             "futures_rates_listed" => out.futures_rates_listed = value,
             "futures_oil_listed" => out.futures_oil_listed = value,
             "margin_scan_coverage" => out.margin_scan_coverage = value,
@@ -13034,6 +13230,27 @@ impl ModelParams {
                 "market_vol_leverage_standardise is {}. It is the power on the day's own sd the return memory counts a day in, in [0, 1].",
                 self.market_vol_leverage_standardise));
         }
+        if !(self.market_vol_leverage_fast >= 0.0 && self.market_vol_leverage_fast <= 50.0) {
+            return Err(format!(
+                "market_vol_leverage_fast is {}. It is a gain on log variance per unit of the fast return memory, in [0, 50]; 0 is off.",
+                self.market_vol_leverage_fast));
+        }
+        if !(self.market_vol_leverage_fast_half_life >= 0.0 && self.market_vol_leverage_fast_half_life <= 2520.0) {
+            return Err(format!(
+                "market_vol_leverage_fast_half_life is {}. It is a half-life in sessions, in [0, 2520].",
+                self.market_vol_leverage_fast_half_life));
+        }
+        if !(self.market_vol_leverage_fast_up >= 0.0 && self.market_vol_leverage_fast_up <= 1.0) {
+            return Err(format!(
+                "market_vol_leverage_fast_up is {}. It is the share of a fall the fast return memory ignores, in [0, 1].",
+                self.market_vol_leverage_fast_up));
+        }
+        if self.market_vol_leverage_fast != 0.0 && self.market_vol_leverage_fast_half_life == 0.0 {
+            return Err(format!(
+                "market_vol_leverage_fast is {} but market_vol_leverage_fast_half_life is 0. The fast \
+                 return memory needs a half-life in sessions.",
+                self.market_vol_leverage_fast));
+        }
         if !(self.market_day_tail_df == 0.0
             || (self.market_day_tail_df >= 3.0 && self.market_day_tail_df <= 200.0))
         {
@@ -13809,6 +14026,24 @@ impl ModelParams {
                  0 is the spread reading the leverage gap itself.",
                 self.corporate_spread_equity_lag));
         }
+        if !(self.market_factor_reversal_transient >= 0.0 && self.market_factor_reversal_transient <= 1.0) {
+            return Err(format!(
+                "market_factor_reversal_transient is {}. It is the share of the market's reversal that \
+                 stays in the mispricing instead of the fair-value level, in [0, 1]; 0 moves it all to the level.",
+                self.market_factor_reversal_transient));
+        }
+        if !(self.market_factor_reversal_vix_power >= 0.0 && self.market_factor_reversal_vix_power <= 4.0) {
+            return Err(format!(
+                "market_factor_reversal_vix_power is {}. It is the power of the VIX over 20 the market's \
+                 reversal share follows, in [0, 4]; 0 is a fixed share.",
+                self.market_factor_reversal_vix_power));
+        }
+        if !(self.market_factor_reversal >= 0.0 && self.market_factor_reversal <= 0.5) {
+            return Err(format!(
+                "market_factor_reversal is {}. It is the share of yesterday's market factor each name \
+                 gives back over today's session, in [0, 0.5]; 0 is no reversal.",
+                self.market_factor_reversal));
+        }
         if !(self.corporate_spread_equity_lag_gain >= 0.0 && self.corporate_spread_equity_lag_gain <= 10.0) {
             return Err(format!(
                 "corporate_spread_equity_lag_gain is {}. It is points of the corporate spread's \
@@ -13959,6 +14194,29 @@ impl ModelParams {
                  spread as normal.",
                 self.forecast_vix_dispersion_skew));
         }
+        for (name, value, hi, unit) in [
+            ("forecast_vix_level_nowcast", self.forecast_vix_level_nowcast, 5.0,
+             "the slow level's nowcast's gain on the published VIX's log average"),
+            ("forecast_vix_level_nowcast_half_life", self.forecast_vix_level_nowcast_half_life, 2520.0,
+             "the half-life in sessions of the published VIX's log average"),
+            ("forecast_vix_level_nowcast_centre", self.forecast_vix_level_nowcast_centre, 6.0,
+             "the log VIX at which the slow level's nowcast is 0"),
+        ] {
+            if !(value >= 0.0 && value <= hi) {
+                return Err(format!(
+                    "{name} is {value}. It is {unit}, in [0, {hi}]; 0 is off."));
+            }
+        }
+        if self.forecast_vix_level_nowcast != 0.0 {
+            if self.forecast_horizon_sessions == 0.0 || self.vix_level_sigma == 0.0 {
+                return Err(format!(
+                    "forecast_vix_level_nowcast is {} but forecast_horizon_sessions is {} and \
+                     vix_level_sigma is {}. It nowcasts the VIX's slow level for the forecast: \
+                     set both first.",
+                    self.forecast_vix_level_nowcast, self.forecast_horizon_sessions,
+                    self.vix_level_sigma));
+            }
+        }
         if !(self.forecast_policy_persistence >= 0.0 && self.forecast_policy_persistence < 1.0) {
             return Err(format!(
                 "forecast_policy_persistence is {}. It is the share of a meeting's expected \
@@ -14063,6 +14321,20 @@ impl ModelParams {
                  listed contract reads 126 sessions ahead: with futures_vix_listed on, \
                  forecast_horizon_sessions is at least 126.",
                 self.forecast_horizon_sessions, self.futures_vix_listed));
+        }
+        if !(self.futures_vix_premium_response >= 0.0 && self.futures_vix_premium_response <= 1.0) {
+            return Err(format!(
+                "futures_vix_premium_response is {}. It is the share of the VIX futures premium's \
+                 slope moved from the frozen level slope to the measured time-series response, \
+                 in [0, 1].",
+                self.futures_vix_premium_response));
+        }
+        if self.futures_vix_premium_response != 0.0 && self.futures_vix_listed == 0.0 {
+            return Err(format!(
+                "futures_vix_listed is 0 but futures_vix_premium_response is {}. It shapes the VIX \
+                 futures' premium, which only futures_vix_listed lists: set futures_vix_listed to \
+                 1.0 first.",
+                self.futures_vix_premium_response));
         }
         if !(self.futures_vix_live_fast_share >= 0.0 && self.futures_vix_live_fast_share <= 1.0) {
             return Err(format!(
@@ -14754,6 +15026,9 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "market_vol_cycle_trough_release",
     "market_vol_leverage",
     "market_vol_leverage_down",
+    "market_vol_leverage_fast",
+    "market_vol_leverage_fast_half_life",
+    "market_vol_leverage_fast_up",
     "market_vol_leverage_half_life",
     "market_vol_leverage_standardise",
     "market_vol_slow_gamma",
@@ -14821,6 +15096,9 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "corporate_spread_equity_lag_gain",
     "treasury_equity_lag",
     "treasury_equity_lag_gain",
+    "market_factor_reversal",
+    "market_factor_reversal_vix_power",
+    "market_factor_reversal_transient",
     "corporate_spread_noise_sd",
     "corporate_spread_noise_half_life",
     "treasury_term_premium_sd",
@@ -14839,6 +15117,9 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "forecast_vix_dispersion",
     "forecast_vix_dispersion_half_life",
     "forecast_vix_dispersion_skew",
+    "forecast_vix_level_nowcast",
+    "forecast_vix_level_nowcast_half_life",
+    "forecast_vix_level_nowcast_centre",
     "forecast_policy_shadow_discount",
     "forecast_policy_persistence",
     "forecast_policy_reversion",
@@ -14850,6 +15131,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "futures_vix_live_fast_share",
     "futures_vix_live_fast_half_life",
     "futures_vix_live_slow_half_life",
+    "futures_vix_premium_response",
     "futures_rates_listed",
     "futures_oil_listed",
     "margin_scan_coverage",
@@ -14980,6 +15262,9 @@ pub fn settable_names() -> Vec<&'static str> {
         "market_vol_leverage_half_life",
         "market_vol_leverage_down",
         "market_vol_leverage_standardise",
+        "market_vol_leverage_fast",
+        "market_vol_leverage_fast_half_life",
+        "market_vol_leverage_fast_up",
         "market_day_tail_df",
         "market_day_tail_state_share",
         "market_vol_alpha_excursion",
@@ -15084,6 +15369,9 @@ pub fn settable_names() -> Vec<&'static str> {
         "corporate_spread_equity_lag_gain",
         "treasury_equity_lag",
         "treasury_equity_lag_gain",
+        "market_factor_reversal",
+        "market_factor_reversal_vix_power",
+        "market_factor_reversal_transient",
         "corporate_spread_noise_sd",
         "corporate_spread_noise_half_life",
         "treasury_term_premium_sd",
@@ -15102,6 +15390,9 @@ pub fn settable_names() -> Vec<&'static str> {
         "forecast_vix_dispersion",
         "forecast_vix_dispersion_half_life",
         "forecast_vix_dispersion_skew",
+        "forecast_vix_level_nowcast",
+        "forecast_vix_level_nowcast_half_life",
+        "forecast_vix_level_nowcast_centre",
         "forecast_policy_shadow_discount",
         "forecast_policy_persistence",
         "forecast_policy_reversion",
@@ -15117,6 +15408,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "futures_vix_live_fast_share",
         "futures_vix_live_fast_half_life",
         "futures_vix_live_slow_half_life",
+        "futures_vix_premium_response",
         "futures_rates_listed",
         "futures_oil_listed",
         "margin_scan_coverage",

@@ -89,6 +89,80 @@ records are identical (`tests/test_futures_accounts.py`).
   carries 0.707 of the mean daily log return; the model's, with the whole
   re-mark at the close, about 0.15.
 
+
+### A fast return memory on the market's variance
+
+- `market_vol_leverage_fast` and `market_vol_leverage_fast_half_life` are new,
+  0.0 on every preset and left out of the digest there: a second return memory
+  on the market factor's variance beside `market_vol_leverage`'s, at its own
+  half-life. The VIX's read-back and the forecast take it at its mean over the
+  VIX's 21-session window. Its state is carried by the snapshot and the state
+  hash only while it is set. On the S&P 500, 1990-2025, a day's return moves
+  the next week's realised volatility by its sign: a two-sd fall raises it by
+  0.24 in logs and a two-sd rise lowers it by 0.13, and most of that is gone
+  within twenty sessions.
+- `market_vol_leverage_fast_up` is new, 0.0 on every preset and left out of
+  the digest there: the share of a fall the fast memory ignores, re-centred,
+  so at 1.0 it counts rises only and a rally calms the next sessions. On the
+  S&P 500 a two-sd rise lowers the next week's realised vol by 0.13 in logs.
+
+### The market's next-session reversal
+
+- `market_factor_reversal` is a new dial, 0.0 on every preset and left out of
+  the digest there: the share of yesterday's whole market factor each name
+  gives back over today's session, moved into the fair-value level so it does
+  not revert. No draw and no state of its own. The S&P 500's daily return has
+  a lag-1 autocorrelation of -0.079 over 1990-2025 and its variance ratios
+  fall to 0.76 by 21 sessions; the E-mini future reads the same.
+- `market_factor_reversal_vix_power` is new, 0.0 on every preset and left out
+  of the digest there: the reversal's share follows the VIX as `k (X/20)^q`.
+  The S&P 500's next-day reversal is near zero under a VIX of 30 and -0.17
+  above it; `(X/20)^2` fits best.
+- `market_factor_reversal_transient` is new, 0.0 on every preset and left out
+  of the digest there: the share of the reversal that stays in the name's
+  mispricing instead of moving to the fair-value level. At 1.0 a move is
+  still partly undone the next session, but the level keeps every move whole,
+  so a crash is not taken back. No draw and no state. The S&P 500's variance
+  ratios fall to 0.78 by 10 sessions and stay there out to 252 (0.79), which
+  the model already reads at 252 without the reversal.
+
+### The index smile's term scaling
+
+- `surface_index_tenor_exponent` is new, 0.0 on every preset and left out of
+  the digest there. Off zero the index's SSVI power law is read at the
+  21-session fit's total variance and falls from there as `theta^-x`, in
+  place of `surface_curvature_exponent`: the 21-session smile, its VIX and
+  its SKEW are unchanged, and the at-the-money skew scales with the tenor as
+  `T^-x` (about `T^-0.4` on the S&P). Index only; read only with
+  `surface_ssvi` set.
+- `surface_index_tenor_strip` is new, 0.0 on every preset and left out of
+  the digest there. At 1.0 the term scaling holds each tenor's strip (the
+  VIX formula's variance) where SSVI's own power law puts it, in place of its
+  at-the-money variance: the VIX9D, VIX3M, VIX6M and VIX1Y strips are
+  unchanged and the scaling moves variance between the money and the wings.
+
+### The forecast's nowcast of the VIX's slow level
+
+- `forecast_vix_level_nowcast`, `forecast_vix_level_nowcast_half_life` and
+  `forecast_vix_level_nowcast_centre` are new, 0.0 on every preset and left
+  out of the digest there; the first is refused without
+  `forecast_horizon_sessions` and `vix_level_sigma`. Off zero the engine keeps
+  the published VIX's log average (snapshotted and hashed only then) and the
+  forecast takes the VIX's slow level, which it cannot see, as the gain times
+  the average's gap to the centre, decaying at `vix_level_persistence`. A
+  projection fitted on held-out histories. It changes only what the forecast
+  publishes.
+
+### The VIX futures premium's response
+
+- `futures_vix_premium_response` is a new dial, 0.0 on every preset and left
+  out of the digest there; refused without `futures_vix_listed`. It moves the
+  VIX futures premium's slope on the VIX from the frozen level slope `b(n)`
+  (+0.02 to +0.19 a VIX point) toward its time-series response measured on
+  CFE VX, 2004-2026: a contract's daily change less the tape's own expected
+  change of its settlement, per point of the day's VIX move, -0.072 (se 0.053)
+  and flat in tenor. At 1.0 a VIX jump compresses the premium, as on CFE. No
+  draw and no state.
 ### Company news released before the open
 
 - `news_preopen_share` is a new dial, 0.0 on every preset and left out of the

@@ -1601,6 +1601,11 @@ impl Engine {
         if self.carries_market_vol_leverage() {
             out.put("market_vol_leverage_memory", V::Float(self.market_vol_leverage_memory()));
         }
+        // The fast return memory, on the same rule, with
+        // `market_vol_leverage_fast` set.
+        if self.carries_market_vol_leverage_fast() {
+            out.put("market_vol_leverage_fast_memory", V::Float(self.market_vol_leverage_fast_memory()));
+        }
         // The cycle's volatility multiplier, on the same rule: carried, and
         // hashed, only with `market_vol_cycle_ratio` set and once a close
         // has set it.
@@ -1732,6 +1737,11 @@ impl Engine {
         // The VIX's fear memory, a key only while `vix_fear_uptake` is set.
         if self.carries_vix_fear() {
             out.put("vix_fear", V::Float(self.vix_fear()));
+        }
+        // The published VIX's log average, a key only while
+        // `forecast_vix_level_nowcast` is set.
+        if self.carries_vix_log_average() {
+            out.put("vix_log_average", V::Float(self.vix_log_average()));
         }
         // The VIX futures (`futures_vix_listed`): their numbers, and their
         // book once an agent has traded one.
@@ -2182,6 +2192,8 @@ impl Engine {
             // The dial-gated state the later mechanisms carry (every dial 0.0
             // on every shipped preset, so no shipped snapshot carries one).
             Gated::dial("market_vol_leverage_memory", "market_vol_leverage", p.market_vol_leverage),
+            Gated::dial("market_vol_leverage_fast_memory", "market_vol_leverage_fast",
+                        p.market_vol_leverage_fast),
             Gated::held("market_vol_cycle_log", "market_vol_cycle_ratio", p.market_vol_cycle_ratio),
             Gated::held("cycle_hold", "market_vol_cycle_hold_onset", p.market_vol_cycle_hold_onset),
             Gated::dial("vix_stress_memory", "vix_stress_premium", p.vix_stress_premium),
@@ -2203,6 +2215,7 @@ impl Engine {
             Gated::held("futures_book", "futures_index_listed", p.futures_index_listed),
             Gated::held("night_bridge", "night_session_steps", p.night_session_steps),
             Gated::dial("vix_fear", "vix_fear_uptake", p.vix_fear_uptake),
+            Gated::dial("vix_log_average", "forecast_vix_level_nowcast", p.forecast_vix_level_nowcast),
             Gated::dial("vix_futures", "futures_vix_listed", p.futures_vix_listed),
             Gated::held("vix_futures_book", "futures_vix_listed", p.futures_vix_listed),
             Gated::dial("rate_futures", "futures_rates_listed", p.futures_rates_listed),
@@ -2949,6 +2962,10 @@ impl Engine {
         if inner.carries_vix_fear() {
             inner.set_vix_fear(read_finite(snapshot, "", "vix_fear")?);
         }
+        // The published VIX's log average (`forecast_vix_level_nowcast`).
+        if inner.carries_vix_log_average() {
+            inner.set_vix_log_average(read_finite(snapshot, "", "vix_log_average")?);
+        }
         // The VIX futures (`futures_vix_listed`): required while the switch
         // is set, which the key check above has held them to.
         {
@@ -3113,6 +3130,10 @@ impl Engine {
         if inner.carries_market_vol_leverage() {
             inner.set_market_vol_leverage_memory(
                 read_finite(snapshot, "", "market_vol_leverage_memory")?);
+        }
+        if inner.carries_market_vol_leverage_fast() {
+            inner.set_market_vol_leverage_fast_memory(
+                read_finite(snapshot, "", "market_vol_leverage_fast_memory")?);
         }
 
         // The macro chain's state, every field by name.

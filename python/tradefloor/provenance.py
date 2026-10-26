@@ -399,6 +399,19 @@ OUT_OF_SCOPE = {
         "`forecast_vix_dispersion` is 0.0. Off zero it is the skewness of the "
         "log VIX's spread about the forecast, measured with the sd on held-out "
         "histories; at 0.0 it is also left out of the model's digest",
+    "forecast_vix_level_nowcast":
+        "unread while `forecast_horizon_sessions` is 0.0, and refused without "
+        "it and `vix_level_sigma`, which no preset sets: the forecast's nowcast "
+        "of the VIX's slow level, a projection on held-out histories; it "
+        "changes only what the forecast publishes; at 0.0 the average is "
+        "neither kept, snapshotted nor hashed, and it is left out of the "
+        "model's digest",
+    "forecast_vix_level_nowcast_half_life":
+        "unread while `forecast_vix_level_nowcast` is 0.0; at 0.0 it is also "
+        "left out of the model's digest",
+    "forecast_vix_level_nowcast_centre":
+        "unread while `forecast_vix_level_nowcast` is 0.0; at 0.0 it is also "
+        "left out of the model's digest",
     "forecast_policy_shadow_discount":
         "unread while `forecast_horizon_sessions` is 0.0: "
         "`forecast_policy_path` does not run. A projection fitted on the "
@@ -492,6 +505,12 @@ OUT_OF_SCOPE = {
         "reads it, and at 0.0 its part is a branch; fitted with "
         "`futures_vix_live_fast_share`; at 0.0 it is also left out of the "
         "model's digest",
+    "futures_vix_premium_response":
+        "unread while `futures_vix_listed` is 0.0, and refused without it: "
+        "only the VIX futures' premium reads it, and at 0.0 the frozen premium "
+        "is a branch; the response it moves toward is measured once on CFE VX "
+        "and frozen in `derivatives::VIX_FUTURE`; no draw and no state; at 0.0 "
+        "it is also left out of the model's digest",
     # The rate futures (pt-v22 phase 1), inert on every shipped preset. A
     # rate future reads the policy rate each close sets and the forecast and
     # draws nothing, so off zero it leaves every price where it was.
@@ -761,6 +780,30 @@ OUT_OF_SCOPE = {
         "inert at 0.0 and read only with credit's leverage gap carried; "
         "refused without `treasury_equity_lag`: the 10-year's anchor is the "
         "expression that stood; no draw; at 0.0 it is also left out of the "
+        "model's digest",
+    "market_vol_leverage_fast":
+        "inert at 0.0: the fast return memory never moves and the variance is "
+        "the arithmetic that stood (a branch in the close); its state is carried "
+        "only with the dial set; at 0.0 it is also left out of the model's digest",
+    "market_vol_leverage_fast_half_life":
+        "unread while `market_vol_leverage_fast` is 0.0; at 0.0 it is also left "
+        "out of the model's digest",
+    "market_vol_leverage_fast_up":
+        "unread while `market_vol_leverage_fast` is 0.0; at 0.0 the fast memory "
+        "counts a day as the slower memory does, to the bit; at 0.0 it is also "
+        "left out of the model's digest",
+    "market_factor_reversal":
+        "inert at 0.0: no name gives back any of yesterday's market factor, "
+        "as it stood (a branch in the tick); no draw and no state of its own; "
+        "at 0.0 it is also left out of the model's digest",
+    "market_factor_reversal_vix_power":
+        "inert at 0.0 and read only with `market_factor_reversal` set: the "
+        "reversal's share is fixed, as it stood (a branch in the tick); no draw "
+        "and no state; at 0.0 it is also left out of the model's digest",
+    "market_factor_reversal_transient":
+        "inert at 0.0 and read only with `market_factor_reversal` set: the "
+        "whole reversal moves to the fair-value level, as it stood (a branch in "
+        "the tick); no draw and no state; at 0.0 it is also left out of the "
         "model's digest",
     "pinned_vix_sets_variance":
         "inert at 0.0: a pinned VIX marks tonight's close forced only when "

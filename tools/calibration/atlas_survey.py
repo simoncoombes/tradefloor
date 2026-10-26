@@ -462,6 +462,10 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "forecast_vix_dispersion": (0.0, 0.6),
     "forecast_vix_dispersion_half_life": (0.0, 126.0),
     "forecast_vix_dispersion_skew": (0.0, 0.99),
+    # The slow level's nowcast: its gain, its average's half-life and centre.
+    "forecast_vix_level_nowcast": (0.0, 1.0),
+    "forecast_vix_level_nowcast_half_life": (0.0, 504.0),
+    "forecast_vix_level_nowcast_centre": (0.0, 3.5),
     "forecast_policy_shadow_discount": (0.0, 0.5),
     "forecast_policy_persistence": (0.0, 0.9),
     "forecast_policy_reversion": (0.0, 0.3),
@@ -481,6 +485,8 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "futures_vix_live_fast_share": (0.0, 1.0),
     "futures_vix_live_fast_half_life": (0.0, 10.0),
     "futures_vix_live_slow_half_life": (0.0, 120.0),
+    # The premium's slope moved toward its measured time-series response: a share.
+    "futures_vix_premium_response": (0.0, 1.0),
     # The rate futures (pt-v22 phase 1): a switch. It moves no stock price.
     "futures_rates_listed": (0.0, 1.0),
     # The oil futures (pt-v22 phase 1): a switch. It moves no stock price.
@@ -541,6 +547,12 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "market_vol_leverage_half_life": (0.0, 126.0),
     # A share: 0 counts up and down days alike, 1 counts falls only.
     "market_vol_leverage_down": (0.0, 1.0),
+    # The fast return memory: off to twice a gain that gives the S&P 500's
+    # first-week asymmetry; half-life off to a month.
+    "market_vol_leverage_fast": (0.0, 6.0),
+    "market_vol_leverage_fast_half_life": (0.0, 21.0),
+    # A share: 0 counts falls and rises alike, 1 counts rises only.
+    "market_vol_leverage_fast_up": (0.0, 1.0),
     # The power on the day's own sd the memory counts a day in: 0 the
     # baseline sd (as shipped), 1 the day's z-score.
     "market_vol_leverage_standardise": (0.0, 1.0),
@@ -749,6 +761,10 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # Credit's repricing lag, sessions.
     "corporate_spread_equity_lag": (0.0, 21.0),
     "corporate_spread_equity_lag_gain": (0.0, 2.0),
+    # The market's next-session reversal: off to twice the S&P's lag-1 autocorrelation.
+    "market_factor_reversal": (0.0, 0.16),
+    "market_factor_reversal_vix_power": (0.0, 2.0),
+    "market_factor_reversal_transient": (0.0, 1.0),
     # The share of company news released before the open.
     "news_preopen_share": (0.0, 1.0),
     # The share of session news released on the measured in-session profile.

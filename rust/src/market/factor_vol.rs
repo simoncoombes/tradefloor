@@ -394,6 +394,39 @@ fn leverage_phi(params: &crate::params::ModelParams) -> f64 {
     mathx::pow(0.5, 1.0 / params.market_vol_leverage_half_life)
 }
 
+/// The fast return memory's per-session carry, `0.5^(1 / half_life)`. Read
+/// only while `market_vol_leverage_fast` is set, where validation holds its
+/// half-life positive.
+fn leverage_fast_phi(params: &crate::params::ModelParams) -> f64 {
+    mathx::pow(0.5, 1.0 / params.market_vol_leverage_fast_half_life)
+}
+
+/// The variance of one day's memory input `u` at the baseline, for a
+/// memory that ignores `down` of an up day: the half-normal arithmetic both
+/// return memories' stationary spreads are built from.
+fn leverage_input_variance(params: &crate::params::ModelParams) -> f64 {
+    let a = params.market_vol_leverage_down;
+    0.5 * (1.0 + (1.0 - a) * (1.0 - a)) - a * a / (2.0 * std::f64::consts::PI)
+}
+
+/// The fast return memory's input variance at the baseline. With
+/// `market_vol_leverage_fast_up` at 0.0 the slower memory's
+/// ([`leverage_input_variance`]); off it, the same half-normal arithmetic with
+/// that share of a FALL ignored, which by the normal's symmetry is the
+/// expression with `down` replaced by the share.
+fn leverage_fast_input_variance(params: &crate::params::ModelParams) -> f64 {
+    let b = params.market_vol_leverage_fast_up;
+    if b == 0.0 {
+        return leverage_input_variance(params);
+    }
+    0.5 * (1.0 + (1.0 - b) * (1.0 - b)) - b * b / (2.0 * std::f64::consts::PI)
+}
+
+/// The VIX's window, in sessions, over which the identity's read-back takes
+/// the fast return memory's expected multiplier (`market_vol_leverage_fast`):
+/// the 30 calendar days the VIX prices.
+pub const VIX_WINDOW_SESSIONS: usize = 21;
+
 /// The shared clamp: a variance stays inside its floor and ceiling
 /// multiples of the baseline, in the bound order `garch.rs` uses.
 fn clamp_variance(params: &crate::params::ModelParams, v: f64) -> f64 {
@@ -571,6 +604,11 @@ pub struct MarketVarianceState {
     /// counted positive. Exactly 0.0, and never written, while the dial is
     /// 0.0; the snapshot and the state hash carry it only while it is set.
     leverage_memory: f64,
+    /// The fast return memory `market_vol_leverage_fast` reads, counted as
+    /// `leverage_memory` is at its own half-life. Exactly 0.0, and never
+    /// written, while that dial is 0.0; the snapshot and the state hash carry
+    /// it only while it is set.
+    leverage_fast_memory: f64,
 }
 
 impl Default for MarketVarianceState {
@@ -602,6 +640,7 @@ impl MarketVarianceState {
             smoothed_vix: None,
             prev_day_factor: 0.0,
             leverage_memory: 0.0,
+            leverage_fast_memory: 0.0,
         }
     }
 
@@ -647,6 +686,85 @@ impl MarketVarianceState {
     /// [`crate::params::ModelParams::market_vol_leverage`].
     pub fn set_leverage_memory(&mut self, value: f64) {
         self.leverage_memory = value;
+    }
+
+    /// The fast return memory `market_vol_leverage_fast` reads. 0.0 on every
+    /// model with that dial off.
+    pub fn leverage_fast_memory(&self) -> f64 {
+        self.leverage_fast_memory
+    }
+
+    /// Put the fast return memory back, for checkpoints. See
+    /// [`crate::params::ModelParams::market_vol_leverage_fast`].
+    pub fn set_leverage_fast_memory(&mut self, value: f64) {
+        self.leverage_fast_memory = value;
+    }
+
+    /// The fast memory's stationary variance at the baseline, `s_f^2`.
+    pub(crate) fn leverage_fast_s2(params: &crate::params::ModelParams) -> f64 {
+        let phi = leverage_fast_phi(params);
+        (1.0 - phi) / (1.0 + phi) * leverage_fast_input_variance(params)
+    }
+
+    /// The fast return memory's variance multiplier at memory `l`,
+    /// `exp(k_f * l - k_f^2 * s_f^2 / 2)`. Read only while
+    /// `market_vol_leverage_fast` is set.
+    fn leverage_fast_multiplier(params: &crate::params::ModelParams, l: f64) -> f64 {
+        let k = params.market_vol_leverage_fast;
+        mathx::exp(k * l - 0.5 * k * k * Self::leverage_fast_s2(params))
+    }
+
+    /// The fast memory's multiplier as the VIX prices it: its expected value
+    /// over the VIX's window of [`VIX_WINDOW_SESSIONS`] sessions from the
+    /// next one, under the memory's own decay,
+    /// `(1/21) sum_{j=0..20} exp(k_f phi_f^j l - k_f^2 s_f^2 phi_f^(2j) / 2)`.
+    /// See [`crate::params::ModelParams::market_vol_leverage_fast`].
+    pub fn leverage_fast_window_multiplier(params: &crate::params::ModelParams, l: f64) -> f64 {
+        let k = params.market_vol_leverage_fast;
+        let phi = leverage_fast_phi(params);
+        let s2 = Self::leverage_fast_s2(params);
+        let mut sum = 0.0;
+        let mut d = 1.0;
+        for _ in 0..VIX_WINDOW_SESSIONS {
+            sum += mathx::exp(k * d * l - 0.5 * k * k * s2 * d * d);
+            d *= phi;
+        }
+        sum / VIX_WINDOW_SESSIONS as f64
+    }
+
+    /// The ratio of the fast memory's window multiplier to its multiplier
+    /// tomorrow, at this state's fast memory: what the VIX's read-back scales
+    /// tomorrow's factor variance by. Exactly 1.0 with
+    /// `market_vol_leverage_fast` at 0.0. Read by the forecast, whose factor
+    /// variances are not this state's own.
+    pub fn vix_window_ratio(&self, params: &crate::params::ModelParams) -> f64 {
+        if params.market_vol_leverage_fast == 0.0 {
+            return 1.0;
+        }
+        let l = self.leverage_fast_memory;
+        let now = Self::leverage_fast_multiplier(params, l);
+        if !(now > 0.0) {
+            return 1.0;
+        }
+        Self::leverage_fast_window_multiplier(params, l) / now
+    }
+
+    /// The variance the VIX's read-back takes: [`Self::variance`] itself, the
+    /// same f64, with `market_vol_leverage_fast` at 0.0; off it, the
+    /// variance with the fast memory's multiplier replaced by its expected
+    /// mean over the VIX's window ([`Self::leverage_fast_window_multiplier`]),
+    /// clamped as the variance is.
+    pub fn vix_window_variance(&self, params: &crate::params::ModelParams) -> f64 {
+        if params.market_vol_leverage_fast == 0.0 {
+            return self.variance;
+        }
+        let l = self.leverage_fast_memory;
+        let now = Self::leverage_fast_multiplier(params, l);
+        if !(now > 0.0) {
+            return self.variance;
+        }
+        clamp_variance(
+            params, self.variance / now * Self::leverage_fast_window_multiplier(params, l))
     }
 
     /// The return memory's variance multiplier at memory `l`,
@@ -707,6 +825,53 @@ impl MarketVarianceState {
     /// [`crate::params::ModelParams::market_vol_leverage`]. Called only
     /// while the dial is set.
     fn step_leverage_memory(&mut self, params: &crate::params::ModelParams) {
+        let x = self.leverage_input(params);
+        let phi = leverage_phi(params);
+        self.leverage_memory = phi * self.leverage_memory + (1.0 - phi) * x;
+    }
+
+    /// One step of the fast return memory on the day's factor, on the input
+    /// the slower memory takes. Called only while
+    /// `market_vol_leverage_fast` is set.
+    fn step_leverage_fast_memory(&mut self, params: &crate::params::ModelParams) {
+        // Its own sign treatment (`market_vol_leverage_fast_up`), or, at 0.0,
+        // the input the slower memory takes, to the bit.
+        let x = if params.market_vol_leverage_fast_up == 0.0 {
+            self.leverage_input(params)
+        } else {
+            self.leverage_fast_rise_input(params)
+        };
+        let phi = leverage_fast_phi(params);
+        self.leverage_fast_memory = phi * self.leverage_fast_memory + (1.0 - phi) * x;
+    }
+
+    /// The fast memory's input with `market_vol_leverage_fast_up` set: the day
+    /// factor in the memory's unit (`market_vol_leverage_standardise`), a fall
+    /// counted positive, with that share `b` of a FALL ignored, re-centred on
+    /// the mean the ignored share takes away: `u = -F / unit` on a rise,
+    /// `-(1 - b) F / unit` on a fall, less `-b sqrt(v) / unit / sqrt(2 pi)`. At
+    /// `b` 1.0 only a rise moves the memory: a rally lowers the variance the
+    /// next sessions draw at, and a fall leaves it to the other channels.
+    fn leverage_fast_rise_input(&self, params: &crate::params::ModelParams) -> f64 {
+        let base = params.market_factor_sigma * params.market_factor_sigma;
+        let b = params.market_vol_leverage_fast_up;
+        let f = self.day_factor;
+        let s = params.market_vol_leverage_standardise;
+        let unit = if s == 0.0 {
+            mathx::sqrt(base)
+        } else {
+            mathx::pow(base, 0.5 * (1.0 - s)) * mathx::pow(self.variance, 0.5 * s)
+        };
+        let u = if f > 0.0 { -f / unit } else { -(1.0 - b) * f / unit };
+        let centre = -b * mathx::sqrt(self.variance) / unit / mathx::sqrt(2.0 * std::f64::consts::PI);
+        u - centre
+    }
+
+    /// The day's input to a return memory, `u - centre`: the day factor in
+    /// the memory's unit, a fall counted positive, re-centred on the mean an
+    /// ignored up day adds. Read before the close writes the variance, so
+    /// `variance` is the one the day was drawn at.
+    fn leverage_input(&self, params: &crate::params::ModelParams) -> f64 {
         let b = params.market_factor_sigma * params.market_factor_sigma;
         let a = params.market_vol_leverage_down;
         let f = self.day_factor;
@@ -736,8 +901,7 @@ impl MarketVarianceState {
         } else {
             a * mathx::sqrt(self.variance) / unit / mathx::sqrt(2.0 * std::f64::consts::PI)
         };
-        let phi = leverage_phi(params);
-        self.leverage_memory = phi * self.leverage_memory + (1.0 - phi) * (u - centre);
+        u - centre
     }
 
     /// Today's factor sigma at DAILY scale — what the tick multiplies by
@@ -897,7 +1061,7 @@ impl MarketVarianceState {
         // THE RETURN MEMORY. A branch, so at `market_vol_leverage` 0.0 --
         // every shipped preset -- nothing below it moves and no field it
         // owns is written. See `ModelParams::market_vol_leverage`.
-        if params.market_vol_leverage != 0.0 {
+        if params.market_vol_leverage != 0.0 || params.market_vol_leverage_fast != 0.0 {
             return self.close_with_leverage_memory(params, target, base, vix_ratio);
         }
 
@@ -1024,10 +1188,26 @@ impl MarketVarianceState {
             self.slow_variance = slow_step(
                 params, self.slow_variance, shock, slow_target.unwrap_or(target));
         }
-        self.step_leverage_memory(params);
+        // Each memory steps only while its own dial is set, so either alone
+        // is the arithmetic that stood for it, to the bit.
+        if params.market_vol_leverage != 0.0 {
+            self.step_leverage_memory(params);
+        }
+        if params.market_vol_leverage_fast != 0.0 {
+            self.step_leverage_fast_memory(params);
+        }
         let mix = self.mixture(params);
-        self.variance = clamp_variance(
-            params, mix * Self::leverage_multiplier(params, self.leverage_memory));
+        let m = if params.market_vol_leverage != 0.0 {
+            Self::leverage_multiplier(params, self.leverage_memory)
+        } else {
+            1.0
+        };
+        let m = if params.market_vol_leverage_fast != 0.0 {
+            m * Self::leverage_fast_multiplier(params, self.leverage_fast_memory)
+        } else {
+            m
+        };
+        self.variance = clamp_variance(params, mix * m);
         self.prev_day_factor = self.day_factor;
         self.day_factor = 0.0;
         (target, slow_target)
@@ -1161,6 +1341,10 @@ impl MarketVarianceState {
         // `market_vol_leverage` 0.0.
         if params.market_vol_leverage != 0.0 {
             self.step_leverage_memory(params);
+        }
+        // The fast memory the same way, on its own dial.
+        if params.market_vol_leverage_fast != 0.0 {
+            self.step_leverage_fast_memory(params);
         }
         self.prev_day_factor = self.day_factor;
         self.day_factor = 0.0;
@@ -1334,6 +1518,7 @@ impl MarketVarianceState {
             smoothed_vix: None,
             prev_day_factor: 0.0,
             leverage_memory: 0.0,
+            leverage_fast_memory: 0.0,
         }
     }
 
@@ -1360,6 +1545,8 @@ impl MarketVarianceState {
             // Carried under its own snapshot key, only while the return
             // memory is on; the engine puts it back after this.
             leverage_memory: 0.0,
+            // The same for the fast return memory.
+            leverage_fast_memory: 0.0,
         }
     }
 }
@@ -2386,5 +2573,181 @@ mod crash_vol_state {
         let rose = close_after(&p, &s0, 0.01);
         assert!(fell.leverage_memory() > 0.0);
         assert!(fell.variance() > rose.variance());
+    }
+}
+
+/// The fast return memory (`market_vol_leverage_fast`, its half-life). See its
+/// entry in `ModelParams`.
+#[cfg(test)]
+mod fast_leverage {
+    use super::*;
+    use crate::params::ModelParams;
+
+    fn base() -> ModelParams {
+        let mut p = crate::params::PT_V20;
+        p.market_vol_leverage = 2.25;
+        p.market_vol_leverage_half_life = 15.0;
+        p.market_vol_leverage_standardise = 1.0;
+        p
+    }
+
+    fn with_fast(k: f64, h: f64) -> ModelParams {
+        let mut p = base();
+        p.market_vol_leverage_fast = k;
+        p.market_vol_leverage_fast_half_life = h;
+        p
+    }
+
+    fn close_after(p: &ModelParams, state: &MarketVarianceState, f: f64) -> MarketVarianceState {
+        let mut s = *state;
+        s.accumulate(f);
+        s.close_day_scaled(p, p.market_vol_vix_anchor, 19.0, 1.0);
+        s
+    }
+
+    #[test]
+    fn off_is_the_slower_memory_alone_to_the_bit() {
+        let p = base();
+        let mut q = base();
+        q.market_vol_leverage_fast_half_life = 5.0; // unread with the gain at 0.0
+        let mut a = MarketVarianceState::new_with(&p);
+        let mut b = a;
+        for &f in &[-0.03, 0.01, -0.004, 0.02, 0.0, -0.05] {
+            a = close_after(&p, &a, f);
+            b = close_after(&q, &b, f);
+            assert_eq!(a, b);
+            assert_eq!(a.leverage_fast_memory().to_bits(), 0.0_f64.to_bits());
+            assert_eq!(a.vix_window_variance(&p).to_bits(), a.variance().to_bits());
+            assert_eq!(a.vix_window_ratio(&p), 1.0);
+        }
+    }
+
+    #[test]
+    fn a_fall_raises_and_a_rise_lowers_the_next_session_more_with_it() {
+        let p = with_fast(2.0, 5.0);
+        let q = base();
+        let s0 = MarketVarianceState::new_with(&p);
+        let fell = close_after(&p, &s0, -0.01);
+        let rose = close_after(&p, &s0, 0.01);
+        assert!(fell.leverage_fast_memory() > 0.0 && rose.leverage_fast_memory() < 0.0);
+        assert!(fell.variance() > close_after(&q, &s0, -0.01).variance());
+        assert!(rose.variance() < close_after(&q, &s0, 0.01).variance());
+        // The slower memory moves exactly as it does without the fast one.
+        assert_eq!(fell.leverage_memory().to_bits(), close_after(&q, &s0, -0.01).leverage_memory().to_bits());
+    }
+
+    #[test]
+    fn the_memory_decays_at_its_half_life() {
+        let p = with_fast(2.0, 5.0);
+        let mut s = close_after(&p, &MarketVarianceState::new_with(&p), -0.02);
+        let l0 = s.leverage_fast_memory();
+        for _ in 0..5 {
+            s = close_after(&p, &s, 0.0);
+        }
+        assert!((s.leverage_fast_memory() / l0 - 0.5).abs() < 1e-12);
+    }
+
+    #[test]
+    fn the_vix_window_takes_a_burst_at_part_of_its_size() {
+        let p = with_fast(2.0, 5.0);
+        let s = close_after(&p, &MarketVarianceState::new_with(&p), -0.02);
+        let l = s.leverage_fast_memory();
+        let now = MarketVarianceState::leverage_fast_multiplier(&p, l);
+        let window = MarketVarianceState::leverage_fast_window_multiplier(&p, l);
+        assert!(now > 1.0 && window > 1.0 && window < now, "now {now}, window {window}");
+        assert!(s.vix_window_variance(&p) < s.variance());
+        // The window's mean is the average of the expected multipliers.
+        let phi = leverage_fast_phi(&p);
+        let s2 = MarketVarianceState::leverage_fast_s2(&p);
+        let k = p.market_vol_leverage_fast;
+        let direct: f64 = (0..VIX_WINDOW_SESSIONS)
+            .map(|j| {
+                let d = phi.powi(j as i32);
+                (k * d * l - 0.5 * k * k * s2 * d * d).exp()
+            })
+            .sum::<f64>()
+            / VIX_WINDOW_SESSIONS as f64;
+        assert!((window / direct - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn a_forced_close_moves_the_memory_and_not_the_variance() {
+        let p = with_fast(2.0, 5.0);
+        let q = base();
+        let mut a = MarketVarianceState::new_with(&p);
+        let mut b = a;
+        a.accumulate(-0.02);
+        b.accumulate(-0.02);
+        a.close_day_forced(&p, p.market_vol_vix_anchor, 30.0, 1.0);
+        b.close_day_forced(&q, q.market_vol_vix_anchor, 30.0, 1.0);
+        assert!(a.leverage_fast_memory() > 0.0);
+        assert_eq!(a.variance().to_bits(), b.variance().to_bits());
+    }
+}
+
+/// The fast return memory counting rises only (`market_vol_leverage_fast_up`).
+#[cfg(test)]
+mod fast_leverage_rises {
+    use super::*;
+    use crate::params::ModelParams;
+
+    fn with_fast(k: f64, h: f64, up: f64) -> ModelParams {
+        let mut p = crate::params::PT_V20;
+        p.market_vol_leverage = 2.25;
+        p.market_vol_leverage_half_life = 15.0;
+        p.market_vol_leverage_standardise = 1.0;
+        p.market_vol_leverage_fast = k;
+        p.market_vol_leverage_fast_half_life = h;
+        p.market_vol_leverage_fast_up = up;
+        p
+    }
+
+    fn close_after(p: &ModelParams, state: &MarketVarianceState, f: f64) -> MarketVarianceState {
+        let mut s = *state;
+        s.accumulate(f);
+        s.close_day_scaled(p, p.market_vol_vix_anchor, 19.0, 1.0);
+        s
+    }
+
+    #[test]
+    fn a_rise_lowers_it_and_a_fall_moves_it_by_the_centre_alone() {
+        let p = with_fast(2.0, 3.0, 1.0);
+        let s0 = MarketVarianceState::new_with(&p);
+        let rose = close_after(&p, &s0, 0.01);
+        let fell = close_after(&p, &s0, -0.01);
+        let fell_more = close_after(&p, &s0, -0.03);
+        assert!(rose.leverage_fast_memory() < 0.0);
+        // A fall of any size moves it by the same re-centring step.
+        assert!(fell.leverage_fast_memory() > 0.0);
+        assert_eq!(fell.leverage_fast_memory().to_bits(), fell_more.leverage_fast_memory().to_bits());
+        // The input's two-sided mean at the day's own sd is zero.
+        let sd = s0.variance().sqrt();
+        let up = close_after(&p, &s0, sd).leverage_fast_memory();
+        let dn = close_after(&p, &s0, -sd).leverage_fast_memory();
+        let phi = leverage_fast_phi(&p);
+        // E[u] over the half-normal: a rise of size x moves (1 - phi) (-x / sd + c),
+        // a fall (1 - phi) c, c = 1 / sqrt(2 pi); a rise of the mean size
+        // E|X| = sd sqrt(2 / pi) and a fall average to zero.
+        let x = sd * (2.0 / std::f64::consts::PI).sqrt();
+        let up_mean = close_after(&p, &s0, x).leverage_fast_memory();
+        assert!(((up_mean + dn) / (1.0 - phi)).abs() < 1e-12, "{up_mean} {dn}");
+        assert!(up < 0.0 && dn > 0.0);
+    }
+
+    #[test]
+    fn at_zero_it_is_the_both_signs_memory_to_the_bit() {
+        let p = with_fast(2.0, 5.0, 0.0);
+        let mut a = MarketVarianceState::new_with(&p);
+        let mut b = a;
+        for &f in &[-0.03, 0.01, -0.004, 0.02] {
+            a = close_after(&p, &a, f);
+            let mut s = b;
+            s.accumulate(f);
+            let x = s.leverage_input(&p);
+            let phi = leverage_fast_phi(&p);
+            let expected = phi * b.leverage_fast_memory() + (1.0 - phi) * x;
+            b = close_after(&p, &b, f);
+            assert_eq!(a.leverage_fast_memory().to_bits(), expected.to_bits());
+        }
     }
 }

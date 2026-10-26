@@ -213,6 +213,12 @@ PARAM_SPECS: dict[str, dict] = {
                                           "hard_range": (0.0, 2520.0), "derived": True},
     "forecast_vix_dispersion_skew": {"kind": "abs", "step_unit": 0.1,
                                      "hard_range": (-0.99, 0.99), "derived": True},
+    "forecast_vix_level_nowcast": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 5.0),
+                                   "derived": True},
+    "forecast_vix_level_nowcast_half_life": {"kind": "abs", "step_unit": 21.0,
+                                             "hard_range": (0.0, 2520.0), "derived": True},
+    "forecast_vix_level_nowcast_centre": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 6.0),
+                                          "derived": True},
     "forecast_policy_shadow_discount": {"kind": "abs", "step_unit": 0.05,
                                         "hard_range": (0.0, 1.0), "derived": True},
     "forecast_policy_persistence": {"kind": "abs", "step_unit": 0.05,
@@ -242,6 +248,7 @@ PARAM_SPECS: dict[str, dict] = {
                                         "derived": True},
     "futures_vix_live_slow_half_life": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 2520.0),
                                         "derived": True},
+    "futures_vix_premium_response": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0), "derived": False},
     # The rate futures (pt-v22 phase 1): a switch; it moves no price.
     "futures_rates_listed": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0), "derived": True},
     # The oil futures (pt-v22 phase 1): a switch; it moves no price.
@@ -735,6 +742,12 @@ PARAM_SPECS: dict[str, dict] = {
                                  "hard_range": (0.0, 1.0)},
     "market_vol_leverage_standardise": {"kind": "abs", "step_unit": 0.1,
                                         "hard_range": (0.0, 1.0)},
+    "market_vol_leverage_fast": {"kind": "abs", "step_unit": 0.5,
+                                 "hard_range": (0.0, 50.0), "derived": False},
+    "market_vol_leverage_fast_half_life": {"kind": "abs", "step_unit": 1.0,
+                                           "hard_range": (0.0, 2520.0), "derived": False},
+    "market_vol_leverage_fast_up": {"kind": "abs", "step_unit": 0.1,
+                                    "hard_range": (0.0, 1.0), "derived": False},
     "market_beta_normalise": {"kind": "abs", "step_unit": 0.1,
                               "hard_range": (0.0, 1.0)},
     "market_day_tail_df": {"kind": "abs", "step_unit": 1.0,
@@ -913,6 +926,9 @@ PARAM_SPECS: dict[str, dict] = {
     "treasury_path_owed_excluded": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0), "derived": False},
     "corporate_spread_equity_lag": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 252.0), "derived": False},
     "corporate_spread_equity_lag_gain": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 10.0), "derived": False},
+    "market_factor_reversal": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 0.5), "derived": False},
+    "market_factor_reversal_vix_power": {"kind": "abs", "step_unit": 0.5, "hard_range": (0.0, 4.0), "derived": False},
+    "market_factor_reversal_transient": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 1.0), "derived": False},
     "news_preopen_share": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0), "derived": False},
     "news_session_release_share": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0), "derived": False},
     "remark_growth_open_share": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0), "derived": False},
@@ -1373,6 +1389,8 @@ def feasibility_violation(vector: dict[str, float],
                 f"carried share {carried:.4f}")
     if val("market_vol_leverage") != 0.0 and val("market_vol_leverage_half_life") == 0.0:
         return "market_vol_leverage is set with a half-life of 0"
+    if val("market_vol_leverage_fast") != 0.0 and val("market_vol_leverage_fast_half_life") == 0.0:
+        return "market_vol_leverage_fast is set with a half-life of 0"
     if not 0.0 <= val("momentum_theta") < 1.0:
         return "momentum_theta must lie in [0, 1)"
     for name in ("market_factor_sigma", "sector_factor_sigma",
