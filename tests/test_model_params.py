@@ -1506,6 +1506,9 @@ PERTURBATIONS = [
     # The market's next-session reversal moves every name on every open tick
     # after the first.
     ("market_factor_reversal", 0.08, True),
+    # INERT: the VIX's power is read only with the reversal set, which pt-v20
+    # leaves off.
+    ("market_factor_reversal_vix_power", 2.0, False),
     # Credit's own state: its opening draw moves the meeting's corporate
     # re-anchor, and with it the discount rate.
     ("corporate_spread_noise_sd", 0.025, True),

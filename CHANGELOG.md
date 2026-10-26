@@ -34,6 +34,10 @@ payload, Arrow and WASM show them; agents trade by symbol.
   not revert. No draw and no state of its own. The S&P 500's daily return has
   a lag-1 autocorrelation of -0.079 over 1990-2025 and its variance ratios
   fall to 0.76 by 21 sessions; the E-mini future reads the same.
+- `market_factor_reversal_vix_power` is new, 0.0 on every preset and left out
+  of the digest there: the reversal's share follows the VIX as `k (X/20)^q`.
+  The S&P 500's next-day reversal is near zero under a VIX of 30 and -0.17
+  above it; `(X/20)^2` fits best.
 
 ### Credit's lagged leverage term
 

@@ -102,3 +102,32 @@ def test_no_draw_and_the_market_moves():
         x.run_days(30, record=False)
     assert base.draws_consumed == live.draws_consumed
     assert floats(base.prices()) != floats(live.prices())
+
+
+def test_the_vix_power_at_zero_is_the_fixed_share():
+    a, b = engine(market_factor_reversal=K), engine(market_factor_reversal=K, market_factor_reversal_vix_power=0.0)
+    for x in (a, b):
+        x.run_days(20, record=False)
+    assert floats(a.prices()) == floats(b.prices())
+    assert a.state_hash() == b.state_hash()
+
+
+def test_the_vix_power_scales_the_share_by_the_last_close_vix():
+    q = 2.0
+    base, live = engine(), engine(market_factor_reversal=K, market_factor_reversal_vix_power=q)
+    for x in (base, live):
+        x.run_days(1, record=False)
+    f, vix = prev_day_factor(live), live.state_snapshot()["economy"]["vix"]
+    for x in (base, live):
+        x.run_days(1, record=False, first_day=1)
+    beta = {c.ticker: c.beta for c in UNIVERSE}
+    ab, al = attribution(base), attribution(live)
+    for i, t in enumerate(live.tickers):
+        want = -K * (vix / 20.0) ** q * beta[t] * f
+        assert al[i][CROWD] - ab[i][CROWD] == pytest.approx(want, rel=1e-6, abs=1e-12)
+
+
+@pytest.mark.parametrize("value", [-0.5, 4.5])
+def test_the_vix_power_out_of_range_is_refused(value):
+    with pytest.raises(Exception):
+        tf.ModelParams.from_preset("pt-v20", market_factor_reversal=K, market_factor_reversal_vix_power=value)

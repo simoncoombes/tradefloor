@@ -1330,6 +1330,20 @@ pub struct ModelParams {
     /// under 1 in every decade. The certified forty's equal-weighted index
     /// reads -0.13 at lag 1 (2015-2025). In [0, 0.5].
     pub market_factor_reversal: f64,
+    /// The market's reversal follows the VIX: under this power `q` the
+    /// share is `market_factor_reversal * (X / 20)^q`, with X the economy's
+    /// VIX at the last close, so `market_factor_reversal` is the share at a
+    /// VIX of 20. 0.0, on every shipped preset, is the share as it stands (a
+    /// branch), and a value of 0.0 is left out of the model's digest. Read
+    /// only with `market_factor_reversal` set. No draw and no state.
+    ///
+    /// The S&P 500's next-day reversal lives in turbulent markets: the lag-1
+    /// slope of ^GSPC's daily log return, 1990-2025, is -0.017, +0.030 and
+    /// -0.025 with the prior close's VIX under 15, 15-20 and 20-30, and
+    /// -0.167 above 30 (the E-mini future -0.027, +0.028, -0.035, -0.116).
+    /// Of `r_{t-1}`, `r_{t-1} X/20` and `r_{t-1} (X/20)^2` the last fits
+    /// best: -0.0267 (se 0.0068). In [0, 4].
+    pub market_factor_reversal_vix_power: f64,
     /// The per-session innovation sd of credit's own state, points of the
     /// corporate spread's base. 0.0, on every shipped preset, is no state
     /// (the spread moves only with the VIX, the cycle and the leverage gap),
@@ -8806,6 +8820,7 @@ impl ModelParams {
             corporate_spread_equity_lag: 0.0,
             corporate_spread_equity_lag_gain: 0.0,
             market_factor_reversal: 0.0,
+            market_factor_reversal_vix_power: 0.0,
             corporate_spread_noise_sd: 0.0,
             corporate_spread_noise_half_life: 0.0,
             treasury_2y_meeting_carry: 0.0,
@@ -11491,6 +11506,7 @@ impl ModelParams {
             "corporate_spread_equity_lag" => self.corporate_spread_equity_lag,
             "corporate_spread_equity_lag_gain" => self.corporate_spread_equity_lag_gain,
             "market_factor_reversal" => self.market_factor_reversal,
+            "market_factor_reversal_vix_power" => self.market_factor_reversal_vix_power,
             "corporate_spread_noise_sd" => self.corporate_spread_noise_sd,
             "corporate_spread_noise_half_life" => self.corporate_spread_noise_half_life,
             "treasury_2y_meeting_carry" => self.treasury_2y_meeting_carry,
@@ -11941,6 +11957,7 @@ impl ModelParams {
             "corporate_spread_equity_lag" => out.corporate_spread_equity_lag = value,
             "corporate_spread_equity_lag_gain" => out.corporate_spread_equity_lag_gain = value,
             "market_factor_reversal" => out.market_factor_reversal = value,
+            "market_factor_reversal_vix_power" => out.market_factor_reversal_vix_power = value,
             "corporate_spread_noise_sd" => out.corporate_spread_noise_sd = value,
             "corporate_spread_noise_half_life" => out.corporate_spread_noise_half_life = value,
             "treasury_2y_meeting_carry" => out.treasury_2y_meeting_carry = value,
@@ -13594,6 +13611,12 @@ impl ModelParams {
                  0 is the spread reading the leverage gap itself.",
                 self.corporate_spread_equity_lag));
         }
+        if !(self.market_factor_reversal_vix_power >= 0.0 && self.market_factor_reversal_vix_power <= 4.0) {
+            return Err(format!(
+                "market_factor_reversal_vix_power is {}. It is the power of the VIX over 20 the market's \
+                 reversal share follows, in [0, 4]; 0 is a fixed share.",
+                self.market_factor_reversal_vix_power));
+        }
         if !(self.market_factor_reversal >= 0.0 && self.market_factor_reversal <= 0.5) {
             return Err(format!(
                 "market_factor_reversal is {}. It is the share of yesterday's market factor each name \
@@ -14554,6 +14577,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "corporate_spread_equity_lag",
     "corporate_spread_equity_lag_gain",
     "market_factor_reversal",
+    "market_factor_reversal_vix_power",
     "corporate_spread_noise_sd",
     "corporate_spread_noise_half_life",
     "treasury_term_premium_sd",
@@ -14811,6 +14835,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "corporate_spread_equity_lag",
         "corporate_spread_equity_lag_gain",
         "market_factor_reversal",
+        "market_factor_reversal_vix_power",
         "corporate_spread_noise_sd",
         "corporate_spread_noise_half_life",
         "treasury_term_premium_sd",

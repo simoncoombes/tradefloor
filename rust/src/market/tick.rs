@@ -1493,11 +1493,17 @@ pub fn simulate_market_tick(
         // the crowd's slot (it is the liquidity the crowd provides against
         // yesterday's market-wide move) and moved whole into the fair-value
         // level below, so it does not revert. A branch: 0.0 adds nothing.
+        // Under `market_factor_reversal_vix_power` q the share is
+        // k * (X / 20)^q, X the economy's VIX at the last close (a branch:
+        // q = 0.0 is k as it stands).
         let reversal = if open && p.market_factor_reversal != 0.0 {
-            -p.market_factor_reversal
-                * companies[idx].stock.beta.unwrap_or(1.0)
-                * inputs.prev_day_factor
-                / 390.0
+            let k = if p.market_factor_reversal_vix_power != 0.0 {
+                p.market_factor_reversal
+                    * mathx::pow(mathx::max(economy.vix, 0.0) / 20.0, p.market_factor_reversal_vix_power)
+            } else {
+                p.market_factor_reversal
+            };
+            -k * companies[idx].stock.beta.unwrap_or(1.0) * inputs.prev_day_factor / 390.0
         } else {
             0.0
         };
