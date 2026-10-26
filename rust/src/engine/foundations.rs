@@ -887,9 +887,18 @@ impl Engine {
             faces_e = next_faces_e;
             down = None;
 
-            // The step's read-back, at the VIX before the step.
+            // The step's read-back, at the VIX before the step. The fast
+            // return memory (`market_vol_leverage_fast`) at its window's mean,
+            // as the close's read-back takes it; the faces themselves with
+            // that dial off.
+            let faces_vix = if p.market_vol_leverage_fast == 0.0 {
+                faces
+            } else {
+                let q = mv.vix_window_ratio(p);
+                (faces.0 * q, faces.1 * q)
+            };
             let (v_next, _) = self.forecast_identity(
-                &names, &garch, &sector_states, &idio, faces, vix, universe_stress, None, &econ);
+                &names, &garch, &sector_states, &idio, faces_vix, vix, universe_stress, None, &econ);
             let mut scale_bar = 0.0;
             for &(w, _, scale) in &regimes {
                 scale_bar += w * scale;
@@ -1187,16 +1196,27 @@ impl Engine {
     /// off.
     fn forecast_leverage_factor(&self, closes: usize) -> f64 {
         let p = &self.params;
-        if p.market_vol_leverage == 0.0 || closes == 0 {
-            return 1.0;
+        let slower = if p.market_vol_leverage == 0.0 || closes == 0 {
+            1.0
+        } else {
+            let k = p.market_vol_leverage;
+            let phi = crate::mathx::pow(0.5, 1.0 / p.market_vol_leverage_half_life);
+            let a = p.market_vol_leverage_down;
+            let var_u = 0.5 * (1.0 + (1.0 - a) * (1.0 - a)) - a * a / (2.0 * std::f64::consts::PI);
+            let s2 = (1.0 - phi) / (1.0 + phi) * var_u;
+            let grown = 1.0 - crate::mathx::pow(phi, 2.0 * closes as f64);
+            crate::mathx::exp(0.5 * k * k * s2 * grown)
+        };
+        // The fast return memory (`market_vol_leverage_fast`) the same way,
+        // at its own half-life; the slower memory's factor alone with it off.
+        if p.market_vol_leverage_fast == 0.0 || closes == 0 {
+            return slower;
         }
-        let k = p.market_vol_leverage;
-        let phi = crate::mathx::pow(0.5, 1.0 / p.market_vol_leverage_half_life);
-        let a = p.market_vol_leverage_down;
-        let var_u = 0.5 * (1.0 + (1.0 - a) * (1.0 - a)) - a * a / (2.0 * std::f64::consts::PI);
-        let s2 = (1.0 - phi) / (1.0 + phi) * var_u;
+        let k = p.market_vol_leverage_fast;
+        let phi = crate::mathx::pow(0.5, 1.0 / p.market_vol_leverage_fast_half_life);
+        let s2 = crate::market::factor_vol::MarketVarianceState::leverage_fast_s2(p);
         let grown = 1.0 - crate::mathx::pow(phi, 2.0 * closes as f64);
-        crate::mathx::exp(0.5 * k * k * s2 * grown)
+        slower * crate::mathx::exp(0.5 * k * k * s2 * grown)
     }
 
     /// One close of the market factor's variance state in expectation: the
@@ -1230,6 +1250,7 @@ impl Engine {
         let c_slow = if p.market_vol_slow_vix_damp == 0.0 { c } else { c * (1.0 - p.market_vol_slow_vix_damp) };
         let w_slow = p.market_vol_slow_weight;
         let (mut variance, mut fast, mut slow_part, mut lev) = (0.0, 0.0, 0.0, 0.0);
+        let mut lev_fast = 0.0;
         let (mut up, mut down) = (0.0, 0.0);
         let mut smoothed_out = -1.0;
         for &(w, level, scale) in regimes {
@@ -1264,11 +1285,14 @@ impl Engine {
                 // The smoothed VIX reads the VIX alone, the same on every node.
                 smoothed_out = snap.5;
                 lev += w / 4.0 * s.leverage_memory();
+                lev_fast += w / 4.0 * s.leverage_fast_memory();
             }
         }
         let mut next = MarketVarianceState::restore_with_components(
             variance, 0.0, fast, slow_part, 0.0, smoothed_out);
         next.set_leverage_memory(lev);
+        // 0.0 with `market_vol_leverage_fast` off, which the field already is.
+        next.set_leverage_fast_memory(lev_fast);
         (next, (up, down))
     }
 

@@ -730,6 +730,10 @@ PARAM_SPECS: dict[str, dict] = {
                                  "hard_range": (0.0, 1.0)},
     "market_vol_leverage_standardise": {"kind": "abs", "step_unit": 0.1,
                                         "hard_range": (0.0, 1.0)},
+    "market_vol_leverage_fast": {"kind": "abs", "step_unit": 0.5,
+                                 "hard_range": (0.0, 50.0), "derived": False},
+    "market_vol_leverage_fast_half_life": {"kind": "abs", "step_unit": 1.0,
+                                           "hard_range": (0.0, 2520.0), "derived": False},
     "market_beta_normalise": {"kind": "abs", "step_unit": 0.1,
                               "hard_range": (0.0, 1.0)},
     "market_day_tail_df": {"kind": "abs", "step_unit": 1.0,
@@ -1365,6 +1369,8 @@ def feasibility_violation(vector: dict[str, float],
                 f"carried share {carried:.4f}")
     if val("market_vol_leverage") != 0.0 and val("market_vol_leverage_half_life") == 0.0:
         return "market_vol_leverage is set with a half-life of 0"
+    if val("market_vol_leverage_fast") != 0.0 and val("market_vol_leverage_fast_half_life") == 0.0:
+        return "market_vol_leverage_fast is set with a half-life of 0"
     if not 0.0 <= val("momentum_theta") < 1.0:
         return "momentum_theta must lie in [0, 1)"
     for name in ("market_factor_sigma", "sector_factor_sigma",

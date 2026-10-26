@@ -4775,6 +4775,55 @@ pub struct ModelParams {
     /// kernel the same way).
     /// pt-v21 ships 1.0.
     pub market_vol_leverage_standardise: f64,
+    /// Gain of the market factor's variance on a FAST return memory, in log
+    /// variance per unit of the memory, beside `market_vol_leverage`'s. 0.0,
+    /// which every preset carries, is off: the memory never moves, the
+    /// snapshot and state hash do not carry it, and every close is the
+    /// arithmetic that stood, to the bit; a value of 0.0 is left out of the
+    /// model's digest.
+    ///
+    /// Off zero the engine keeps a second memory `l_f` of the day factor,
+    /// counted as `market_vol_leverage`'s is (the same unit,
+    /// `market_vol_leverage_standardise`, and the same treatment of an up
+    /// day, `market_vol_leverage_down`), at its own half-life
+    /// `market_vol_leverage_fast_half_life`:
+    ///
+    /// ```text
+    /// l_f' = phi_f * l_f + (1 - phi_f) * u,   phi_f = 0.5^(1 / half_life)
+    /// ```
+    ///
+    /// and the variance the next session draws with is the mixture times
+    /// both multipliers, `exp(k l - k^2 s^2 / 2) * exp(k_f l_f - k_f^2 s_f^2 / 2)`,
+    /// clamped, `s_f^2` the fast memory's stationary variance, so its mean
+    /// is about one. A forced close moves it with the day's factor and sets
+    /// the variance without it, as it does the slower memory.
+    ///
+    /// THE VIX READS IT OVER ITS OWN WINDOW. The identity's read-back
+    /// (`vix_level_identity`) takes the fast multiplier at its expected
+    /// mean over the next 21 sessions under the memory's own decay,
+    /// `(1/21) sum_{j=0..20} exp(k_f phi_f^j l_f - k_f^2 s_f^2 phi_f^(2j) / 2)`,
+    /// in place of tomorrow's value: the VIX prices the variance over its
+    /// 30 calendar days, and a burst that decays in a week is a fraction of
+    /// that. So the fast memory lives mostly outside the loop from the VIX
+    /// back to the variance. The forecast carries the memory's expectation
+    /// and reads it the same way.
+    ///
+    /// Why. On the S&P 500 (^GSPC and the VIX, 1990-2025) a day's return
+    /// moves the next week's realised volatility by its sign: a two-sd fall
+    /// raises the log of realised vol over the next five sessions by 0.24
+    /// and a two-sd rise lowers it by 0.13, holding the pre-shock vol, the
+    /// VIX and their trailing levels fixed (Engle and Ng 1993's sign-size
+    /// form). The asymmetry, N(-2) less N(+2), is 0.37 (se 0.02) over
+    /// sessions 1-5, 0.17 over 6-20, 0.08 over 21-60 and 0.05 over 61-120.
+    /// The one memory at a half-life of 15 sessions gives about the tape's
+    /// asymmetry beyond 20 sessions and half of it in the first week; what
+    /// is missing decays at a half-life of about five sessions. The index
+    /// leverage kernel of Bouchaud, Matacz and Potters (2001) is strong and
+    /// short-lived in the same way. In [0, 50].
+    pub market_vol_leverage_fast: f64,
+    /// Half-life of the fast return memory, in sessions. Unread at
+    /// `market_vol_leverage_fast` 0.0; must be positive off it. In [0, 2520].
+    pub market_vol_leverage_fast_half_life: f64,
     /// Degrees of freedom of the day's market draw: each session's
     /// market-factor variance is multiplied by `m = (nu - 2) / X`, `X` a
     /// chi-square with `nu` degrees of freedom drawn once at the open, so
@@ -8623,6 +8672,8 @@ impl ModelParams {
             market_vol_leverage_half_life: 0.0,
             market_vol_leverage_down: 0.0,
             market_vol_leverage_standardise: 0.0,
+            market_vol_leverage_fast: 0.0,
+            market_vol_leverage_fast_half_life: 0.0,
             market_day_tail_df: 0.0,
             market_day_tail_state_share: 0.0,
             market_vol_alpha_excursion: 0.0,
@@ -11328,6 +11379,8 @@ impl ModelParams {
             "market_vol_leverage_half_life" => self.market_vol_leverage_half_life,
             "market_vol_leverage_down" => self.market_vol_leverage_down,
             "market_vol_leverage_standardise" => self.market_vol_leverage_standardise,
+            "market_vol_leverage_fast" => self.market_vol_leverage_fast,
+            "market_vol_leverage_fast_half_life" => self.market_vol_leverage_fast_half_life,
             "market_day_tail_df" => self.market_day_tail_df,
             "market_day_tail_state_share" => self.market_day_tail_state_share,
             "market_vol_alpha_excursion" => self.market_vol_alpha_excursion,
@@ -11779,6 +11832,8 @@ impl ModelParams {
             "market_vol_leverage_half_life" => out.market_vol_leverage_half_life = value,
             "market_vol_leverage_down" => out.market_vol_leverage_down = value,
             "market_vol_leverage_standardise" => out.market_vol_leverage_standardise = value,
+            "market_vol_leverage_fast" => out.market_vol_leverage_fast = value,
+            "market_vol_leverage_fast_half_life" => out.market_vol_leverage_fast_half_life = value,
             "market_day_tail_df" => out.market_day_tail_df = value,
             "market_day_tail_state_share" => out.market_day_tail_state_share = value,
             "market_vol_alpha_excursion" => out.market_vol_alpha_excursion = value,
@@ -12835,6 +12890,22 @@ impl ModelParams {
             return Err(format!(
                 "market_vol_leverage_standardise is {}. It is the power on the day's own sd the return memory counts a day in, in [0, 1].",
                 self.market_vol_leverage_standardise));
+        }
+        if !(self.market_vol_leverage_fast >= 0.0 && self.market_vol_leverage_fast <= 50.0) {
+            return Err(format!(
+                "market_vol_leverage_fast is {}. It is a gain on log variance per unit of the fast return memory, in [0, 50]; 0 is off.",
+                self.market_vol_leverage_fast));
+        }
+        if !(self.market_vol_leverage_fast_half_life >= 0.0 && self.market_vol_leverage_fast_half_life <= 2520.0) {
+            return Err(format!(
+                "market_vol_leverage_fast_half_life is {}. It is a half-life in sessions, in [0, 2520].",
+                self.market_vol_leverage_fast_half_life));
+        }
+        if self.market_vol_leverage_fast != 0.0 && self.market_vol_leverage_fast_half_life == 0.0 {
+            return Err(format!(
+                "market_vol_leverage_fast is {} but market_vol_leverage_fast_half_life is 0. The fast \
+                 return memory needs a half-life in sessions.",
+                self.market_vol_leverage_fast));
         }
         if !(self.market_day_tail_df == 0.0
             || (self.market_day_tail_df >= 3.0 && self.market_day_tail_df <= 200.0))
@@ -14514,6 +14585,8 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "market_vol_cycle_trough_release",
     "market_vol_leverage",
     "market_vol_leverage_down",
+    "market_vol_leverage_fast",
+    "market_vol_leverage_fast_half_life",
     "market_vol_leverage_half_life",
     "market_vol_leverage_standardise",
     "market_vol_slow_gamma",
@@ -14732,6 +14805,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "market_vol_leverage_half_life",
         "market_vol_leverage_down",
         "market_vol_leverage_standardise",
+        "market_vol_leverage_fast",
+        "market_vol_leverage_fast_half_life",
         "market_day_tail_df",
         "market_day_tail_state_share",
         "market_vol_alpha_excursion",

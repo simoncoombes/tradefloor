@@ -1601,6 +1601,11 @@ impl Engine {
         if self.carries_market_vol_leverage() {
             out.put("market_vol_leverage_memory", V::Float(self.market_vol_leverage_memory()));
         }
+        // The fast return memory, on the same rule, with
+        // `market_vol_leverage_fast` set.
+        if self.carries_market_vol_leverage_fast() {
+            out.put("market_vol_leverage_fast_memory", V::Float(self.market_vol_leverage_fast_memory()));
+        }
         // The cycle's volatility multiplier, on the same rule: carried, and
         // hashed, only with `market_vol_cycle_ratio` set and once a close
         // has set it.
@@ -2171,6 +2176,8 @@ impl Engine {
             // The dial-gated state the later mechanisms carry (every dial 0.0
             // on every shipped preset, so no shipped snapshot carries one).
             Gated::dial("market_vol_leverage_memory", "market_vol_leverage", p.market_vol_leverage),
+            Gated::dial("market_vol_leverage_fast_memory", "market_vol_leverage_fast",
+                        p.market_vol_leverage_fast),
             Gated::held("market_vol_cycle_log", "market_vol_cycle_ratio", p.market_vol_cycle_ratio),
             Gated::held("cycle_hold", "market_vol_cycle_hold_onset", p.market_vol_cycle_hold_onset),
             Gated::dial("vix_stress_memory", "vix_stress_premium", p.vix_stress_premium),
@@ -3084,6 +3091,10 @@ impl Engine {
         if inner.carries_market_vol_leverage() {
             inner.set_market_vol_leverage_memory(
                 read_finite(snapshot, "", "market_vol_leverage_memory")?);
+        }
+        if inner.carries_market_vol_leverage_fast() {
+            inner.set_market_vol_leverage_fast_memory(
+                read_finite(snapshot, "", "market_vol_leverage_fast_memory")?);
         }
 
         // The macro chain's state, every field by name.

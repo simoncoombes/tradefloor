@@ -1843,6 +1843,37 @@ impl Engine {
         self.market_vol.set_leverage_memory(value);
     }
 
+    /// Whether this engine's model carries the market factor's fast return
+    /// memory, which is when the snapshot and the state hash carry it: only
+    /// with `market_vol_leverage_fast` set. Off on every shipped preset.
+    pub fn carries_market_vol_leverage_fast(&self) -> bool {
+        self.params.market_vol_leverage_fast != 0.0
+    }
+
+    /// The market factor's fast return memory. See
+    /// [`crate::params::ModelParams::market_vol_leverage_fast`].
+    pub fn market_vol_leverage_fast_memory(&self) -> f64 {
+        self.market_vol.leverage_fast_memory()
+    }
+
+    /// Put the market factor's fast return memory back. Call after
+    /// [`Engine::set_market_variance_state_with_components`], which resets
+    /// it to 0.0.
+    pub fn set_market_vol_leverage_fast_memory(&mut self, value: f64) {
+        self.market_vol.set_leverage_fast_memory(value);
+    }
+
+    /// The index's conditional variance terms as the VIX's read-back takes
+    /// them: [`Self::index_conditional_variance_terms_now`] exactly with
+    /// `market_vol_leverage_fast` at 0.0 (the same f64 is passed), and off it
+    /// at the factor variance with the fast return memory read over the
+    /// VIX's window (`MarketVarianceState::vix_window_variance`).
+    fn index_conditional_variance_terms_vix(
+        &self,
+    ) -> crate::market::index_var::IndexVarianceTerms {
+        self.index_conditional_variance_terms_at(self.market_vol.vix_window_variance(&self.params))
+    }
+
     /// Whether this engine's model carries the Fed put's state (the
     /// intermeeting return, the put's stock, what it owes and the previous
     /// close's market cap), which is when the snapshot and the state hash
@@ -9746,7 +9777,9 @@ impl Engine {
         let index_variance = if self.params.vix_level_identity == 0.0 {
             0.0
         } else {
-            let terms = self.index_conditional_variance_terms_now();
+            // The fast return memory at its window's mean
+            // (`market_vol_leverage_fast`); `_now` itself with that dial off.
+            let terms = self.index_conditional_variance_terms_vix();
             self.last_index_variance = Some(terms);
             terms.total()
         };
@@ -13749,6 +13782,10 @@ impl Engine {
         // The market factor's return memory, on the same rule.
         if self.carries_market_vol_leverage() {
             hash_f64(&mut buf, self.market_vol.leverage_memory());
+        }
+        // The fast return memory, on the same rule.
+        if self.carries_market_vol_leverage_fast() {
+            hash_f64(&mut buf, self.market_vol.leverage_fast_memory());
         }
         // The cycle's volatility multiplier, on the same rule: only with
         // `market_vol_cycle_ratio` set, and once a close has set it.

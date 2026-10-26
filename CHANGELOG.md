@@ -26,6 +26,18 @@ payload, Arrow and WASM show them; agents trade by symbol.
 
 <!-- release-note-ends -->
 
+### A fast return memory on the market's variance
+
+- `market_vol_leverage_fast` and `market_vol_leverage_fast_half_life` are new,
+  0.0 on every preset and left out of the digest there: a second return memory
+  on the market factor's variance beside `market_vol_leverage`'s, at its own
+  half-life. The VIX's read-back and the forecast take it at its mean over the
+  VIX's 21-session window. Its state is carried by the snapshot and the state
+  hash only while it is set. On the S&P 500, 1990-2025, a day's return moves
+  the next week's realised volatility by its sign: a two-sd fall raises it by
+  0.24 in logs and a two-sd rise lowers it by 0.13, and most of that is gone
+  within twenty sessions.
+
 ### The market's next-session reversal
 
 - `market_factor_reversal` is a new dial, 0.0 on every preset and left out of

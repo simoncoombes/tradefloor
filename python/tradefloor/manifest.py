@@ -527,6 +527,7 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # constant of the run.
     expected = set(_SNAPSHOT_KEYS) | (
         {"vix_anchor_slow", "vix_anchor", "vix_stress_memory", "market_vol_leverage_memory",
+         "market_vol_leverage_fast_memory",
          "market_vol_cycle_log", "rates", "book", "fair_value_offset", "opening_z",
          "buyback_log_shares", "opening_carry",
          # Carried only while set: a forced close pending tonight, today's
@@ -801,6 +802,10 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # `market_vol_leverage` set: `Engine::state_hash`'s order and rule.
     if "market_vol_leverage_memory" in snapshot:
         _f64(buf, snapshot["market_vol_leverage_memory"])
+    # The fast return memory, only on a model with `market_vol_leverage_fast`
+    # set: `Engine::state_hash`'s order and rule.
+    if "market_vol_leverage_fast_memory" in snapshot:
+        _f64(buf, snapshot["market_vol_leverage_fast_memory"])
     # The cycle's volatility multiplier, only on a model with
     # `market_vol_cycle_ratio` set: `Engine::state_hash`'s order and rule.
     if "market_vol_cycle_log" in snapshot:

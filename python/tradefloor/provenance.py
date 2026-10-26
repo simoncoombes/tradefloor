@@ -714,6 +714,13 @@ OUT_OF_SCOPE = {
         "term is the lag's own (the priced gap in place of the gap), as it "
         "stood; no draw and no state of its own; at 0.0 it is also left out of "
         "the model's digest",
+    "market_vol_leverage_fast":
+        "inert at 0.0: the fast return memory never moves and the variance is "
+        "the arithmetic that stood (a branch in the close); its state is carried "
+        "only with the dial set; at 0.0 it is also left out of the model's digest",
+    "market_vol_leverage_fast_half_life":
+        "unread while `market_vol_leverage_fast` is 0.0; at 0.0 it is also left "
+        "out of the model's digest",
     "market_factor_reversal":
         "inert at 0.0: no name gives back any of yesterday's market factor, "
         "as it stood (a branch in the tick); no draw and no state of its own; "
