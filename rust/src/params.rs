@@ -13341,7 +13341,7 @@ impl ModelParams {
         }
         if self.market_vol_leverage_fast != 0.0 && self.market_vol_leverage_fast_half_life == 0.0 {
             return Err(format!(
-                "market_vol_leverage_fast is {} but market_vol_leverage_fast_half_life is 0. The fast \
+                "market_vol_leverage_fast_half_life is 0 but market_vol_leverage_fast is {}. The fast \
                  return memory needs a half-life in sessions.",
                 self.market_vol_leverage_fast));
         }
@@ -14335,11 +14335,11 @@ impl ModelParams {
         if self.forecast_vix_level_nowcast != 0.0 {
             if self.forecast_horizon_sessions == 0.0 || self.vix_level_sigma == 0.0 {
                 return Err(format!(
-                    "forecast_vix_level_nowcast is {} but forecast_horizon_sessions is {} and \
-                     vix_level_sigma is {}. It nowcasts the VIX's slow level for the forecast: \
-                     set both first.",
-                    self.forecast_vix_level_nowcast, self.forecast_horizon_sessions,
-                    self.vix_level_sigma));
+                    "forecast_horizon_sessions is {}, and vix_level_sigma is {}, but \
+                     forecast_vix_level_nowcast is {}. It nowcasts the VIX's slow level for the \
+                     forecast: set both first.",
+                    self.forecast_horizon_sessions, self.vix_level_sigma,
+                    self.forecast_vix_level_nowcast));
             }
         }
         if !(self.forecast_policy_persistence >= 0.0 && self.forecast_policy_persistence < 1.0) {
@@ -14675,10 +14675,10 @@ impl ModelParams {
             && (self.options_index_listed == 0.0 || self.futures_index_listed == 0.0)
         {
             return Err(format!(
-                "options_index_forward_from_future is {} but options_index_listed is {} and \
-                 futures_index_listed is {}. The dealer takes the index options' forward from the \
-                 listed index futures: set both to 1.0 first.",
-                self.options_index_forward_from_future, self.options_index_listed, self.futures_index_listed));
+                "options_index_listed is {}, and futures_index_listed is {}, but \
+                 options_index_forward_from_future is {}. The dealer takes the index options' forward \
+                 from the listed index futures: set both to 1.0 first.",
+                self.options_index_listed, self.futures_index_listed, self.options_index_forward_from_future));
         }
         if !(self.options_names_listed == 0.0 || self.options_names_listed == 1.0) {
             return Err(format!(

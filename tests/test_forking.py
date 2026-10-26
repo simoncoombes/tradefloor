@@ -1206,6 +1206,9 @@ def _nothing_dormant():
                    options_index_listed=1.0,
                    # The index surface's strip-held term scaling: a switch.
                    surface_index_tenor_strip=1.0,
+                   # The index options' forward from the listed future: a
+                   # switch.
+                   options_index_forward_from_future=1.0,
                    # The single-name options (pt-v22 phase 3): a switch; the
                    # names' premium and skew take the blanket 0.05.
                    options_names_listed=1.0,
