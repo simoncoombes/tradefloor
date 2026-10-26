@@ -842,6 +842,12 @@ OUT_OF_SCOPE = {
         "inert at 0.0: the forecast publishes the unclamped expectation it "
         "steps, as it stood; it reads the forecast only, so no price moves at "
         "any value, and at 0.0 it is also left out of the model's digest",
+    "oil_forecast_cycle_growth":
+        "inert at 0.0: oil's forecast steps growth in the believed phase held "
+        "as it stood (a branch on `== 0.0`, and the close passes no growth "
+        "to oil's block); it reads the forecast only, so the law moves no "
+        "price at any value, and at 0.0 it is also left out of the model's "
+        "digest",
     "oil_forecast_opec_spread":
         "inert at 0.0: the forecast's expected OPEC decision reads the short "
         "factor's spread as it stood (a branch on `== 0.0`); it reads the "

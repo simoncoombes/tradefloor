@@ -10367,6 +10367,7 @@ impl Engine {
             oil_convenience_inventory_var: 0.0,
             oil_convenience_inventory_var_before: 0.0,
             oil_target_drift: None,
+            oil_growth: None,
             oil_pushes_in_target: self.params.oil_pushes_in_target != 0.0,
             oil_noise_log_sd: self.params.oil_noise_log_sd,
             oil_dollar_elasticity: self.params.oil_dollar_elasticity,

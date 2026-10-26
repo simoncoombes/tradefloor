@@ -1561,7 +1561,9 @@ sessions), and `oil_forecast_clamp` has the forecast publish the oil price's
 expectation truncated at its clamps, 35 and 150, over the spread the short
 factor and the level carriers give it. `oil_forecast_opec_spread` has the
 forecast's expected OPEC decision read that same spread, lognormal, in place
-of the short factor's alone. `usd_mean_reversion` and
+of the short factor's alone. `oil_forecast_cycle_growth` has oil's forecast read
+growth's expectation over the cycle's phases, in place of the believed phase
+held for the whole horizon. `usd_mean_reversion` and
 `usd_noise_sd` set the dollar index's law (0.0 the standing 0.02 and 0.3): FRED's
 trade-weighted dollar (DTWEXM, 1987 to 2019) has an AR(1) half-life of 729
 sessions and a daily log change of 0.0043, so the dollar the oil curve carries
@@ -1623,6 +1625,7 @@ centre of 81 is 16.4 and 279.
 | `oil_inventory_noise_sd` | 0 (0.5); up to 5 | same | not set | EIA WCESTUS1, 1987 to 2024: sd 0.087 of the log deviation from the trailing 260-week mean |
 | `oil_forecast_clamp` | 0 (unclamped); 1 | same | not set | none: the clamps are in the law |
 | `oil_forecast_opec_spread` | 0 (the short factor's spread, normal); 1 (the price's whole spread, lognormal) | same | not set | none: OPEC's rule is in the law |
+| `oil_forecast_cycle_growth` | 0 (growth in the believed phase held); 1 (growth's expectation over the phases) | same | not set | none: the cycle and its shocks are in the law |
 | `oil_dollar_elasticity` $\varepsilon$ | 0 (the daily drag); up to 5 | same | not set | EIA RCLC1 and RCLC4 on FRED DTWEXM, 1987 to 2019: 0.69 on daily changes, 1.2 over 21 sessions; DTWEXBGS 2006 on: 2.3 |
 | `oil_noise_log_sd` $s$ | 0 (dollar noise); up to 0.1 | same | not set | EIA's contracts 1 and 4 at a reversion of 0.006: the short factor's daily sd, 0.017 (median of seven windows); Schwartz and Smith (2000) 0.018 |
 | `oil_target_drift_reversion` $r$ | 0 (no pull); up to 1 | same | not set | none: a stated guard against the clamps |

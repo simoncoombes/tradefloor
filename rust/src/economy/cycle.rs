@@ -435,6 +435,21 @@ pub fn mean_sojourn_days_for(phase: CyclePhase, spec: &CycleSpec) -> f64 {
     walk_survival(phase, spec, |_, _| true)
 }
 
+/// One phase's hazard-only survival in DAYS, `S(1)` to `S(n)`: `out[d - 1]`
+/// is the chance a fresh sojourn survives its first `d - 1` checks, on the
+/// same daily transition probabilities [`mean_sojourn_days_for`] walks, so
+/// it leaves at its `d`-th with `S(d) - S(d + 1)`. For the forecast's cycle
+/// (`oil_forecast_cycle_growth`).
+pub fn sojourn_survival_days_for(phase: CyclePhase, spec: &CycleSpec, n: usize) -> Vec<f64> {
+    let mut out = Vec::with_capacity(n);
+    let mut s = 1.0;
+    for d in 1..=n {
+        out.push(s);
+        s *= 1.0 - hazard_only_transition_probability(phase, d as i64, spec);
+    }
+    out
+}
+
 /// The `q` quantile of one phase's sojourn, in DAYS, on the hazard alone:
 /// the smallest `d` with `P(T <= d) >= q`, on the same daily transition
 /// probabilities [`mean_sojourn_days_for`] walks. The time-held fade's onset

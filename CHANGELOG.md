@@ -107,6 +107,19 @@ payload, Arrow and WASM show them; agents trade by symbol.
   the long factor carrying most of the spread, the short factor's undercounts
   the rule's cuts, which are worth more than its raises, and the forecast
   sits low. It changes what the forecast publishes and nothing in the law.
+- `oil_forecast_cycle_growth` is a new switch, 0.0 on every preset and left
+  out of the digest there. At 0.0 the forecast steps the economy in the
+  believed phase, held for the whole horizon, so oil's target follows that
+  phase's growth; the law changes phase, with shocks on a phase's first
+  session that sum to -2 points a cycle, and the forecast runs high
+  at long horizons. At 1.0 oil's block reads growth's expectation over the
+  cycle's phases on the law's own sojourns: the belief's mass on a phase
+  leaves it as a sojourn of stationary age does, mass entering a phase
+  leaves as a fresh one does, and each cohort's growth steps by the law in
+  its phase with the law's mean shock on entry. The sojourns are the hazard
+  alone, without the ladder's state-dependent additions, so where those end
+  expansions early it moves the forecast less than the law does. It changes
+  what the forecast publishes and nothing in the law.
 ### The skew noise
 
 - `surface_skew_noise_sd` and `surface_skew_noise_half_life` are new dials,

@@ -338,6 +338,12 @@ pub struct DailyInputs<'a> {
     /// log of its level before the step and after it. `None` is no long
     /// factor. The forecast passes the log of the level's expectation.
     pub oil_target_drift: Option<(f64, f64)>,
+    /// The growth rate oil's block reads (its demand and its target's
+    /// growth term) in place of `gdp_growth`: `None` at a close, which reads
+    /// the economy's own; the forecast under
+    /// `ModelParams::oil_forecast_cycle_growth` passes growth's expectation
+    /// over the cycle's phases.
+    pub oil_growth: Option<f64>,
     /// Whether the oil pushes decay at the shipped 0.03 apart from the rest
     /// of the price. See `ModelParams::oil_pushes_in_target`.
     pub oil_pushes_in_target: bool,
@@ -587,6 +593,7 @@ impl<'a> Default for DailyInputs<'a> {
             oil_convenience_inventory_var: 0.0,
             oil_convenience_inventory_var_before: 0.0,
             oil_target_drift: None,
+            oil_growth: None,
             oil_pushes_in_target: false,
             oil_noise_log_sd: 0.0,
             oil_dollar_elasticity: 0.0,
@@ -1797,6 +1804,22 @@ pub fn usd_safe_haven_gain(dial: f64) -> f64 {
     }
 }
 
+/// The growth shock the step gives on a phase's first session: in
+/// contraction `-(2 + u (1 + volatility))` on the uniform `u` (the draw is
+/// taken in every phase), and a fixed step in the others. The step reads it
+/// at its draw; the forecast (`oil_forecast_cycle_growth`) at `u` 0.5, its
+/// mean.
+pub fn phase_entry_growth_shock(phase: CyclePhase, u: f64, volatility: f64) -> f64 {
+    let contraction_shock = -(2.0 + u * (1.0 + volatility));
+    match phase {
+        CyclePhase::Contraction => contraction_shock,
+        CyclePhase::Trough => -0.5,
+        CyclePhase::Recovery => 1.0,
+        CyclePhase::Expansion => 0.5,
+        CyclePhase::Peak => 0.0,
+    }
+}
+
 /// The oil price OPEC's rule defends, and the distance from it past which
 /// a decision is a cut or a raise rather than a small adjustment.
 const OPEC_TARGET: f64 = 80.0;
@@ -1944,15 +1967,9 @@ pub fn update_economy_daily(
         // contraction arm — which is the same output and a DIFFERENT stream
         // position, shifting every later consumer that day.
         //
-        // So the draw is hoisted out, exactly as the literal does.
-        let contraction_shock = -(2.0 + rng.next_f64() * (1.0 + volatility));
-        let shock = match economy.cycle_phase {
-            CyclePhase::Contraction => contraction_shock,
-            CyclePhase::Trough => -0.5,
-            CyclePhase::Recovery => 1.0,
-            CyclePhase::Expansion => 0.5,
-            CyclePhase::Peak => 0.0,
-        };
+        // So the draw is hoisted out, exactly as the literal does: taken here
+        // in every phase and handed to [`phase_entry_growth_shock`].
+        let shock =phase_entry_growth_shock(economy.cycle_phase, rng.next_f64(), volatility);
         if shock != 0.0 {
             new_state.gdp_growth = clamp(economy.gdp_growth + shock, gdp_floor, 6.0);
         }
@@ -2353,7 +2370,11 @@ pub fn update_economy_daily(
     let oil_inventory = economy.oil_inventory_level;
     let oil_last_opec = economy.oil_last_opec_day;
 
-    let oil_demand_factor = economy.gdp_growth * 0.15;
+    // `oil_forecast_cycle_growth`: the forecast hands the block growth's
+    // expectation over the cycle's phases; a close passes `None` and reads
+    // the economy's own, the same number.
+    let oil_growth = inputs.oil_growth.unwrap_or(economy.gdp_growth);
+    let oil_demand_factor = oil_growth * 0.15;
     // Supply answers demand, or does not. At 0.0 this is the literal zero
     // the reference implementation writes, and a BRANCH rather than a
     // multiply so a negative `gdp_growth` cannot turn a `-0.0` into a
@@ -2463,7 +2484,7 @@ pub fn update_economy_daily(
         }
     }
 
-    let oil_target_level = OIL_BASELINE + economy.gdp_growth * 3.0 + shock_oil_impact * 10.0;
+    let oil_target_level = OIL_BASELINE + oil_growth * 3.0 + shock_oil_impact * 10.0;
     // Where the seasonal shape acts, as a share of its own amplitude. A
     // BRANCH at 0.0, so every preset before pt-v18 runs the reference
     // implementation's arithmetic in its own order: the whole amplitude
@@ -2883,6 +2904,26 @@ mod phase_table_dials {
     fn a_full_draw_reads_the_stored_target() {
         let c = phase_characteristics(CyclePhase::Contraction);
         assert_eq!(phase_growth_target(-2.75, c.gdp_growth_range, 1.0), -2.75);
+    }
+
+    /// The shock on a phase's first session is the step's literal table, and
+    /// over a cycle at the uniform's mean it sums to -2 points, which is
+    /// what the held-phase forecast misses (`oil_forecast_cycle_growth`).
+    #[test]
+    fn phase_entry_shock_is_the_steps_table() {
+        for u in [0.0, 0.25, 0.999] {
+            for v in [0.7, 1.0] {
+                assert_eq!(phase_entry_growth_shock(CyclePhase::Contraction, u, v), -(2.0 + u * (1.0 + v)));
+            }
+        }
+        let fixed = [0.5, 0.0, f64::NAN, -0.5, 1.0];
+        for (p, want) in PHASES.iter().zip(fixed) {
+            if *p != CyclePhase::Contraction {
+                assert_eq!(phase_entry_growth_shock(*p, 0.3, 1.0), want, "{p:?}");
+            }
+        }
+        let cycle: f64 = PHASES.iter().map(|p| phase_entry_growth_shock(*p, 0.5, 1.0)).sum();
+        assert_eq!(cycle, -2.0);
     }
 }
 
