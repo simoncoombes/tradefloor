@@ -251,7 +251,7 @@ PARAM_SPECS: dict[str, dict] = {
     "margin_scan_coverage": {"kind": "abs", "step_unit": 0.005, "hard_range": (0.0, 0.9999), "derived": True},
     "margin_scan_tail": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 5.0), "derived": True},
     "margin_scan_option_tail": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 5.0), "derived": True},
-    "margin_option_minimum": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 1.0), "derived": False},
+    "margin_option_minimum": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 10.0), "derived": False},
     "margin_pretrade_check": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0), "derived": False},
     # The index options, their surface and their dealer (pt-v22 phase 2): two
     # switches and the surface's and the dealer's dials; none moves a price.

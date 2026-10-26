@@ -80,11 +80,12 @@ payload, Arrow and WASM show them; agents trade by symbol.
 ### The option scan's tail
 
 - `margin_option_minimum` is a new dial, 0.0 on every preset and left out of
-  the digest there: an option book's margin is at least that share of the
-  underlying for each uncovered short call and of the strike for each
-  uncovered short put, a short call and put together asking the greater
-  (FINRA Rule 4210(f)(2)(E)(i) and (f)(2)(G); the rule's 10%). The scan
-  charged a deep out-of-the-money short close to nothing.
+  the digest there: an option book's margin is at least that many dollars a
+  unit of every option it holds, long or short, a long's not more than its
+  value. The scan is a risk-based theoretical loss, so the account it
+  margins is a portfolio-margin account, and FINRA Rule 4210(g)(7) asks the
+  greater of the scan's largest loss and (B) $.375 a listed option times
+  its multiplier: 0.375 a unit.
 - `margin_pretrade_check` is a new switch, 0.0 on every preset and left out
   of the digest there: a `Portfolio` refuses an order that would leave its
   equity under the initial margin it then asks (`MarginError`; FINRA Rule

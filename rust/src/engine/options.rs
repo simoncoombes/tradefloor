@@ -795,10 +795,11 @@ impl Engine {
         let index = self.options_index();
         let (index_move, vol_shift) = self.option_scan_size(surface.vix, index);
         let loss = super::margin::option_scan_loss(&scan, index_move, vol_shift);
-        // The rulebook's minimum for uncovered shorts (`margin_option_minimum`).
-        let share = self.params.margin_option_minimum;
-        Some(if share != 0.0 {
-            crate::mathx::max(loss, super::margin::short_option_minimum(&scan, 0.0, index, share))
+        // The portfolio-margin rule's per-contract minimum
+        // (`margin_option_minimum`).
+        let per_unit = self.params.margin_option_minimum;
+        Some(if per_unit != 0.0 {
+            crate::mathx::max(loss, super::margin::option_contract_minimum(&scan, per_unit))
         } else {
             loss
         })

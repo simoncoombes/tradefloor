@@ -857,10 +857,10 @@ impl Engine {
                 .unwrap_or(0.0);
             let spot_move = z * crate::mathx::sqrt(crate::mathx::max(0.0, variance)) * ctx.spot;
             let loss = super::margin::option_scan_loss_with(&scan, shares, spot_move, z * super::margin::SCAN_VOL_SD);
-            // The rulebook's minimum for uncovered shorts (`margin_option_minimum`).
+            // The portfolio-margin rule's per-contract minimum
+            // (`margin_option_minimum`).
             total += if p.margin_option_minimum != 0.0 {
-                let floor = super::margin::short_option_minimum(&scan, shares, ctx.spot, p.margin_option_minimum);
-                crate::mathx::max(loss, floor)
+                crate::mathx::max(loss, super::margin::option_contract_minimum(&scan, p.margin_option_minimum))
             } else {
                 loss
             };

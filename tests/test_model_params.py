@@ -1302,9 +1302,9 @@ PERTURBATIONS = [
     ("margin_scan_coverage", 0.99, False),
     ("margin_scan_tail", 1.3, False),
     ("margin_scan_option_tail", 0.8, False),
-    # INERT: the rulebook's minimum floors the option margin, which reads
-    # quotes and writes nothing; the pre-trade check is read by accounts.
-    ("margin_option_minimum", 0.1, False),
+    # INERT: the portfolio-margin minimum floors the option margin, which
+    # reads quotes and writes nothing; the pre-trade check is read by accounts.
+    ("margin_option_minimum", 0.375, False),
     ("margin_pretrade_check", 1.0, False),
     # The index options, their surface and their dealer (pt-v22 phase 2).
     # INERT by construction: the surface and the options read public state,

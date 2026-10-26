@@ -4578,12 +4578,12 @@ both together covers more than the quantile names. It is a projection on the
 model's held-out histories, as `margin_scan_tail` is. A
 long option's margin is at most its premium, a spread's at most its width,
 and offsetting positions margin net. Under `margin_option_minimum` (0.0 on
-every shipped preset) an option book's margin is at least the rulebook's
-minimum for its uncovered shorts, that share of the underlying for a call
-and of the strike for a put, a short call and put together asking the
-greater (FINRA Rule 4210(f)(2)(E)(i), column III, 10%, and (f)(2)(G)), so a
-deep out-of-the-money short the scan charges close to nothing asks a tenth
-of what it is written on. Maintenance is initial over 1.1. A
+every shipped preset) an option book's margin is at least the
+portfolio-margin rule's minimum, that many dollars a unit of every option
+it holds, long or short, a long's not more than its value: the scan is a
+risk-based theoretical loss, so the account is a portfolio-margin account,
+and FINRA Rule 4210(g)(7) asks the greater of the largest theoretical loss
+and (B) $.375 a listed option times its multiplier (0.375 a unit). Maintenance is initial over 1.1. A
 `Portfolio` pays an option's premium when it trades, marks it at the
 dealer's mid, is paid its settlement at expiry (`Portfolio.settled`), counts
 it at its delta-notional against the leverage limit, adds the scan to

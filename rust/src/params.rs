@@ -1913,27 +1913,23 @@ pub struct ModelParams {
     /// allowance of 1. The scan reads quotes and writes nothing, so no price
     /// moves. Requires `margin_scan_coverage`. In [0, 5].
     pub margin_scan_option_tail: f64,
-    /// The rulebook's minimum margin for a short listed option, as a share of
-    /// the underlying's value for a call and of the exercise price for a put.
-    /// 0.0, on every shipped preset, is the scan alone, and a value of 0.0 is
-    /// left out of the model's digest.
+    /// The portfolio-margin rule's minimum margin for a listed option,
+    /// dollars a unit of the underlying (the rule's dollars a contract over
+    /// the multiplier). 0.0, on every shipped preset, is the scan alone, and
+    /// a value of 0.0 is left out of the model's digest.
     ///
     /// Off zero, an option book's margin (`Engine::option_margin`, and so
     /// each quote's `initial_margin`) is the scan's or, if greater, this
-    /// share times the underlying for each short call and times the strike
-    /// for each short put that nothing covers (long options of the same
-    /// right, long stock for a call, short stock for a put); a short call
-    /// and a short put together ask the greater of the two. FINRA Rule
-    /// 4210(f)(2)(E)(i): a short listed option is margined at its value plus
-    /// 20% of the underlying less the out-of-the-money amount, "but shall not
-    /// be less than" its value plus 10% of the underlying (calls) or of the
-    /// aggregate exercise price (puts), 10% for a broad index too (column
-    /// III); 4210(f)(2)(G) pairs a short call with a short put at the greater
-    /// requirement. The option's value is already in the account's equity,
-    /// so the share is the 10%. A deep out-of-the-money short, which the
-    /// scan charges close to nothing, so asks a tenth of what it is written
-    /// on. The scan reads quotes and writes nothing, so no price moves.
-    /// Requires `margin_scan_coverage`. In [0, 1].
+    /// times the units of every option it holds (contracts times the
+    /// multiplier), long or short, a long's not more than its value. The
+    /// scan is a risk-based theoretical loss, so an account under it is a
+    /// portfolio-margin account: FINRA Rule 4210(g)(7) margins a portfolio at
+    /// the greater of the largest theoretical loss at its valuation points
+    /// and (B) "$.375 for each listed option ... multiplied by the contract's
+    /// or instrument's multiplier, not to exceed the market value in the case
+    /// of long contracts". The rule's value is 0.375. The scan reads quotes
+    /// and writes nothing, so no price moves. Requires
+    /// `margin_scan_coverage`. In [0, 10].
     pub margin_option_minimum: f64,
     /// A switch: 1.0 refuses an account's order when its equity after the
     /// order would be under the initial margin the account then asks
@@ -14040,10 +14036,10 @@ impl ModelParams {
                  first.",
                 self.margin_scan_option_tail));
         }
-        if !(0.0..=1.0).contains(&self.margin_option_minimum) {
+        if !(0.0..=10.0).contains(&self.margin_option_minimum) {
             return Err(format!(
-                "margin_option_minimum is {}. It is the rulebook's minimum margin for a short option, a \
-                 share of the underlying (calls) or the strike (puts), in [0, 1]; FINRA's is 0.10.",
+                "margin_option_minimum is {}. It is the portfolio-margin rule's minimum margin for a listed \
+                 option, dollars a unit of the underlying, in [0, 10]; FINRA Rule 4210(g)(7)(B)'s is 0.375.",
                 self.margin_option_minimum));
         }
         if self.margin_option_minimum != 0.0 && self.margin_scan_coverage == 0.0 {
