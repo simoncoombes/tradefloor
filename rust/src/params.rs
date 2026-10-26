@@ -1840,6 +1840,18 @@ pub struct ModelParams {
     /// the session only. A rate futures price feeds nothing a stock price or
     /// the economy reads. A switch.
     pub futures_rates_listed: f64,
+    /// A switch: 1.0 prices each rate future with the premium taken at each
+    /// close of its period, at that close's distance
+    /// (`derivatives::RATE_PREMIUM_PER_FIXING`), inside the period's mean
+    /// (`FF`) or compounding (`TR3`). 0.0, on every shipped preset, is the
+    /// premium at the period's last close (`derivatives::RATE_PREMIUM`),
+    /// which a `TR3` quarter took whole where its three `FF` months took
+    /// theirs, so the quarter sat below its strip (4.5 bp at 63 sessions,
+    /// 8.2 at 126) for a rate-neutral spread; a value of 0.0 is left out of
+    /// the model's digest. The per-fixing premium is refitted to the same
+    /// excess returns as the frozen one. Requires `futures_rates_listed`.
+    /// 0 or 1.
+    pub rate_premium_per_fixing: f64,
     /// Whether the engine lists monthly oil futures. 0.0, on every shipped
     /// preset, lists none: no contract, no state, nothing in the snapshot or
     /// the state hash, and a value of 0.0 is left out of the model's digest.
@@ -8843,6 +8855,7 @@ impl ModelParams {
             cycle_rate_hazard: 0.0,
             fed_eve_decision: 0.0,
             policy_eve_surprise_sd: 0.0,
+            rate_premium_per_fixing: 0.0,
             treasury_path_owed_excluded: 0.0,
             corporate_spread_equity_lag: 0.0,
             corporate_spread_equity_lag_gain: 0.0,
@@ -11529,6 +11542,7 @@ impl ModelParams {
             "cycle_rate_hazard" => self.cycle_rate_hazard,
             "fed_eve_decision" => self.fed_eve_decision,
             "policy_eve_surprise_sd" => self.policy_eve_surprise_sd,
+            "rate_premium_per_fixing" => self.rate_premium_per_fixing,
             "treasury_path_owed_excluded" => self.treasury_path_owed_excluded,
             "corporate_spread_equity_lag" => self.corporate_spread_equity_lag,
             "corporate_spread_equity_lag_gain" => self.corporate_spread_equity_lag_gain,
@@ -11980,6 +11994,7 @@ impl ModelParams {
             "cycle_rate_hazard" => out.cycle_rate_hazard = value,
             "fed_eve_decision" => out.fed_eve_decision = value,
             "policy_eve_surprise_sd" => out.policy_eve_surprise_sd = value,
+            "rate_premium_per_fixing" => out.rate_premium_per_fixing = value,
             "treasury_path_owed_excluded" => out.treasury_path_owed_excluded = value,
             "corporate_spread_equity_lag" => out.corporate_spread_equity_lag = value,
             "corporate_spread_equity_lag_gain" => out.corporate_spread_equity_lag_gain = value,
@@ -13653,6 +13668,18 @@ impl ModelParams {
                  price. Set fed_eve_decision to 1.",
                 self.policy_eve_surprise_sd));
         }
+        if !(self.rate_premium_per_fixing == 0.0 || self.rate_premium_per_fixing == 1.0) {
+            return Err(format!(
+                "rate_premium_per_fixing is {}. It is a switch: 0 (the premium at a period's last close) or 1 \
+                 (the premium at each close of the period).",
+                self.rate_premium_per_fixing));
+        }
+        if self.rate_premium_per_fixing != 0.0 && self.futures_rates_listed == 0.0 {
+            return Err(format!(
+                "rate_premium_per_fixing is {} but futures_rates_listed is 0: no rate future to price. \
+                 Set futures_rates_listed to 1.",
+                self.rate_premium_per_fixing));
+        }
         if !(self.treasury_path_owed_excluded == 0.0 || self.treasury_path_owed_excluded == 1.0) {
             return Err(format!(
                 "treasury_path_owed_excluded is {}. It is a switch: 0 (the anticipated path's step \
@@ -14617,6 +14644,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "cycle_rate_hazard",
     "fed_eve_decision",
     "policy_eve_surprise_sd",
+    "rate_premium_per_fixing",
     "treasury_path_owed_excluded",
     "corporate_spread_equity_lag",
     "corporate_spread_equity_lag_gain",
@@ -14874,6 +14902,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "cycle_rate_hazard",
         "fed_eve_decision",
         "policy_eve_surprise_sd",
+        "rate_premium_per_fixing",
         "treasury_path_owed_excluded",
         "corporate_spread_equity_lag",
         "corporate_spread_equity_lag_gain",

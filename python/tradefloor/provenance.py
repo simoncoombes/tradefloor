@@ -501,6 +501,11 @@ OUT_OF_SCOPE = {
         "with the switch off, `Engine::contracts` lists no rate future, "
         "`Engine::quote` returns None for one, and nothing is snapshotted or "
         "hashed; at 0.0 it is also left out of the model's digest",
+    "rate_premium_per_fixing":
+        "inert at 0.0: a rate future's premium is the frozen one at its "
+        "period's last close, as it stood (a branch in "
+        "`rate_futures_valuation`); read only with `futures_rates_listed` on; "
+        "at 0.0 it is also left out of the model's digest",
     # The oil futures (pt-v22 phase 1), inert on every shipped preset. An oil
     # future reads the oil price and the forecast and draws nothing.
     "futures_oil_listed":

@@ -37,6 +37,13 @@ payload, Arrow and WASM show them; agents trade by symbol.
   trading the front contract by it won 36 of 36 meetings. The tape: the
   Kuttner-scaled ZQ=F surprise on scheduled FOMC days net of an ordinary
   session, 2015 and 2021-2026, 2.55 bp (se 0.69). No stock price moves.
+- `rate_premium_per_fixing` is a new switch, 0.0 on every preset and left out
+  of the digest there: each close of a rate future's period takes the
+  premium at its own distance, inside the mean (FF) or the compounding
+  (TR3), so a quarter and its three months carry one premium. At its last
+  close a TR3 took the whole quarter's premium, 4.5 bp under its strip at 63
+  sessions and 8.2 at 126. The per-fixing premium is refitted to the same
+  excess returns (k 3.1679, p 1.3235; every point within 0.39 se).
 - `news_preopen_share` is a new dial, 0.0 on every preset and left out of the
   digest there: the share of the day's endogenous company news released
   before the open, priced by the opening print on the night rather than

@@ -507,6 +507,19 @@ impl RatePremium {
 /// The rate futures' premium.
 pub const RATE_PREMIUM: RatePremium = RatePremium { k: 1.5956, p: 1.683, cap: 126.0 };
 
+/// The rate futures' premium taken at each close of a contract's period
+/// (`rate_premium_per_fixing`): `k (h / 21)^p` basis points for a close `h`
+/// sessions away, held at its value at `cap`, so a month's premium is the
+/// mean of the premium over its 21 closes and a quarter's is that of its
+/// three months. Refitted, in the same way and to the same figures as
+/// [`RATE_PREMIUM`] (the free 2000-2026 front-month reading, 1.28 bp se 0.67;
+/// Piazzesi and Swanson, JME 55(4), 2008, Table 1, 6.3, 10.5, 16.1, 23.2
+/// and 30.7 bp at two to six months, se the mean over its HAC t), with each
+/// month's premium the mean over its closes: k 3.1679, p 1.3235, every point
+/// within 0.39 se (1.44, 5.57, 10.82, 16.80, 23.37, 30.44 bp). The frozen
+/// form read per close would give 0.63 bp at one month.
+pub const RATE_PREMIUM_PER_FIXING: RatePremium = RatePremium { k: 3.1679, p: 1.3235, cap: 126.0 };
+
 /// A rate future's specification: constants of the contract, not dials.
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[non_exhaustive]

@@ -309,3 +309,38 @@ def test_the_order_log_replays_the_rate_futures_orders():
     _go_on(engine)
     again = replay(engine.order_log, seed=15, universe=SMALL, model=model(**EVERY))
     assert again.state_hash() == engine.state_hash()
+
+
+def _strip_gaps(engine):
+    """Each TR3 against its three FF months, compounded a month at a time: the
+    TR3's fair rate less the strip's, bp, for the quarters whose months are all
+    listed."""
+    ff = {c["expiry"]: engine.quote(c["symbol"]) for c in rate_contracts(engine, "FF")}
+    gaps = []
+    for c in rate_contracts(engine, "TR3"):
+        months = [c["expiry"] - 42, c["expiry"] - 21, c["expiry"]]
+        if not all(m in ff for m in months):
+            continue
+        growth = 1.0
+        for m in months:
+            growth *= 1.0 + (100.0 - ff[m]["fair"]) * 21 / 25200.0
+        strip = (growth - 1.0) * 25200.0 / 63
+        gaps.append(100.0 * ((100.0 - engine.quote(c["symbol"])["fair"]) - strip))
+    return gaps
+
+
+def test_per_fixing_a_quarter_and_its_three_months_carry_one_premium():
+    # At its last close a TR3 took the premium of the whole quarter where its
+    # months took their own, a rate-neutral spread of several bp; per fixing
+    # (rate_premium_per_fixing) the gap is the strip's monthly compounding.
+    at_expiry = tf.Engine(seed=11, universe=SMALL, model=model(**ON))
+    fixing = tf.Engine(seed=11, universe=SMALL, model=model(**ON, rate_premium_per_fixing=1.0))
+    for _ in range(3):
+        day(at_expiry)
+        day(fixing)
+    assert max(_strip_gaps(at_expiry)) > 3.0
+    gaps = _strip_gaps(fixing)
+    assert len(gaps) >= 3
+    assert max(abs(g) for g in gaps) < 0.25, gaps
+    # The switch moves no stock price.
+    assert at_expiry.prices() == fixing.prices()

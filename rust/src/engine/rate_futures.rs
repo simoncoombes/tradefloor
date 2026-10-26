@@ -38,7 +38,7 @@ use crate::agent_book::{remove_front, AgentFill, AgentOrder, BookState, Liquidit
 use crate::derivatives::calendar::{self, SESSIONS_PER_MONTH, SESSIONS_PER_QUARTER};
 use crate::derivatives::{
     rate_future_symbol, ContractKind, ContractSpec, ContractSymbol, Quote, RateFutureSpec, Settlement, SymbolKind,
-    POLICY_RATE_FUTURE, RATE_PREMIUM, TERM_RATE_FUTURE,
+    POLICY_RATE_FUTURE, RATE_PREMIUM, RATE_PREMIUM_PER_FIXING, TERM_RATE_FUTURE,
 };
 use crate::market_maker::MARKET_MAKER_ID;
 use crate::order_book::{OrderBook, Side, SubmitOptions};
@@ -349,6 +349,14 @@ impl Engine {
     /// The rate of the period ending at `expiry` for a future of `kind`, per
     /// cent, with each close made at its rate and each to come expected.
     fn rate_futures_period_rate(&self, kind: ContractKind, expiry: i64) -> f64 {
+        self.rate_futures_period_rate_with(kind, expiry, None)
+    }
+
+    /// [`Self::rate_futures_period_rate`], with each close to come taking
+    /// the premium at its own distance when `fixing` holds the session's
+    /// share used (`rate_premium_per_fixing`): the rate the contract is
+    /// priced at, premium and all.
+    fn rate_futures_period_rate_with(&self, kind: ContractKind, expiry: i64, fixing: Option<f64>) -> f64 {
         let length = period(kind);
         let closed = self.rate_futures_closed().unwrap_or(i64::MIN);
         let rates: Vec<f64> = (expiry - length + 1..=expiry)
@@ -361,7 +369,10 @@ impl Engine {
                         .map(|(_, r)| *r)
                         .unwrap_or(self.economy.federal_funds_rate)
                 } else {
-                    self.rate_expected_at(k)
+                    match fixing {
+                        Some(used) => self.rate_expected_at(k) + RATE_PREMIUM_PER_FIXING.at((k - closed) as f64 - used),
+                        None => self.rate_expected_at(k),
+                    }
                 }
             })
             .collect();
@@ -378,7 +389,15 @@ impl Engine {
         };
         let sessions = crate::mathx::max(0.0, (c.expiry - closed) as f64 - used);
         let expected = self.rate_futures_period_rate(c.kind, c.expiry);
-        let premium = RATE_PREMIUM.at(sessions);
+        // Per fixing (`rate_premium_per_fixing`), each close to come carries
+        // the premium at its own distance inside the period's mean or
+        // compounding, so a quarter and its three months carry one premium;
+        // otherwise the period's, at its last close, as it stood.
+        let premium = if self.params.rate_premium_per_fixing != 0.0 {
+            self.rate_futures_period_rate_with(c.kind, c.expiry, Some(used)) - expected
+        } else {
+            RATE_PREMIUM.at(sessions)
+        };
         let fair = 100.0 - expected - premium;
         Some(RateValuation { expected, premium, fair, sessions, price: fair + c.impact })
     }
@@ -869,6 +888,16 @@ mod tests {
         let closed = (crate::mathx::pow(1.0 + 5.0 / 25_200.0, 63.0) - 1.0) * 25_200.0 / 63.0;
         assert!((flat - closed).abs() < 1e-12, "{flat} {closed}");
         assert!(flat > 5.03 && flat < 5.032, "{flat}");
+    }
+
+    #[test]
+    fn the_per_fixing_premium_reads_its_fit() {
+        let p = RATE_PREMIUM_PER_FIXING;
+        let month = |m: f64| (1..=21).map(|j| p.at(21.0 * (m - 1.0) + j as f64)).sum::<f64>() / 21.0 * 100.0;
+        for (m, want) in [(1.0, 1.44), (2.0, 5.57), (3.0, 10.82), (6.0, 30.44)] {
+            assert!((month(m) - want).abs() < 0.01, "{m}: {}", month(m));
+        }
+        assert_eq!(p.at(500.0), p.at(126.0));
     }
 
     #[test]

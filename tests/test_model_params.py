@@ -1289,6 +1289,9 @@ PERTURBATIONS = [
     # reads the policy rate each close sets and the forecast, draws nothing
     # and writes only its own state (tests/test_rate_futures.py).
     ("futures_rates_listed", 1.0, False),
+    # INERT: the rate futures' premium moves only their prices, which no
+    # stock price reads.
+    ("rate_premium_per_fixing", 1.0, False),
     # The oil futures (pt-v22 phase 1). INERT by construction: an oil future
     # reads the oil price and the forecast, draws nothing and writes only its
     # own state (tests/test_oil_futures.py).
@@ -2248,6 +2251,9 @@ COMPANIONS: dict[str, dict[str, float]] = {
     # The tail allowance scales the margin, which the coverage sets.
     "margin_scan_tail": {"margin_scan_coverage": 0.99},
     "margin_scan_option_tail": {"margin_scan_coverage": 0.99},
+    # The premium per fixing prices the rate futures, listed by their switch.
+    "rate_premium_per_fixing": {"futures_rates_listed": 1.0, "index_level_listed": 1.0,
+                                "forecast_horizon_sessions": 252.0},
     # Credit's lagged term reads the priced gap, which the lag steps.
     "corporate_spread_equity_lag_gain": {"corporate_spread_equity_lag": 5.0},
     # The open prices the pre-open news only under a night split.

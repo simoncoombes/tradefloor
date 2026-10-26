@@ -244,6 +244,7 @@ PARAM_SPECS: dict[str, dict] = {
                                         "derived": True},
     # The rate futures (pt-v22 phase 1): a switch; it moves no price.
     "futures_rates_listed": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0), "derived": True},
+    "rate_premium_per_fixing": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0), "derived": False},
     # The oil futures (pt-v22 phase 1): a switch; it moves no price.
     "futures_oil_listed": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0), "derived": True},
     # The contracts' margin (pt-v22 phase 1); it moves no price.

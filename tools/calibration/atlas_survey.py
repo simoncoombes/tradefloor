@@ -483,6 +483,7 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "futures_vix_live_slow_half_life": (0.0, 120.0),
     # The rate futures (pt-v22 phase 1): a switch. It moves no stock price.
     "futures_rates_listed": (0.0, 1.0),
+    "rate_premium_per_fixing": (0.0, 1.0),
     # The oil futures (pt-v22 phase 1): a switch. It moves no stock price.
     "futures_oil_listed": (0.0, 1.0),
     # The contracts' margin (pt-v22 phase 1): its coverage and tail allowance.
