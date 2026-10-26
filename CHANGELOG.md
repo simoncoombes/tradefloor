@@ -28,6 +28,15 @@ payload, Arrow and WASM show them; agents trade by symbol.
 
 ### Company news released before the open
 
+- `policy_eve_surprise_sd` is a new dial, 0.0 on every preset and left out of
+  the digest there: with `fed_eve_decision` on, the forecast taken on a
+  meeting's eve prices the decision the eve holds, plus a zero-mean surprise
+  of this sd (bp) keyed on the seed, instead of a discounted share of it and
+  a reversion step. The meeting then moves the policy-rate futures by the
+  surprise alone; before, the eve's step revealed the decision and a rule
+  trading the front contract by it won 36 of 36 meetings. The tape: the
+  Kuttner-scaled ZQ=F surprise on scheduled FOMC days net of an ordinary
+  session, 2015 and 2021-2026, 2.55 bp (se 0.69). No stock price moves.
 - `news_preopen_share` is a new dial, 0.0 on every preset and left out of the
   digest there: the share of the day's endogenous company news released
   before the open, priced by the opening print on the night rather than

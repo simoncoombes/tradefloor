@@ -1254,6 +1254,36 @@ pub struct ModelParams {
     /// it stood. The stored decision is snapshotted and hashed only with
     /// this set. 0 or 1.
     pub fed_eve_decision: f64,
+    /// The sd, in basis points, of the meeting-day surprise the market's
+    /// policy path carries once the eve holds the decision. 0.0, on every
+    /// shipped preset, is the path as it stood: the next meeting priced at
+    /// `1 - forecast_policy_shadow_discount` of the shadow change plus the
+    /// reversion step, even on the eve, and a value of 0.0 is left out of the
+    /// model's digest.
+    ///
+    /// Off zero, with `fed_eve_decision` on, the forecast taken at the close
+    /// before a scheduled meeting prices that meeting's change at the
+    /// decision the eve holds (the change the meeting delivers), plus a
+    /// zero-mean surprise of this sd: the first normal of
+    /// `GameRng::keyed(rng::eve_surprise_key(seed), EVE_SURPRISE_TAG, day)`,
+    /// so it takes nothing from any stream and moves no other draw. The
+    /// meeting's own close then moves the policy-rate futures by the surprise
+    /// alone, which no one can know at the eve; at 0.0 the miss is a known
+    /// share of a decision the eve's path reveals. The forecast feeds only
+    /// the contracts, so no stock price moves. Later meetings are priced as
+    /// they stood. Requires `fed_eve_decision`. In [0, 100].
+    ///
+    /// The tape: the Kuttner (2001) surprise, the CME 30-day fed funds
+    /// futures' front-month change on a scheduled FOMC decision day scaled
+    /// by `D / (D - d)` (Yahoo `ZQ=F`; meetings in a month's last seven days
+    /// and on its first session, where the series rolls, left out), net in
+    /// quadrature of an ordinary session's change, 2015 and 2021-2026 (RF2's
+    /// years): 2.55 bp on 33 meetings (bootstrap se 0.69 over meetings, 0.59
+    /// over years). By era: 2015-2019 2.01 (0.43), 2008-2015 3.04 (1.50);
+    /// 2000-2007's meeting RMS 4.77. The series' raw meeting-day changes in
+    /// RF2's years agree with Bauer and Swanson's (2023, NBER Macroeconomics
+    /// Annual 37) 30-minute front-contract surprises at a correlation of 0.96.
+    pub policy_eve_surprise_sd: f64,
     /// A switch: with `treasury_path_anticipated` on, 1.0 leaves the Fed
     /// put's owed step out of the meeting's path step, so the path moves by
     /// the anticipation's further move alone. 0.0, on every shipped preset,
@@ -8812,6 +8842,7 @@ impl ModelParams {
             cycle_inflation_hazard: 0.0,
             cycle_rate_hazard: 0.0,
             fed_eve_decision: 0.0,
+            policy_eve_surprise_sd: 0.0,
             treasury_path_owed_excluded: 0.0,
             corporate_spread_equity_lag: 0.0,
             corporate_spread_equity_lag_gain: 0.0,
@@ -11497,6 +11528,7 @@ impl ModelParams {
             "cycle_inflation_hazard" => self.cycle_inflation_hazard,
             "cycle_rate_hazard" => self.cycle_rate_hazard,
             "fed_eve_decision" => self.fed_eve_decision,
+            "policy_eve_surprise_sd" => self.policy_eve_surprise_sd,
             "treasury_path_owed_excluded" => self.treasury_path_owed_excluded,
             "corporate_spread_equity_lag" => self.corporate_spread_equity_lag,
             "corporate_spread_equity_lag_gain" => self.corporate_spread_equity_lag_gain,
@@ -11947,6 +11979,7 @@ impl ModelParams {
             "cycle_inflation_hazard" => out.cycle_inflation_hazard = value,
             "cycle_rate_hazard" => out.cycle_rate_hazard = value,
             "fed_eve_decision" => out.fed_eve_decision = value,
+            "policy_eve_surprise_sd" => out.policy_eve_surprise_sd = value,
             "treasury_path_owed_excluded" => out.treasury_path_owed_excluded = value,
             "corporate_spread_equity_lag" => out.corporate_spread_equity_lag = value,
             "corporate_spread_equity_lag_gain" => out.corporate_spread_equity_lag_gain = value,
@@ -13608,6 +13641,18 @@ impl ModelParams {
                  (a scheduled meeting delivers the eve's decision).",
                 self.fed_eve_decision));
         }
+        if !(self.policy_eve_surprise_sd >= 0.0 && self.policy_eve_surprise_sd <= 100.0) {
+            return Err(format!(
+                "policy_eve_surprise_sd is {}. It is the sd of the meeting-day surprise in basis points, \
+                 in [0, 100]; 0 prices the eve's meeting as it stood.",
+                self.policy_eve_surprise_sd));
+        }
+        if self.policy_eve_surprise_sd != 0.0 && self.fed_eve_decision == 0.0 {
+            return Err(format!(
+                "policy_eve_surprise_sd is {} but fed_eve_decision is 0: the eve holds no decision to \
+                 price. Set fed_eve_decision to 1.",
+                self.policy_eve_surprise_sd));
+        }
         if !(self.treasury_path_owed_excluded == 0.0 || self.treasury_path_owed_excluded == 1.0) {
             return Err(format!(
                 "treasury_path_owed_excluded is {}. It is a switch: 0 (the anticipated path's step \
@@ -14571,6 +14616,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "cycle_inflation_hazard",
     "cycle_rate_hazard",
     "fed_eve_decision",
+    "policy_eve_surprise_sd",
     "treasury_path_owed_excluded",
     "corporate_spread_equity_lag",
     "corporate_spread_equity_lag_gain",
@@ -14827,6 +14873,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "cycle_inflation_hazard",
         "cycle_rate_hazard",
         "fed_eve_decision",
+        "policy_eve_surprise_sd",
         "treasury_path_owed_excluded",
         "corporate_spread_equity_lag",
         "corporate_spread_equity_lag_gain",

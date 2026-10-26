@@ -621,6 +621,26 @@ impl Engine {
         Some(self.next_meeting_day(f.day) - 1)
     }
 
+    /// The change the forecast for `day` prices at the meeting held at `first`
+    /// when that meeting is the next close and the eve holds its decision
+    /// (`policy_eve_surprise_sd`, `fed_eve_decision`): the decision, plus the
+    /// surprise, percentage points. `None` otherwise, and always with the
+    /// dial at 0.0, where the path is as it stood.
+    fn eve_priced_change(&self, day: i64, first: i64) -> Option<f64> {
+        let sd = self.params.policy_eve_surprise_sd;
+        if sd == 0.0 || first != day + 1 {
+            return None;
+        }
+        let decision = self.eve_decision?;
+        let z = crate::rng::GameRng::keyed(
+            crate::rng::eve_surprise_key(self.root_seed),
+            crate::rng::EVE_SURPRISE_TAG as u64,
+            day as u64,
+        )
+        .next_normal();
+        Some(decision + sd / 100.0 * z)
+    }
+
     fn forecast_policy_path(&self, day: i64, horizon: usize) -> Vec<f64> {
         let p = &self.params;
         let r0 = self.economy.federal_funds_rate;
@@ -645,6 +665,7 @@ impl Engine {
         let mut path = vec![r0; horizon];
         let mut rate = r0;
         let mut push = (1.0 - p.forecast_policy_shadow_discount) * shadow;
+        let held = self.eve_priced_change(day, first);
         let mut j = 0;
         loop {
             let at = first + (j as f64 * cadence).round() as i64;
@@ -654,6 +675,11 @@ impl Engine {
             let mut change = push;
             if p.forecast_policy_reversion != 0.0 {
                 change += p.forecast_policy_reversion * (p.forecast_policy_neutral - rate);
+            }
+            if j == 0 {
+                if let Some(c) = held {
+                    change = c;
+                }
             }
             rate += change;
             for slot in path.iter_mut().skip((at - day - 1) as usize) {
@@ -1524,6 +1550,46 @@ mod tests {
         e.advance_day_with(&request, &mut crate::economy::daily::MeanDraws);
         assert_eq!(last.to_bits(), e.published_vix().to_bits());
         assert_eq!(e.live_vix().unwrap().to_bits(), e.published_vix().to_bits());
+    }
+
+    #[test]
+    fn on_a_meetings_eve_the_path_prices_the_held_decision_less_only_its_surprise() {
+        let base = [("forecast_horizon_sessions", 63.0), ("index_level_listed", 1.0), ("fed_eve_decision", 1.0)];
+        let mut dials = base.to_vec();
+        dials.push(("policy_eve_surprise_sd", 5.0));
+        let mut e = engine(with(&dials));
+        let mut off = engine(with(&base));
+        let (mut buffer, mut other) = (SessionBuffer::new(), SessionBuffer::new());
+        let mut eve: Option<(f64, f64, f64)> = None;
+        let mut surprises = Vec::new();
+        for day in 0..2000 {
+            e.run_numbered_day(day, 390, &mut buffer);
+            off.run_numbered_day(day, 390, &mut other);
+            // The forecast feeds only the contracts: no stock price moves.
+            for (a, b) in e.companies().iter().zip(off.companies().iter()) {
+                assert_eq!(a.stock.price.to_bits(), b.stock.price.to_bits(), "day {day}");
+            }
+            let rate = e.economy.federal_funds_rate;
+            if let Some((priced, held, then)) = eve.take() {
+                // The meeting delivered the decision the eve held, so the
+                // path missed it by the surprise alone.
+                assert_eq!((rate - then).to_bits(), held.to_bits(), "day {day}");
+                surprises.push(priced - held);
+            }
+            let f = e.forecast().unwrap();
+            let first = e.next_meeting_day(f.day);
+            if let Some(c) = e.eve_priced_change(f.day, first) {
+                assert_eq!((f.policy_rate[0] - rate).to_bits(), (rate + c - rate).to_bits());
+                eve = Some((c, e.eve_decision.unwrap(), rate));
+            } else {
+                assert!(first != f.day + 1 || e.eve_decision.is_none());
+            }
+        }
+        let n = surprises.len() as f64;
+        assert!(n >= 50.0, "{n} eves");
+        let mean = surprises.iter().sum::<f64>() / n;
+        let sd = (surprises.iter().map(|x| (x - mean) * (x - mean)).sum::<f64>() / (n - 1.0)).sqrt();
+        assert!(mean.abs() < 0.03 && sd > 0.025 && sd < 0.08, "mean {mean} sd {sd} on {n}");
     }
 
     #[test]

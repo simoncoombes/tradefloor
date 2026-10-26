@@ -740,6 +740,7 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "cycle_inflation_hazard": (0.0, 0.1),
     # Two switches.
     "fed_eve_decision": (0.0, 1.0),
+    "policy_eve_surprise_sd": (0.0, 100.0),
     "treasury_path_owed_excluded": (0.0, 1.0),
     # Credit's repricing lag, sessions.
     "corporate_spread_equity_lag": (0.0, 21.0),

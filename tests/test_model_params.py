@@ -1004,6 +1004,9 @@ PERTURBATIONS = [
     # The eve's decision: the probe's meetings deliver the eve's silent
     # shadow instead of re-reading the day, which moves its rate path.
     ("fed_eve_decision", 1.0, True),
+    # INERT: the eve's surprise moves only the forecast the contracts read,
+    # and no stock price reads the forecast.
+    ("policy_eve_surprise_sd", 5.0, False),
     # The owed step left out. INERT on the probe: read only with
     # treasury_path_anticipated, which pt-v20 leaves off.
     ("treasury_path_owed_excluded", 1.0, False),
@@ -2209,6 +2212,8 @@ def test_the_perturbation_table_covers_the_whole_settable_surface():
 #: carrying the same companions, none of the three moved. The companions
 #: are the default's 0.375 now, and the three rows are re-valued.
 COMPANIONS: dict[str, dict[str, float]] = {
+    # The eve holds a decision only under fed_eve_decision.
+    "policy_eve_surprise_sd": {"fed_eve_decision": 1.0},
     # Core differs from headline only where oil pays inflation, which the
     # symmetric pass-through does either side of 81 (the shipped branch pays
     # nothing between 50 and 80).
