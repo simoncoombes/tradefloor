@@ -597,20 +597,15 @@ pub struct StripHold {
 
 impl StripHold {
     /// The map from SSVI's own smile `scaled` with its tenor dropped to
-    /// `scaled` itself. `None` without a tenor, or where a strip fails to price.
+    /// `scaled` itself. A node whose strip does not price (total variances far
+    /// beyond any listed tenor's, tens of years of variance) takes its
+    /// neighbour's toward the anchor. `None` without a tenor.
     pub fn new(scaled: &Ssvi) -> Option<Self> {
         if scaled.tenor == 0.0 || !(scaled.anchor > 0.0) {
             return None;
         }
         let base = Ssvi { anchor: 0.0, tenor: 0.0, ..*scaled };
-        let mut logs = Vec::with_capacity(HOLD_NODES);
-        for i in 0..HOLD_NODES {
-            let x = HOLD_LO + HOLD_STEP * i as f64;
-            if x == 0.0 {
-                logs.push(0.0);
-                continue;
-            }
-            let theta = scaled.anchor * mathx::exp(x);
+        let node = |theta: f64| -> Option<f64> {
             let target = strip_variance(&base, theta)?;
             // Each step scales theta by the ratio of the strips, nearly
             // proportional to theta, as `theta_for_vix` does.
@@ -625,7 +620,17 @@ impl StripHold {
                     return None;
                 }
             }
-            logs.push(mathx::log(held / theta));
+            Some(mathx::log(held / theta))
+        };
+        let zero = (-HOLD_LO / HOLD_STEP).round() as usize;
+        let mut logs = vec![0.0; HOLD_NODES];
+        for i in (zero + 1)..HOLD_NODES {
+            let theta = scaled.anchor * mathx::exp(HOLD_LO + HOLD_STEP * i as f64);
+            logs[i] = node(theta).unwrap_or(logs[i - 1]);
+        }
+        for i in (0..zero).rev() {
+            let theta = scaled.anchor * mathx::exp(HOLD_LO + HOLD_STEP * i as f64);
+            logs[i] = node(theta).unwrap_or(logs[i + 1]);
         }
         Some(StripHold { anchor: scaled.anchor, logs })
     }
@@ -738,6 +743,26 @@ mod tests {
     use super::*;
 
     const T21: f64 = 21.0 / 252.0;
+
+    #[test]
+    fn the_strip_hold_is_built_and_rises_at_every_level() {
+        // VIX about 2 to 300, every correlation the fit allows: the map is
+        // built, the anchor maps to itself, and theta' rises with theta.
+        for &rho in &[-0.999, -0.9, -0.4, 0.0, 0.8, 0.999] {
+            for &a in &[0.00005, 0.001, 0.01, 0.06, 0.4, 1.0] {
+                let s = Ssvi::new(rho, 1.0, 0.5).with_tenor(a, 0.4);
+                let h = StripHold::new(&s).unwrap();
+                assert_eq!(h.at(a), a);
+                let mut last = 0.0;
+                for i in 0..400 {
+                    let t = a * mathx::exp(-8.0 + 0.035 * f64::from(i));
+                    let held = h.at(t);
+                    assert!(held > last && held.is_finite(), "rho {rho} anchor {a} theta {t}");
+                    last = held;
+                }
+            }
+        }
+    }
 
     #[test]
     fn a_flat_smile_reads_vix_100_sigma_and_skew_100() {
