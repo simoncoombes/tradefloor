@@ -621,6 +621,30 @@ impl Engine {
         Some(self.next_meeting_day(f.day) - 1)
     }
 
+    /// The next meeting's change as the economy as published implies it and
+    /// as the Fed's own reading (the economy the meeting reads) does,
+    /// percentage points, on the standing forecast's close: the two silent
+    /// shadows `policy_anticipation_guidance` blends, `(published, own)`.
+    /// `None` without a forecast (`forecast_horizon_sessions`). No stream is
+    /// touched and nothing is written.
+    pub fn policy_shadows(&self) -> Option<(f64, f64)> {
+        let f = self.forecast()?;
+        let request = Self::meeting_request(f.day);
+        let options = self.policy_options(false);
+        Some((self.shadow_published_change(&request, &options), self.shadow_own_change(&request, &options)))
+    }
+
+    /// The request a shadow meeting for the close after `day` reads.
+    fn meeting_request(day: i64) -> DayAdvanceRequest<'static> {
+        DayAdvanceRequest {
+            volatility: 1.0,
+            active_shocks: &[],
+            market_return_pct: 0.0,
+            game_day: day + 1,
+            timestamp: (day + 1) * 24 * 60,
+        }
+    }
+
     /// The change the forecast for `day` prices at the meeting held at `first`
     /// when that meeting is the next close and the eve holds its decision
     /// (`policy_eve_surprise_sd`, `fed_eve_decision`): the decision, plus the
@@ -644,13 +668,7 @@ impl Engine {
     fn forecast_policy_path(&self, day: i64, horizon: usize) -> Vec<f64> {
         let p = &self.params;
         let r0 = self.economy.federal_funds_rate;
-        let request = DayAdvanceRequest {
-            volatility: 1.0,
-            active_shocks: &[],
-            market_return_pct: 0.0,
-            game_day: day + 1,
-            timestamp: (day + 1) * 24 * 60,
-        };
+        let request = Self::meeting_request(day);
         let options = self.policy_options(false);
         let shadow = self.shadow_meeting_change(&request, &options);
         let first = self.next_meeting_day(day);

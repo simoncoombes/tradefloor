@@ -222,6 +222,23 @@ def test_the_forecast_runs_its_horizon_from_public_state():
     assert engine.forecast()["vix"][0] > f["vix"][0]
 
 
+def test_the_policy_shadows_are_a_read_on_the_forecasts_close():
+    assert tf.Engine(seed=9, universe=SMALL, model="pt-v21").policy_shadows() is None
+    engine = tf.Engine(seed=9, universe=SMALL, model=model(**ON))
+    assert engine.policy_shadows() is None
+    engine.run_days(30)
+    hashed = engine.state_hash()
+    published, own = engine.policy_shadows()
+    # Each is a meeting's change: whole quarter points, unless the rate's
+    # bounds cut it short.
+    rate = engine.economy()["federal_funds_rate"]
+    for change in (published, own):
+        assert math.isfinite(change)
+        assert change * 4 == pytest.approx(round(change * 4), abs=1e-9) or rate + change in (0.0, 8.0)
+    assert engine.policy_shadows() == (published, own)
+    assert engine.state_hash() == hashed
+
+
 # ── Snapshot and state hash ─────────────────────────────────────────────────
 
 def test_the_keys_are_carried_hashed_and_mirrored_and_a_restore_continues():
