@@ -105,9 +105,11 @@ pub(crate) fn option_scan_loss(positions: &[ScanOption], index_move: f64, vol_sh
 }
 
 /// [`option_scan_loss`] with a linear position in the underlying beside the
-/// options: `linear` units (shares, for a single name) each losing the move,
-/// so stock and the options on it are scanned together. With `linear` at 0
-/// it is [`option_scan_loss`]'s arithmetic.
+/// options: `linear` units (shares, for a single name) each making the move.
+/// In each scenario the stock's gain offsets the options' loss and its loss
+/// is not counted, so stock covers an option's risk and is never charged on
+/// its own (its own margin is not this scan's). With `linear` at 0 it is
+/// [`option_scan_loss`]'s arithmetic.
 pub(crate) fn option_scan_loss_with(positions: &[ScanOption], linear: f64, index_move: f64, vol_shift: f64) -> f64 {
     if positions.is_empty() && linear == 0.0 {
         return 0.0;
@@ -127,7 +129,7 @@ pub(crate) fn option_scan_loss_with(positions: &[ScanOption], linear: f64, index
                 loss += p.units * (before - after);
             }
             if linear != 0.0 {
-                loss -= linear * m * index_move;
+                loss -= crate::mathx::max(0.0, linear * m * index_move);
             }
             worst = crate::mathx::max(worst, loss);
         }
@@ -398,6 +400,24 @@ mod tests {
         // A wider scan asks more of a short.
         assert!(option_scan_loss(&[short], 2.0 * m, v) > option_scan_loss(&[short], m, v));
         assert_eq!(option_scan_loss(&[], m, v), 0.0);
+    }
+
+    #[test]
+    fn stock_offsets_an_options_loss_where_it_gains_and_asks_nothing_alone() {
+        let (m, v) = (30.0, 0.18);
+        // +100 shares and 3 short calls are, move for move, 1 short put and
+        // 2 short calls at the strike (C - P moves with the spot): the same
+        // worst loss, on the rise. The stock is not credited twice.
+        let combo = option_scan_loss_with(&[option(Right::Call, 1000.0, -300.0)], 100.0, m, v);
+        let synthetic = option_scan_loss(&[option(Right::Put, 1000.0, -100.0), option(Right::Call, 1000.0, -200.0)], m, v);
+        assert!(synthetic > 0.0);
+        assert!((combo - synthetic).abs() <= 1e-9 * synthetic, "{combo} {synthetic}");
+        // A covered call asks less than the naked call; stock alone, nothing.
+        let naked = option_scan_loss(&[option(Right::Call, 1000.0, -100.0)], m, v);
+        let covered = option_scan_loss_with(&[option(Right::Call, 1000.0, -100.0)], 100.0, m, v);
+        assert!(covered < naked);
+        assert_eq!(option_scan_loss_with(&[], 100.0, m, v), 0.0);
+        assert_eq!(option_scan_loss_with(&[], -100.0, m, v), 0.0);
     }
 
     #[test]

@@ -804,8 +804,9 @@ impl Engine {
     /// `positions` (`(symbol or ticker, signed contracts or shares)`), name
     /// by name: the worst loss over the scan's moves of the name, sized to
     /// the margin's quantile of its one-session sd, at each volatility
-    /// shift, less the stock's own worst loss, floored at 0, so stock that
-    /// covers an option's risk nets it and stock alone asks nothing. Each
+    /// shift, the stock's gain in each move netted against the options' loss
+    /// there (`option_scan_loss_with`), so stock that covers an option's risk
+    /// nets it and stock alone asks nothing. Each
     /// option is revalued as a European on its escrowed price. 0 where no
     /// name option is held; `None` where a held name does not price.
     pub(super) fn name_option_margin(&self, positions: &[(String, f64)]) -> Option<f64> {
@@ -855,9 +856,7 @@ impl Engine {
                 .and_then(|s| s.first().copied())
                 .unwrap_or(0.0);
             let spot_move = z * crate::mathx::sqrt(crate::mathx::max(0.0, variance)) * ctx.spot;
-            let with = super::margin::option_scan_loss_with(&scan, shares, spot_move, z * super::margin::SCAN_VOL_SD);
-            let alone = shares.abs() * spot_move;
-            total += crate::mathx::max(0.0, with - alone);
+            total += super::margin::option_scan_loss_with(&scan, shares, spot_move, z * super::margin::SCAN_VOL_SD);
         }
         Some(total)
     }

@@ -327,10 +327,31 @@ def test_a_covered_call_margins_net_and_a_naked_one_does_not():
     call = strike_near(engine, ticker, expiry, "C", 1)["symbol"]
     naked = engine.option_margin([(call, -1.0)])
     assert naked > 0.0 and naked == engine.quote(call)["initial_margin"]
-    assert engine.option_margin([(call, -1.0), (ticker, 100.0)]) == 0.0
+    # Covered, the call asks only what the stock cannot offset: the scan's
+    # volatility shift with the stock unmoved.
+    covered = engine.option_margin([(call, -1.0), (ticker, 100.0)])
+    assert 0.0 <= covered < 0.25 * naked
     assert engine.option_margin([(ticker, 100.0)]) == 0.0
+    assert engine.option_margin([(ticker, -100.0)]) == 0.0
     # Ten naked calls ask ten times one.
     assert engine.option_margin([(call, -10.0)]) == pytest.approx(10.0 * naked)
+
+
+def test_stock_beside_short_calls_is_credited_once():
+    # +100 shares and 3 short calls are, move for move, 1 short put and 2
+    # short calls at the strike (C - P moves with the stock): one worst loss,
+    # on the rise, and the stock's gain there credited once.
+    engine = tf.Engine(seed=19, universe=SMALL, model=model(**ON))
+    for _ in range(3):
+        day(engine)
+    ticker = engine.tickers[3]
+    expiry = sorted({c["expiry"] for c in names(engine, ticker)})[0]
+    call, put = strike_near(engine, ticker, expiry, "C"), strike_near(engine, ticker, expiry, "P")
+    assert call["strike"] == put["strike"]
+    combo = engine.option_margin([(call["symbol"], -3.0), (ticker, 100.0)])
+    synthetic = engine.option_margin([(put["symbol"], -1.0), (call["symbol"], -2.0)])
+    assert synthetic > 0.0
+    assert combo == pytest.approx(synthetic, rel=1e-9)
 
 
 def test_an_exercise_is_refused_where_it_cannot_be_made():
