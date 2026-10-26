@@ -73,7 +73,7 @@ from ._core import rate_specs as _rate_specs
 #: its flow goes to ``run_session``'s ``fills`` whatever the book's dials say.
 _RATE_TICKERS = frozenset(spec["ticker"] for spec in _rate_specs())
 
-#: A listed future's symbol, ``ROOT.Fnnnn`` (pt-v22 phase 1). The engine
+#: A listed future's symbol, ``ROOT.Fnnnn``. The engine
 #: lists contracts; they hold no slot in a price column.
 _FUTURE_SYMBOL = re.compile(r"^[A-Za-z0-9_\-]+(?:\.[A-Za-z0-9_\-]+)*\.F\d{4,}$")
 
@@ -88,7 +88,7 @@ def _future_expiry(symbol: str) -> int:
     return int(symbol.rsplit(".F", 1)[1])
 
 
-#: A listed option's symbol, ``ROOT.Onnnn.Rk.cc`` (pt-v22 phase 2): the root,
+#: A listed option's symbol, ``ROOT.Onnnn.Rk.cc``: the root,
 #: the expiry session, the right and the strike in dollars and cents.
 _OPTION_SYMBOL = re.compile(
     r"^[A-Za-z0-9_\-]+(?:\.[A-Za-z0-9_\-]+)*\.O(\d{4,})\.[CP]\d+\.\d{2}$")
@@ -107,7 +107,7 @@ def _option_expiry(symbol: str) -> int:
 
 def _option_root(symbol: str) -> str:
     """An option symbol's root: ``IDX`` for an index option, the ticker for
-    a single-name option (pt-v22 phase 3)."""
+    a single-name option."""
     return symbol.rsplit(".", 3)[0]
 
 
@@ -342,8 +342,8 @@ class Limit:
 class Exercise:
     """Exercise a single-name option, as a value in an agent's ``act()``
     mapping: ``{"ACME.O0035.C42.50": tf.Exercise(5)}`` exercises 5 of the
-    contracts held at the session's close (pt-v22 phase 3,
-    ``options_names_listed``).
+    contracts held at the session's close, on a model that lists them
+    (``options_names_listed``).
 
     A call's holder pays the strike for 100 shares a contract, and a put's
     delivers 100 shares for it: the shares arrive in, or leave, the
@@ -422,7 +422,7 @@ class Position:
 
 
 class FuturesPosition:
-    """A holding in one listed future (pt-v22 phase 1).
+    """A holding in one listed future.
 
     ``quantity`` is signed contracts. ``mark`` is the price the position is
     held at: the last settlement mark, or the price of its first trade before
@@ -454,7 +454,7 @@ class FuturesPosition:
 
 
 class OptionPosition:
-    """A holding in one listed option (pt-v22 phase 2).
+    """A holding in one listed option.
 
     ``quantity`` is signed contracts. The premium moves cash when a trade
     fills, ``quantity * multiplier * price``, and the position is worth its
@@ -568,7 +568,7 @@ class Portfolio:
         # `sync` has something to collect. A portfolio that never has asks
         # the engine nothing, and its run's order log is the one it was.
         self._in_book = False
-        #: Futures positions by symbol (pt-v22 phase 1). Empty, and every
+        #: Futures positions by symbol. Empty, and every
         #: futures hook a no-op that asks the engine nothing, for a portfolio
         #: that never traded one.
         self.futures: dict[str, FuturesPosition] = {}
@@ -583,16 +583,16 @@ class Portfolio:
         #: One entry per futures or options position settled at expiry:
         #: ``day``, ``symbol``, ``quantity``, ``price`` and ``cash``.
         self.settled: list[dict] = []
-        #: Option positions by symbol (pt-v22 phase 2). Empty, and every
+        #: Option positions by symbol. Empty, and every
         #: option hook a no-op that asks the engine nothing, for a portfolio
         #: that never traded one.
         self.options: dict[str, OptionPosition] = {}
-        #: One entry per single-name option exercised or assigned (pt-v22
-        #: phase 3), as :meth:`settle_close` delivered it: ``day`` (the
-        #: session it was exercised at), ``symbol``, ``event``
-        #: (``"exercise"`` or ``"assignment"``), ``contracts``, ``ticker``,
-        #: ``shares`` received (negative: delivered), ``price`` (the strike)
-        #: and ``cash`` received (negative: paid).
+        #: One entry per single-name option exercised or assigned, as
+        #: :meth:`settle_close` delivered it: ``day`` (the session it was
+        #: exercised at), ``symbol``, ``event`` (``"exercise"`` or
+        #: ``"assignment"``), ``contracts``, ``ticker``, ``shares`` received
+        #: (negative: delivered), ``price`` (the strike) and ``cash`` received
+        #: (negative: paid).
         self.deliveries: list[dict] = []
 
     # -- trading ----------------------------------------------------------
@@ -622,8 +622,7 @@ class Portfolio:
 
         if (is_future_symbol(ticker) or is_option_symbol(ticker)) and ticker not in engine.tickers:
             # A listed future trades in its own book in the engine, and a
-            # listed option with its dealer, whatever `book_live` says
-            # (pt-v22 phases 1 and 2).
+            # listed option with its dealer, whatever `book_live` says.
             return self._execute_in_book(engine, ticker, float(quantity), None)
         if getattr(engine, "book_live", False) and ticker not in _RATE_TICKERS:
             return self._execute_in_book(engine, ticker, float(quantity), None)
@@ -1001,7 +1000,7 @@ class Portfolio:
         return (self.cash + self.market_value(engine) + self.futures_value(engine)
                 + self.options_value(engine))
 
-    # -- futures (pt-v22 phase 1) -----------------------------------------
+    # -- futures ----------------------------------------------------------
 
     def _future_price(self, engine: Engine, position: FuturesPosition) -> float:
         """A held contract's price now: its quote's, or its mark once it is
@@ -1061,7 +1060,7 @@ class Portfolio:
         if self.options:
             held = [(o.symbol, o.quantity) for o in self.options.values()]
             # The stock in a name whose options are held, so a covered call
-            # or a protective put margins net (pt-v22 phase 3).
+            # or a protective put margins net.
             names = {_option_root(o.symbol) for o in self.options.values()
                      if is_name_option(o.symbol)}
             held += [(t, p.quantity) for t, p in self.positions.items()
@@ -1151,7 +1150,7 @@ class Portfolio:
                 "call": None if call is None else
                 {k: call[k] for k in ("day", "equity", "maintenance", "initial")}}
 
-    # -- options (pt-v22 phase 2) ------------------------------------------
+    # -- options -----------------------------------------------------------
 
     def _option_price(self, engine: Engine, position: OptionPosition) -> float:
         """A held option's value a contract now: its dealer's mid, or its
@@ -1220,8 +1219,8 @@ class Portfolio:
 
     def exercise(self, engine: Engine, symbol: str, quantity: float) -> float:
         """Exercise ``quantity`` contracts of a single-name option this
-        portfolio holds long, at the session's close (pt-v22 phase 3,
-        ``options_names_listed``). Returns the contracts instructed for the
+        portfolio holds long, at the session's close, on a model that lists
+        them (``options_names_listed``). Returns the contracts instructed for the
         close so far.
 
         The instruction waits in the engine (``Engine.exercise``) until the
@@ -1260,7 +1259,7 @@ class Portfolio:
 
     def _deliver(self, engine: Engine, session: int) -> None:
         """The single-name options' exercises and assignments at the close
-        of ``session`` (pt-v22 phase 3): each closes its contracts and moves
+        of ``session``: each closes its contracts and moves
         its shares into or out of the name's stock position at the strike,
         and its cash; a delisted name's options are paid in cash; and every
         name option expiring at that close and still held closes at nothing,
@@ -1348,8 +1347,8 @@ class Portfolio:
         """At an open, after the engine's: settle the contracts that expired
         at it, then decide the last close's margin call. A call is met when
         the account's equity is back at or above the initial requirement;
-        otherwise every futures position is closed at the market through
-        its book. A no-op, asking the engine nothing, for a portfolio with
+        otherwise every contract held is closed at the market through its
+        book. A no-op, asking the engine nothing, for a portfolio with
         no futures and no call open. The harnesses call it after the open."""
         if not self.futures and not self.options and self._margin_call is None:
             return

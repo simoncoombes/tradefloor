@@ -138,7 +138,7 @@ OBSERVABLE_MACRO = MACRO_FIELDS
 #: order, so the agent can decline a decision period. CANCEL carries no
 #: quantity either: it withdraws every limit order still waiting on the
 #: symbol, the :class:`tradefloor.Cancel` a Python agent returns. EXERCISE
-#: (decision schema 3, pt-v22 phase 3) exercises ``quantity`` contracts of a
+#: (decision schema 3) exercises ``quantity`` contracts of a
 #: single-name option held, at the session's close, the
 #: :class:`tradefloor.Exercise` a Python agent returns.
 SIDES = ("BUY", "SELL", "HOLD", "CANCEL", "EXERCISE")
@@ -175,18 +175,17 @@ MAX_PARTICIPATION = 0.02
 #: and one bad action refused the whole decision. Fixed for the 0.8.x line
 #: (``docs/SUPPORT.md``).
 #:
-#: Version 3 (pt-v22 phase 1): an action's ``symbol`` may name a listed
-#: future (``IDX.F0119``, ``Engine.contracts()``), its ``quantity`` then
-#: counted in contracts and capped at ``MAX_PARTICIPATION`` of the
-#: contract's stated daily volume. The shape is version 2's: no field is
-#: added, and a decision valid under 2 is valid and means the same under 3.
-#: From pt-v22 phase 2 a symbol may also name a listed index option
-#: (``IDX.O0035.C1050.00``), counted in contracts. An option has no daily
-#: volume to cap it at: its dealer fills at most the ladder it shows, ten
-#: levels of 50 contracts a side, and the leverage limit applies. From
-#: phase 3 it may name a listed single-name option (``ACME.O0035.C42.50``),
-#: and the side ``EXERCISE`` exercises ``quantity`` contracts of one held at
-#: the close. A decision valid under version 2 is valid and means the same.
+#: Version 3: an action's ``symbol`` may name a listed future
+#: (``IDX.F0119``, ``Engine.contracts()``), its ``quantity`` then counted in
+#: contracts and capped at ``MAX_PARTICIPATION`` of the contract's stated
+#: daily volume. The shape is version 2's: no field is added, and a decision
+#: valid under 2 is valid and means the same under 3. A symbol may also name
+#: a listed option, an index option (``IDX.O0035.C1050.00``) or a
+#: single-name option (``ACME.O0035.C42.50``), counted in contracts. An
+#: option has no daily volume to cap it at: its dealer fills at most the
+#: ladder it shows, and the leverage limit applies. The side ``EXERCISE``
+#: exercises ``quantity`` contracts of a single-name option held at the
+#: close. A decision valid under version 2 is valid and means the same.
 DECISION_SCHEMA_VERSION = "3"
 
 #: Version of the observation payload :func:`serialize_observation` builds
@@ -206,14 +205,13 @@ DECISION_SCHEMA_VERSION = "3"
 #: other model the payload is version 1's to the byte, so a version-1
 #: recording still replays there (`REPLAYABLE_SCHEMA_VERSIONS`).
 #:
-#: Version 3 (pt-v22 phase 1) adds three top-level keys, `index`,
-#: `futures` and `margin`, on a model that lists futures (any of
-#: `futures_index_listed`, `futures_vix_listed`, `futures_rates_listed`,
-#: `futures_oil_listed`), and nothing else. From pt-v22 phase 2 a model that
-#: lists index options (`options_index_listed`) adds `options`, a summary
-#: of each listed expiry and the options held, with `index` and `margin`.
-#: No shipped preset lists any, so on every shipped preset the payload is
-#: version 2's (or 1's) to the byte.
+#: Version 3 adds three top-level keys, `index`, `futures` and `margin`, on
+#: a model that lists futures (any of `futures_index_listed`,
+#: `futures_vix_listed`, `futures_rates_listed`, `futures_oil_listed`), and
+#: nothing else. A model that lists options (`options_index_listed` or
+#: `options_names_listed`) adds `options`, a summary of the listed expiries
+#: and the options held, with `index` and `margin`. On a model that lists
+#: none the payload is version 2's (or 1's) to the byte.
 OBSERVATION_SCHEMA_VERSION = "3"
 
 #: The recorded payload versions a replay looks up. Versions 2 and 3 only
@@ -1182,9 +1180,8 @@ def _orders_from(decision: Decision, obs: Any, *, max_participation: float,
     # book is sized to (decision schema 3); empty, asking the engine
     # nothing, on a model that lists none.
     contracts = _listed_contracts(obs.engine)
-    # Whether index or single-name options are listed (pt-v22 phases 2 and
-    # 3): a symbol then may name one, which the engine is asked about only
-    # when one is named.
+    # Whether index or single-name options are listed: a symbol then may
+    # name one, which the engine is asked about only when one is named.
     options = _lists_options(obs.engine) or _lists_name_options(obs.engine)
     orders: dict[str, Any] = {}
     notes: list[str] = []
@@ -1389,7 +1386,7 @@ def derivatives_payload(obs: Any, *,
     ``initial``) and ``call`` (the margin call the last close made and the
     next open decides, or None). None for a portfolio that cannot say.
 
-    ``options`` summarises the index options (pt-v22 phase 2) in two lists,
+    ``options`` summarises the index options in two lists,
     so the payload stays small; ``Engine.chain`` and the MCP server's
     ``option_chain`` give whole chains. ``expiries``, one entry per listed
     expiry in expiry order, as ``Engine.option_expiries`` reads it off the
@@ -1406,7 +1403,7 @@ def derivatives_payload(obs: Any, *,
     quote. An option is named ``ROOT.Onnnn.Rk.cc``: ``IDX.O0035.C1050.00``
     is the 1050 call settling at session 35 (``tf.contracts.format``).
 
-    On a model that lists single-name options (pt-v22 phase 3) ``options``
+    On a model that lists single-name options ``options``
     is there whether or not the index's are (``expiries`` then empty), its
     ``positions`` hold the name options too, and ``names`` says what the
     names list: ``expiries``, the sessions their options settle at the

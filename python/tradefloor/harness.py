@@ -534,7 +534,7 @@ class Scorecard:
     mean multiple over the steps with a finite one.
 
     Shares an agent did not order, handed over or taken by a single-name
-    option's exercise or assignment (pt-v22 phase 3), are holdings like any
+    option's exercise or assignment, are holdings like any
     other: valued at the price in the equity curve and counted in the
     exposure. They are not trades, so ``trades``, ``turnover`` and
     ``impact_bps`` leave them out.
@@ -1308,7 +1308,7 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
         # model without dividends.
         portfolio.collect_dividends(engine)
         # The futures the open settled, and the last close's margin call met
-        # or the account's futures liquidated (pt-v22 phase 1). Nothing for
+        # or the account's futures liquidated. Nothing for
         # a portfolio without futures.
         portfolio.settle_open(engine)
         for _ in range(steps_per_day):
@@ -1438,8 +1438,8 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
         history._close(engine, day)
         engine.close_market()
         # Variation margin to the close's settlement marks, the contracts
-        # settled at it, and a margin call under maintenance (pt-v22 phase
-        # 1). Nothing for a portfolio without futures.
+        # settled at it, and a margin call under maintenance. Nothing for a
+        # portfolio without futures.
         portfolio.settle_close(engine)
         # Marked after the close, which on pt-v20 re-marks every name, so
         # the last value is the final net worth below.
@@ -1538,7 +1538,7 @@ def _impact_bps(portfolio, tickers, baseline, actual) -> float:
     names = set(tickers)
     for fill in portfolio.fills:
         # Impact is on the names' prices. A listed contract holds no slot in
-        # them, and its flow moves none of them (pt-v22 phase 1).
+        # them, and its flow moves none of them.
         if fill["ticker"] not in names:
             continue
         traded[fill["ticker"]] = traded.get(fill["ticker"], 0.0) + abs(fill["notional"])

@@ -40,9 +40,9 @@ name was earlier in the roster, and the cap refused it.
 ## A target is the whole holding
 
 A weight is the target for everything the account holds in a name,
-whatever put it there. On a model that lists single-name options (pt-v22
-phase 3) an option's exercise or assignment can hand an account shares it
-did not order, or leave it short; the env's actions name stocks only, so
+whatever put it there. On a model that lists single-name options an
+option's exercise or assignment can hand an account shares it did not
+order, or leave it short; the env's actions name stocks only, so
 its own account is never assigned, but the rule is the same for any
 holding: the next step trades the difference between the target and the
 position as it stands.
@@ -340,8 +340,7 @@ class TradingEnv(_Base):
         self._step += 1
         if self._step % self.steps_per_day == 0:
             engine.close_market()
-            # Variation margin and a margin call at the close (pt-v22 phase
-            # 1); nothing without futures.
+            # Variation margin and a margin call at the close; nothing without futures.
             portfolio.settle_close(engine)
             if self._step < self.max_steps:
                 open_day(engine)

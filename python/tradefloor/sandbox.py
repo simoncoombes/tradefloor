@@ -348,15 +348,15 @@ class MarketView:
         nothing, because orders go through the ``act`` mapping."""
         return _WRAPPED[self].book(ticker)
 
-    # The derivatives' public reads (pt-v22 phase 1). Each reads public
-    # state only and writes nothing; a contract trades through the ``act``
-    # mapping by its symbol, as a ticker does.
+    # The derivatives' public reads. Each reads public state only and writes
+    # nothing; a contract trades through the ``act`` mapping by its symbol,
+    # as a ticker does.
 
     @property
     def lists_futures(self) -> bool:
         """Whether the model lists futures of any family, as
-        ``Engine.lists_futures``: a property of the model, True before the
-        first close lists a VIX future. False on every shipped preset."""
+        ``Engine.lists_futures``: a property of the model, True even before a
+        contract is listed."""
         return _WRAPPED[self].lists_futures
 
     def contracts(self) -> list[dict[str, Any]]:
@@ -388,20 +388,19 @@ class MarketView:
         reads public state only, as ``Engine.forecast``."""
         return _WRAPPED[self].forecast()
 
-    # The index options' public reads (pt-v22 phase 2): the dealer's quotes
-    # and the surface they come from, which reads public state only.
+    # The index options' public reads: the dealer's quotes and the surface
+    # they come from, which reads public state only.
 
     @property
     def lists_options(self) -> bool:
         """Whether the model lists index options, as ``Engine.lists_options``:
-        a property of the model. False on every shipped preset."""
+        a property of the model."""
         return _WRAPPED[self].lists_options
 
     @property
     def lists_name_options(self) -> bool:
         """Whether the model lists American options on its names, as
-        ``Engine.lists_name_options`` (pt-v22 phase 3). False on every
-        shipped preset."""
+        ``Engine.lists_name_options``: a property of the model."""
         return _WRAPPED[self].lists_name_options
 
     def name_option_roots(self) -> list[str]:
@@ -743,8 +742,8 @@ class PortfolioView:
         portfolio, live = _WRAPPED[self]
         return [dict(o) for o in portfolio.open_orders(live)]
 
-    # The futures (pt-v22 phase 1) and the options (phase 2), as copies:
-    # the view's holder cannot move a mark, a cost or a quantity.
+    # The futures and the options, as copies: the view's holder cannot move
+    # a mark, a cost or a quantity.
 
     @property
     def futures(self) -> dict[str, Any]:
@@ -763,7 +762,7 @@ class PortfolioView:
 
     @property
     def options(self) -> dict[str, Any]:
-        """The options held (pt-v22 phases 2 and 3), by symbol, as copies of
+        """The options held, by symbol, as copies of
         the portfolio's :class:`~tradefloor.portfolio.OptionPosition`. Empty
         without options."""
         from .portfolio import OptionPosition
@@ -794,9 +793,9 @@ class PortfolioView:
 
     @property
     def deliveries(self) -> list[dict]:
-        """The single-name options exercised and assigned so far (pt-v22
-        phase 3), as copies of :attr:`Portfolio.deliveries
-        <tradefloor.Portfolio.deliveries>`: the shares and cash each moved."""
+        """The single-name options exercised and assigned so far, as copies
+        of :attr:`Portfolio.deliveries <tradefloor.Portfolio.deliveries>`:
+        the shares and cash each moved."""
         return [dict(d) for d in _WRAPPED[self][0].deliveries]
 
     def __getattr__(self, name: str) -> Any:

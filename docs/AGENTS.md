@@ -22,14 +22,14 @@ hidden state all raise `tf.SandboxError`. The hidden state includes the true
 business-cycle phase; the macro fields carry the phase as published. The gym
 environment's `env.engine` and `env.portfolio` are the same views.
 
-On a model that lists futures (the pt-v22 switches, off on every shipped
-preset), `obs.engine.contracts()`, `obs.engine.quote(symbol)` and
+On a model that lists futures (pt-v22 lists index, rate and oil futures),
+`obs.engine.contracts()`, `obs.engine.quote(symbol)` and
 `obs.engine.settlements()` read them, and `act` trades one by its symbol,
 `IDX.F0056` for instance, as it trades a ticker. The portfolio holds a
 future at its last settlement mark and pays the mark's move in cash at each
 close; a close that leaves equity under the contracts' maintenance margin
 makes a margin call, and if equity is not back at the initial margin by the
-next open, the futures are closed at the market. MODEL.md's Margin section
+next open, every contract is closed at the market. MODEL.md's Margin section
 has the rules. `obs.portfolio.margin()` reads the account's initial and
 maintenance requirement, its excess over the initial and any open call, and
 `obs.portfolio.futures` the positions. `tf.contracts.parse` and
@@ -58,8 +58,8 @@ expiry's chain, `quote_contracts` quotes an option, and `session_step`
 trades one by its symbol. `Engine.chain_table()` gives the chains now as an
 Arrow table.
 
-On a model that lists single-name options (`options_names_listed`, off on
-every shipped preset), every name lists American calls and puts from the
+On a model that lists single-name options (`options_names_listed`; pt-v22
+lists them), every name lists American calls and puts from the
 first close, 100 shares a contract, each settling at its expiry session's
 close: `obs.engine.name_option_roots()` names them, and
 `obs.engine.option_expiries("ACME")`, `obs.engine.chain("ACME", expiry)` and

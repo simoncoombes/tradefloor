@@ -4012,7 +4012,7 @@ the model's digest there, with their companions `basis_sd` and
 `basis_persistence`. A future reads the index, the dividends, the forecast
 and the market factor's sigma, and it draws only on its own stream
 (`rng::stream::DERIVATIVES`, 14, outside `COUNT`). Nothing a stock price
-reads is written, so an untraded run with every phase 1 switch on prints
+reads is written, so an untraded run with every futures switch on prints
 the stock prices, closes and economy of the run without them, night
 included, and a run whose agents trade only futures prints the stocks of a
 run nobody trades (`tests/test_index_futures.py`, seeds 3, 17, 101 and 9001
@@ -4089,9 +4089,9 @@ half-life; and agents' resting orders. The daily volume is the constituents'
 daily dollar volume over a contract's notional, about 200,000 contracts on
 `Universe.random(40, seed=111)`. A resting order fills when the moved book
 crosses it, at the book's prices. Fills on contracts come back through
-`take_fills` after the names' fills, numbered on their own counter. There is
-no margin and no `Portfolio` account for futures yet, so a caller keeps a
-position's cash itself.
+`take_fills` after the names' fills, numbered on their own counter. The
+engine keeps no account: `Portfolio` holds futures, pays their variation
+margin and makes margin calls (see Margin).
 
 Under `night_session_steps` each close runs the next open on a copy of the
 engine. Nothing draws on the OVERNIGHT stream but the open, and nothing
@@ -4267,7 +4267,7 @@ with the three switches above on.
 on every shipped preset and left out of the model's digest there. A rate
 future reads the policy rate each close sets and the forecast, and draws
 nothing, so an untraded run with it on prints the stock prices, closes and
-economy of the run without it, with every other phase 1 contract on as
+economy of the run without it, with every other futures family on as
 well, across settlements and a pin, and a run whose agents trade rate
 futures prints the stocks of a run nobody trades
 (`tests/test_rate_futures.py`, seeds 3, 17, 101 and 9001 of pt-v21).
@@ -4341,7 +4341,7 @@ the forecast expects.
 preset and left out of the model's digest there. An oil future reads the
 oil price and the forecast, and draws nothing, so an untraded run with it
 on prints the stock prices, closes and economy of the run without it, with
-every other phase 1 contract on as well, across an expiry and a pin, and a
+every other futures family on as well, across an expiry and a pin, and a
 run whose agents trade oil futures prints the stocks of a run nobody trades
 (`tests/test_oil_futures.py`, seeds 3, 17, 101 and 9001 of pt-v21).
 
@@ -4413,7 +4413,7 @@ it, 6.7 the VIX future's and 5.8 the
 oil future's, whose sensitivity to their underlying rises as they near
 expiry, and 1.9 and 2.3 the rate futures', which move in jumps on meeting
 days. `tools/calibration/margin_dials.py derive` fits the allowance on 24
-held-out histories of 1,500 sessions (seeds 8501 to 8524, every phase 1
+held-out histories of 1,500 sessions (seeds 8501 to 8524, every futures
 contract listed) as the quantile, at the coverage, of each front move over
 the $z\sigma$ its margin was set from: 1.762. The half-life is the
 compromise between the families: at 21 sessions the VIX futures' moves pass
@@ -4441,7 +4441,7 @@ contracts held, or their maintenance margin. A close that leaves the
 account's equity under the maintenance requirement makes a margin call
 (`Portfolio.margin_calls`); at the next open (`Portfolio.settle_open`) the
 call is met when equity is back at or above the initial requirement, and
-otherwise every futures position is closed at the market through its book
+otherwise every contract held is closed at the market through its book
 (`Portfolio.liquidations`), so no account carries a call past an open (row
 MG2). `tf.evaluate`, `tf.rank`, `World`, the gym environment and MCP
 sessions call both hooks; a portfolio that never traded a future asks the
@@ -4450,7 +4450,7 @@ An agent sees the contracts through `obs.engine.contracts()`,
 `obs.engine.quote(symbol)` and `obs.engine.settlements()`, and trades one by
 its symbol in the mapping `act` returns. The scorecard's impact reads the
 names' prices, which no contract moves. Stock is not liquidated: with the
-futures closed the requirement is nil.
+contracts closed the requirement is nil.
 
 ## Index options
 
