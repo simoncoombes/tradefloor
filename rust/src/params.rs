@@ -1578,6 +1578,40 @@ pub struct ModelParams {
     /// the expectation of every power of the VIX stays finite. In
     /// [-0.99, 0.99], the skew-normal's reach.
     pub forecast_vix_dispersion_skew: f64,
+    /// The forecast's nowcast of the VIX's slow level (`vix_level_sigma`):
+    /// its gain on the published VIX's slow average. The slow level moves
+    /// the VIX's anchor and is not public, so the forecast, which reads
+    /// public state only, iterates the law at the level's mean, and its
+    /// error then carries the level: on R22-reg19 with the level at
+    /// `vix_level_sigma` 0.0181 and the fear memory (12 held-out histories of
+    /// 5,292 sessions), the log error at 21 to 126 sessions loads 0.8 to 1.1
+    /// on the level, and realised over forecast at 63 sessions runs from
+    /// 0.86 under a VIX of 13 to 1.10 at 20 to 32. Off zero the engine keeps
+    /// the average `x` of the log published VIX at
+    /// `forecast_vix_level_nowcast_half_life` (from
+    /// `forecast_vix_level_nowcast_centre` at the first close), and the
+    /// forecast takes the level as `q = g (x - c)`, `g` this and `c` the
+    /// centre, its expectation `phi^k q` at `k` closes on (`phi`
+    /// `vix_level_persistence`), multiplying the anchor and the implied VIX
+    /// as the level itself does. A projection fitted on the model's own
+    /// held-out histories (the level is the engine's state there):
+    /// least squares of the level on the average, its half-life on a grid.
+    /// Read only with `forecast_horizon_sessions` and `vix_level_sigma` set;
+    /// 0.0, on every shipped preset, is no nowcast (a branch, the average
+    /// neither kept, snapshotted nor hashed), and a value of 0.0 is left out
+    /// of the model's digest. In [0, 5].
+    pub forecast_vix_level_nowcast: f64,
+    /// The half-life, in sessions, of the published VIX's log average the
+    /// slow level's nowcast reads (`forecast_vix_level_nowcast`). Read only
+    /// with that dial set; 0.0, on every shipped preset, takes the average as
+    /// the last close's log VIX, and a value of 0.0 is left out of the
+    /// model's digest. In [0, 2520].
+    pub forecast_vix_level_nowcast_half_life: f64,
+    /// The log VIX at which the slow level's nowcast is 0
+    /// (`forecast_vix_level_nowcast`), and the average's start at the first
+    /// close. Read only with that dial set; 0.0, on every shipped preset, is
+    /// left out of the model's digest. In [0, 6].
+    pub forecast_vix_level_nowcast_centre: f64,
     /// The share of the next meeting's shadow change the forecast's policy
     /// path leaves out. The shadow is the change the meeting function makes
     /// on the economy as published, the change `policy_anticipation` prices.
@@ -1789,6 +1823,21 @@ pub struct ModelParams {
     /// `futures_vix_listed` set; 0.0, on every shipped preset, is a branch,
     /// and a value of 0.0 is left out of the model's digest. In [0, 2520].
     pub futures_vix_live_slow_half_life: f64,
+    /// The VIX futures premium's slope on the VIX, moved this share of the
+    /// way from the frozen level slope `b(n)` to the premium's measured
+    /// time-series response `g(n)` (`derivatives::VIX_FUTURE`'s
+    /// `VixPremium::response`): the premium of a contract `n` sessions from
+    /// expiry is `a(n) + ((1 - w) b(n) + w g(n)) (VIX - centre)`. `b(n)` is
+    /// the slope of the settlement less the final settlement on the VIX's
+    /// close across contract-days; `g(n)` is how a contract's daily change
+    /// differs from the tape's own expected change of its settlement per
+    /// point of the day's VIX move (CFE VX 2004-2026 on the Cboe VIX close,
+    /// -0.072 at every tenor, se 0.053; `b(n)` is +0.02 to +0.19). So at 1.0
+    /// a VIX jump compresses the premium, as on CFE, where under `b(n)` it
+    /// widened it. Read only with `futures_vix_listed` set; 0.0, on every
+    /// shipped preset, is the frozen premium (a branch), and a value of 0.0
+    /// is left out of the model's digest. No draw and no state. In [0, 1].
+    pub futures_vix_premium_response: f64,
     /// Whether the engine lists policy-rate and term-rate futures. 0.0, on
     /// every shipped preset, lists none: no contract, no state, nothing in
     /// the snapshot or the state hash, and a value of 0.0 is left out of the
@@ -8802,6 +8851,9 @@ impl ModelParams {
             forecast_vix_dispersion: 0.0,
             forecast_vix_dispersion_half_life: 0.0,
             forecast_vix_dispersion_skew: 0.0,
+            forecast_vix_level_nowcast: 0.0,
+            forecast_vix_level_nowcast_half_life: 0.0,
+            forecast_vix_level_nowcast_centre: 0.0,
             forecast_policy_shadow_discount: 0.0,
             forecast_policy_persistence: 0.0,
             forecast_policy_reversion: 0.0,
@@ -8817,6 +8869,7 @@ impl ModelParams {
             futures_vix_live_fast_share: 0.0,
             futures_vix_live_fast_half_life: 0.0,
             futures_vix_live_slow_half_life: 0.0,
+            futures_vix_premium_response: 0.0,
             futures_rates_listed: 0.0,
             futures_oil_listed: 0.0,
             margin_scan_coverage: 0.0,
@@ -11486,6 +11539,9 @@ impl ModelParams {
             "forecast_vix_dispersion" => self.forecast_vix_dispersion,
             "forecast_vix_dispersion_half_life" => self.forecast_vix_dispersion_half_life,
             "forecast_vix_dispersion_skew" => self.forecast_vix_dispersion_skew,
+            "forecast_vix_level_nowcast" => self.forecast_vix_level_nowcast,
+            "forecast_vix_level_nowcast_half_life" => self.forecast_vix_level_nowcast_half_life,
+            "forecast_vix_level_nowcast_centre" => self.forecast_vix_level_nowcast_centre,
             "forecast_policy_shadow_discount" => self.forecast_policy_shadow_discount,
             "forecast_policy_persistence" => self.forecast_policy_persistence,
             "forecast_policy_reversion" => self.forecast_policy_reversion,
@@ -11501,6 +11557,7 @@ impl ModelParams {
             "futures_vix_live_fast_share" => self.futures_vix_live_fast_share,
             "futures_vix_live_fast_half_life" => self.futures_vix_live_fast_half_life,
             "futures_vix_live_slow_half_life" => self.futures_vix_live_slow_half_life,
+            "futures_vix_premium_response" => self.futures_vix_premium_response,
             "futures_rates_listed" => self.futures_rates_listed,
             "futures_oil_listed" => self.futures_oil_listed,
             "margin_scan_coverage" => self.margin_scan_coverage,
@@ -11935,6 +11992,9 @@ impl ModelParams {
             "forecast_vix_dispersion" => out.forecast_vix_dispersion = value,
             "forecast_vix_dispersion_half_life" => out.forecast_vix_dispersion_half_life = value,
             "forecast_vix_dispersion_skew" => out.forecast_vix_dispersion_skew = value,
+            "forecast_vix_level_nowcast" => out.forecast_vix_level_nowcast = value,
+            "forecast_vix_level_nowcast_half_life" => out.forecast_vix_level_nowcast_half_life = value,
+            "forecast_vix_level_nowcast_centre" => out.forecast_vix_level_nowcast_centre = value,
             "forecast_policy_shadow_discount" => out.forecast_policy_shadow_discount = value,
             "forecast_policy_persistence" => out.forecast_policy_persistence = value,
             "forecast_policy_reversion" => out.forecast_policy_reversion = value,
@@ -11950,6 +12010,7 @@ impl ModelParams {
             "futures_vix_live_fast_share" => out.futures_vix_live_fast_share = value,
             "futures_vix_live_fast_half_life" => out.futures_vix_live_fast_half_life = value,
             "futures_vix_live_slow_half_life" => out.futures_vix_live_slow_half_life = value,
+            "futures_vix_premium_response" => out.futures_vix_premium_response = value,
             "futures_rates_listed" => out.futures_rates_listed = value,
             "futures_oil_listed" => out.futures_oil_listed = value,
             "margin_scan_coverage" => out.margin_scan_coverage = value,
@@ -13704,6 +13765,29 @@ impl ModelParams {
                  spread as normal.",
                 self.forecast_vix_dispersion_skew));
         }
+        for (name, value, hi, unit) in [
+            ("forecast_vix_level_nowcast", self.forecast_vix_level_nowcast, 5.0,
+             "the slow level's nowcast's gain on the published VIX's log average"),
+            ("forecast_vix_level_nowcast_half_life", self.forecast_vix_level_nowcast_half_life, 2520.0,
+             "the half-life in sessions of the published VIX's log average"),
+            ("forecast_vix_level_nowcast_centre", self.forecast_vix_level_nowcast_centre, 6.0,
+             "the log VIX at which the slow level's nowcast is 0"),
+        ] {
+            if !(value >= 0.0 && value <= hi) {
+                return Err(format!(
+                    "{name} is {value}. It is {unit}, in [0, {hi}]; 0 is off."));
+            }
+        }
+        if self.forecast_vix_level_nowcast != 0.0 {
+            if self.forecast_horizon_sessions == 0.0 || self.vix_level_sigma == 0.0 {
+                return Err(format!(
+                    "forecast_vix_level_nowcast is {} but forecast_horizon_sessions is {} and \
+                     vix_level_sigma is {}. It nowcasts the VIX's slow level for the forecast: \
+                     set both first.",
+                    self.forecast_vix_level_nowcast, self.forecast_horizon_sessions,
+                    self.vix_level_sigma));
+            }
+        }
         if !(self.forecast_policy_persistence >= 0.0 && self.forecast_policy_persistence < 1.0) {
             return Err(format!(
                 "forecast_policy_persistence is {}. It is the share of a meeting's expected \
@@ -13808,6 +13892,20 @@ impl ModelParams {
                  listed contract reads 126 sessions ahead: with futures_vix_listed on, \
                  forecast_horizon_sessions is at least 126.",
                 self.forecast_horizon_sessions, self.futures_vix_listed));
+        }
+        if !(self.futures_vix_premium_response >= 0.0 && self.futures_vix_premium_response <= 1.0) {
+            return Err(format!(
+                "futures_vix_premium_response is {}. It is the share of the VIX futures premium's \
+                 slope moved from the frozen level slope to the measured time-series response, \
+                 in [0, 1].",
+                self.futures_vix_premium_response));
+        }
+        if self.futures_vix_premium_response != 0.0 && self.futures_vix_listed == 0.0 {
+            return Err(format!(
+                "futures_vix_listed is 0 but futures_vix_premium_response is {}. It shapes the VIX \
+                 futures' premium, which only futures_vix_listed lists: set futures_vix_listed to \
+                 1.0 first.",
+                self.futures_vix_premium_response));
         }
         if !(self.futures_vix_live_fast_share >= 0.0 && self.futures_vix_live_fast_share <= 1.0) {
             return Err(format!(
@@ -14543,6 +14641,9 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "forecast_vix_dispersion",
     "forecast_vix_dispersion_half_life",
     "forecast_vix_dispersion_skew",
+    "forecast_vix_level_nowcast",
+    "forecast_vix_level_nowcast_half_life",
+    "forecast_vix_level_nowcast_centre",
     "forecast_policy_shadow_discount",
     "forecast_policy_persistence",
     "forecast_policy_reversion",
@@ -14554,6 +14655,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "futures_vix_live_fast_share",
     "futures_vix_live_fast_half_life",
     "futures_vix_live_slow_half_life",
+    "futures_vix_premium_response",
     "futures_rates_listed",
     "futures_oil_listed",
     "margin_scan_coverage",
@@ -14799,6 +14901,9 @@ pub fn settable_names() -> Vec<&'static str> {
         "forecast_vix_dispersion",
         "forecast_vix_dispersion_half_life",
         "forecast_vix_dispersion_skew",
+        "forecast_vix_level_nowcast",
+        "forecast_vix_level_nowcast_half_life",
+        "forecast_vix_level_nowcast_centre",
         "forecast_policy_shadow_discount",
         "forecast_policy_persistence",
         "forecast_policy_reversion",
@@ -14814,6 +14919,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "futures_vix_live_fast_share",
         "futures_vix_live_fast_half_life",
         "futures_vix_live_slow_half_life",
+        "futures_vix_premium_response",
         "futures_rates_listed",
         "futures_oil_listed",
         "margin_scan_coverage",

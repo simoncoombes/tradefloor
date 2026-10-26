@@ -3925,6 +3925,24 @@ of 0.0 it is a lognormal. The stress memory at each node moves the same
 number of its own standard deviations as the log VIX, since it is an
 average of the VIX's log excursions.
 
+`forecast_vix_level_nowcast` (0.0 on every shipped preset, left out of the
+digest there; refused without `forecast_horizon_sessions` and
+`vix_level_sigma`) gives the forecast a nowcast of that slow level from
+public data. The engine keeps $x$, the published VIX's log average at
+`forecast_vix_level_nowcast_half_life` sessions, started at
+`forecast_vix_level_nowcast_centre` $c$ at the first close, and the
+forecast iterates the law with the level at $g\,(x - c)\,\phi^k$ at $k$
+closes on, $g$ the dial and $\phi$ `vix_level_persistence`: it multiplies
+the anchor and the implied VIX the step reads, as the level does. The three
+are a projection of the level on the average, fitted on the model's own
+held-out histories, where the level is the engine's state. On R22-reg19
+with the level at 0.0181 and the fear memory, 12 histories of 5,292
+sessions, the forecast's log error loads 0.8 to 1.1 on the level at 21 to
+126 sessions and realised over forecast at 63 sessions runs from 0.86 under
+a VIX of 13 to 1.10 at 20 to 32; the average at a half-life of 126 sessions
+explains 39 per cent of the level's variance. The nowcast changes only what
+the forecast publishes.
+
 The variances the forecast reports run on a second track, where each convex
 VIX coupling (the factor's target, the GARCH coupling, the sector sigma and
 the jump rate) is taken as its expectation over the same spread, and the
@@ -4149,6 +4167,23 @@ $b(n) = 0.36\,(1 - e^{-(n - 1)/148})$ its slope on the VIX's close that day,
 about the VIX's mean over those days, $c = 19.3197$. The close marks
 are the curve the pt-v22 VIX-law screen priced and read, to 1e-12 over
 every horizon from 1 to 126 sessions.
+
+`futures_vix_premium_response` (0.0 on every shipped preset, left out of
+the digest there, refused without `futures_vix_listed`) moves the slope
+$b(n)$ a share $w$ of the way to the premium's time-series response
+$g(n) = -0.0716\,(1 - e^{-(n - 1)/0.5})$, also frozen in
+`derivatives::VIX_FUTURE`: the premium is
+$a(n) + ((1 - w)\,b(n) + w\,g(n))(P - c)$, in the close marks and the
+session's roll alike. $g(n)$ is how a contract's daily change on CFE differs
+from the tape's own expected change of its settlement, per point of the
+day's VIX move: the expected change is the local projection of the VIX
+$n - 1$ closes on, on the day's move with the previous close held (Cboe VIX
+1990-2026), and the regression pools 31,643 same-contract day pairs with
+$n$ from 2 to 126 (2004-2026). It is -0.072 (se 0.053, whole years
+resampled) and flat in $n$; by contract position F1 -0.080 (0.031), F2
+-0.090 (0.062) and F4 -0.071 (0.039), where $b(n)$ is +0.023, +0.067 and
++0.140. The level slope is a cross-section across contract-days; on the day
+the VIX jumps, CFE's premium falls a little at every tenor.
 
 Within the next session a contract is `m = n - 1` sessions from expiry
 counted from tonight's close, and moves with what the session says about

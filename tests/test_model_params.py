@@ -1252,6 +1252,12 @@ PERTURBATIONS = [
     ("forecast_vix_dispersion", 0.3, False),
     ("forecast_vix_dispersion_half_life", 21.0, False),
     ("forecast_vix_dispersion_skew", 0.8, False),
+    # The slow level's nowcast: INERT for the same reason (it changes only
+    # what the forecast publishes); its companions set the level and the
+    # horizon it needs.
+    ("forecast_vix_level_nowcast", 0.4, False),
+    ("forecast_vix_level_nowcast_half_life", 126.0, False),
+    ("forecast_vix_level_nowcast_centre", 2.9, False),
     ("forecast_policy_shadow_discount", 0.25, False),
     ("forecast_policy_persistence", 0.5, False),
     ("forecast_policy_reversion", 0.1, False),
@@ -1282,6 +1288,8 @@ PERTURBATIONS = [
     ("futures_vix_live_fast_share", 0.27, False),
     ("futures_vix_live_fast_half_life", 1.3, False),
     ("futures_vix_live_slow_half_life", 28.6, False),
+    # INERT: the premium's slope moves only the VIX futures' own marks.
+    ("futures_vix_premium_response", 1.0, False),
     # The rate futures (pt-v22 phase 1). INERT by construction: a rate future
     # reads the policy rate each close sets and the forecast, draws nothing
     # and writes only its own state (tests/test_rate_futures.py).
@@ -2274,6 +2282,16 @@ COMPANIONS: dict[str, dict[str, float]] = {
     "futures_vix_live_fast_share": {"forecast_horizon_sessions": 126.0, "futures_vix_listed": 1.0},
     "futures_vix_live_fast_half_life": {"forecast_horizon_sessions": 126.0, "futures_vix_listed": 1.0},
     "futures_vix_live_slow_half_life": {"forecast_horizon_sessions": 126.0, "futures_vix_listed": 1.0},
+    "futures_vix_premium_response": {"forecast_horizon_sessions": 126.0, "futures_vix_listed": 1.0},
+    # The slow level's nowcast needs the horizon and the level; its half-life
+    # and centre need the gain.
+    "forecast_vix_level_nowcast": {"forecast_horizon_sessions": 21.0, "vix_level_sigma": 0.0181,
+                                   "forecast_vix_level_nowcast_half_life": 126.0},
+    "forecast_vix_level_nowcast_half_life": {"forecast_horizon_sessions": 21.0, "vix_level_sigma": 0.0181,
+                                             "forecast_vix_level_nowcast": 0.4},
+    "forecast_vix_level_nowcast_centre": {"forecast_horizon_sessions": 21.0, "vix_level_sigma": 0.0181,
+                                          "forecast_vix_level_nowcast": 0.4,
+                                          "forecast_vix_level_nowcast_half_life": 126.0},
     # The stress cut's start at 15, where the probe's burn-in reads it (see
     # the rows), and the cut on for the two dials read only with it.
     "fed_stress_cut": {"fed_stress_vix": 15.0},

@@ -298,6 +298,13 @@ impl Engine {
 
     // ── Pricing ───────────────────────────────────────────────────────────
 
+    /// The premium of a contract `n` sessions from expiry on the VIX `vix`:
+    /// the frozen form, its VIX slope moved toward the time-series response
+    /// by `futures_vix_premium_response` (the frozen form itself at 0.0).
+    fn vix_premium(&self, n: f64, vix: f64) -> f64 {
+        VIX_FUTURE.premium.at_response(n, vix, self.params.futures_vix_premium_response)
+    }
+
     /// The forecast's expected published VIX after `closes` closes from the
     /// close it was taken at; the published VIX now at 0.
     fn vix_expected(&self, f: &crate::derivatives::Forecast, closes: i64) -> f64 {
@@ -310,7 +317,6 @@ impl Engine {
 
     /// What the contract in `slot` is worth now. `None` without a forecast.
     pub(crate) fn vix_futures_valuation(&self, slot: usize) -> Option<VixValuation> {
-        let spec = &VIX_FUTURE;
         let f = self.forecast()?;
         let c = &self.vix_futures.contracts[slot];
         let published = self.published_vix();
@@ -327,11 +333,11 @@ impl Engine {
                 let tonight = self.vix_expected(f, 1);
                 let live = self.live_vix().unwrap_or(tonight);
                 let k = crate::mathx::min(1.0, f64::from(self.ticks_today()) / SESSION_TICKS);
-                let premium = (1.0 - k) * spec.premium.at(n, published) + k * spec.premium.at(m, live);
+                let premium = (1.0 - k) * self.vix_premium(n, published) + k * self.vix_premium(m, live);
                 let loading = self.vix_futures_loading(m);
                 (live, premium, loading, n - k)
             }
-            _ => (published, spec.premium.at(n, published), self.vix_futures_loading(n - 1.0), n),
+            _ => (published, self.vix_premium(n, published), self.vix_futures_loading(n - 1.0), n),
         };
         let surprise = match self.vix_futures.phase {
             VixPhase::Session => vix - self.vix_expected(f, 1),
@@ -941,5 +947,25 @@ mod tests {
         assert!((p.level(63.0) - 1.9848).abs() < 5e-5, "{}", p.level(63.0));
         assert!((p.level(126.0) - 2.8035).abs() < 5e-5, "{}", p.level(126.0));
         assert!((p.at(21.0, p.centre) - p.level(21.0)).abs() < 1e-15);
+    }
+
+    #[test]
+    fn the_premium_response_is_the_frozen_premium_at_zero_and_the_measured_slope_at_one() {
+        let p = VIX_FUTURE.premium;
+        for &(n, v) in &[(1.0, 40.0), (2.0, 12.0), (21.0, 35.0), (74.0, 19.0), (126.0, 80.0)] {
+            assert_eq!(p.at_response(n, v, 0.0).to_bits(), p.at(n, v).to_bits());
+            let one = p.at_response(n, v, 1.0);
+            assert!((one - (p.level(n) + p.response(n) * (v - p.centre))).abs() < 1e-12);
+            let half = p.at_response(n, v, 0.5);
+            assert!((half - 0.5 * (p.at(n, v) + one)).abs() < 1e-12);
+        }
+        assert_eq!(p.response(1.0), 0.0);
+        // Flat from two sessions out: the measured tau is the grid's floor.
+        assert!((p.response(2.0) - 0.8647 * p.response_gamma).abs() < 1e-4);
+        assert!((p.response(21.0) - p.response_gamma).abs() < 1e-12);
+        // A jump of 10 points lowers the premium at every tenor at 1.0.
+        for n in [2.0, 21.0, 74.0, 126.0] {
+            assert!(p.at_response(n, 30.0, 1.0) < p.at_response(n, 20.0, 1.0));
+        }
     }
 }

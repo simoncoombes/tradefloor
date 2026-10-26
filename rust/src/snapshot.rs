@@ -1733,6 +1733,11 @@ impl Engine {
         if self.carries_vix_fear() {
             out.put("vix_fear", V::Float(self.vix_fear()));
         }
+        // The published VIX's log average, a key only while
+        // `forecast_vix_level_nowcast` is set.
+        if self.carries_vix_log_average() {
+            out.put("vix_log_average", V::Float(self.vix_log_average()));
+        }
         // The VIX futures (`futures_vix_listed`): their numbers, and their
         // book once an agent has traded one.
         if let Some(words) = self.vix_futures_words() {
@@ -2192,6 +2197,7 @@ impl Engine {
             Gated::held("futures_book", "futures_index_listed", p.futures_index_listed),
             Gated::held("night_bridge", "night_session_steps", p.night_session_steps),
             Gated::dial("vix_fear", "vix_fear_uptake", p.vix_fear_uptake),
+            Gated::dial("vix_log_average", "forecast_vix_level_nowcast", p.forecast_vix_level_nowcast),
             Gated::dial("vix_futures", "futures_vix_listed", p.futures_vix_listed),
             Gated::held("vix_futures_book", "futures_vix_listed", p.futures_vix_listed),
             Gated::dial("rate_futures", "futures_rates_listed", p.futures_rates_listed),
@@ -2919,6 +2925,10 @@ impl Engine {
         // is set, which the key check above has held it to.
         if inner.carries_vix_fear() {
             inner.set_vix_fear(read_finite(snapshot, "", "vix_fear")?);
+        }
+        // The published VIX's log average (`forecast_vix_level_nowcast`).
+        if inner.carries_vix_log_average() {
+            inner.set_vix_log_average(read_finite(snapshot, "", "vix_log_average")?);
         }
         // The VIX futures (`futures_vix_listed`): required while the switch
         // is set, which the key check above has held them to.
