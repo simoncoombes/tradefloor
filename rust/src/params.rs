@@ -1082,17 +1082,15 @@ pub struct ModelParams {
     /// cycle, so growth sits below where the held phase would take it, and
     /// the forecast runs high by more the longer the horizon (row OF4). At
     /// 1.0 oil's block reads growth's expectation over the cycle's phases,
-    /// on the law's own sojourns: the belief's mass on each phase leaves it
-    /// as a sojourn of unknown (stationary) age does, mass entering a phase
-    /// leaves it as a fresh sojourn does, each on the law's hazard-only
-    /// survival, and every cohort's growth steps by the law in its phase,
-    /// with the law's mean shock on entry. A constant exit rate (the
-    /// nowcast's) leaves the short phases far too slowly: a contraction
-    /// lasts 110 sessions, sd 16. The sojourns are the hazard alone: the
-    /// ladder's additions from the macro state and the market are not in
-    /// them, so where those end expansions early the switch moves the
-    /// forecast less than the law does. It reads the forecast only; the law
-    /// is unchanged.
+    /// on the law's own transitions: the belief's mass on each phase, at the
+    /// phase's stationary age (the age is not public), and the mass entering
+    /// a phase, each leave at the probability the law's transition check
+    /// reads at their age on the forecast's economy at each close (the
+    /// hazard and the ladder from the state: the market's fall, inflation,
+    /// rates, the curve, valuation, unemployment, growth); every cohort's
+    /// growth steps by the law in its phase, with the law's mean shock on
+    /// entry. A construction with no free parameter. It reads the forecast
+    /// only; the law is unchanged.
     pub oil_forecast_cycle_growth: f64,
     /// The share of the dollar index's gap to its target closed each
     /// session. 0.0, on every shipped preset, is the standing 0.02, and a

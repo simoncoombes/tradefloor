@@ -180,14 +180,21 @@ pub fn hazard_cap(us: bool) -> f64 {
 /// not textually identical (one inlines the inversion depth, the other binds
 /// it to a temporary), but every condition, constant and operation matches.
 /// If they ever diverge upstream this must split back into two.
-fn adjust_transition_probability(economy: &EconomyState, mut p: f64, spec: &CycleSpec) -> f64 {
+fn adjust_transition_probability(economy: &EconomyState, p: f64, spec: &CycleSpec) -> f64 {
+    adjust_transition_probability_in(economy, economy.cycle_phase, p, spec)
+}
+
+/// [`adjust_transition_probability`] with the phase read from `phase`
+/// rather than from `economy`, so the forecast can read the ladder for a
+/// phase the economy is not in without copying it.
+fn adjust_transition_probability_in(economy: &EconomyState, phase: CyclePhase, mut p: f64, spec: &CycleSpec) -> f64 {
     // THE MARKET'S FALL (`cycle_equity_hazard`): in an expansion and at a
     // peak, monthly hazard per unit of the index's log fall below its slow
     // average beyond the knee. Added first, so the expansion's guard below
     // still takes its 0.2 off an economy that has not recovered. Guarded,
     // so at 0.0 the ladder is the one that stood, operation for operation.
     if spec.equity_hazard != 0.0
-        && matches!(economy.cycle_phase, CyclePhase::Expansion | CyclePhase::Peak)
+        && matches!(phase, CyclePhase::Expansion | CyclePhase::Peak)
     {
         p += spec.equity_hazard * mathx::max(0.0, economy.spread_equity_gap - spec.equity_knee);
     }
@@ -195,11 +202,11 @@ fn adjust_transition_probability(economy: &EconomyState, mut p: f64, spec: &Cycl
     // (`cycle_equity_hazard_opening`): the engine sets it only while the
     // economy runs alone, before day zero. Guarded likewise.
     if spec.equity_opening != 0.0
-        && matches!(economy.cycle_phase, CyclePhase::Expansion | CyclePhase::Peak)
+        && matches!(phase, CyclePhase::Expansion | CyclePhase::Peak)
     {
         p += spec.equity_opening;
     }
-    match economy.cycle_phase {
+    match phase {
         CyclePhase::Expansion => {
             // THE INFLATION AND RATE HAZARDS (`cycle_inflation_hazard`,
             // `cycle_rate_hazard`): the legacy 0.1 a month each, or off zero
@@ -435,18 +442,69 @@ pub fn mean_sojourn_days_for(phase: CyclePhase, spec: &CycleSpec) -> f64 {
     walk_survival(phase, spec, |_, _| true)
 }
 
-/// One phase's hazard-only survival in DAYS, `S(1)` to `S(n)`: `out[d - 1]`
-/// is the chance a fresh sojourn survives its first `d - 1` checks, on the
-/// same daily transition probabilities [`mean_sojourn_days_for`] walks, so
-/// it leaves at its `d`-th with `S(d) - S(d + 1)`. For the forecast's cycle
-/// (`oil_forecast_cycle_growth`).
-pub fn sojourn_survival_days_for(phase: CyclePhase, spec: &CycleSpec, n: usize) -> Vec<f64> {
-    let mut out = Vec::with_capacity(n);
-    let mut s = 1.0;
-    for d in 1..=n {
-        out.push(s);
-        s *= 1.0 - hazard_only_transition_probability(phase, d as i64, spec);
+/// The probability [`check_cycle_transition_for`] compares against for an
+/// economy in `phase` on its `days`-th day, the ladder read from `economy`'s
+/// fields as they stand: the hazard, the ladder, the clamp and the per-day
+/// conversion, in that function's order. For the forecast's cycle
+/// (`oil_forecast_cycle_growth`), which reads the law's own hazards at each
+/// close.
+pub fn transition_probability_for(economy: &EconomyState, phase: CyclePhase, days: f64, spec: &CycleSpec) -> f64 {
+    let months = days / spec.month_days;
+    if months < phase_characteristics_for(phase, spec.us).min_months {
+        return 0.0;
     }
+    let (shape, scale) = cycle_hazard_params_for(phase, spec.us);
+    let p = adjust_transition_probability_in(economy, phase, weibull_hazard(months, shape, scale), spec);
+    per_day(clamp(p, 0.0, hazard_cap(spec.us)), spec)
+}
+
+/// A phase's stationary age law on the hazard alone (the opening's, see
+/// [`walk_survival`]), in bins of `bin` days: each bin's mass and its
+/// mass-weighted age in completed days. Bins under a billionth are left out.
+/// For the forecast's cycle (`oil_forecast_cycle_growth`), which reads the
+/// age at this law because it is not public. Memoised on the spec's bits.
+pub fn stationary_age_bins_for(phase: CyclePhase, spec: &CycleSpec, bin: i64) -> Vec<(f64, f64)> {
+    type Key = (u64, u64, bool, u64, u64, u64, u8, i64);
+    thread_local! {
+        static MEMO: std::cell::RefCell<Vec<(Key, Vec<(f64, f64)>)>> = const { std::cell::RefCell::new(Vec::new()) };
+    }
+    let key: Key = (spec.per_month.to_bits(), spec.month_days.to_bits(), spec.us, spec.equity_hazard.to_bits(),
+                    spec.equity_knee.to_bits(), spec.equity_opening.to_bits(), phase as u8, bin);
+    if let Some(v) = MEMO.with(|m| m.borrow().iter().find(|(k, _)| *k == key).map(|(_, v)| v.clone())) {
+        return v;
+    }
+    let mut cum = Vec::new();
+    let mean = walk_survival(phase, spec, |_, c| {
+        cum.push(c);
+        true
+    });
+    let mut out: Vec<(f64, f64)> = Vec::new();
+    let (mut prev, mut b) = (0.0, 0i64);
+    let (mut mass, mut age) = (0.0, 0.0);
+    for (a, &c) in cum.iter().enumerate() {
+        let w = (c - prev) / mean;
+        prev = c;
+        if a as i64 / bin != b {
+            if mass > 1e-9 {
+                out.push((age / mass, mass));
+            }
+            b = a as i64 / bin;
+            mass = 0.0;
+            age = 0.0;
+        }
+        mass += w;
+        age += w * a as f64;
+    }
+    if mass > 1e-9 {
+        out.push((age / mass, mass));
+    }
+    MEMO.with(|m| {
+        let mut m = m.borrow_mut();
+        if m.len() > 32 {
+            m.clear();
+        }
+        m.push((key, out.clone()));
+    });
     out
 }
 

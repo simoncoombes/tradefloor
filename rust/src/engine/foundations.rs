@@ -1340,86 +1340,72 @@ impl Engine {
 
 
 /// Growth's expectation over the cycle's phases for oil's forecast
-/// (`oil_forecast_cycle_growth`), on the law's own sojourns. Each phase
-/// holds cohorts of the belief's mass, each with its own growth: the mass on
-/// a phase at the start, at the phase's stationary age, which leaves at the
-/// `i`-th close with probability `S(i) / E[T]` of the whole (the age is not
-/// public, so it is read at its stationary law); and the mass that enters a
-/// phase over the horizon, a fresh sojourn that leaves at its `m`-th close
-/// with probability `1 - S(m + 1) / S(m)`. `S` and `E[T]` are the
-/// hazard-only survival and mean ([`crate::economy::cycle`]). Every
-/// cohort's growth steps by the law in its phase, its draws at their means,
-/// and mass entering a phase takes the step's mean shock on a phase's first
-/// session. At a constant hazard this is the belief's own predict step; the
-/// law's sojourns are far from that in the short phases (a contraction
-/// lasts 110 sessions, sd 16).
+/// (`oil_forecast_cycle_growth`), on the law's own transitions. Each phase
+/// holds cohorts of the belief's mass, each with its own growth and age:
+/// the mass on a phase at the start, spread over the phase's stationary age
+/// law (the age is not public; [`crate::economy::cycle::stationary_age_bins_for`],
+/// in months), and the mass that enters a phase over the horizon, a fresh
+/// sojourn. At each close every phase is stepped by the law, its draws at
+/// their means, from the forecast's economy with the phase and its cohorts'
+/// growth in place; each cohort's growth moves with it, and each cohort
+/// leaves with the probability the law's transition check compares against
+/// on that stepped economy at the cohort's age: the hazard, the ladder from
+/// the state (the market's fall, inflation, rates, the curve, valuation,
+/// unemployment, growth), the clamp and the per-day conversion
+/// ([`crate::economy::cycle::transition_probability_for`]). Mass entering a
+/// phase takes the step's mean shock on a phase's first session. No value
+/// is set here: every part is the law's.
 struct CycleGrowth {
     phases: [crate::economy::CyclePhase; 5],
-    /// `S(1)` to `S(horizon + 2)` for each phase.
-    survival: Vec<Vec<f64>>,
-    /// `E[T]` for each phase, in sessions.
-    mean: [f64; 5],
-    /// Each phase's mass at the start, and the start's mass and growth now.
-    start_mass: [f64; 5],
-    start: [(f64, f64); 5],
-    /// Each phase's entered cohorts: the close they entered after, their
-    /// mass now and their growth.
-    entered: Vec<Vec<(usize, f64, f64)>>,
-    closes: usize,
+    spec: crate::economy::CycleSpec,
+    /// Each phase's cohorts: age in completed sessions, mass and growth.
+    cohorts: Vec<Vec<(f64, f64, f64)>>,
 }
 
 impl CycleGrowth {
-    fn new(engine: &Engine, belief: &[f64; 5], growth: f64, horizon: usize) -> Self {
+    fn new(engine: &Engine, belief: &[f64; 5], growth: f64, _horizon: usize) -> Self {
         let phases = crate::economy::cycle::phase_cycle();
         let spec = engine.cycle_spec();
-        let (mean, _) = crate::economy::cycle::stationary_phase_shares_for(&spec);
-        let survival = phases
-            .iter()
-            .map(|ph| crate::economy::cycle::sojourn_survival_days_for(*ph, &spec, horizon + 2))
-            .collect();
+        let month = spec.month_days.round().max(1.0) as i64;
         let total: f64 = belief.iter().sum();
-        let mut start_mass = [0.0; 5];
-        let mut start = [(0.0, growth); 5];
-        for j in 0..5 {
-            start_mass[j] = if total > 0.0 { belief[j] / total } else { 0.0 };
-            start[j].0 = start_mass[j];
+        let mut cohorts = vec![Vec::new(); 5];
+        for k in 0..5 {
+            let b = if total > 0.0 { belief[k] / total } else { 0.0 };
+            if b > 0.0 {
+                for (age, w) in crate::economy::cycle::stationary_age_bins_for(phases[k], &spec, month) {
+                    cohorts[k].push((age, b * w, growth));
+                }
+            }
         }
-        CycleGrowth { phases, survival, mean, start_mass, start, entered: vec![Vec::new(); 5], closes: 0 }
+        CycleGrowth { phases, spec, cohorts }
     }
 
     /// The growth oil's block reads at the next step: the cohorts' mean.
     fn growth(&self) -> f64 {
         let (mut m, mut g) = (0.0, 0.0);
-        for k in 0..5 {
-            m += self.start[k].0;
-            g += self.start[k].0 * self.start[k].1;
-            for &(_, mass, growth) in &self.entered[k] {
-                m += mass;
-                g += mass * growth;
-            }
+        for c in self.cohorts.iter().flatten() {
+            m += c.1;
+            g += c.1 * c.2;
         }
         if m > 0.0 {
             g / m
         } else {
-            self.start[0].1
+            0.0
         }
     }
 
-    /// One close: each phase's cohorts step their growth by the law in the
-    /// phase (`economy` and `inputs` as the forecast's step had them), then
-    /// each cohort's leavers enter the next phase.
+    /// One close: each phase stepped by the law at its cohorts' mean growth
+    /// and one point above it (the step is affine in growth but for its
+    /// clamp and the pull's doubling against the phase, so each cohort moves
+    /// on the line through the two), then each cohort's leavers, at the law's
+    /// transition probability on the stepped economy, enter the next phase.
     fn step(&mut self, economy: &EconomyState, inputs: &DailyInputs, volatility: f64) {
-        self.closes += 1;
-        let i = self.closes;
-        // The step is affine in growth but for its clamp and the pull's
-        // doubling against the phase, so each phase is stepped at its
-        // cohorts' mean and one point above it, and each cohort moves on the
-        // line through the two.
+        let mut leaving = [(0.0, 0.0); 5];
         for k in 0..5 {
-            let (mut m, mut g) = (self.start[k].0, self.start[k].0 * self.start[k].1);
-            for &(_, mass, growth) in &self.entered[k] {
-                m += mass;
-                g += mass * growth;
+            let (mut m, mut g) = (0.0, 0.0);
+            for c in &self.cohorts[k] {
+                m += c.1;
+                g += c.1 * c.2;
             }
             if !(m > 0.0) {
                 continue;
@@ -1427,39 +1413,29 @@ impl CycleGrowth {
             let bar = g / m;
             let mut at = economy.clone();
             at.cycle_phase = self.phases[k];
-            at.gdp_growth = bar;
-            let s0 = update_economy_daily(&at, inputs, &mut crate::economy::daily::MeanDraws).gdp_growth;
             at.gdp_growth = bar + 1.0;
-            let slope = update_economy_daily(&at, inputs, &mut crate::economy::daily::MeanDraws).gdp_growth - s0;
-            self.start[k].1 = s0 + slope * (self.start[k].1 - bar);
-            for c in self.entered[k].iter_mut() {
+            let s1 = update_economy_daily(&at, inputs, &mut crate::economy::daily::MeanDraws).gdp_growth;
+            at.gdp_growth = bar;
+            let stepped = update_economy_daily(&at, inputs, &mut crate::economy::daily::MeanDraws);
+            let s0 = stepped.gdp_growth;
+            let slope = s1 - s0;
+            for c in self.cohorts[k].iter_mut() {
+                c.0 += 1.0;
                 c.2 = s0 + slope * (c.2 - bar);
-            }
-        }
-        let mut leaving = [(0.0, 0.0); 5];
-        for k in 0..5 {
-            let s = &self.survival[k];
-            if self.mean[k] > 0.0 && i <= s.len() && self.start[k].0 > 0.0 {
-                let out = (self.start_mass[k] * s[i - 1] / self.mean[k]).min(self.start[k].0);
-                self.start[k].0 -= out;
-                leaving[k].0 += out;
-                leaving[k].1 += out * self.start[k].1;
-            }
-            for c in self.entered[k].iter_mut() {
-                let age = i - c.0;
-                let q = if age < s.len() && s[age - 1] > 0.0 { 1.0 - s[age] / s[age - 1] } else { 1.0 };
+                let q = crate::economy::cycle::transition_probability_for(&stepped, self.phases[k], c.0, &self.spec);
                 let out = c.1 * q;
                 c.1 -= out;
                 leaving[k].0 += out;
                 leaving[k].1 += out * c.2;
             }
+            self.cohorts[k].retain(|c| c.1 > 1e-12);
         }
         for k in 0..5 {
             let (m, g) = leaving[k];
             if m > 0.0 {
                 let next = (k + 1) % 5;
                 let shock = crate::economy::daily::phase_entry_growth_shock(self.phases[next], 0.5, volatility);
-                self.entered[next].push((i, m, g / m + shock));
+                self.cohorts[next].push((0.0, m, g / m + shock));
             }
         }
     }
