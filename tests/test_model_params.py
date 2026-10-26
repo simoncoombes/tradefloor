@@ -1511,6 +1511,10 @@ PERTURBATIONS = [
     # INERT: the pre-open news is read only under a night split, which
     # pt-v20 leaves off (and it is refused without one).
     ("news_preopen_share", 0.259, False),
+    # INERT here: it moves only when an event is drawn, and the probe's news
+    # uniforms deliver none (as for the absorption profile above).
+    # test_news_session_release.py moves it on days that have news.
+    ("news_session_release_share", 1.0, False),
     # Credit's own state: its opening draw moves the meeting's corporate
     # re-anchor, and with it the discount rate.
     ("corporate_spread_noise_sd", 0.025, True),

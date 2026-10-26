@@ -262,6 +262,19 @@ class PublishedMacro:
 _WRAPPED: "weakref.WeakKeyDictionary[Any, Any]" = weakref.WeakKeyDictionary()
 
 
+def _released(engine: Any) -> list[dict[str, Any]]:
+    """The day's news a trader can have seen by now. Under
+    ``news_session_release_share`` an event carries ``release_minute`` and
+    is held back until ``session_tick`` reaches it; without the dial every
+    event is out from the open, as it always was."""
+    news = engine.session_news()
+    if not any("release_minute" in e for e in news):
+        return news
+    tick = engine.session_tick
+    tick = 0 if tick is None else tick
+    return [e for e in news if e.get("release_minute", 0.0) <= tick]
+
+
 def _no_copy(what: str, holds: str) -> SandboxError:
     return SandboxError(
         f"the {what} cannot be copied or pickled, because the copy would "
@@ -476,7 +489,7 @@ class MarketView:
         """
         return [{"ticker": e.get("ticker"), "sector": e.get("sector"),
                  "day": e.get("day")}
-                for e in _WRAPPED[self].session_news()]
+                for e in _released(_WRAPPED[self])]
 
     # -- dividends --------------------------------------------------------
 

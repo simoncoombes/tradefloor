@@ -554,18 +554,27 @@ pub const NEWS_SESSION_TICKS: f64 = 390.0;
 /// complete at the close whatever the half-life: the profile moves WHEN the
 /// move lands, never how much of it lands.
 fn absorbed_component(n: f64, half_life: f64) -> f64 {
+    absorbed_component_over(n, half_life, NEWS_SESSION_TICKS)
+}
+
+/// [`absorbed_component`] over `horizon` ticks rather than the session's
+/// 390: 0 at its start and exactly 1 after `horizon`. An event released
+/// during the session (`news_session_release_share`) is absorbed over what
+/// is left of the session, so it too is complete at the close. At a horizon
+/// of 390 it is the same operations in the same order.
+fn absorbed_component_over(n: f64, half_life: f64, horizon: f64) -> f64 {
     if n <= 0.0 {
         return 0.0;
     }
-    if n >= NEWS_SESSION_TICKS {
+    if n >= horizon {
         return 1.0;
     }
     if half_life == 0.0 {
-        return n / NEWS_SESSION_TICKS;
+        return n / horizon;
     }
     let ln2 = core::f64::consts::LN_2;
     let at = 1.0 - mathx::exp(-ln2 * n / half_life);
-    let full = 1.0 - mathx::exp(-ln2 * NEWS_SESSION_TICKS / half_life);
+    let full = 1.0 - mathx::exp(-ln2 * horizon / half_life);
     at / full
 }
 
@@ -606,6 +615,58 @@ pub fn news_absorption_weight(params: &crate::params::ModelParams,
     let m = minutes_since_open as f64;
     NEWS_SESSION_TICKS
         * (news_absorbed_share(params, m + 1.0) - news_absorbed_share(params, m))
+}
+
+/// When the session's company news is released, as it is on the tape: the
+/// EDGAR acceptance times of the certified forty's 8-Ks without item 2.02
+/// (results of operations), 2014-2025, accepted between 09:30 and 16:00 New
+/// York on a full trading day, counted by half hour of the session. 1,372
+/// filings. 0.6% of them land in the first minute and 4.7% in the first half
+/// hour; the mean is minute 223. Read by `news_session_release_share`.
+pub const NEWS_RELEASE_PROFILE_COUNTS: [f64; 13] =
+    [65.0, 103.0, 85.0, 93.0, 65.0, 79.0, 71.0, 96.0, 110.0, 129.0, 125.0, 235.0, 116.0];
+
+/// The session minute, in [0, 390), at which an event whose release uniform
+/// is `v` in [0, 1) is released under [`NEWS_RELEASE_PROFILE_COUNTS`]: the
+/// profile's inverse, linear within each half hour.
+pub fn news_release_minute(v: f64) -> f64 {
+    let total: f64 = NEWS_RELEASE_PROFILE_COUNTS.iter().sum();
+    let width = NEWS_SESSION_TICKS / NEWS_RELEASE_PROFILE_COUNTS.len() as f64;
+    let target = v.clamp(0.0, 1.0) * total;
+    let mut below = 0.0;
+    for (k, c) in NEWS_RELEASE_PROFILE_COUNTS.iter().enumerate() {
+        if target < below + c {
+            return (k as f64 + (target - below) / c) * width;
+        }
+        below += c;
+    }
+    NEWS_SESSION_TICKS - 1e-9
+}
+
+/// The multiple of `price_impact / 390` the tick at `minutes_since_open`
+/// applies for an endogenous news event released at session minute
+/// `release` (`news_session_release_share`): `390 * (A(m + 1 - r) - A(m -
+/// r))`, with `A` [`news_absorbed_share`] over the `390 - r` minutes left, so
+/// the event prices nothing before its release and all of it by the close.
+/// A release at 0.0 is [`news_absorption_weight`]'s profile. Off the regular
+/// session it is 0.0.
+pub fn news_release_weight(params: &crate::params::ModelParams,
+                           minutes_since_open: i64, release: f64) -> f64 {
+    if !(0..390).contains(&minutes_since_open) {
+        return 0.0;
+    }
+    let m = minutes_since_open as f64;
+    let horizon = NEWS_SESSION_TICKS - release;
+    let share = |n: f64| {
+        let fast = absorbed_component_over(n, params.news_absorption_half_life, horizon);
+        let d = params.news_absorption_drift_share;
+        if d == 0.0 {
+            return fast;
+        }
+        let drift = absorbed_component_over(n, params.news_absorption_drift_half_life, horizon);
+        (1.0 - d) * fast + d * drift
+    };
+    NEWS_SESSION_TICKS * (share(m + 1.0 - release) - share(m - release))
 }
 
 /// The company fields the live factor subset reads.
