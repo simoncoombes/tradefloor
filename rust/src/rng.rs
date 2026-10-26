@@ -722,16 +722,18 @@ pub fn skew_noise_key(root_seed: u64) -> u64 {
     splitmix64_mix(root_seed ^ (((SKEW_NOISE_TAG as u64) << 32) | 0xFFFF_FFFF))
 }
 
-/// The tag of the eve's meeting surprise (`policy_eve_surprise_sd`), ASCII
-/// "EVES".
-pub const EVE_SURPRISE_TAG: u32 = 0x4556_4553;
+/// The tag of the guidance's signal noise (`policy_guidance_signal_sd`),
+/// ASCII "GSIG".
+pub const GUIDANCE_SIGNAL_TAG: u32 = 0x4753_4947;
 
-/// The key of a root seed's eve surprises: as [`publication_key`] under
-/// [`EVE_SURPRISE_TAG`]. The forecast taken for `day` on a meeting's eve takes
-/// the first normal of `GameRng::keyed(key, EVE_SURPRISE_TAG, day)`, so it
-/// takes nothing from any stream and moves no other draw.
-pub fn eve_surprise_key(root_seed: u64) -> u64 {
-    splitmix64_mix(root_seed ^ (((EVE_SURPRISE_TAG as u64) << 32) | 0xFFFF_FFFF))
+/// The key of a root seed's guidance signals: as [`publication_key`] under
+/// [`GUIDANCE_SIGNAL_TAG`]. The signal of the meeting held at the close whose
+/// day count is `meeting` takes the first normal of
+/// `GameRng::keyed(key, GUIDANCE_SIGNAL_TAG, meeting)`, one for every close
+/// that forecasts that meeting, so it takes nothing from any stream and
+/// moves no other draw.
+pub fn guidance_signal_key(root_seed: u64) -> u64 {
+    splitmix64_mix(root_seed ^ (((GUIDANCE_SIGNAL_TAG as u64) << 32) | 0xFFFF_FFFF))
 }
 
 /// The `k`-th publication uniform in [0, 1) of a key:

@@ -17,6 +17,37 @@ use crate::market::index_var::{
     NameVariance,
 };
 
+/// The policy grid a meeting moves the rate on, percentage points.
+const GUIDANCE_GRID: f64 = 0.25;
+
+/// The prior over a scheduled meeting's decision (`policy_guidance_signal_sd`):
+/// `(steps, weight)`, the decision being the published shadow plus `steps`
+/// times [`GUIDANCE_GRID`]. The model's own: on 64 histories of 21 years of
+/// the pt-v22 futures line (10,040 eves), the share of eves at which the
+/// decision the meeting delivered was the published shadow plus each step,
+/// with a half count on each of -8 to 8 so none has no weight. The decision
+/// is the published shadow at 93.2% of eves (se 0.6%), one step off at 4.9%;
+/// the Fed's own reading at every close sits off it at the same shares.
+const GUIDANCE_PRIOR: [(f64, f64); 17] = [
+    (-8.0, 4.975867e-05),
+    (-7.0, 4.975867e-05),
+    (-6.0, 4.975867e-05),
+    (-5.0, 4.975867e-05),
+    (-4.0, 3.483107e-04),
+    (-3.0, 1.243967e-03),
+    (-2.0, 6.319351e-03),
+    (-1.0, 2.333682e-02),
+    (0.0, 9.315321e-01),
+    (1.0, 2.522765e-02),
+    (2.0, 1.030004e-02),
+    (3.0, 1.144449e-03),
+    (4.0, 1.492760e-04),
+    (5.0, 4.975867e-05),
+    (6.0, 4.975867e-05),
+    (7.0, 4.975867e-05),
+    (8.0, 4.975867e-05),
+];
+
 /// Five-point Gauss-Hermite nodes and weights (physicists' form, the
 /// weights summing to the square root of pi).
 const GAUSS_HERMITE_5: [(f64, f64); 5] = [
@@ -645,24 +676,38 @@ impl Engine {
         }
     }
 
-    /// The change the forecast for `day` prices at the meeting held at `first`
-    /// when that meeting is the next close and the eve holds its decision
-    /// (`policy_eve_surprise_sd`, `fed_eve_decision`): the decision, plus the
-    /// surprise, percentage points. `None` otherwise, and always with the
-    /// dial at 0.0, where the path is as it stood.
-    fn eve_priced_change(&self, day: i64, first: i64) -> Option<f64> {
-        let sd = self.params.policy_eve_surprise_sd;
-        if sd == 0.0 || first != day + 1 {
-            return None;
-        }
-        let decision = self.eve_decision?;
+    /// The next meeting's change as the market sees it through the Fed's
+    /// guidance (`policy_guidance_signal_sd`): the Fed's own reading of the
+    /// meeting held at `meeting`, `reading`, plus the meeting's signal noise,
+    /// and the posterior mean over the decisions it can make, the 25 bp grid
+    /// around the published shadow `published`, weighted by
+    /// [`GUIDANCE_PRIOR`]. Percentage points.
+    fn guidance_posterior(&self, reading: f64, published: f64, meeting: i64) -> f64 {
+        let sd = self.params.policy_guidance_signal_sd / 100.0;
         let z = crate::rng::GameRng::keyed(
-            crate::rng::eve_surprise_key(self.root_seed),
-            crate::rng::EVE_SURPRISE_TAG as u64,
-            day as u64,
+            crate::rng::guidance_signal_key(self.root_seed),
+            crate::rng::GUIDANCE_SIGNAL_TAG as u64,
+            meeting as u64,
         )
         .next_normal();
-        Some(decision + sd / 100.0 * z)
+        let signal = reading + sd * z;
+        let r0 = self.economy.federal_funds_rate;
+        let mut points = [(0.0, 0.0); GUIDANCE_PRIOR.len()];
+        let mut top = f64::NEG_INFINITY;
+        for (point, (steps, weight)) in points.iter_mut().zip(GUIDANCE_PRIOR.iter()) {
+            let change = crate::mathx::clamp(r0 + published + GUIDANCE_GRID * steps, 0.0, 8.0) - r0;
+            let x = (signal - change) / sd;
+            let log = crate::mathx::log(*weight) - 0.5 * x * x;
+            *point = (change, log);
+            top = crate::mathx::max(top, log);
+        }
+        let (mut sum, mut total) = (0.0, 0.0);
+        for (change, log) in points {
+            let w = crate::mathx::exp(log - top);
+            sum += w * change;
+            total += w;
+        }
+        sum / total
     }
 
     fn forecast_policy_path(&self, day: i64, horizon: usize) -> Vec<f64> {
@@ -670,8 +715,26 @@ impl Engine {
         let r0 = self.economy.federal_funds_rate;
         let request = Self::meeting_request(day);
         let options = self.policy_options(false);
-        let shadow = self.shadow_meeting_change(&request, &options);
         let first = self.next_meeting_day(day);
+        // THE GUIDANCE'S SIGNAL (`policy_guidance_signal_sd`): the Fed's own
+        // reading reaches the price through a noisy signal, so its share q is
+        // the posterior mean over the grid, not the reading. On a meeting's
+        // eve the reading is the decision the eve holds, and the meeting is
+        // priced at the market's expectation of it whole. A branch: at 0.0
+        // the shadow is the blend as it stood.
+        let (shadow, held) = if p.policy_guidance_signal_sd != 0.0 {
+            let published = self.shadow_published_change(&request, &options);
+            let eve = if first == day + 1 { self.eve_decision } else { None };
+            let reading = match eve {
+                Some(decision) => decision,
+                None => self.shadow_own_change(&request, &options),
+            };
+            let q = p.policy_anticipation_guidance;
+            let seen = (1.0 - q) * published + q * self.guidance_posterior(reading, published, first);
+            (seen, eve.map(|_| seen))
+        } else {
+            (self.shadow_meeting_change(&request, &options), None)
+        };
         // The normal cadence is 42 to 55 calendar days, uniform.
         let cal = self.macro_calendar();
         let mut cadence = 0.0;
@@ -683,7 +746,6 @@ impl Engine {
         let mut path = vec![r0; horizon];
         let mut rate = r0;
         let mut push = (1.0 - p.forecast_policy_shadow_discount) * shadow;
-        let held = self.eve_priced_change(day, first);
         let mut j = 0;
         loop {
             let at = first + (j as f64 * cadence).round() as i64;
@@ -1571,15 +1633,20 @@ mod tests {
     }
 
     #[test]
-    fn on_a_meetings_eve_the_path_prices_the_held_decision_less_only_its_surprise() {
-        let base = [("forecast_horizon_sessions", 63.0), ("index_level_listed", 1.0), ("fed_eve_decision", 1.0)];
+    fn the_guidance_reaches_the_path_through_its_signal_and_rounding_the_eve_recovers_nothing() {
+        let base = [
+            ("forecast_horizon_sessions", 63.0),
+            ("index_level_listed", 1.0),
+            ("fed_eve_decision", 1.0),
+            ("policy_anticipation_guidance", 1.0),
+        ];
         let mut dials = base.to_vec();
-        dials.push(("policy_eve_surprise_sd", 5.0));
+        dials.push(("policy_guidance_signal_sd", 6.4759));
         let mut e = engine(with(&dials));
         let mut off = engine(with(&base));
         let (mut buffer, mut other) = (SessionBuffer::new(), SessionBuffer::new());
-        let mut eve: Option<(f64, f64, f64)> = None;
-        let mut surprises = Vec::new();
+        let mut eve: Option<(f64, f64)> = None;
+        let mut misses = Vec::new();
         for day in 0..2000 {
             e.run_numbered_day(day, 390, &mut buffer);
             off.run_numbered_day(day, 390, &mut other);
@@ -1588,26 +1655,32 @@ mod tests {
                 assert_eq!(a.stock.price.to_bits(), b.stock.price.to_bits(), "day {day}");
             }
             let rate = e.economy.federal_funds_rate;
-            if let Some((priced, held, then)) = eve.take() {
-                // The meeting delivered the decision the eve held, so the
-                // path missed it by the surprise alone.
-                assert_eq!((rate - then).to_bits(), held.to_bits(), "day {day}");
-                surprises.push(priced - held);
+            if let Some((priced, then)) = eve.take() {
+                misses.push((rate - then, priced));
             }
             let f = e.forecast().unwrap();
-            let first = e.next_meeting_day(f.day);
-            if let Some(c) = e.eve_priced_change(f.day, first) {
-                assert_eq!((f.policy_rate[0] - rate).to_bits(), (rate + c - rate).to_bits());
-                eve = Some((c, e.eve_decision.unwrap(), rate));
-            } else {
-                assert!(first != f.day + 1 || e.eve_decision.is_none());
+            if e.next_meeting_day(f.day) == f.day + 1 {
+                // What the signal lets the market expect of the decision.
+                eve = Some((f.policy_rate[0] - rate, rate));
             }
         }
-        let n = surprises.len() as f64;
+        let n = misses.len() as f64;
         assert!(n >= 50.0, "{n} eves");
-        let mean = surprises.iter().sum::<f64>() / n;
-        let sd = (surprises.iter().map(|x| (x - mean) * (x - mean)).sum::<f64>() / (n - 1.0)).sqrt();
-        assert!(mean.abs() < 0.03 && sd > 0.025 && sd < 0.08, "mean {mean} sd {sd} on {n}");
+        let surprise: Vec<f64> = misses.iter().map(|(d, p)| d - p).collect();
+        let mean = surprise.iter().sum::<f64>() / n;
+        let sd = (surprise.iter().map(|x| (x - mean) * (x - mean)).sum::<f64>() / (n - 1.0)).sqrt();
+        assert!(mean.abs() < 0.02 && sd > 0.005 && sd < 0.08, "mean {mean} sd {sd} on {n}");
+        // Rounding the eve's price to the grid and trading toward it.
+        let edge: Vec<f64> = misses
+            .iter()
+            .map(|(d, p)| {
+                let toward = (p / GUIDANCE_GRID).round() * GUIDANCE_GRID - p;
+                if toward == 0.0 { 0.0 } else { toward.signum() * (d - p) }
+            })
+            .collect();
+        let m = edge.iter().sum::<f64>() / n;
+        let s = (edge.iter().map(|x| (x - m) * (x - m)).sum::<f64>() / (n - 1.0)).sqrt();
+        assert!(m < 2.0 * s / n.sqrt(), "the grid rule's edge {m} (se {})", s / n.sqrt());
     }
 
     #[test]

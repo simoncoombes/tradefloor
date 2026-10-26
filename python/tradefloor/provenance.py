@@ -713,11 +713,11 @@ OUT_OF_SCOPE = {
         "stood (a branch in the meeting); the stored decision is neither "
         "computed, snapshotted nor hashed; at 0.0 it is also left out of the "
         "model's digest",
-    "policy_eve_surprise_sd":
-        "inert at 0.0: the forecast prices the eve's meeting at the "
-        "discounted shadow and the reversion step as it stood (a branch in "
-        "the forecast's policy path); its draw is keyed on the seed, so no "
-        "stream is touched; at 0.0 it is also left out of the model's digest",
+    "policy_guidance_signal_sd":
+        "inert at 0.0: the forecast prices the next meeting at the guidance's "
+        "blend of the shadows as it stood (a branch in the forecast's policy "
+        "path); its draw is keyed on the seed, so no stream is touched; at "
+        "0.0 it is also left out of the model's digest",
     "treasury_path_owed_excluded":
         "inert at 0.0 and read only with `treasury_path_anticipated` on: the "
         "anticipated path's meeting step carries the put's owed step as it "

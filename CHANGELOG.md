@@ -28,13 +28,18 @@ payload, Arrow and WASM show them; agents trade by symbol.
 
 ### Company news released before the open
 
-- `policy_eve_surprise_sd` is a new dial, 0.0 on every preset and left out of
-  the digest there: with `fed_eve_decision` on, the forecast taken on a
-  meeting's eve prices the decision the eve holds, plus a zero-mean surprise
-  of this sd (bp) keyed on the seed, instead of a discounted share of it and
-  a reversion step. The meeting then moves the policy-rate futures by the
-  surprise alone; before, the eve's step revealed the decision and a rule
-  trading the front contract by it won 36 of 36 meetings. The tape: the
+- `policy_guidance_signal_sd` is a new dial, 0.0 on every preset and left
+  out of the digest there: the forecast's policy path, which the policy-rate
+  and term-rate futures read, sees the Fed's own reading of the next meeting
+  (the share `policy_anticipation_guidance` gives it) through a signal with
+  noise of this sd (bp, one keyed draw a meeting), and prices its posterior
+  mean over the 25 bp grid around the published shadow, under the model's
+  own prior over the gap between the two; on the eve the reading is the
+  decision the eve holds (`fed_eve_decision`) and the meeting is priced at
+  that whole. Before, the path showed the decision itself: a rule trading
+  the front fed funds future on the eve's step won 35 of 36 meetings, and a
+  surprise added to the eve's price was undone by rounding it to the grid.
+  At 6.48 bp the decision less the eve's price has the sd of the
   Kuttner-scaled ZQ=F surprise on scheduled FOMC days net of an ordinary
   session, 2015 and 2021-2026, 2.55 bp (se 0.69). No stock price moves.
 - `rate_premium_per_fixing` is a new switch, 0.0 on every preset and left out
