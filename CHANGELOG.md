@@ -204,6 +204,27 @@ records are identical (`tests/test_futures_accounts.py`).
   change of its settlement, per point of the day's VIX move, -0.072 (se 0.053)
   and flat in tenor. At 1.0 a VIX jump compresses the premium, as on CFE,
   with no draw and no state of its own.
+
+### A liquidation takes the shares an assignment delivered
+
+On an unmet margin call `Portfolio` closed its futures and options and left
+the stock an exercise or an assignment had delivered, so an early
+assignment that handed an account several times its equity in shares stayed
+held after the liquidation. The shares in a name whose options the account
+trades now go with them. Shares in other names, and every account without
+single-name options, are as before; known answers are unchanged.
+
+### The single-name options' dealer on the tape
+
+Five dials, 0.0 on every preset, shape the single-name options' dealer:
+its inventory response per contract (`option_name_inventory_slope`, a
+share of the at-the-money volatility) and the half-life of its pressure in
+sessions (`option_name_inventory_half_life`), both constants before (half a
+half-spread per 20 contracts, 15 open ticks); and its spread as a share of
+the price by delta (`option_name_spread_otm`, `option_name_spread_itm`) and
+in tenor (`option_name_spread_tenor_exponent`). They price options only:
+stock prices and every known answer are where they were.
+
 ### Company news released before the open
 
 - `policy_guidance_signal_sd` is a new dial, 0.0 on every preset and left

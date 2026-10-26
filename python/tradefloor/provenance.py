@@ -679,6 +679,26 @@ OUT_OF_SCOPE = {
         "listed option family; a stated simplification of exchange limits, sized "
         "to the dealer's displayed depth, not fitted; at 0.0 it is also left out "
         "of the model's digest",
+    "option_name_inventory_slope":
+        "inert at 0.0: `name_context` in engine/name_options.rs keeps the "
+        "constant response; refused without `options_names_listed`; at 0.0 it "
+        "is also left out of the model's digest",
+    "option_name_inventory_half_life":
+        "inert at 0.0: `name_options_session_step` keeps the 15-tick decay; "
+        "refused without `options_names_listed`; at 0.0 it is also left out "
+        "of the model's digest",
+    "option_name_spread_otm":
+        "inert at 0.0 with `option_name_spread_itm`: `name_priced` keeps the "
+        "half-spread in volatility; refused without "
+        "`options_names_listed`; at 0.0 it is also left out of the model's digest",
+    "option_name_spread_itm":
+        "inert at 0.0 with `option_name_spread_otm`: `name_priced` keeps the "
+        "half-spread in volatility; refused without "
+        "`options_names_listed`; at 0.0 it is also left out of the model's digest",
+    "option_name_spread_tenor_exponent":
+        "inert at 0.0: `name_priced` keeps the half-spread flat in tenor; "
+        "refused without `options_names_listed`; at 0.0 it is also left out "
+        "of the model's digest",
     # The oil law (pt-v22, decision 3), inert on every shipped preset: each a
     # branch to the standing arithmetic at 0.0.
     "oil_mean_reversion":

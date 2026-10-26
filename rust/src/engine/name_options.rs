@@ -69,7 +69,10 @@ use super::*;
 use crate::agent_book::{AgentFill, AgentOrder, BookState, Liquidity, RestMode, AGENT_BOOK_CAP};
 use crate::derivatives::american::{self, CashDividend, Lattice, OptionSpec, Style};
 use crate::derivatives::calendar;
-use crate::derivatives::dealer::{american_ladder, dealer_thetas, pressure_after, read_smile, walk, ExpirySummary, Ladder, OptionQuote};
+use crate::derivatives::dealer::{
+    american_ladder, dealer_thetas, moneyness_factor, pressure_after, price_ladder, read_smile, walk, ExpirySummary, Ladder,
+    OptionQuote,
+};
 use crate::derivatives::pricing::{black_greeks, intrinsic, Greeks};
 use crate::derivatives::surface::{term_shape, Ssvi, Surface, TermInputs, ThetaCurve};
 use crate::derivatives::{
@@ -78,6 +81,9 @@ use crate::derivatives::{
 };
 use crate::market_maker::MARKET_MAKER_ID;
 use crate::order_book::{OrderBook, Side};
+
+/// Open ticks a session (`option_name_inventory_half_life` counts sessions).
+const SESSION_TICKS: f64 = 390.0;
 
 /// The contract families' roots: a name with one of these tickers lists no
 /// options, so a symbol names one contract.
@@ -554,8 +560,23 @@ impl Engine {
         let mut shifts = Vec::with_capacity(c.expiries.len());
         for e in &c.expiries {
             let sessions = crate::mathx::max(0.0, (e.expiry + 1) as f64 - clock.now);
-            plain.push((sessions, surface.theta(sessions)));
-            shifts.push(spec.inventory_shift(e.pressure, spec.half_spread(base, surface.vix, 0.0)));
+            let theta = surface.theta(sessions);
+            plain.push((sessions, theta));
+            let half_atm = spec.half_spread(base, surface.vix, 0.0);
+            let slope = self.params.option_name_inventory_slope;
+            shifts.push(if slope != 0.0 {
+                // `option_name_inventory_slope`: a share of the expiry's
+                // at-the-money volatility per contract, under the same cap
+                let vol = if sessions > 0.0 && theta > 0.0 { crate::mathx::sqrt(theta * 252.0 / sessions) } else { 0.0 };
+                if e.pressure == 0.0 || !(half_atm > 0.0) {
+                    0.0
+                } else {
+                    let cap = spec.inventory_cap * half_atm;
+                    crate::mathx::clamp(slope * vol * e.pressure, -cap, cap)
+                }
+            } else {
+                spec.inventory_shift(e.pressure, half_atm)
+            });
         }
         let dealer = dealer_thetas(&plain, &shifts);
         let thetas = plain.iter().zip(dealer).map(|(&(_, theta), d)| (theta, d)).collect();
@@ -643,8 +664,33 @@ impl Engine {
             self.name_tree(right, ctx.spot, strike, x, surface_iv, Style::American)?.value
         };
         let z = if x.theta > 0.0 { k / crate::mathx::sqrt(x.theta) } else { 0.0 };
-        let half = spec.half_spread(self.params.option_dealer_spread, ctx.surface.vix, z);
-        let l = american_ladder(spec, right, x.forward, strike, x.years, x.discount, iv, half, tree.value);
+        let mut half = spec.half_spread(self.params.option_dealer_spread, ctx.surface.vix, z);
+        let exponent = self.params.option_name_spread_tenor_exponent;
+        let tenor = if exponent != 0.0 {
+            crate::mathx::pow(crate::mathx::max(x.sessions, 1.0) / 21.0, exponent)
+        } else {
+            1.0
+        };
+        let (otm, itm) = (self.params.option_name_spread_otm, self.params.option_name_spread_itm);
+        let atm_vol = if x.years > 0.0 && x.dealer_theta > 0.0 {
+            crate::mathx::sqrt(x.dealer_theta / x.years)
+        } else {
+            0.0
+        };
+        let l = if (otm != 0.0 || itm != 0.0) && atm_vol > 0.0 {
+            // `option_name_spread_otm` and `_itm`: the half-spread a share of
+            // the price, the at-the-money share times the moneyness factor
+            let side = |v: f64| if v != 0.0 { v } else { 1.0 };
+            let share = spec.half_spread(self.params.option_dealer_spread, ctx.surface.vix, 0.0) / atm_vol
+                * moneyness_factor(tree.delta.abs(), side(otm), side(itm))
+                * tenor;
+            price_ladder(spec, tree.value, share * tree.value, iv)
+        } else {
+            if exponent != 0.0 {
+                half *= tenor;
+            }
+            american_ladder(spec, right, x.forward, strike, x.years, x.discount, iv, half, tree.value)
+        };
         let (_, euro) = black_greeks(right, x.carry_spot, strike, x.years, iv, x.rate);
         let greeks = Greeks { delta: tree.delta, gamma: tree.gamma, vega: euro.vega, theta: euro.theta };
         let symbol = name_option_symbol(&ctx.ticker, x.expiry, right, strike);
@@ -1446,7 +1492,13 @@ impl Engine {
         if !self.names_on() || self.options.phase != OptionsPhase::Session {
             return;
         }
-        let d = NAME_OPTION_DEALER.decay();
+        let life = self.params.option_name_inventory_half_life;
+        let d = if life != 0.0 {
+            // `option_name_inventory_half_life`, sessions of open ticks
+            crate::mathx::pow(0.5, 1.0 / (life * SESSION_TICKS))
+        } else {
+            NAME_OPTION_DEALER.decay()
+        };
         for chain in self.name_options.chains.iter_mut() {
             for e in chain.expiries.iter_mut() {
                 e.pressure *= d;

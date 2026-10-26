@@ -1351,6 +1351,11 @@ PERTURBATIONS = [
     ("surface_name_premium", 0.1, False),
     ("surface_name_skew", 0.5, False),
     ("option_position_limit", 1.0, False),
+    ("option_name_inventory_slope", 0.0002, False),
+    ("option_name_inventory_half_life", 10.0, False),
+    ("option_name_spread_otm", 1.4, False),
+    ("option_name_spread_itm", 0.7, False),
+    ("option_name_spread_tenor_exponent", -0.2, False),
     # The VIX's fear memory (pt-v22 phase 1). LIVE: the first close's VIX
     # sits off its target, the memory takes up a share of the gap, and the
     # target the step reverts to moves, which the factor's VIX-coupled
@@ -2345,7 +2350,12 @@ COMPANIONS: dict[str, dict[str, float]] = {
                              "forecast_horizon_sessions": 63.0},
     **{name: {"index_level_listed": 1.0, "surface_ssvi": 1.0, "forecast_horizon_sessions": 63.0,
               "options_names_listed": 1.0}
-       for name in ("surface_name_premium", "surface_name_skew", "option_position_limit")},
+       for name in ("surface_name_premium", "surface_name_skew", "option_position_limit",
+                    "option_name_inventory_slope", "option_name_inventory_half_life",
+                    "option_name_spread_tenor_exponent")},
+    **{name: {"index_level_listed": 1.0, "surface_ssvi": 1.0, "forecast_horizon_sessions": 63.0,
+              "options_names_listed": 1.0}
+       for name in ("option_name_spread_otm", "option_name_spread_itm")},
     "futures_vix_live_fast_share": {"forecast_horizon_sessions": 126.0, "futures_vix_listed": 1.0},
     "futures_vix_live_fast_half_life": {"forecast_horizon_sessions": 126.0, "futures_vix_listed": 1.0},
     "futures_vix_live_slow_half_life": {"forecast_horizon_sessions": 126.0, "futures_vix_listed": 1.0},
