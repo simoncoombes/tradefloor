@@ -4809,15 +4809,14 @@ impl PyEngine {
     /// (`futures_index_listed`, `futures_vix_listed`, `futures_rates_listed`
     /// or `futures_oil_listed`). A property of the model: True on a model
     /// that lists VIX futures before its first close, while `contracts()` is
-    /// still empty. False on every shipped preset.
+    /// still empty.
     #[getter]
     fn lists_futures(&self) -> bool {
         self.inner.lists_futures()
     }
 
     /// Whether the model lists index options (`options_index_listed`): a
-    /// property of the model, as `lists_futures` is. False on every shipped
-    /// preset.
+    /// property of the model, as `lists_futures` is.
     #[getter]
     fn lists_options(&self) -> bool {
         self.inner.lists_options()
@@ -4825,7 +4824,7 @@ impl PyEngine {
 
     /// Whether the model lists American options on its names
     /// (`options_names_listed`): a property of the model, True before the
-    /// first close lists any. False on every shipped preset.
+    /// first close lists any.
     #[getter]
     fn lists_name_options(&self) -> bool {
         self.inner.lists_name_options()
@@ -6043,17 +6042,16 @@ impl PyEngine {
         ))
     }
 
-    /// The `futures_bars` table (pt-v22 phase 1): one row per listed
-    /// contract per recorded day, read at `record`. Every day loop in the
-    /// package records after the day's last session and before its close,
-    /// so `price` is the contract's price at the day's last print, `fair`
-    /// its fair value then, `basis_bp` the gap in basis points, `bid` and
-    /// `ask` its book's touch, `mark` the previous close's settlement mark,
-    /// `index` what `fair` reads, `sessions_to_expiry`, and
-    /// `initial_margin`, dollars a contract as the last close set it.
-    /// Nullable where a quote's field is None. `day = N` is that recorded
-    /// day alone. Empty on a model that lists no futures, which is every
-    /// shipped preset. The schema's `schema_version` metadata key is "1".
+    /// The `futures_bars` table: one row per listed contract per recorded
+    /// day, read at `record`. Every day loop in the package records after the
+    /// day's last session and before its close, so `price` is the contract's
+    /// price at the day's last print, `fair` its fair value then, `basis_bp`
+    /// the gap in basis points, `bid` and `ask` its book's touch, `mark` the
+    /// previous close's settlement mark, `index` what `fair` reads,
+    /// `sessions_to_expiry`, and `initial_margin`, dollars a contract as the
+    /// last close set it. Nullable where a quote's field is None. `day = N`
+    /// is that recorded day alone. Empty on a model that lists no futures.
+    /// The schema's `schema_version` metadata key is "1".
     #[pyo3(signature = (day = None))]
     fn futures_bars(&self, day: Option<u32>) -> PyResult<crate::python_arrow::PyArrowStream> {
         let rows: Vec<&crate::python_arrow::FuturesBarRow> =
@@ -6066,7 +6064,7 @@ impl PyEngine {
         ))
     }
 
-    /// The `settlements` table (pt-v22 phase 1): `Engine.settlements(day)`
+    /// The `settlements` table: `Engine.settlements(day)`
     /// as Arrow, one row per final settlement in session order, with
     /// `session`, `symbol`, `root`, `kind`, `value` and `reference`, and a
     /// single-name option's exercises and assignments (`event`, `agent`,
@@ -6085,13 +6083,13 @@ impl PyEngine {
         ))
     }
 
-    /// The `option_quotes` table (pt-v22 phase 2): the index options'
+    /// The `option_quotes` table: the index options'
     /// chains now as Arrow, every listed expiry's in expiry order, or
     /// `expiry`'s alone, each by strike, the call before the put, as
     /// `chain` quotes them. `day` is the engine's day count when read, so
     /// tables read at successive closes stack into a history. Read now, not
     /// recorded: a chain is several hundred contracts. Empty on a model that
-    /// lists no options, which is every shipped preset; an expiry not listed
+    /// lists no index options; an expiry not listed
     /// is refused. The schema's `schema_version` metadata key is "1".
     ///
     /// A listed name's ticker as `root` reads its options

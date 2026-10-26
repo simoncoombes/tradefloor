@@ -123,7 +123,7 @@
     },
     {
       "name": "option_chain",
-      "description": "Read the index options an open session's market lists now: each listed expiry with its forward, its strike grid, the dealer's at-the-money implied volatility and the 25-delta skew (the volatility where a put's delta is -0.25 less where a call's is 0.25), and one expiry's chain by strike, the call before the put: each option's symbol (IDX.O0035.C1050.00 is the 1050 call settling at session 35), the dealer's bid and ask with the contracts shown at each, its mid, implied volatility, delta, gamma, vega and theta, and open interest."
+      "description": "Read the options an open session's market lists now: each listed expiry with its forward, its strike grid, the dealer's at-the-money implied volatility and the 25-delta skew (the volatility where a put's delta is -0.25 less where a call's is 0.25), and one expiry's chain by strike, the call before the put: each option's symbol (ACME.O0035.C42.50 is the 42.50 call on ACME settling at session 35), the dealer's bid and ask with the contracts shown at each, its mid, implied volatility, delta, gamma, vega and theta, and open interest."
     },
     {
       "name": "session_fork",

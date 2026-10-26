@@ -454,6 +454,52 @@ def _preset_lists_options(name: str) -> bool:
                for dial in set(tf.contracts.OPTION_ROOTS.values()))
 
 
+@functools.lru_cache(maxsize=64)
+def _preset_lists_name_options(name: str) -> bool:
+    """Whether a shipped preset lists options on its names."""
+    return getattr(tf.ModelParams.from_preset(name), tf.contracts.NAME_OPTIONS) != 0.0
+
+
+#: Each futures family's switch and the word a sentence names it by.
+_FUTURE_WORDS = (("index", "futures_index_listed"), ("VIX", "futures_vix_listed"),
+                 ("rate", "futures_rates_listed"), ("oil", "futures_oil_listed"))
+
+
+@functools.lru_cache(maxsize=64)
+def _preset_contracts(name: str) -> str:
+    """What a shipped preset lists, in words ("index, rate and oil futures
+    and single-name options"), or "" when it lists no contract."""
+    params = tf.ModelParams.from_preset(name)
+    futures = [word for word, dial in _FUTURE_WORDS if getattr(params, dial) != 0.0]
+    parts = [envelope._and(futures) + " futures"] if futures else []
+    if _preset_lists_options(name):
+        parts.append("index options")
+    if _preset_lists_name_options(name):
+        parts.append("single-name options")
+    return envelope._and(parts) if parts else ""
+
+
+def _listed_on(lists: Any) -> str:
+    """The sentence that says which shipped presets list a family, `lists`
+    being one of the `_preset_lists_*` checks."""
+    names = [name for name in tf.preset_names() if lists(name)]
+    if names:
+        return f"{envelope._and(names)} {'lists' if len(names) == 1 else 'list'} them."
+    return ("No shipped preset lists them: a library Engine built with the "
+            "switches on does.")
+
+
+def _where_contracts() -> str:
+    """Where a session finds contracts: each shipped preset that lists
+    some, and what it lists."""
+    names = [name for name in tf.preset_names() if _preset_contracts(name)]
+    if not names:
+        return ("No shipped preset lists any: a library Engine built with "
+                "the listing switches on does.")
+    return (" ".join(f"{name} lists {_preset_contracts(name)}." for name in names)
+            + f' A session opened with preset="{names[0]}" trades them.')
+
+
 def _preset_record(name: str) -> dict[str, Any] | None:
     """A preset's measured record, or None when it has none."""
     try:
@@ -1575,16 +1621,20 @@ def describe_simulator() -> dict[str, Any]:
                        "session's listed futures, and session_step trades "
                        "one by its symbol, counted in contracts. Each is "
                        "marked at the close (variation margin) and settles "
-                       "in cash at expiry; a close that leaves an account "
-                       "under maintenance margin makes a margin call. No "
-                       "shipped preset lists any yet: a library Engine "
-                       "built with the switches on lists them.",
+                       "in cash at expiry. A close that "
+                       "leaves equity under maintenance margin makes a "
+                       "margin call, and if equity is still under initial "
+                       "margin at the next open, every contract is closed "
+                       "at the market. " + _listed_on(_preset_lists_futures),
             },
             "name_options": {
                 "listed_by": tf.contracts.NAME_OPTIONS,
                 "symbols": "TICKER.Onnnn.Rk.cc: ACME.O0035.C42.50 is the "
                            "42.50 call on ACME settling at the close of "
                            "session 35.",
+                "on_shipped_presets": [
+                    name for name in tf.preset_names()
+                    if _preset_lists_name_options(name)],
                 "how": "American, 100 shares a contract, on every name, "
                        "quoted by the dealer from a tree on the name's "
                        "surface. option_chain with root set to a ticker "
@@ -1594,8 +1644,8 @@ def describe_simulator() -> dict[str, Any]:
                        "hands. The dealer exercises where its tree says to "
                        "and its exercises are assigned to short positions "
                        "pro rata, so an account can be handed stock, or go "
-                       "short, without an order. No shipped preset lists "
-                       "any yet.",
+                       "short, without an order. "
+                       + _listed_on(_preset_lists_name_options),
             },
             "options": {
                 "families": [
@@ -1619,9 +1669,7 @@ def describe_simulator() -> dict[str, Any]:
                        "contracts. The premium moves cash at the fill, a "
                        "position is marked at the dealer's mid and settles "
                        "in cash at expiry, and short options ask a scan "
-                       "margin. No shipped preset lists any yet: a "
-                       "library Engine built with the switches on lists "
-                       "them.",
+                       "margin. " + _listed_on(_preset_lists_options),
             },
         },
         "long_runs": {
@@ -3758,7 +3806,7 @@ class _Session:
                     continue
                 if isinstance(order, tf.Exercise):
                     # An instruction for the close: the shares move at
-                    # settle_close (pt-v22 phase 3).
+                    # settle_close.
                     portfolio.exercise(self.engine, ticker, order.quantity)
                     continue
                 if isinstance(order, tf.Limit):
@@ -3802,7 +3850,7 @@ class _Session:
                 for label in self.labels:
                     books[label].collect_dividends(engine)
                 # The futures the open settled and each margin call decided
-                # (pt-v22 phase 1); nothing without futures.
+                #; nothing without futures.
                 for label in self.labels:
                     books[label].settle_open(engine)
             prices = _f64(engine.prices())
@@ -3842,8 +3890,7 @@ class _Session:
                     book.accrue(engine)
                 live["history"]._close(engine, day)
                 engine.close_market()
-                # Variation margin and margin calls at the close (pt-v22
-                # phase 1); nothing without futures.
+                # Variation margin and margin calls at the close; nothing without futures.
                 for label in self.labels:
                     books[label].settle_close(engine)
         return refused
@@ -3958,9 +4005,8 @@ def _orders_from(orders: Any, tickers: list[str],
     anything runs, so a step never advances on half an instruction.
 
     `contracts` are the futures and the index options the session's
-    market lists now (pt-v22 phases 1 and 2), which trade by symbol in the
-    same grammar, the quantity in contracts. None and empty on every
-    shipped preset.
+    market lists now, which trade by symbol in the same grammar, the
+    quantity in contracts. None and empty on a preset that lists none.
     """
     contracts = list(contracts or [])
     if not isinstance(orders, dict):
@@ -3982,16 +4028,14 @@ def _orders_from(orders: Any, tickers: list[str],
                             "too: option_chain lists each expiry's.")
             elif not contracts and tf.contracts.is_contract(ticker):
                 message += (" It is spelled as a contract symbol, and this "
-                            "session's preset lists no futures or options: "
-                            "no shipped preset does yet (list_contracts, "
-                            "option_chain).")
+                            "session's preset lists no futures or options. "
+                            + _where_contracts())
             raise ValueError(message)
         if isinstance(value, str) and value.strip().lower() == _CANCEL:
             mapping[ticker], echo[ticker] = tf.Cancel(), _CANCEL
             continue
         if isinstance(value, dict) and set(value) == {"exercise"}:
-            # An exercise of a single-name option held, at the close
-            # (pt-v22 phase 3).
+            # An exercise of a single-name option held, at the close.
             try:
                 mapping[ticker] = tf.Exercise(value["exercise"])
             except (tf.ValidationError, TypeError) as exc:
@@ -4031,7 +4075,7 @@ def _rounded(value: float, places: int) -> float | None:
 
 
 def _futures_view(view: Any) -> dict[str, Any]:
-    """An agent's futures as a result shows them (pt-v22 phase 1), read
+    """An agent's futures as a result shows them, read
     through `PortfolioView`: each position by symbol, with its quantity in
     contracts, the settlement mark it is held at and the variation margin
     it has paid, net."""
@@ -4046,7 +4090,7 @@ def _futures_view(view: Any) -> dict[str, Any]:
 
 
 def _options_view(view: Any, market: Any) -> dict[str, Any]:
-    """An agent's index options as a result shows them (pt-v22 phase 2):
+    """An agent's index options as a result shows them:
     each position by symbol, with its quantity in contracts, the average
     premium it was bought or sold at (`cost`, a contract), the premium
     gained on what was closed (`realised`, dollars) and the dealer's mid
@@ -4066,7 +4110,7 @@ def _options_view(view: Any, market: Any) -> dict[str, Any]:
 
 
 def _margin_view(view: Any) -> dict[str, Any]:
-    """The account's margin as a result shows it (pt-v22), on a session
+    """The account's margin as a result shows it, on a session
     whose market lists futures or options."""
     margin = view.margin()
     return {
@@ -4110,8 +4154,7 @@ def _portfolio_view(view: Any, futures: bool = False,
         **(_futures_view(view) if futures else {}),
         **(_options_view(view, option_market)
            if option_market is not None else {}),
-        # The shares and cash single-name options delivered (pt-v22 phase
-        # 3), only once there are any.
+        # The shares and cash single-name options delivered, only once there are any.
         **({"deliveries": view.deliveries[-10:]}
            if option_market is not None and view.deliveries else {}),
         **(_margin_view(view)
@@ -4182,11 +4225,11 @@ def _session_view(sess: "_Session", tickers: list[str] | None = None
         "macro": view.macro_fields,
         "news_today": view.news(),
     }
-    # A market that lists futures (pt-v22 phase 1) shows its price index
-    # and how many futures it lists; list_contracts and quote_contracts
-    # read them. One that lists index options (phase 2) shows the index and
-    # how many options it lists; option_chain reads them. Nothing on any
-    # shipped preset, whose view is the one it was.
+    # A market that lists futures shows its price index and how many
+    # futures it lists; list_contracts and quote_contracts read them. One
+    # that lists options shows the index and how many options it lists;
+    # option_chain reads them. Nothing on a preset that lists none, whose
+    # view is the one it was.
     lists_futures, lists_options = view.lists_futures, view.lists_options
     lists_names = view.lists_name_options
     if lists_futures or lists_options or lists_names:
@@ -4196,8 +4239,8 @@ def _session_view(sess: "_Session", tickers: list[str] | None = None
             market["contracts_listed"] = [k for k, _ in kinds].count("future")
         if lists_options:
             market["options_listed"] = kinds.count(("option", "IDX"))
-        # The names with options listed (pt-v22 phase 3); option_chain with
-        # a ticker as root reads one.
+        # The names with options listed; option_chain with a ticker as root
+        # reads one.
         if lists_names:
             market["name_options_listed"] = len(view.name_option_roots())
     if tickers:
@@ -4381,8 +4424,8 @@ def open_session(
         "order is refused before anything runs, and one the market refuses "
         "(the leverage cap, a book that cannot fill) is listed and the rest "
         "trade. On a preset that lists futures an order may name a contract "
-        "symbol from list_contracts, and on one that lists index options an "
-        "option symbol from option_chain, its quantity in contracts. At most "
+        "symbol from list_contracts, and on one that lists options an option "
+        "symbol from option_chain, its quantity in contracts. At most "
         f"{MAX_SESSION_STEPS} steps a call and "
         f"{MAX_SESSION_DAYS} days a session; a step costs about a sixth of "
         "a day of evaluate_strategies for one entrant. Keeps a checkpoint "
@@ -4631,7 +4674,7 @@ _QUOTE_FIELDS: dict[str, int | None] = {
 
 
 #: An index option's quote as quote_contracts and option_chain show it
-#: (pt-v22 phase 2), with the places each is rounded to.
+#:, with the places each is rounded to.
 _OPTION_FIELDS: dict[str, int | None] = {
     "right": None, "strike": None, "bid": 4, "ask": 4, "bid_size": None,
     "ask_size": None, "mid": 4, "iv": 6, "delta": 6, "gamma": 8, "vega": 4,
@@ -4672,17 +4715,20 @@ def _option_row(q: dict[str, Any]) -> dict[str, Any]:
 
 def _no_futures_note(sess: "_Session") -> str:
     return (f"This session's preset ({sess.preset or tf.model_preset()['name']}) "
-            "lists no futures or options, and no shipped preset does yet: "
-            "the pt-v22 switches that list index, VIX, rate and oil futures "
-            "and index options are off on every one. A library Engine built "
-            "with them on lists them.")
+            "lists no futures or options, so list_contracts, quote_contracts "
+            "and option_chain return none. " + _where_contracts())
 
 
 def _no_options_note(sess: "_Session") -> str:
-    return (f"This session's preset ({sess.preset or tf.model_preset()['name']}) "
-            "lists no index options, and no shipped preset does yet: the "
-            "pt-v22 switch that lists them, options_index_listed, is off on "
-            "every one. A library Engine built with it on lists them.")
+    view = MarketView(sess.engine)
+    if not (view.lists_futures or view.lists_name_options):
+        return _no_futures_note(sess)
+    out = (f"This session's preset ({sess.preset or tf.model_preset()['name']}) "
+           "lists no index options.")
+    if view.lists_name_options:
+        return out + (" Its single-name options are read with root set to a "
+                      "ticker; name_options lists the tickers.")
+    return out + " " + _listed_on(_preset_lists_options)
 
 
 @server.tool(
@@ -4697,8 +4743,8 @@ def _no_options_note(sess: "_Session") -> str:
         "the list changes. On a market that lists index options it adds "
         "each listed expiry's strike grid, at-the-money volatility and "
         "25-delta skew; option_chain reads the options themselves. Empty on "
-        "a preset that lists none, which is every shipped preset so far. "
-        "Runs no market."),
+        "a preset that lists none; describe_simulator names the presets "
+        "that list them. Runs no market."),
     annotations=_READ_ONLY,
 )
 @_guarded
@@ -4736,8 +4782,7 @@ def list_contracts(session_id: SessionIdArg) -> dict[str, Any]:
                            "are read with option_chain.")
         elif not listed:
             out["note"] = ("This market lists futures, and none is listed "
-                           "yet: VIX, rate and oil futures list from the "
-                           "first close.")
+                           "yet: they list from the first close.")
         out["provenance"] = _session_provenance(sess, orders=False)
         return out
 
@@ -4817,25 +4862,23 @@ MAX_CHAIN_STRIKES = 100
 @server.tool(
     title='Read an option chain in a session',
     description=(
-        "Read the index options an open session's market lists now: each "
-        "listed expiry with its forward, its strike grid, the dealer's "
+        "Read the options an open session's market lists now: each listed "
+        "expiry with its forward, its strike grid, the dealer's "
         "at-the-money implied volatility and the 25-delta skew (the "
         "volatility where a put's delta is -0.25 less where a call's is "
         "0.25), and one expiry's chain by strike, the call before the put: "
-        "each option's symbol (IDX.O0035.C1050.00 is the 1050 call "
+        "each option's symbol (ACME.O0035.C42.50 is the 42.50 call on ACME "
         "settling at session 35), the dealer's bid and ask with the "
         "contracts shown at each, its mid, implied volatility, delta, "
-        "gamma, vega and theta, and open interest. Name an expiry from the "
-        "list, or omit it for the nearest; strikes sets how many listed "
-        "strikes either side of the forward to show. An option trades in "
-        "session_step by its symbol, counted in contracts of $100 a point, "
-        "and quote_contracts gives one option's margin. On a market that "
-        "lists single-name options, root names a ticker to read that "
-        "name's American options (100 shares a contract, settling at the "
-        "expiry session's close, exercised with session_step's "
-        "{\"exercise\": q}); name_options lists the tickers. Empty on a "
-        "preset that lists none, which is every shipped preset so far. "
-        "Runs no market."),
+        "gamma, vega and theta, and open interest. root names a ticker for "
+        "that name's American options (100 shares a contract, settling at "
+        "the expiry session's close, exercised with session_step's "
+        "{\"exercise\": q}); name_options lists the tickers. root IDX reads "
+        "the index's European options ($100 a point) on a market that lists "
+        "them. Name an expiry from the list, or omit it for the nearest; "
+        "strikes sets how many listed strikes either side of the forward to "
+        "show. An option trades in session_step by its symbol, counted in "
+        "contracts. Empty on a preset that lists none. Runs no market."),
     annotations=_READ_ONLY,
 )
 @_guarded
@@ -4849,9 +4892,9 @@ def option_chain(
         f"{MAX_CHAIN_STRIKES}; each strike is a call and a put. Default "
         f"10."))] = 10,
     root: Annotated[str | None, Field(description=(
-        "IDX for the index options, or a ticker for that name's options on "
-        "a market that lists them. Omit for the index's, or for the first "
-        "name's where only names list options."))] = None,
+        "A ticker for that name's options, or IDX for the index's on a "
+        "market that lists them. Omit for the index's where they are "
+        "listed, or else the first name's."))] = None,
 ) -> dict[str, Any]:
     """A session's listed option expiries and one expiry's chain."""
     sess, refused = _session(session_id)
@@ -4872,9 +4915,8 @@ def option_chain(
         if root != "IDX" and root not in names:
             if not view.lists_name_options:
                 return _fail(f"{root!r} lists no options: this session's "
-                             "preset lists no single-name options "
-                             "(options_names_listed is off on every shipped "
-                             "preset).")
+                             "preset lists no single-name options. "
+                             + _listed_on(_preset_lists_name_options))
             return _fail(f"{root!r} lists no options. The names that do are "
                          f"{names}.")
         lists = view.lists_options if root == "IDX" else True

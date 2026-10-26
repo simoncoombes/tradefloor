@@ -1,28 +1,60 @@
 ## Unreleased
 
-An MCP market session now pays dividends. On pt-v21 a holder in a session
-took the ex-date price drop and was never paid, so its net worth and P&L
-read low; the session now collects them at each open, reinvested in the
-paying name as `evaluate` does, and a portfolio shows `dividends` once any
-are paid. A holder through an ex-date is paid what `evaluate` pays it on
-the same market, and a fork, a rewind or a replay of the session's orders
-pays each ex-date once, with every known-answer digest where it was.
+**pt-v22** lists contracts beside the stocks: index futures with a night
+session, monthly policy-rate and quarterly term-rate futures, monthly oil
+futures, and American options on every name. An agent trades them by symbol
+in whole contracts, as it trades a ticker, and exercises an option at a
+close with `tf.Exercise`.
 
-Three switches, off on every preset, build what futures and options will
-read: a price index of the roster with a divisor, a VIX published live
-within the session, and a forecast of the VIX, the index's and each name's
-variance, the policy rate and oil up to 252 sessions ahead, computed at
-each close from public state. None of them moves a price.
+Margin works as a clearing house's does. Each contract asks an initial
+margin, set at each close from its recent volatility, and a lower
+maintenance margin. A future pays its move to the day's settlement mark in
+cash at each close. A close that leaves equity under maintenance makes a
+margin call, and if equity is still under the initial margin at the next
+open, every contract held is closed at the market.
 
-Two more switches, also off on every preset, list futures on that index and
-let them trade through the night: the front two quarterly contracts, each
-priced at its carry fair value plus a basis, with its own book, and settled
-on the index of its expiry session's opening prints. Stock prices are the
-same with them on as off.
+`tradefloor.contracts.explain_move` says why a contract's price moved, cause
+by cause, and a strategy spec can hold the front index future as a hedge.
+An MCP market session now pays dividends. Listing the contracts moves no
+stock price.
 
-Four more list European index options and American options on every name,
-settled in shares, quoted from arbitrage-free surfaces. The MCP server,
-payload, Arrow and WASM show them; agents trade by symbol.
+<!-- release-note-ends -->
+
+### pt-v22: the contracts
+
+**pt-v22** lists contracts beside the stocks, and an agent trades them by
+symbol in whole contracts, as it trades a ticker:
+
+- **Index futures** on a price index of the roster: the front two
+  quarterly contracts, each named by its expiry session (`IDX.F0056`) and
+  priced at its carry fair value plus a basis, with its own book and a
+  night session from the close to the next open. Each settles in cash on
+  the index of its expiry session's opening prints.
+- **Rate futures**: monthly policy-rate futures (`FF`) and quarterly
+  term-rate futures (`TR3`), priced on the policy rate the market expects
+  plus a premium, settling in cash at 100 less the period's rate.
+- **Oil futures**, monthly, priced on the oil price the market expects and
+  settling in cash on the oil price at expiry.
+- **Single-name options** on every name: American calls and puts, 100
+  shares a contract, quoted by a dealer from each name's volatility
+  surface. A holder exercises at a close with `tf.Exercise`; exercise and
+  assignment move the shares and the strike at the close.
+
+Margin works as a clearing house's does. Each contract asks an initial
+margin set at each close from its recent volatility, and a maintenance
+margin of the initial over 1.1; a short option asks a scan margin. A
+future pays its move to the day's settlement mark in cash at each close. A
+close that leaves equity under the maintenance margin makes a margin call,
+and if equity is still under the initial margin at the next open, every
+contract held is closed at the market. `Portfolio.margin(engine)` reads the
+account's requirement and any open call.
+
+The MCP server's `list_contracts`, `quote_contracts` and `option_chain`
+read a session's contracts, and `session_step` trades and exercises them.
+The framework payload, the Arrow tables and the WASM build show them too.
+Listing the contracts moves no stock price.
+
+### The causes of a contract's price change
 
 `tradefloor.contracts.explain_move(before, after, quantity)` says why a
 contract's price moved between two of its quotes: a future's move as the
@@ -33,6 +65,8 @@ change in implied volatility, its theta over the sessions passed, and the
 rest. The parts sum to the move, and in dollars they are a position's P&L
 by cause. It reads the two quotes only.
 
+### Specs that hold the index future
+
 A strategy spec can hold the front index future beside its stock book: a
 `contracts` section, `{"index_future": {"hedge_ratio": 1.0}}` to offset the
 book's dollars or `{"index_future": {"weight": 0.5}}` for a share of net
@@ -42,7 +76,15 @@ serializes and fingerprints exactly as before, and on a model that lists no
 index futures the section trades nothing. Neither change moves a price:
 every known-answer digest is where it was.
 
-<!-- release-note-ends -->
+### Dividends in MCP sessions
+
+An MCP market session now pays dividends. On pt-v21 a holder in a session
+took the ex-date price drop and was never paid, so its net worth and P&L
+read low; the session now collects them at each open, reinvested in the
+paying name as `evaluate` does, and a portfolio shows `dividends` once any
+are paid. A holder through an ex-date is paid what `evaluate` pays it on
+the same market, and a fork, a rewind or a replay of the session's orders
+pays each ex-date once, with every known-answer digest where it was.
 
 ### Company news released before the open
 
@@ -233,7 +275,7 @@ every known-answer digest is where it was.
   quote.
 - WASM: `Sim.nameOptionRoots` lists the names with options and
   `Sim.nameOptionExpiries(ticker)` reads each of a name's expiries as an
-  `OptionExpiry`, both empty on every shipped preset.
+  `OptionExpiry`, both empty on a model that lists no name options.
 
 ### The options' public API
 
@@ -349,7 +391,7 @@ every known-answer digest is where it was.
   `surface_skew_premium`, `surface_skew_premium_slope`, `surface_curvature`, `surface_curvature_exponent`,
   `surface_term_premium_short`, `surface_term_premium_long` and
   `surface_earnings_weight` beside them, all 0.0 on every preset and left out
-  of the digest there. None is fitted yet.
+  of the digest there.
 - The surface is SSVI (Gatheral and Jacquier 2014) with the paper's
   no-arbitrage conditions checked at every knot. Its 21-session strip,
   priced by the Cboe VIX formula, returns the VIX (row SV1, by
@@ -426,7 +468,7 @@ every known-answer digest is where it was.
   `initial_margin` carries it, and the new `maintenance_margin` its
   maintenance level.
 - `tools/calibration/margin_dials.py derive` fits the tail allowance on
-  held-out histories (1.762 with every phase 1 contract listed), and
+  held-out histories (1.762 with every futures family listed), and
   `measure` reads row MG1: 1.05 per cent on 16 fresh histories.
 - A snapshot carries `margin` only under the coverage, hashed behind tag 54
   only then. Every known-answer digest is where it was.
@@ -778,10 +820,9 @@ every known-answer digest is where it was.
 
 ### An American options pricer
 
-- New module `derivatives::american`, the pricer pt-v22's single-stock
-  options will quote from. It is library code that the engine does not
-  call yet: no dial reads it, it takes no draw, and every known-answer
-  digest is where it was. It provides a Leisen-Reimer binomial tree
+- New module `derivatives::american`, the pricer the single-name options
+  quote from. It takes no draw, and every known-answer digest is where it
+  was. It provides a Leisen-Reimer binomial tree
   (`price`, `steps_for`, `OptionSpec`, `Style`, `Lattice`, `TreeValue`),
   with cash dividends on the escrowed price (`CashDividend`,
   `CashDividend::from_ex_day`), the early-exercise boundary at each step

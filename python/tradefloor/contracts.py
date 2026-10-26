@@ -11,10 +11,10 @@ the order the engine listed contracts in.
 - An option is ``ROOT.Onnnn.Rk.cc``: the expiry after ``O``, the right
   (``C`` or ``P``) and the strike in dollars and cents.
   ``IDX.O0035.C1050.00`` is the 1050 call on the price index settling at
-  session 35, which a model with ``options_index_listed`` lists (pt-v22
-  phase 2); ``ACME.O0294.C42.50`` is the 42.50 call on ACME, an American
-  option settling in shares at session 294's close, which a model with
-  ``options_names_listed`` lists on every name (pt-v22 phase 3).
+  session 35, which a model with ``options_index_listed`` lists;
+  ``ACME.O0294.C42.50`` is the 42.50 call on ACME, an American option
+  settling in shares at session 294's close, which a model with
+  ``options_names_listed`` lists on every name.
 
 :func:`parse` reads only the canonical spelling :func:`format` writes, so
 the two round-trip exactly. Both call the engine's own reader
@@ -42,7 +42,7 @@ from . import _core
 __all__ = ["FUTURE_ROOTS", "NAME_OPTIONS", "OPTION_ROOTS", "explain_move", "format",
            "is_contract", "parse"]
 
-#: The root of each futures family pt-v22 phase 1 lists, and the switch
+#: The root of each futures family the engine can list, and the switch
 #: that lists it: the price index (``futures_index_listed``), the VIX
 #: (``futures_vix_listed``), the policy-rate month and the term-rate quarter
 #: (``futures_rates_listed``) and oil (``futures_oil_listed``).
@@ -54,7 +54,7 @@ FUTURE_ROOTS: dict[str, str] = {
     "OIL": "futures_oil_listed",
 }
 
-#: The underlying of each options family pt-v22 phase 2 lists, and the
+#: The underlying of each options family the engine can list, and the
 #: switch that lists it: European options on the price index
 #: (``options_index_listed``). American options on the roster's names are
 #: listed under ``NAME_OPTIONS``, each headed by its name's ticker.
@@ -62,7 +62,7 @@ OPTION_ROOTS: dict[str, str] = {
     "IDX": "options_index_listed",
 }
 
-#: The switch that lists American options on every name (pt-v22 phase 3),
+#: The switch that lists American options on every name,
 #: each symbol headed by the name's ticker: ``Engine.name_option_roots()``
 #: lists the names that have them.
 NAME_OPTIONS = "options_names_listed"

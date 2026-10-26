@@ -2,9 +2,9 @@
 //! dividends, its early-exercise boundary, and the exercise decision the
 //! option dealer will take from it.
 //!
-//! Library code for pt-v22's single-stock options (its third phase).
-//! Nothing in the engine calls it yet: no switch reads it, no state holds it, and no draw is taken, so every preset
-//! is bit-identical with it compiled in.
+//! The single-name options' dealer quotes from it (`engine::name_options`).
+//! It takes no draw and holds no state, so a model without those options is
+//! bit-identical with it compiled in.
 //!
 //! # The lattice
 //!
