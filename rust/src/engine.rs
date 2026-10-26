@@ -961,6 +961,11 @@ pub struct Engine {
     /// the snapshot and the state hash only then. See
     /// `ModelParams::vix_fear_uptake`.
     vix_fear: f64,
+    /// The published VIX's log average the forecast's nowcast of the VIX's
+    /// slow level reads (`forecast_vix_level_nowcast`). Kept only with that
+    /// dial set, which no preset sets, and carried by the snapshot and the
+    /// state hash only then; 0.0 before the first close.
+    vix_log_average: f64,
     /// The host's premium on the VIX target, in VIX points, and the
     /// half-life in sessions it fades at (0.0 holds it). 0.0 with nothing
     /// written, where the target reads no term. See
@@ -2409,6 +2414,7 @@ impl Engine {
             vix_hold_log: None,
             vix_stress_memory: 0.0,
             vix_fear: 0.0,
+            vix_log_average: 0.0,
             vix_target_premium: 0.0,
             vix_target_premium_half_life: 0.0,
             vix_target_floor: None,
@@ -2642,6 +2648,10 @@ impl Engine {
         pre.params.futures_vix_live_fast_share = 0.0;
         pre.params.futures_vix_live_fast_half_life = 0.0;
         pre.params.futures_vix_live_slow_half_life = 0.0;
+        pre.params.forecast_vix_level_nowcast = 0.0;
+        pre.params.forecast_vix_level_nowcast_half_life = 0.0;
+        pre.params.forecast_vix_level_nowcast_centre = 0.0;
+        pre.params.futures_vix_premium_response = 0.0;
         pre.params.futures_rates_listed = 0.0;
         pre.params.futures_oil_listed = 0.0;
         pre.params.margin_scan_coverage = 0.0;
@@ -11061,6 +11071,55 @@ impl Engine {
         self.vix_fear = value;
     }
 
+    /// Whether this engine's model keeps the published VIX's log average
+    /// (`forecast_vix_level_nowcast`), which is when the snapshot and the
+    /// state hash carry it.
+    pub fn carries_vix_log_average(&self) -> bool {
+        self.params.forecast_vix_level_nowcast != 0.0
+    }
+
+    /// The published VIX's log average (`forecast_vix_level_nowcast`); 0.0
+    /// with the dial off or before the first close.
+    pub fn vix_log_average(&self) -> f64 {
+        self.vix_log_average
+    }
+
+    pub fn set_vix_log_average(&mut self, value: f64) {
+        self.vix_log_average = value;
+    }
+
+    /// A close's step of the published VIX's log average: from
+    /// `forecast_vix_level_nowcast_centre` at the first close, then toward
+    /// the log of the VIX the close published at the dial's half-life.
+    fn advance_vix_log_average(&mut self) {
+        let p = &self.params;
+        if p.forecast_vix_level_nowcast == 0.0 {
+            return;
+        }
+        let published = self.published_vix();
+        if !(published > 0.0) {
+            return;
+        }
+        let from = if self.vix_log_average == 0.0 { p.forecast_vix_level_nowcast_centre } else { self.vix_log_average };
+        let alpha = if p.forecast_vix_level_nowcast_half_life == 0.0 {
+            1.0
+        } else {
+            1.0 - crate::mathx::pow(0.5, 1.0 / p.forecast_vix_level_nowcast_half_life)
+        };
+        self.vix_log_average = from + alpha * (crate::mathx::log(published) - from);
+    }
+
+    /// The VIX's slow level as the published VIX's log average nowcasts it,
+    /// `g (x - c)` (`forecast_vix_level_nowcast`); 0.0 with the dial off or
+    /// before the first close.
+    pub(crate) fn vix_level_nowcast(&self) -> f64 {
+        let p = &self.params;
+        if p.forecast_vix_level_nowcast == 0.0 || self.vix_log_average == 0.0 {
+            return 0.0;
+        }
+        p.forecast_vix_level_nowcast * (self.vix_log_average - p.forecast_vix_level_nowcast_centre)
+    }
+
     /// Put a premium on the VIX target, in VIX points, that fades at
     /// `half_life_sessions` (0.0 holds it until it is written again).
     ///
@@ -11887,6 +11946,9 @@ impl Engine {
         if self.params.rate_close_remark != 0.0 && !self.rates.is_empty() {
             self.rates.remark_now(&self.economy);
         }
+        // The published VIX's log average the slow level's nowcast reads
+        // (`forecast_vix_level_nowcast`). Nothing with the dial at 0.0.
+        self.advance_vix_log_average();
         // The forecast on the state the close leaves (`forecast_horizon_sessions`).
         // Nothing with the dial at 0.0.
         self.refresh_forecast(Some(game_day));
@@ -14022,6 +14084,12 @@ impl Engine {
         if self.carries_vix_fear() {
             hash_f64(&mut buf, 47.0);
             hash_f64(&mut buf, self.vix_fear);
+        }
+        // The published VIX's log average, only while
+        // `forecast_vix_level_nowcast` is set, behind its own tag.
+        if self.carries_vix_log_average() {
+            hash_f64(&mut buf, 93.0);
+            hash_f64(&mut buf, self.vix_log_average);
         }
         // The VIX futures, only while `futures_vix_listed` is set, behind
         // their own tag, length-prefixed; their book behind another once an

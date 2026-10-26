@@ -399,6 +399,19 @@ OUT_OF_SCOPE = {
         "`forecast_vix_dispersion` is 0.0. Off zero it is the skewness of the "
         "log VIX's spread about the forecast, measured with the sd on held-out "
         "histories; at 0.0 it is also left out of the model's digest",
+    "forecast_vix_level_nowcast":
+        "unread while `forecast_horizon_sessions` is 0.0, and refused without "
+        "it and `vix_level_sigma`, which no preset sets: the forecast's nowcast "
+        "of the VIX's slow level, a projection on held-out histories; it "
+        "changes only what the forecast publishes; at 0.0 the average is "
+        "neither kept, snapshotted nor hashed, and it is left out of the "
+        "model's digest",
+    "forecast_vix_level_nowcast_half_life":
+        "unread while `forecast_vix_level_nowcast` is 0.0; at 0.0 it is also "
+        "left out of the model's digest",
+    "forecast_vix_level_nowcast_centre":
+        "unread while `forecast_vix_level_nowcast` is 0.0; at 0.0 it is also "
+        "left out of the model's digest",
     "forecast_policy_shadow_discount":
         "unread while `forecast_horizon_sessions` is 0.0: "
         "`forecast_policy_path` does not run. A projection fitted on the "
@@ -492,6 +505,12 @@ OUT_OF_SCOPE = {
         "reads it, and at 0.0 its part is a branch; fitted with "
         "`futures_vix_live_fast_share`; at 0.0 it is also left out of the "
         "model's digest",
+    "futures_vix_premium_response":
+        "unread while `futures_vix_listed` is 0.0, and refused without it: "
+        "only the VIX futures' premium reads it, and at 0.0 the frozen premium "
+        "is a branch; the response it moves toward is measured once on CFE VX "
+        "and frozen in `derivatives::VIX_FUTURE`; no draw and no state; at 0.0 "
+        "it is also left out of the model's digest",
     # The rate futures (pt-v22 phase 1), inert on every shipped preset. A
     # rate future reads the policy rate each close sets and the forecast and
     # draws nothing, so off zero it leaves every price where it was.

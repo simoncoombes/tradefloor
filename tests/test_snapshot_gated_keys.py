@@ -174,6 +174,11 @@ CASES = {
                       ("futures", "derivatives_rng"), (), ("night_bridge",), {}),
     # The VIX's fear memory, carried whenever its switch is set.
     "vix_fear": (dict(vix_fear_uptake=0.2, vix_fear_half_life=20.0), ("vix_fear",), (), (), {}),
+    # The published VIX's log average the slow level's nowcast reads, carried
+    # whenever its dial is set.
+    "vix_log_average": (dict(forecast_horizon_sessions=21.0, vix_level_sigma=0.0181,
+                             forecast_vix_level_nowcast=0.4, forecast_vix_level_nowcast_half_life=126.0,
+                             forecast_vix_level_nowcast_centre=2.9), ("vix_log_average",), (), (), {}),
     # The VIX futures, carried whenever their switch is set.
     "vix_futures": (dict(forecast_horizon_sessions=126.0, futures_vix_listed=1.0), ("vix_futures",), (), (), {}),
     # The rate futures, carried whenever their switch is set.

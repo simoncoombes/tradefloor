@@ -462,6 +462,10 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "forecast_vix_dispersion": (0.0, 0.6),
     "forecast_vix_dispersion_half_life": (0.0, 126.0),
     "forecast_vix_dispersion_skew": (0.0, 0.99),
+    # The slow level's nowcast: its gain, its average's half-life and centre.
+    "forecast_vix_level_nowcast": (0.0, 1.0),
+    "forecast_vix_level_nowcast_half_life": (0.0, 504.0),
+    "forecast_vix_level_nowcast_centre": (0.0, 3.5),
     "forecast_policy_shadow_discount": (0.0, 0.5),
     "forecast_policy_persistence": (0.0, 0.9),
     "forecast_policy_reversion": (0.0, 0.3),
@@ -481,6 +485,8 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "futures_vix_live_fast_share": (0.0, 1.0),
     "futures_vix_live_fast_half_life": (0.0, 10.0),
     "futures_vix_live_slow_half_life": (0.0, 120.0),
+    # The premium's slope moved toward its measured time-series response: a share.
+    "futures_vix_premium_response": (0.0, 1.0),
     # The rate futures (pt-v22 phase 1): a switch. It moves no stock price.
     "futures_rates_listed": (0.0, 1.0),
     # The oil futures (pt-v22 phase 1): a switch. It moves no stock price.

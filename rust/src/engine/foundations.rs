@@ -767,6 +767,9 @@ impl Engine {
         };
         let skewed = p.forecast_vix_dispersion != 0.0 && p.forecast_vix_dispersion_skew != 0.0;
         let mut stress_sd = 0.0;
+        // The VIX's slow level as the published VIX's log average nowcasts
+        // it (`forecast_vix_level_nowcast`); 0.0 with the dial off.
+        let level_now = self.vix_level_nowcast();
 
         let mut out = Forecast {
             day,
@@ -936,6 +939,17 @@ impl Engine {
             };
             let mut inputs = self.daily_inputs(&request, 0.0, v_next, slow, scale_bar);
             inputs.vix_anchor_level = self.vix_anchor * scale_bar;
+            // The slow level's nowcast (`forecast_vix_level_nowcast`): the
+            // level's expectation at this close multiplies the anchor, as the
+            // level itself does; the implied VIX below takes it too.
+            let level = if level_now != 0.0 {
+                crate::mathx::exp(level_now * crate::mathx::pow(p.vix_level_persistence, (step + 1) as f64))
+            } else {
+                1.0
+            };
+            if level_now != 0.0 {
+                inputs.vix_anchor_level *= level;
+            }
             inputs.vix_target_premium = premium;
             if premium != 0.0 {
                 premium *= premium_fade;
@@ -944,7 +958,7 @@ impl Engine {
                 }
             }
             inputs.vix_implied_from_market = if p.vix_level_identity != 0.0 {
-                implied
+                if level_now != 0.0 { implied * level } else { implied }
             } else if p.vix_realised_vol_weight == 0.0 {
                 0.0
             } else {

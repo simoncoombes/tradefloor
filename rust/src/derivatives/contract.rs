@@ -391,6 +391,21 @@ pub struct VixPremium {
     pub p: f64,
     pub beta: f64,
     pub tau: f64,
+    /// The time-series response's size and its rise in `n`, `g(n)`
+    /// ([`VixPremium::response`]): read only under
+    /// `futures_vix_premium_response`. Measured once on the same settlements
+    /// and the Cboe VIX close: a day's change of a contract `n` sessions from
+    /// expiry less the tape's own expected change of its settlement (the
+    /// local projection of the VIX `n - 1` closes on, on the day's VIX move
+    /// with the previous close held, 1990-2026), regressed on the day's VIX
+    /// move, pooled over contracts with `n` of 2 to 126 (31,643 day pairs,
+    /// 2004-2026). `gamma` -0.0716 (se 0.053 by whole years), flat in `n` (the
+    /// least-squares `tau` is the grid's floor, 0.5): by contract position
+    /// F1 -0.080 (0.031), F2 -0.090 (0.062), F4 -0.071 (0.039), against
+    /// `b(n)` +0.023, +0.067 and +0.140 there. On CFE the premium falls a
+    /// little when the VIX jumps, at every tenor.
+    pub response_gamma: f64,
+    pub response_tau: f64,
 }
 
 impl VixPremium {
@@ -415,6 +430,27 @@ impl VixPremium {
     /// The premium of a contract `n` sessions from expiry on the VIX `vix`.
     pub fn at(&self, n: f64, vix: f64) -> f64 {
         self.level(n) + self.slope(n) * (vix - self.centre)
+    }
+
+    /// The premium's time-series response to the VIX, `g(n) = gamma (1 -
+    /// exp(-(n - 1) / tau))`: 0 at `n = 1`.
+    pub fn response(&self, n: f64) -> f64 {
+        if n <= 1.0 {
+            0.0
+        } else {
+            self.response_gamma * (1.0 - crate::mathx::exp(-(n - 1.0) / self.response_tau))
+        }
+    }
+
+    /// The premium with its VIX slope moved a share `w` of the way from the
+    /// level slope `b(n)` to the time-series response `g(n)`
+    /// (`futures_vix_premium_response`); `at` itself at `w = 0`.
+    pub fn at_response(&self, n: f64, vix: f64, w: f64) -> f64 {
+        if w == 0.0 {
+            return self.at(n, vix);
+        }
+        let slope = (1.0 - w) * self.slope(n) + w * self.response(n);
+        self.level(n) + slope * (vix - self.centre)
     }
 }
 
@@ -474,7 +510,8 @@ pub const VIX_FUTURE: VixFutureSpec = VixFutureSpec {
     daily_sigma: 0.05,
     impact_coefficient: 0.15,
     impact_half_life: 30.0,
-    premium: VixPremium { centre: 19.3197, k: 0.26, p: 0.4925, beta: 0.36, tau: 148.0 },
+    premium: VixPremium { centre: 19.3197, k: 0.26, p: 0.4925, beta: 0.36, tau: 148.0, response_gamma: -0.0716,
+                           response_tau: 0.5 },
 };
 
 /// The rate futures' premium over the expected rate, frozen: fitted once,

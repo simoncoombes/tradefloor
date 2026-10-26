@@ -213,6 +213,12 @@ PARAM_SPECS: dict[str, dict] = {
                                           "hard_range": (0.0, 2520.0), "derived": True},
     "forecast_vix_dispersion_skew": {"kind": "abs", "step_unit": 0.1,
                                      "hard_range": (-0.99, 0.99), "derived": True},
+    "forecast_vix_level_nowcast": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 5.0),
+                                   "derived": True},
+    "forecast_vix_level_nowcast_half_life": {"kind": "abs", "step_unit": 21.0,
+                                             "hard_range": (0.0, 2520.0), "derived": True},
+    "forecast_vix_level_nowcast_centre": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 6.0),
+                                          "derived": True},
     "forecast_policy_shadow_discount": {"kind": "abs", "step_unit": 0.05,
                                         "hard_range": (0.0, 1.0), "derived": True},
     "forecast_policy_persistence": {"kind": "abs", "step_unit": 0.05,
@@ -242,6 +248,7 @@ PARAM_SPECS: dict[str, dict] = {
                                         "derived": True},
     "futures_vix_live_slow_half_life": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 2520.0),
                                         "derived": True},
+    "futures_vix_premium_response": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0), "derived": False},
     # The rate futures (pt-v22 phase 1): a switch; it moves no price.
     "futures_rates_listed": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0), "derived": True},
     # The oil futures (pt-v22 phase 1): a switch; it moves no price.

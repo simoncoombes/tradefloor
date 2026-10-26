@@ -70,6 +70,29 @@ payload, Arrow and WASM show them; agents trade by symbol.
   at-the-money variance: the VIX9D, VIX3M, VIX6M and VIX1Y strips are
   unchanged and the scaling moves variance between the money and the wings.
 
+### The forecast's nowcast of the VIX's slow level
+
+- `forecast_vix_level_nowcast`, `forecast_vix_level_nowcast_half_life` and
+  `forecast_vix_level_nowcast_centre` are new, 0.0 on every preset and left
+  out of the digest there; the first is refused without
+  `forecast_horizon_sessions` and `vix_level_sigma`. Off zero the engine keeps
+  the published VIX's log average (snapshotted and hashed only then) and the
+  forecast takes the VIX's slow level, which it cannot see, as the gain times
+  the average's gap to the centre, decaying at `vix_level_persistence`. A
+  projection fitted on held-out histories. It changes only what the forecast
+  publishes.
+
+### The VIX futures premium's response
+
+- `futures_vix_premium_response` is a new dial, 0.0 on every preset and left
+  out of the digest there; refused without `futures_vix_listed`. It moves the
+  VIX futures premium's slope on the VIX from the frozen level slope `b(n)`
+  (+0.02 to +0.19 a VIX point) toward its time-series response measured on
+  CFE VX, 2004-2026: a contract's daily change less the tape's own expected
+  change of its settlement, per point of the day's VIX move, -0.072 (se 0.053)
+  and flat in tenor. At 1.0 a VIX jump compresses the premium, as on CFE. No
+  draw and no state.
+
 ### Credit's lagged leverage term
 
 - `corporate_spread_equity_lag_gain` is a new dial, 0.0 on every preset and
