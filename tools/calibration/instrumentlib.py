@@ -734,6 +734,8 @@ PARAM_SPECS: dict[str, dict] = {
                                  "hard_range": (0.0, 50.0), "derived": False},
     "market_vol_leverage_fast_half_life": {"kind": "abs", "step_unit": 1.0,
                                            "hard_range": (0.0, 2520.0), "derived": False},
+    "market_vol_leverage_fast_up": {"kind": "abs", "step_unit": 0.1,
+                                    "hard_range": (0.0, 1.0), "derived": False},
     "market_beta_normalise": {"kind": "abs", "step_unit": 0.1,
                               "hard_range": (0.0, 1.0)},
     "market_day_tail_df": {"kind": "abs", "step_unit": 1.0,

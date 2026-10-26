@@ -297,6 +297,9 @@ PERTURBATIONS = [
     ("market_vol_leverage_fast", 1.0, True),
     # INERT: unread at `market_vol_leverage_fast` 0.0, the default's value.
     ("market_vol_leverage_fast_half_life", 5.0, False),
+    # LIVE with the fast memory on (its companions): counting rises only
+    # moves the memory differently on every down day.
+    ("market_vol_leverage_fast_up", 1.0, True),
     # The roster's beta normalised at construction (tails). Ships at 0.0, so
     # the perturbation is TO a roster whose cap-weighted beta is one; LIVE
     # from the first tick, which loads every name on the market factor by
@@ -2377,6 +2380,8 @@ COMPANIONS: dict[str, dict[str, float]] = {
                                         "market_vol_leverage_half_life": 40.0},
     # The fast return memory's gain is refused without its half-life.
     "market_vol_leverage_fast": {"market_vol_leverage_fast_half_life": 5.0},
+    "market_vol_leverage_fast_up": {"market_vol_leverage_fast": 2.0,
+                                    "market_vol_leverage_fast_half_life": 5.0},
     # The state's share of the day's t scale is read only with the scale on
     # (d1tail).
     "market_day_tail_state_share": {"market_day_tail_df": 7.0},

@@ -4824,6 +4824,23 @@ pub struct ModelParams {
     /// Half-life of the fast return memory, in sessions. Unread at
     /// `market_vol_leverage_fast` 0.0; must be positive off it. In [0, 2520].
     pub market_vol_leverage_fast_half_life: f64,
+    /// How much of a FALL the fast return memory ignores, the mirror of
+    /// `market_vol_leverage_down`. 0.0, which every preset carries, counts
+    /// the day as the slower memory does (its `market_vol_leverage_down`
+    /// included), to the bit; 1.0 counts rises only, so a rally lowers the
+    /// variance the next sessions draw at and a fall moves the fast memory
+    /// only by its re-centring. The memory is re-centred on the mean the
+    /// ignored share takes away, at the variance the day was drawn at, and
+    /// its stationary spread is the half-normal one with this share. Unread
+    /// at `market_vol_leverage_fast` 0.0. In [0, 1]; a value of 0.0 is left
+    /// out of the model's digest.
+    ///
+    /// Why. On the S&P 500 and the VIX, 1990-2025, a two-sd rise lowers the
+    /// log of realised vol over the next five sessions by 0.13 (se 0.02) and
+    /// over sessions 6-20 by 0.02, holding the pre-shock vol and the VIX
+    /// fixed: a rally calms the market within a week. A model whose variance
+    /// takes a rise's squared size and a fall's alike shows almost none of it.
+    pub market_vol_leverage_fast_up: f64,
     /// Degrees of freedom of the day's market draw: each session's
     /// market-factor variance is multiplied by `m = (nu - 2) / X`, `X` a
     /// chi-square with `nu` degrees of freedom drawn once at the open, so
@@ -8674,6 +8691,7 @@ impl ModelParams {
             market_vol_leverage_standardise: 0.0,
             market_vol_leverage_fast: 0.0,
             market_vol_leverage_fast_half_life: 0.0,
+            market_vol_leverage_fast_up: 0.0,
             market_day_tail_df: 0.0,
             market_day_tail_state_share: 0.0,
             market_vol_alpha_excursion: 0.0,
@@ -11381,6 +11399,7 @@ impl ModelParams {
             "market_vol_leverage_standardise" => self.market_vol_leverage_standardise,
             "market_vol_leverage_fast" => self.market_vol_leverage_fast,
             "market_vol_leverage_fast_half_life" => self.market_vol_leverage_fast_half_life,
+            "market_vol_leverage_fast_up" => self.market_vol_leverage_fast_up,
             "market_day_tail_df" => self.market_day_tail_df,
             "market_day_tail_state_share" => self.market_day_tail_state_share,
             "market_vol_alpha_excursion" => self.market_vol_alpha_excursion,
@@ -11834,6 +11853,7 @@ impl ModelParams {
             "market_vol_leverage_standardise" => out.market_vol_leverage_standardise = value,
             "market_vol_leverage_fast" => out.market_vol_leverage_fast = value,
             "market_vol_leverage_fast_half_life" => out.market_vol_leverage_fast_half_life = value,
+            "market_vol_leverage_fast_up" => out.market_vol_leverage_fast_up = value,
             "market_day_tail_df" => out.market_day_tail_df = value,
             "market_day_tail_state_share" => out.market_day_tail_state_share = value,
             "market_vol_alpha_excursion" => out.market_vol_alpha_excursion = value,
@@ -12900,6 +12920,11 @@ impl ModelParams {
             return Err(format!(
                 "market_vol_leverage_fast_half_life is {}. It is a half-life in sessions, in [0, 2520].",
                 self.market_vol_leverage_fast_half_life));
+        }
+        if !(self.market_vol_leverage_fast_up >= 0.0 && self.market_vol_leverage_fast_up <= 1.0) {
+            return Err(format!(
+                "market_vol_leverage_fast_up is {}. It is the share of a fall the fast return memory ignores, in [0, 1].",
+                self.market_vol_leverage_fast_up));
         }
         if self.market_vol_leverage_fast != 0.0 && self.market_vol_leverage_fast_half_life == 0.0 {
             return Err(format!(
@@ -14587,6 +14612,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "market_vol_leverage_down",
     "market_vol_leverage_fast",
     "market_vol_leverage_fast_half_life",
+    "market_vol_leverage_fast_up",
     "market_vol_leverage_half_life",
     "market_vol_leverage_standardise",
     "market_vol_slow_gamma",
@@ -14807,6 +14833,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "market_vol_leverage_standardise",
         "market_vol_leverage_fast",
         "market_vol_leverage_fast_half_life",
+        "market_vol_leverage_fast_up",
         "market_day_tail_df",
         "market_day_tail_state_share",
         "market_vol_alpha_excursion",

@@ -37,6 +37,10 @@ payload, Arrow and WASM show them; agents trade by symbol.
   the next week's realised volatility by its sign: a two-sd fall raises it by
   0.24 in logs and a two-sd rise lowers it by 0.13, and most of that is gone
   within twenty sessions.
+- `market_vol_leverage_fast_up` is new, 0.0 on every preset and left out of
+  the digest there: the share of a fall the fast memory ignores, re-centred,
+  so at 1.0 it counts rises only and a rally calms the next sessions. On the
+  S&P 500 a two-sd rise lowers the next week's realised vol by 0.13 in logs.
 
 ### The market's next-session reversal
 

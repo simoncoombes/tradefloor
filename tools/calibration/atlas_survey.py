@@ -540,6 +540,8 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # first-week asymmetry; half-life off to a month.
     "market_vol_leverage_fast": (0.0, 6.0),
     "market_vol_leverage_fast_half_life": (0.0, 21.0),
+    # A share: 0 counts falls and rises alike, 1 counts rises only.
+    "market_vol_leverage_fast_up": (0.0, 1.0),
     # The power on the day's own sd the memory counts a day in: 0 the
     # baseline sd (as shipped), 1 the day's z-score.
     "market_vol_leverage_standardise": (0.0, 1.0),

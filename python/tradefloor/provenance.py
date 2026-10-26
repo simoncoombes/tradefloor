@@ -721,6 +721,10 @@ OUT_OF_SCOPE = {
     "market_vol_leverage_fast_half_life":
         "unread while `market_vol_leverage_fast` is 0.0; at 0.0 it is also left "
         "out of the model's digest",
+    "market_vol_leverage_fast_up":
+        "unread while `market_vol_leverage_fast` is 0.0; at 0.0 the fast memory "
+        "counts a day as the slower memory does, to the bit; at 0.0 it is also "
+        "left out of the model's digest",
     "market_factor_reversal":
         "inert at 0.0: no name gives back any of yesterday's market factor, "
         "as it stood (a branch in the tick); no draw and no state of its own; "

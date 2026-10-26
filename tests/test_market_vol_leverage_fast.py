@@ -23,7 +23,7 @@ import tradefloor as tf
 from tradefloor.manifest import state_hash
 
 UNIVERSE = list(tf.Universe.random(12, seed=3))
-DIALS = ("market_vol_leverage_fast", "market_vol_leverage_fast_half_life")
+DIALS = ("market_vol_leverage_fast", "market_vol_leverage_fast_half_life", "market_vol_leverage_fast_up")
 FAST = {"market_vol_leverage_fast": 2.0, "market_vol_leverage_fast_half_life": 5.0}
 KEY = "market_vol_leverage_fast_memory"
 
@@ -61,6 +61,25 @@ def test_it_moves_the_market(preset):
 
 def test_the_half_life_is_unread_without_the_gain():
     assert prices(market_vol_leverage_fast_half_life=5.0) == prices()
+
+
+def test_the_rise_share_is_unread_without_the_gain_and_moves_it_with_it():
+    assert prices(market_vol_leverage_fast_up=1.0) == prices()
+    assert prices(market_vol_leverage_fast_up=1.0, **FAST) != prices(**FAST)
+
+
+def test_a_rises_only_memory_restores():
+    dials = dict(FAST, market_vol_leverage_fast_up=1.0)
+    e = engine(**dials)
+    e.run_days(6, record=False)
+    snap = e.state_snapshot()
+    assert snap[KEY] != 0.0
+    assert state_hash(snap) == e.state_hash()
+    twin = engine(**dials)
+    twin.restore_state(snap)
+    for x in (e, twin):
+        x.run_days(4, record=False, first_day=6)
+    assert floats(e.prices()) == floats(twin.prices())
 
 
 def test_the_vix_moves_with_it():
@@ -141,6 +160,7 @@ def test_the_forecast_carries_it_and_is_a_pure_function_of_the_state():
     ({"market_vol_leverage_fast": 51.0, "market_vol_leverage_fast_half_life": 5.0},
      "market_vol_leverage_fast"),
     ({"market_vol_leverage_fast_half_life": -1.0}, "market_vol_leverage_fast_half_life"),
+    ({"market_vol_leverage_fast_up": 1.5}, "market_vol_leverage_fast_up"),
 ])
 def test_validation(dials, match):
     with pytest.raises(tf.ValidationError, match=match):
