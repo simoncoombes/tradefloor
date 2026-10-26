@@ -24,6 +24,13 @@ the engine cannot disagree about what a symbol says.
 Which contracts trade is the engine's to say: ``Engine.contracts()`` lists
 them, ``Engine.quote(symbol)`` quotes one, and a symbol that parses here is
 not thereby listed.
+
+:func:`explain_move` says why a contract's price moved between two of its
+quotes: for a future, how much came from the underlying, from the carry its
+fair value holds and from the basis to that fair value; for a rate future,
+from the expected policy rate and the premium; for an option, from the
+underlying through its delta and gamma, from its implied volatility through
+its vega, from time through its theta, and what is left.
 """
 
 from __future__ import annotations
@@ -32,7 +39,8 @@ from typing import Any
 
 from . import _core
 
-__all__ = ["FUTURE_ROOTS", "NAME_OPTIONS", "OPTION_ROOTS", "format", "is_contract", "parse"]
+__all__ = ["FUTURE_ROOTS", "NAME_OPTIONS", "OPTION_ROOTS", "explain_move", "format",
+           "is_contract", "parse"]
 
 #: The root of each futures family pt-v22 phase 1 lists, and the switch
 #: that lists it: the price index (``futures_index_listed``), the VIX
@@ -102,3 +110,106 @@ def is_contract(symbol: object) -> bool:
     except _core.ValidationError:
         return False
     return True
+
+
+#: Rate futures: priced as 100 less the expected rate and its premium.
+_RATE_ROOTS = frozenset({"FF", "TR3"})
+
+
+def _field(quote: Any, name: str, symbol: str) -> float:
+    value = quote.get(name) if isinstance(quote, dict) else None
+    if value is None:
+        raise _core.ValidationError(
+            f"the quotes of {symbol} carry no {name!r}; pass two quotes "
+            "from Engine.quote, read while the contract was listed")
+    return float(value)
+
+
+def explain_move(before: dict[str, Any], after: dict[str, Any],
+                 quantity: float = 1.0) -> dict[str, Any]:
+    """Why a contract's price moved from ``before`` to ``after``, two of its
+    quotes from :meth:`Engine.quote` (the last close's and now, say), as a
+    dict: ``symbol``, ``kind``, ``move`` (the price's change), ``parts``
+    (name to its share of the move, in price points, summing to ``move``
+    exactly), ``dollars`` (each part times the multiplier and ``quantity``
+    contracts, signed, for a position's P&L) and ``sessions`` (the sessions
+    between the two quotes).
+
+    A future's parts, from its carry fair value ``FV = (S - PV(D)) e^(r tau)``:
+
+    - ``underlying``: the index's move carried to expiry, ``(S1 - S0) FV0/S0``;
+    - ``carry``: the rest of the fair value's change (the financing rate,
+      the dividends to expiry, time passing);
+    - ``basis``: the change in the price's distance from its fair value.
+
+    A rate future (``FF``, ``TR3``), priced 100 less the expected rate and
+    its premium:
+
+    - ``expected_rate``: minus the change in the policy rate the forecast
+      expects over its period, in rate points;
+    - ``premium``: minus the change in the premium over that forecast;
+    - ``basis``: the change in the price's distance from that fair value.
+
+    An option's parts, from the Greeks of ``before`` and its dealer's mid:
+
+    - ``underlying``: ``delta dS + gamma dS^2 / 2``;
+    - ``volatility``: ``vega d(iv)``;
+    - ``time``: ``theta`` times the sessions passed;
+    - ``other``: what those leave, the spread, the carry and higher-order
+      terms.
+
+    Reads the two quotes only, so it works on quotes kept from an earlier
+    day and changes nothing in any engine. Raises
+    :class:`tradefloor.ValidationError` for quotes of two different
+    contracts, or ones missing a field the split needs.
+    """
+    if not isinstance(before, dict) or not isinstance(after, dict):
+        raise _core.ValidationError("explain_move takes two quotes from Engine.quote")
+    symbol = before.get("symbol")
+    if symbol is None or symbol != after.get("symbol"):
+        raise _core.ValidationError(
+            f"explain_move compares two quotes of one contract, got "
+            f"{before.get('symbol')!r} and {after.get('symbol')!r}")
+    if isinstance(quantity, bool) or not isinstance(quantity, (int, float)) \
+            or quantity != quantity:
+        raise _core.ValidationError(f"quantity is a number of contracts, got {quantity!r}")
+    info = parse(symbol)
+    multiplier = _field(after, "multiplier", symbol)
+    sessions = (_field(before, "sessions_to_expiry", symbol)
+                - _field(after, "sessions_to_expiry", symbol))
+    parts: dict[str, float]
+    if info["kind"] == "option":
+        p0, p1 = _field(before, "mid", symbol), _field(after, "mid", symbol)
+        ds = _field(after, "index", symbol) - _field(before, "index", symbol)
+        underlying = (_field(before, "delta", symbol) * ds
+                      + 0.5 * _field(before, "gamma", symbol) * ds * ds)
+        volatility = _field(before, "vega", symbol) * (
+            _field(after, "iv", symbol) - _field(before, "iv", symbol))
+        time = _field(before, "theta", symbol) * sessions
+        move = p1 - p0
+        parts = {"underlying": underlying, "volatility": volatility, "time": time,
+                 "other": move - underlying - volatility - time}
+    else:
+        p0, p1 = _field(before, "price", symbol), _field(after, "price", symbol)
+        f0, f1 = _field(before, "fair", symbol), _field(after, "fair", symbol)
+        move = p1 - p0
+        basis = (p1 - f1) - (p0 - f0)
+        if info["root"] in _RATE_ROOTS and before.get("expected") is not None:
+            expected = -(_field(after, "expected", symbol) - _field(before, "expected", symbol))
+            premium = -(_field(after, "premium", symbol) - _field(before, "premium", symbol))
+            # Whatever the fair value did beyond the two (none, as quoted).
+            rest = (f1 - f0) - expected - premium
+            parts = {"expected_rate": expected, "premium": premium + rest, "basis": basis}
+        else:
+            s0, s1 = _field(before, "index", symbol), _field(after, "index", symbol)
+            underlying = (s1 - s0) * (f0 / s0) if s0 else 0.0
+            parts = {"underlying": underlying, "carry": (f1 - f0) - underlying,
+                     "basis": basis}
+    # The parts sum to the move to the last bit: the largest absorbs rounding.
+    gap = move - sum(parts.values())
+    if gap:
+        biggest = max(parts, key=lambda k: abs(parts[k]))
+        parts[biggest] += gap
+    scale = multiplier * float(quantity)
+    return {"symbol": symbol, "kind": info["kind"], "move": move, "parts": parts,
+            "dollars": {k: v * scale for k, v in parts.items()}, "sessions": sessions}

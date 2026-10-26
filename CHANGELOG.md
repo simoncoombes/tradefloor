@@ -24,6 +24,24 @@ Four more list European index options and American options on every name,
 settled in shares, quoted from arbitrage-free surfaces. The MCP server,
 payload, Arrow and WASM show them; agents trade by symbol.
 
+`tradefloor.contracts.explain_move(before, after, quantity)` says why a
+contract's price moved between two of its quotes: a future's move as the
+index carried to expiry, the rest of its carry and the change in its basis;
+a rate future's as the expected policy rate, its premium and the basis; an
+option's as its delta and gamma on the underlying's move, its vega on the
+change in implied volatility, its theta over the sessions passed, and the
+rest. The parts sum to the move, and in dollars they are a position's P&L
+by cause. It reads the two quotes only.
+
+A strategy spec can hold the front index future beside its stock book: a
+`contracts` section, `{"index_future": {"hedge_ratio": 1.0}}` to offset the
+book's dollars or `{"index_future": {"weight": 0.5}}` for a share of net
+worth, sized in whole contracts at each decision and rolled to the next
+contract (`StrategySpec.with_index_future`). A spec without the section
+serializes and fingerprints exactly as before, and on a model that lists no
+index futures the section trades nothing. Neither change moves a price:
+every known-answer digest is where it was.
+
 <!-- release-note-ends -->
 
 ### Company news released before the open
