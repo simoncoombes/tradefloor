@@ -1311,6 +1311,25 @@ pub struct ModelParams {
     /// term added to 180 held-out histories' spreads, gives G 0.9 at a lag of
     /// 8 sessions (loss 3.1 against 37.1 without it). In [0, 10].
     pub corporate_spread_equity_lag_gain: f64,
+    /// The market's next-session reversal: the share `k` of yesterday's
+    /// whole accumulated market factor `F_{d-1}` (the plain draw, night
+    /// included) that each name gives back over today's session, as
+    /// `-k * beta * F_{d-1} / 390` on each open tick. It is booked to the
+    /// crowd's attribution slot and moved whole into the name's fair-value
+    /// level on the tick, so it is permanent: the market's day overshoots
+    /// and a share of it is taken back the next session, not later. 0.0, on
+    /// every shipped preset, adds nothing (a branch), and a value of 0.0 is
+    /// left out of the model's digest. No draw and no state of its own: it
+    /// reads `prev_day_factor`, which the market's variance state carries.
+    ///
+    /// The S&P 500's daily close-to-close log return has a lag-1
+    /// autocorrelation of -0.079 over 1990-2025 (^GSPC; the total-return
+    /// index the same; the E-mini front future, rolls left out, -0.064 over
+    /// 2000-2025), and Lo-MacKinlay variance ratios of 0.92, 0.86, 0.78 and
+    /// 0.76 at 2, 5, 10 and 21 sessions (robust se 0.02, 0.05, 0.08, 0.12),
+    /// under 1 in every decade. The certified forty's equal-weighted index
+    /// reads -0.13 at lag 1 (2015-2025). In [0, 0.5].
+    pub market_factor_reversal: f64,
     /// The per-session innovation sd of credit's own state, points of the
     /// corporate spread's base. 0.0, on every shipped preset, is no state
     /// (the spread moves only with the VIX, the cycle and the leverage gap),
@@ -8786,6 +8805,7 @@ impl ModelParams {
             treasury_path_owed_excluded: 0.0,
             corporate_spread_equity_lag: 0.0,
             corporate_spread_equity_lag_gain: 0.0,
+            market_factor_reversal: 0.0,
             corporate_spread_noise_sd: 0.0,
             corporate_spread_noise_half_life: 0.0,
             treasury_2y_meeting_carry: 0.0,
@@ -11470,6 +11490,7 @@ impl ModelParams {
             "treasury_path_owed_excluded" => self.treasury_path_owed_excluded,
             "corporate_spread_equity_lag" => self.corporate_spread_equity_lag,
             "corporate_spread_equity_lag_gain" => self.corporate_spread_equity_lag_gain,
+            "market_factor_reversal" => self.market_factor_reversal,
             "corporate_spread_noise_sd" => self.corporate_spread_noise_sd,
             "corporate_spread_noise_half_life" => self.corporate_spread_noise_half_life,
             "treasury_2y_meeting_carry" => self.treasury_2y_meeting_carry,
@@ -11919,6 +11940,7 @@ impl ModelParams {
             "treasury_path_owed_excluded" => out.treasury_path_owed_excluded = value,
             "corporate_spread_equity_lag" => out.corporate_spread_equity_lag = value,
             "corporate_spread_equity_lag_gain" => out.corporate_spread_equity_lag_gain = value,
+            "market_factor_reversal" => out.market_factor_reversal = value,
             "corporate_spread_noise_sd" => out.corporate_spread_noise_sd = value,
             "corporate_spread_noise_half_life" => out.corporate_spread_noise_half_life = value,
             "treasury_2y_meeting_carry" => out.treasury_2y_meeting_carry = value,
@@ -13572,6 +13594,12 @@ impl ModelParams {
                  0 is the spread reading the leverage gap itself.",
                 self.corporate_spread_equity_lag));
         }
+        if !(self.market_factor_reversal >= 0.0 && self.market_factor_reversal <= 0.5) {
+            return Err(format!(
+                "market_factor_reversal is {}. It is the share of yesterday's market factor each name \
+                 gives back over today's session, in [0, 0.5]; 0 is no reversal.",
+                self.market_factor_reversal));
+        }
         if !(self.corporate_spread_equity_lag_gain >= 0.0 && self.corporate_spread_equity_lag_gain <= 10.0) {
             return Err(format!(
                 "corporate_spread_equity_lag_gain is {}. It is points of the corporate spread's \
@@ -14525,6 +14553,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "treasury_path_owed_excluded",
     "corporate_spread_equity_lag",
     "corporate_spread_equity_lag_gain",
+    "market_factor_reversal",
     "corporate_spread_noise_sd",
     "corporate_spread_noise_half_life",
     "treasury_term_premium_sd",
@@ -14781,6 +14810,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "treasury_path_owed_excluded",
         "corporate_spread_equity_lag",
         "corporate_spread_equity_lag_gain",
+        "market_factor_reversal",
         "corporate_spread_noise_sd",
         "corporate_spread_noise_half_life",
         "treasury_term_premium_sd",

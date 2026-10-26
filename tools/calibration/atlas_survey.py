@@ -744,6 +744,8 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # Credit's repricing lag, sessions.
     "corporate_spread_equity_lag": (0.0, 21.0),
     "corporate_spread_equity_lag_gain": (0.0, 2.0),
+    # The market's next-session reversal: off to twice the S&P's lag-1 autocorrelation.
+    "market_factor_reversal": (0.0, 0.16),
     # Credit's own state: off to twice addendum L's sd; half-life off to a year.
     "corporate_spread_noise_sd": (0.0, 0.05),
     # Every pin sets the variance: a switch.

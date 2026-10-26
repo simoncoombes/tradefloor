@@ -714,6 +714,10 @@ OUT_OF_SCOPE = {
         "term is the lag's own (the priced gap in place of the gap), as it "
         "stood; no draw and no state of its own; at 0.0 it is also left out of "
         "the model's digest",
+    "market_factor_reversal":
+        "inert at 0.0: no name gives back any of yesterday's market factor, "
+        "as it stood (a branch in the tick); no draw and no state of its own; "
+        "at 0.0 it is also left out of the model's digest",
     "pinned_vix_sets_variance":
         "inert at 0.0: a pinned VIX marks tonight's close forced only when "
         "the caller asks (`vix_sets_variance`), as it stood (a branch in "

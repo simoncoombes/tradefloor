@@ -1487,15 +1487,38 @@ pub fn simulate_market_tick(
         // would be a different market.
         let raw = &all_factors[i];
         let scale = 1.0 / 390.0;
+        // The market's next-session reversal (`market_factor_reversal`): on
+        // each open tick the name takes -k * beta * F_{d-1} / 390, where
+        // F_{d-1} is yesterday's whole accumulated market factor. Booked to
+        // the crowd's slot (it is the liquidity the crowd provides against
+        // yesterday's market-wide move) and moved whole into the fair-value
+        // level below, so it does not revert. A branch: 0.0 adds nothing.
+        let reversal = if open && p.market_factor_reversal != 0.0 {
+            -p.market_factor_reversal
+                * companies[idx].stock.beta.unwrap_or(1.0)
+                * inputs.prev_day_factor
+                / 390.0
+        } else {
+            0.0
+        };
         s_components[i] = if open {
             [
                 s_val * (p.s_phi_tick - 1.0),
                 (p.momentum_theta * momentum) / 390.0,
-                (if p.forced_flow_gain != 0.0 {
-                    crowd_lean_with(p, s_val, momentum) + forced
+                if reversal != 0.0 {
+                    (if p.forced_flow_gain != 0.0 {
+                        crowd_lean_with(p, s_val, momentum) + forced
+                    } else {
+                        crowd_lean_with(p, s_val, momentum)
+                    }) / 390.0
+                        + reversal
                 } else {
-                    crowd_lean_with(p, s_val, momentum)
-                }) / 390.0,
+                    (if p.forced_flow_gain != 0.0 {
+                        crowd_lean_with(p, s_val, momentum) + forced
+                    } else {
+                        crowd_lean_with(p, s_val, momentum)
+                    }) / 390.0
+                },
                 raw.company_news * scale,
                 with_fill_impact(raw.order_flow_impact * scale, inputs.fill_impact.get(idx)),
                 raw.short_squeeze_effect * scale,
@@ -1551,6 +1574,9 @@ pub fn simulate_market_tick(
                 + (if p.forced_flow_gain != 0.0 { lean + forced } else { lean }) / 390.0
                 + all_drifts[i]
                 + all_noises[i] * intraday_vol_mult;
+            if reversal != 0.0 {
+                s_val += reversal;
+            }
         } else {
             s_val = s_val + all_drifts[i] + all_noises[i];
         }
@@ -1562,7 +1588,7 @@ pub fn simulate_market_tick(
         // what later reverts changes. A branch, so 0.0 is the arithmetic
         // that stood, bit for bit.
         let mut fv_moved = fv;
-        if p.fair_value_news_share != 0.0 || p.fair_value_market_share != 0.0 {
+        if p.fair_value_news_share != 0.0 || p.fair_value_market_share != 0.0 || reversal != 0.0 {
             let psi = p.fair_value_news_share;
             let noise_scale = if open { intraday_vol_mult } else { 0.15 };
             let own_noise = psi * ((raw.noise_idio + raw.noise_sector) * noise_scale);
@@ -1587,6 +1613,10 @@ pub fn simulate_market_tick(
                     + psim * (market_draw * noise_scale)
                     + psim * (raw.company_news_market * scale)
             };
+            // The market's reversal is permanent whole: it leaves `s` for
+            // `v` on the tick it is applied. A branch, so 0.0 is `dv` as it
+            // stood.
+            let dv = if reversal != 0.0 { dv + reversal } else { dv };
             // The component slots keep the WHOLE shock, deliberately: they
             // report what moved the PRICE (the attribution an agent's
             // explanation is scored against), and the close feeds slot 6 to

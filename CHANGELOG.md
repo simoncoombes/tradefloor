@@ -26,6 +26,15 @@ payload, Arrow and WASM show them; agents trade by symbol.
 
 <!-- release-note-ends -->
 
+### The market's next-session reversal
+
+- `market_factor_reversal` is a new dial, 0.0 on every preset and left out of
+  the digest there: the share of yesterday's whole market factor each name
+  gives back over today's session, moved into the fair-value level so it does
+  not revert. No draw and no state of its own. The S&P 500's daily return has
+  a lag-1 autocorrelation of -0.079 over 1990-2025 and its variance ratios
+  fall to 0.76 by 21 sessions; the E-mini future reads the same.
+
 ### Credit's lagged leverage term
 
 - `corporate_spread_equity_lag_gain` is a new dial, 0.0 on every preset and

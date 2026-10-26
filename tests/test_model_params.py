@@ -1503,6 +1503,9 @@ PERTURBATIONS = [
     # INERT: the lagged term is read only with corporate_spread_equity_gain
     # non-zero, which pt-v20 leaves off (and it is refused without the lag).
     ("corporate_spread_equity_lag_gain", 0.9, False),
+    # The market's next-session reversal moves every name on every open tick
+    # after the first.
+    ("market_factor_reversal", 0.08, True),
     # Credit's own state: its opening draw moves the meeting's corporate
     # re-anchor, and with it the discount rate.
     ("corporate_spread_noise_sd", 0.025, True),
