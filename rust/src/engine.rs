@@ -643,6 +643,14 @@ pub struct Distribution {
     pub amount: f64,
 }
 
+/// What of a re-mark's move is growth (`remark_growth_open_share`): none of
+/// it, all of it (the aggregate level's close step), or each name's own part.
+enum RemarkGrowth {
+    None,
+    All,
+    Part(Vec<f64>),
+}
+
 /// Cloneable, and that is a correctness property rather than a convenience.
 ///
 /// An in-memory fork is `self.clone()`. The alternative -- rebuilding a fresh
@@ -8879,7 +8887,8 @@ impl Engine {
                 comp.stock.fair_value_offset = Some(v + c);
             }
             if marks.is_some() {
-                self.reprice_to_published_macro(marks);
+                // The shift is growth throughout (`remark_growth_open_share`).
+                self.reprice_marks(marks, RemarkGrowth::All);
             }
         }
         self.aggregate_level = Some(a + c);
@@ -11917,6 +11926,13 @@ impl Engine {
         // with `macro_publication_repricing` on: the step's decision is
         // readable the moment it ends, so the price takes it then.
         let marks = self.published_macro_marks();
+        // The state before the step, kept only to split the re-mark's
+        // growth from its news (`remark_growth_open_share`). A branch.
+        let before = if marks.is_some() && self.params.remark_growth_open_share != 0.0 {
+            Some(self.economy.clone())
+        } else {
+            None
+        };
         let hold = self.carries_earnings_withheld();
         let level_before = self.economy.earnings_cycle + self.economy.earnings_anticipation;
         let outcome = self.advance_day(&DayAdvanceRequest {
@@ -11926,6 +11942,12 @@ impl Engine {
             game_day,
             timestamp: game_day * 24 * 60,
         });
+        // The re-mark's growth part, on the names' figures as the step left
+        // them and before any of the cycle is held back below.
+        let growth = match (&before, &marks) {
+            (Some(old), Some(fv0)) => Some(self.remark_growth(old, fv0)),
+            _ => None,
+        };
         // THE CYCLE A NAME LEARNS FROM ITS OWN REPORT
         // (`earnings_cycle_report_share`): the share of the step's move in
         // the cycle's level that each traded name's fair value holds back
@@ -11936,7 +11958,10 @@ impl Engine {
                 - level_before;
             self.withhold_cycle(delta);
         }
-        self.reprice_to_published_macro(marks);
+        self.reprice_marks(marks, match growth {
+            Some(g) => RemarkGrowth::Part(g),
+            None => RemarkGrowth::None,
+        });
         // THE RATE INDICES AT THE SAME CLOSE (`rate_close_remark`): the curve
         // the step just published reaches their levels now, beside the
         // equities' re-mark, and not at the next open. A branch.
@@ -12709,9 +12734,41 @@ impl Engine {
     /// `marks` is [`Engine::published_macro_marks`] taken before the change;
     /// `None` does nothing.
     pub fn reprice_to_published_macro(&mut self, marks: Option<Vec<f64>>) {
+        self.reprice_marks(marks, RemarkGrowth::None);
+    }
+
+    /// The close's macro step's growth part for each name, the log change
+    /// in its fair value from `fv0` (the marks before the step) on the state
+    /// before the step `old` with only nominal output (`gdp`, `cpi`) brought
+    /// forward, on the name's figures now. NaN where there is no mark. See
+    /// `ModelParams::remark_growth_open_share`. No draw.
+    fn remark_growth(&self, old: &crate::economy::EconomyState, fv0: &[f64]) -> Vec<f64> {
+        let mut mixed = old.clone();
+        mixed.gdp = self.economy.gdp;
+        mixed.cpi = self.economy.cpi;
+        self.companies
+            .iter()
+            .zip(fv0.iter())
+            .map(|(c, &f0)| {
+                if !(f0 > 0.0) || c.is_bankrupt || !c.is_public {
+                    return f64::NAN;
+                }
+                let fg = crate::market::tick::tick_fair_value(
+                    &self.params, &mixed, self.nominal_output_base, self.elapsed_days, c, c.stock.price);
+                if fg > 0.0 { crate::mathx::log(fg / f0) } else { f64::NAN }
+            })
+            .collect()
+    }
+
+    /// [`Engine::reprice_to_published_macro`], with `growth` the part of
+    /// each name's move the next opening print takes at
+    /// `remark_growth_open_share` rather than the re-mark. With the dial at
+    /// 0.0, or `RemarkGrowth::None`, it is the re-mark as it stood.
+    fn reprice_marks(&mut self, marks: Option<Vec<f64>>, growth: RemarkGrowth) {
         let Some(before) = marks else {
             return;
         };
+        let share = self.params.remark_growth_open_share;
         let p = &self.params;
         let economy = &self.economy;
         let base = self.nominal_output_base;
@@ -12754,6 +12811,21 @@ impl Engine {
                     price = next;
                 }
             }
+            // The growth part's share left to the next opening print: the
+            // price only, so `s` stands and the open prices it on the night.
+            let held = if share == 0.0 {
+                0.0
+            } else {
+                match &growth {
+                    RemarkGrowth::None => 0.0,
+                    RemarkGrowth::All => share * crate::mathx::log(fv1 / fv0),
+                    RemarkGrowth::Part(g) => match g.get(slot) {
+                        Some(&x) if x.is_finite() => share * x,
+                        _ => 0.0,
+                    },
+                }
+            };
+            let price = if held == 0.0 { price } else { clamp(price * crate::mathx::exp(-held)) };
             let stock = &mut c.stock;
             stock.price = price;
             stock.high = crate::mathx::max(stock.high, price);

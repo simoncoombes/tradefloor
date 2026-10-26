@@ -753,6 +753,8 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "news_preopen_share": (0.0, 1.0),
     # The share of session news released on the measured in-session profile.
     "news_session_release_share": (0.0, 1.0),
+    # The share of the close's re-mark's growth the next open prices.
+    "remark_growth_open_share": (0.0, 1.0),
     # Credit's own state: off to twice addendum L's sd; half-life off to a year.
     "corporate_spread_noise_sd": (0.0, 0.05),
     # Every pin sets the variance: a switch.

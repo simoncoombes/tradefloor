@@ -1515,6 +1515,9 @@ PERTURBATIONS = [
     # uniforms deliver none (as for the absorption profile above).
     # test_news_session_release.py moves it on days that have news.
     ("news_session_release_share", 1.0, False),
+    # The close's re-mark (pt-v20 sets macro_publication_repricing) leaves
+    # its growth to the opening print the companion's night split prices.
+    ("remark_growth_open_share", 0.707, True),
     # Credit's own state: its opening draw moves the meeting's corporate
     # re-anchor, and with it the discount rate.
     ("corporate_spread_noise_sd", 0.025, True),
@@ -2256,6 +2259,8 @@ COMPANIONS: dict[str, dict[str, float]] = {
     "corporate_spread_equity_lag_gain": {"corporate_spread_equity_lag": 5.0},
     # The open prices the pre-open news only under a night split.
     "news_preopen_share": {"overnight_idio_share": 0.1},
+    # The opening print prices the held-back growth only under a night split.
+    "remark_growth_open_share": {"overnight_idio_share": 0.1},
     # The convenience premium unwinds as inventory refills, which only the
     # inventory's reversion gives it; refused without it.
     "oil_convenience_yield": {"oil_inventory_reversion": 0.002},

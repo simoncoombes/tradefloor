@@ -3059,6 +3059,39 @@ pub struct ModelParams {
     /// half hour (0.9%), the mean at minute 223. 1.0 releases all the
     /// session's news on that profile.
     pub news_session_release_share: f64,
+    /// The share of the growth in the close's macro re-mark that the next
+    /// opening print prices, rather than the re-mark itself. 0.0, on every
+    /// shipped preset, is the engine as it stood: under
+    /// `macro_publication_repricing` each name takes the whole change the
+    /// close's macro step makes to its fair value as the step ends, after
+    /// the day's last print. A value of 0.0 is left out of the model's
+    /// digest.
+    ///
+    /// Off zero the re-mark is split in two. Its growth part is the change
+    /// in the name's fair value with the state from before the step and only
+    /// nominal output (`gdp * cpi`) brought forward, the name's own figures
+    /// as the step leaves them; the rest (the corporate yield and the policy
+    /// rate, the VIX's discount, the earnings cycle and its anticipation)
+    /// is the re-mark's news. The name takes the news whole and `(1 - p)` of
+    /// the growth at the re-mark; its mispricing `s` is unchanged, so the
+    /// next opening print, priced from `s` on the whole fair value, takes
+    /// the rest on the night. The aggregate level's close step
+    /// (`fair_value_aggregate_remark`) is growth throughout and is split the
+    /// same way. No draw and no state: the price after the close is the
+    /// only thing that moves, and only until the open. Read only with
+    /// `macro_publication_repricing` (without it the whole step reaches the
+    /// open already). Refused without a night split (`overnight_market_share`
+    /// or `overnight_idio_share`): only under one does the opening print price
+    /// each name from its fair value. In [0, 1].
+    ///
+    /// The growth part carries the re-mark's mean and almost none of its
+    /// variance, so the night's share of each name's drift moves and its
+    /// share of variance does not. The forty names 2015-01 to 2025-07 (daily
+    /// bars with the open, the dividend added back on the ex-date's night):
+    /// the night carries 0.707 of the mean daily log return (se 0.19, by
+    /// year), SPY 0.630 and the S&P 500 0.693 on the same years. With the
+    /// whole re-mark at the close the model's night carries about 0.15.
+    pub remark_growth_open_share: f64,
     /// The earnings calendar's master switch and the surprise's size, in
     /// units of the name's current idiosyncratic daily sigma. 0.0, which
     /// every preset through pt-v20 carries, is no calendar.
@@ -9009,6 +9042,7 @@ impl ModelParams {
             overnight_idio_df: 0.0,
             news_preopen_share: 0.0,
             news_session_release_share: 0.0,
+            remark_growth_open_share: 0.0,
             earnings_surprise_sigma: 0.0,
             earnings_surprise_df: 0.0,
             earnings_session_sigma: 0.0,
@@ -11700,6 +11734,7 @@ impl ModelParams {
             "overnight_idio_df" => self.overnight_idio_df,
             "news_preopen_share" => self.news_preopen_share,
             "news_session_release_share" => self.news_session_release_share,
+            "remark_growth_open_share" => self.remark_growth_open_share,
             "earnings_surprise_sigma" => self.earnings_surprise_sigma,
             "earnings_surprise_df" => self.earnings_surprise_df,
             "earnings_session_sigma" => self.earnings_session_sigma,
@@ -12156,6 +12191,7 @@ impl ModelParams {
             "overnight_idio_df" => out.overnight_idio_df = value,
             "news_preopen_share" => out.news_preopen_share = value,
             "news_session_release_share" => out.news_session_release_share = value,
+            "remark_growth_open_share" => out.remark_growth_open_share = value,
             "earnings_surprise_sigma" => out.earnings_surprise_sigma = value,
             "earnings_surprise_df" => out.earnings_surprise_df = value,
             "earnings_session_sigma" => out.earnings_session_sigma = value,
@@ -12818,6 +12854,23 @@ impl ModelParams {
                  company news released during the session on the measured profile, in [0, 1]; 0 \
                  releases it all at the first tick.",
                 self.news_session_release_share));
+        }
+        if !(self.remark_growth_open_share >= 0.0 && self.remark_growth_open_share <= 1.0) {
+            return Err(format!(
+                "remark_growth_open_share is {}. It is the share of the growth in the close's macro \
+                 re-mark that the next opening print prices, in [0, 1]; 0 prices it all at the re-mark.",
+                self.remark_growth_open_share));
+        }
+        if self.remark_growth_open_share != 0.0
+            && self.overnight_market_share == 0.0
+            && self.overnight_idio_share == 0.0
+        {
+            return Err(format!(
+                "remark_growth_open_share is {} but there is no night split (overnight_market_share and \
+                 overnight_idio_share are 0). Only under a split does the opening print price the name from \
+                 its fair value; without one the open keeps the last price and the first tick would take the \
+                 growth held back. Set one.",
+                self.remark_growth_open_share));
         }
         if self.news_preopen_share != 0.0
             && self.overnight_market_share == 0.0
@@ -14670,6 +14723,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "policy_anticipation_cut_share",
     "rate_close_remark",
     "rate_intraday_live",
+    "remark_growth_open_share",
     "treasury_haven_gain",
     "treasury_path_half_life",
     "treasury_path_pricing",
@@ -15090,6 +15144,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "overnight_idio_df",
         "news_preopen_share",
         "news_session_release_share",
+        "remark_growth_open_share",
         "earnings_surprise_sigma",
         "earnings_surprise_df",
         "earnings_session_sigma",

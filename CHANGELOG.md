@@ -76,6 +76,19 @@ records are identical (`tests/test_futures_accounts.py`).
   land in the first minute and 4.7% in the first half hour; the model's first
   tick prices about 0.6 of the session's news.
 
+### The close's growth priced at the open
+
+- `remark_growth_open_share` is a new dial, 0.0 on every preset and left out
+  of the digest there: the share of the growth in the close's macro re-mark
+  (the change in fair value with only nominal output brought forward, and the
+  aggregate level's close step) that the next opening print prices rather
+  than the re-mark. The re-mark's news (rates, the VIX, the cycle) stays at
+  the close. The mispricing is unchanged, so the open takes the rest on the
+  night; no draw and no state. Read only with `macro_publication_repricing`;
+  refused without a night split. On the forty names 2015-2025 the night
+  carries 0.707 of the mean daily log return; the model's, with the whole
+  re-mark at the close, about 0.15.
+
 ### Company news released before the open
 
 - `news_preopen_share` is a new dial, 0.0 on every preset and left out of the
