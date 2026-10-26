@@ -55,6 +55,21 @@ payload, Arrow and WASM show them; agents trade by symbol.
   The S&P 500's next-day reversal is near zero under a VIX of 30 and -0.17
   above it; `(X/20)^2` fits best.
 
+### The index smile's term scaling
+
+- `surface_index_tenor_exponent` is new, 0.0 on every preset and left out of
+  the digest there. Off zero the index's SSVI power law is read at the
+  21-session fit's total variance and falls from there as `theta^-x`, in
+  place of `surface_curvature_exponent`: the 21-session smile, its VIX and
+  its SKEW are unchanged, and the at-the-money skew scales with the tenor as
+  `T^-x` (about `T^-0.4` on the S&P). Index only; read only with
+  `surface_ssvi` set.
+- `surface_index_tenor_strip` is new, 0.0 on every preset and left out of
+  the digest there. At 1.0 the term scaling holds each tenor's strip (the
+  VIX formula's variance) where SSVI's own power law puts it, in place of its
+  at-the-money variance: the VIX9D, VIX3M, VIX6M and VIX1Y strips are
+  unchanged and the scaling moves variance between the money and the wings.
+
 ### Credit's lagged leverage term
 
 - `corporate_spread_equity_lag_gain` is a new dial, 0.0 on every preset and
@@ -138,6 +153,17 @@ payload, Arrow and WASM show them; agents trade by symbol.
   `skew_noise` (the level and its key) while the dial is set, hashed behind
   tag 82, as `manifest.state_hash` does. Every known-answer digest is where
   it was.
+### The index surface's own curvature
+
+- `surface_index_curvature` is a new dial, 0.0 on every preset (the shared
+  `surface_curvature`) and left out of the digest there. Off zero the index
+  surface is fitted at its own curvature and the names keep theirs: a
+  name's correlation is its share of the one the index's VIX and skewness
+  give at the shared curvature, so the names' smiles are the ones they have
+  without it. A lower index curvature puts less of the strip's variance in
+  the wings, so at-the-money volatility sits nearer the VIX, and reaches
+  less skew. No state, nothing in the snapshot; stock prices are the same
+  with it set, and every known-answer digest is where it was.
 
 ### Single-name options
 

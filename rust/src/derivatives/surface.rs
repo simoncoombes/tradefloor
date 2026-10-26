@@ -70,11 +70,42 @@ pub struct Ssvi {
     pub rho: f64,
     pub eta: f64,
     pub gamma: f64,
+    /// The vertex's move toward the money (`surface_index_vertex`): the
+    /// smile is SSVI's at `k + shift m`, `m = -rho / phi` its vertex. 0.0 is
+    /// SSVI itself.
+    pub shift: f64,
+    /// The total variance `anchor` at which the power law is read, and the
+    /// exponent `tenor` it falls by from there (`surface_index_tenor_exponent`):
+    /// `phi(theta) = phi_SSVI(anchor) (theta / anchor)^-tenor`. An anchor of
+    /// 0.0 is SSVI's own power law.
+    pub anchor: f64,
+    pub tenor: f64,
 }
 
 impl Ssvi {
     pub fn new(rho: f64, eta: f64, gamma: f64) -> Self {
-        Ssvi { rho, eta, gamma }
+        Ssvi { rho, eta, gamma, shift: 0.0, anchor: 0.0, tenor: 0.0 }
+    }
+
+    /// The same smile with its vertex moved a share `shift` of the way to the
+    /// money.
+    pub fn with_shift(self, shift: f64) -> Self {
+        Ssvi { shift, ..self }
+    }
+
+    /// The same smile at `anchor`, with the power law falling from there by
+    /// `tenor` in place of `gamma`: the smile at `anchor` is unchanged, and
+    /// the smiles at other tenors scale from it. `tenor` 0.0 is the smile
+    /// itself.
+    pub fn with_tenor(self, anchor: f64, tenor: f64) -> Self {
+        if tenor == 0.0 {
+            return self;
+        }
+        Ssvi { anchor, tenor, ..self }
+    }
+
+    fn power_law(&self, theta: f64) -> f64 {
+        self.eta * mathx::pow(theta, -self.gamma) * mathx::pow(1.0 + theta, self.gamma - 1.0)
     }
 
     /// The power law, `eta theta^-gamma (1 + theta)^(gamma - 1)`: 0 with `eta`
@@ -83,7 +114,10 @@ impl Ssvi {
         if self.eta == 0.0 {
             return 0.0;
         }
-        self.eta * mathx::pow(theta, -self.gamma) * mathx::pow(1.0 + theta, self.gamma - 1.0)
+        if self.anchor > 0.0 {
+            return self.power_law(self.anchor) * mathx::pow(theta / self.anchor, -self.tenor);
+        }
+        self.power_law(theta)
     }
 
     /// Total implied variance at log-moneyness `k` on the smile whose
@@ -91,8 +125,30 @@ impl Ssvi {
     pub fn total_variance(&self, k: f64, theta: f64) -> f64 {
         let p = self.phi(theta);
         let r = self.rho;
+        // The vertex moved toward the money (`shift`); exactly SSVI at 0.0.
+        let k = if self.shift == 0.0 || p == 0.0 { k } else { k - self.shift * r / p };
         let x = p * k + r;
         0.5 * theta * (1.0 + r * p * k + mathx::sqrt(x * x + 1.0 - r * r))
+    }
+
+    /// Durrleman's condition, `g(k) >= 0`, on 401 points over eight
+    /// at-the-money total standard deviations either side: the check that
+    /// replaces Gatheral and Jacquier's sufficient conditions once the
+    /// vertex is moved, where they no longer apply.
+    pub fn check_durrleman(&self, theta: f64) -> Result<(), String> {
+        let width = 8.0 * mathx::sqrt(theta);
+        let h = 1e-5 * mathx::max(width, 1e-3);
+        for i in 0..=400 {
+            let k = -width + 2.0 * width * f64::from(i) / 400.0;
+            let w = self.total_variance(k, theta);
+            let w1 = (self.total_variance(k + h, theta) - self.total_variance(k - h, theta)) / (2.0 * h);
+            let w2 = (self.total_variance(k + h, theta) + self.total_variance(k - h, theta) - 2.0 * w) / (h * h);
+            let g = (1.0 - k * w1 / (2.0 * w)) * (1.0 - k * w1 / (2.0 * w)) - 0.25 * w1 * w1 * (1.0 / w + 0.25) + 0.5 * w2;
+            if !(w > 0.0 && g >= -1e-9) {
+                return Err(format!("butterfly: Durrleman's g is {g} at k {k}, theta {theta}"));
+            }
+        }
+        Ok(())
     }
 
     /// The largest `|rho|` the fit allows at `eta`: inside `2 / eta - 1`, where
@@ -110,11 +166,14 @@ impl Ssvi {
     /// butterfly pair of their Theorem 4.2 and the bound on `d(theta
     /// phi)/d theta` of their Theorem 4.1. `Err` names the first that fails.
     pub fn check(&self, theta: f64) -> Result<(), String> {
+        if self.shift != 0.0 {
+            return self.check_durrleman(theta);
+        }
         let (r, e, g) = (self.rho, self.eta, self.gamma);
         if !(theta > 0.0 && theta.is_finite()) {
             return Err(format!("theta is {theta}; it is finite and positive"));
         }
-        if !(r.abs() < 1.0 && (0.0..=1.0).contains(&g) && e >= 0.0 && e.is_finite()) {
+        if !(r.abs() < 1.0 && (0.0..=1.0).contains(&g) && e >= 0.0 && e.is_finite() && (0.0..1.0).contains(&self.tenor)) {
             return Err(format!("rho {r}, eta {e}, gamma {g}: |rho| < 1, eta >= 0, gamma in [0, 1]"));
         }
         let p = self.phi(theta);
@@ -125,8 +184,9 @@ impl Ssvi {
         if !(theta * p * p * a <= 4.0) {
             return Err(format!("butterfly: theta phi^2 (1 + |rho|) is {} at theta {theta}, above 4", theta * p * p * a));
         }
-        // d(theta phi)/d theta = phi (1 - gamma) / (1 + theta) for this phi.
-        let slope = p * (1.0 - g) / (1.0 + theta);
+        // d(theta phi)/d theta = phi (1 - gamma) / (1 + theta) for this phi;
+        // phi (1 - tenor) for the anchored one.
+        let slope = if self.anchor > 0.0 { p * (1.0 - self.tenor) } else { p * (1.0 - g) / (1.0 + theta) };
         if slope < 0.0 {
             return Err(format!("calendar: d(theta phi)/d theta is {slope} at theta {theta}, below 0"));
         }
@@ -230,8 +290,16 @@ pub struct SmileFit {
 /// by the squared ratio of the target to the strip's VIX, which is nearly
 /// proportional to `theta`. Converges to a relative 1e-13 in a handful of
 /// steps; at most 100.
-fn theta_for_vix(rho: f64, eta: f64, gamma: f64, target_vix: f64, years: f64, start: f64) -> Option<(f64, StripMoments)> {
-    let ssvi = Ssvi::new(rho, eta, gamma);
+fn theta_for_vix(
+    rho: f64,
+    eta: f64,
+    gamma: f64,
+    shift: f64,
+    target_vix: f64,
+    years: f64,
+    start: f64,
+) -> Option<(f64, StripMoments)> {
+    let ssvi = Ssvi::new(rho, eta, gamma).with_shift(shift);
     let mut theta = start;
     let mut last = None;
     for _ in 0..100 {
@@ -259,6 +327,19 @@ fn theta_for_vix(rho: f64, eta: f64, gamma: f64, target_vix: f64, years: f64, st
 /// `rho`, and `theta` re-solved at each `rho`; a skewness beyond the bound's
 /// is met at the bound, `reached` false. `None` when no strip prices.
 pub fn fit_smile(target_vix: f64, target_skewness: Option<f64>, years: f64, eta: f64, gamma: f64) -> Option<SmileFit> {
+    fit_smile_shifted(target_vix, target_skewness, years, eta, gamma, 0.0)
+}
+
+/// [`fit_smile`] on the smile with its vertex moved a share `shift` of the
+/// way to the money ([`Ssvi::with_shift`]); 0.0 is [`fit_smile`] itself.
+pub fn fit_smile_shifted(
+    target_vix: f64,
+    target_skewness: Option<f64>,
+    years: f64,
+    eta: f64,
+    gamma: f64,
+    shift: f64,
+) -> Option<SmileFit> {
     if !(target_vix > 0.0 && target_vix.is_finite() && years > 0.0) {
         return None;
     }
@@ -266,14 +347,14 @@ pub fn fit_smile(target_vix: f64, target_skewness: Option<f64>, years: f64, eta:
     let target = match target_skewness {
         Some(s) if eta > 0.0 && s.is_finite() => s,
         _ => {
-            let (theta, moments) = theta_for_vix(0.0, eta, gamma, target_vix, years, start)?;
+            let (theta, moments) = theta_for_vix(0.0, eta, gamma, shift, target_vix, years, start)?;
             return Some(SmileFit { theta, rho: 0.0, moments, reached: target_skewness.is_none() || eta == 0.0 });
         }
     };
     let bound = Ssvi::rho_bound(eta);
     let mut theta_hint = start;
     let mut eval = |rho: f64| -> Option<(f64, StripMoments)> {
-        let r = theta_for_vix(rho, eta, gamma, target_vix, years, theta_hint)?;
+        let r = theta_for_vix(rho, eta, gamma, shift, target_vix, years, theta_hint)?;
         theta_hint = r.0;
         Some(r)
     };
@@ -487,6 +568,93 @@ impl ThetaCurve {
     }
 }
 
+/// The grid [`StripHold`] is read on: `ln(theta / anchor)` from
+/// `HOLD_LO` in steps of `HOLD_STEP`, the anchor a node.
+const HOLD_LO: f64 = -6.0;
+const HOLD_STEP: f64 = 0.5;
+const HOLD_NODES: usize = 23;
+
+/// The strip's total variance (the VIX formula's variance times the years)
+/// of `ssvi` at at-the-money total variance `theta`: a function of the
+/// total-variance smile alone, so read on a one-year strip.
+fn strip_variance(ssvi: &Ssvi, theta: f64) -> Option<f64> {
+    smile_moments(ssvi, theta, 1.0).map(|m| (m.vix / 100.0) * (m.vix / 100.0))
+}
+
+/// The term scaling with each tenor's strip held
+/// (`surface_index_tenor_strip`): the at-the-money total variance `theta'`
+/// at which the scaled smile's strip is the strip SSVI's own power law gives
+/// at `theta`, as `ln(theta' / theta)` on a grid of `ln(theta / anchor)`,
+/// linear between nodes and held at the ends. The anchor is a node and maps
+/// to itself (the two smiles are one there), so the 21-session fit is
+/// unchanged. Both strips rise with `theta`, so the map does too.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct StripHold {
+    pub anchor: f64,
+    pub logs: Vec<f64>,
+}
+
+impl StripHold {
+    /// The map from SSVI's own smile `scaled` with its tenor dropped to
+    /// `scaled` itself. A node whose strip does not price (total variances far
+    /// beyond any listed tenor's, tens of years of variance) takes its
+    /// neighbour's toward the anchor. `None` without a tenor.
+    pub fn new(scaled: &Ssvi) -> Option<Self> {
+        if scaled.tenor == 0.0 || !(scaled.anchor > 0.0) {
+            return None;
+        }
+        let base = Ssvi { anchor: 0.0, tenor: 0.0, ..*scaled };
+        let node = |theta: f64| -> Option<f64> {
+            let target = strip_variance(&base, theta)?;
+            // Each step scales theta by the ratio of the strips, nearly
+            // proportional to theta, as `theta_for_vix` does.
+            let mut held = theta;
+            for _ in 0..100 {
+                let ratio = target / strip_variance(scaled, held)?;
+                if (ratio - 1.0).abs() <= 1e-12 {
+                    break;
+                }
+                held *= ratio;
+                if !(held > 0.0 && held.is_finite()) {
+                    return None;
+                }
+            }
+            Some(mathx::log(held / theta))
+        };
+        let zero = (-HOLD_LO / HOLD_STEP).round() as usize;
+        let mut logs = vec![0.0; HOLD_NODES];
+        for i in (zero + 1)..HOLD_NODES {
+            let theta = scaled.anchor * mathx::exp(HOLD_LO + HOLD_STEP * i as f64);
+            logs[i] = node(theta).unwrap_or(logs[i - 1]);
+        }
+        for i in (0..zero).rev() {
+            let theta = scaled.anchor * mathx::exp(HOLD_LO + HOLD_STEP * i as f64);
+            logs[i] = node(theta).unwrap_or(logs[i + 1]);
+        }
+        Some(StripHold { anchor: scaled.anchor, logs })
+    }
+
+    /// The held at-the-money total variance for SSVI's `theta`.
+    pub fn at(&self, theta: f64) -> f64 {
+        if !(theta > 0.0) {
+            return theta;
+        }
+        let u = (mathx::log(theta / self.anchor) - HOLD_LO) / HOLD_STEP;
+        let n = self.logs.len();
+        let l = if u <= 0.0 {
+            self.logs[0]
+        } else if u >= (n - 1) as f64 {
+            self.logs[n - 1]
+        } else {
+            let i = u.floor() as usize;
+            let f = u - i as f64;
+            if f == 0.0 { self.logs[i] } else { self.logs[i] + f * (self.logs[i + 1] - self.logs[i]) }
+        };
+        if l == 0.0 { theta } else { theta * mathx::exp(l) }
+    }
+}
+
 /// A surface: the SSVI smile on a term structure of at-the-money total
 /// variance, `T` in sessions from the moment it was built.
 #[derive(Debug, Clone, PartialEq)]
@@ -500,12 +668,20 @@ pub struct Surface {
     pub vix: f64,
     pub skewness_target: Option<f64>,
     pub fit: SmileFit,
+    /// The term scaling's strips held (`surface_index_tenor_strip`): the
+    /// curve's at-the-money variance read through the map. `None` reads the
+    /// curve itself.
+    pub hold: Option<StripHold>,
 }
 
 impl Surface {
     /// At-the-money total variance `t` sessions out.
     pub fn theta(&self, t: f64) -> f64 {
-        self.curve.at(t)
+        let theta = self.curve.at(t);
+        match &self.hold {
+            Some(hold) => hold.at(theta),
+            None => theta,
+        }
     }
 
     /// Total implied variance at log-moneyness `k`, `t` sessions out.
@@ -535,12 +711,28 @@ impl Surface {
     /// non-decreasing. `Err` names the first that fails.
     pub fn check(&self) -> Result<(), String> {
         let mut last = 0.0;
-        for (i, &theta) in self.curve.knots.iter().enumerate() {
+        for (i, &knot) in self.curve.knots.iter().enumerate() {
+            let theta = self.hold.as_ref().map_or(knot, |h| h.at(knot));
             if theta < last {
                 return Err(format!("calendar: theta falls from {last} to {theta} at knot {}", i + 1));
             }
             last = theta;
             self.ssvi.check(theta)?;
+        }
+        // Off SSVI the knots' order is not enough: total variance must not
+        // fall with the tenor at any log-moneyness.
+        if self.ssvi.shift != 0.0 {
+            for pair in self.curve.knots.windows(2) {
+                let pair = self.hold.as_ref().map_or([pair[0], pair[1]], |h| [h.at(pair[0]), h.at(pair[1])]);
+                let width = 8.0 * mathx::sqrt(pair[1]);
+                for i in 0..=200 {
+                    let k = -width + 2.0 * width * f64::from(i) / 200.0;
+                    let (a, b) = (self.ssvi.total_variance(k, pair[0]), self.ssvi.total_variance(k, pair[1]));
+                    if b < a - 1e-12 {
+                        return Err(format!("calendar: total variance falls from {a} to {b} at k {k}"));
+                    }
+                }
+            }
         }
         Ok(())
     }
@@ -551,6 +743,26 @@ mod tests {
     use super::*;
 
     const T21: f64 = 21.0 / 252.0;
+
+    #[test]
+    fn the_strip_hold_is_built_and_rises_at_every_level() {
+        // VIX about 2 to 300, every correlation the fit allows: the map is
+        // built, the anchor maps to itself, and theta' rises with theta.
+        for &rho in &[-0.999, -0.9, -0.4, 0.0, 0.8, 0.999] {
+            for &a in &[0.00005, 0.001, 0.01, 0.06, 0.4, 1.0] {
+                let s = Ssvi::new(rho, 1.0, 0.5).with_tenor(a, 0.4);
+                let h = StripHold::new(&s).unwrap();
+                assert_eq!(h.at(a), a);
+                let mut last = 0.0;
+                for i in 0..400 {
+                    let t = a * mathx::exp(-8.0 + 0.035 * f64::from(i));
+                    let held = h.at(t);
+                    assert!(held > last && held.is_finite(), "rho {rho} anchor {a} theta {t}");
+                    last = held;
+                }
+            }
+        }
+    }
 
     #[test]
     fn a_flat_smile_reads_vix_100_sigma_and_skew_100() {
@@ -650,6 +862,7 @@ mod tests {
             vix: 24.0,
             skewness_target: Some(-2.0),
             fit,
+            hold: None,
         };
         surface.check().unwrap();
         // The VIX point is the fit's, to the last bits.
