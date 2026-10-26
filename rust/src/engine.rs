@@ -1461,6 +1461,19 @@ pub struct GdpPublication {
     pub pending: std::collections::VecDeque<(i64, f64)>,
 }
 
+/// The draw source a shadow meeting reads: every uniform 0.5 and every
+/// normal 0, so no stream is touched.
+struct SilentDraws;
+
+impl Rng for SilentDraws {
+    fn next_f64(&mut self) -> f64 {
+        0.5
+    }
+    fn next_normal(&mut self) -> f64 {
+        0.0
+    }
+}
+
 impl Engine {
     /// Derive the three engine streams from the root seed and take
     /// ownership of the state.
@@ -10097,7 +10110,7 @@ impl Engine {
         // implies tonight, for the next scheduled meeting to deliver. A silent
         // shadow: no draw. Nothing runs with the switch off.
         if self.params.fed_eve_decision != 0.0 {
-            self.eve_decision = Some(self.own_shadow_change(request, &policy));
+            self.eve_decision = Some(self.shadow_own_change(request, &policy));
         }
         self.macro_pins_today = 0;
         self.pinned_vix_jump = 0.0;
@@ -10962,33 +10975,6 @@ impl Engine {
             (None, true) => Err("this model sets core_trend_sd and the snapshot carries no core_trend".to_string()),
             (Some(_), false) => Err("this snapshot carries core_trend and this model's core_trend_sd is 0".to_string()),
         }
-    }
-
-    /// The decision the Fed's own reading implies tonight: a silent shadow
-    /// meeting on the economy the meeting reads (`fed_eve_decision`; the
-    /// same shadow as `policy_anticipation_guidance`'s "own"), percentage
-    /// points.
-    fn own_shadow_change(&self, request: &DayAdvanceRequest, options: &crate::economy::PolicyOptions) -> f64 {
-        struct Silent;
-        impl Rng for Silent {
-            fn next_f64(&mut self) -> f64 {
-                0.5
-            }
-            fn next_normal(&mut self) -> f64 {
-                0.0
-            }
-        }
-        let mut cb = self.central_bank;
-        cb.next_meeting_date = request.timestamp;
-        let options = crate::economy::PolicyOptions {
-            stress_level: self.stress_vix_max,
-            stress_hold: self.stress_hold_now(),
-            path_before: self.priced_policy_path(),
-            eve_change: None,
-            ..*options
-        };
-        let own = update_central_bank_with(&cb, &self.economy, request.timestamp, &mut Silent, &options);
-        own.economy.federal_funds_rate - self.economy.federal_funds_rate
     }
 
     /// The eve's decision for a snapshot and the state hash, `[present,
@@ -12173,30 +12159,7 @@ impl Engine {
     /// unemployment and the rate as they stand), with tonight's options, on
     /// a silent draw source. No stream is touched and nothing is written.
     fn shadow_meeting_change(&self, request: &DayAdvanceRequest, options: &crate::economy::PolicyOptions) -> f64 {
-        struct Silent;
-        impl Rng for Silent {
-            fn next_f64(&mut self) -> f64 {
-                0.5
-            }
-            fn next_normal(&mut self) -> f64 {
-                0.0
-            }
-        }
-        let mut economy = self.economy.clone();
-        economy.cycle_phase = self.published_cycle_phase();
-        economy.gdp_growth = self.published_gdp_growth();
-        economy.vix = self.published_vix();
-        let mut cb = self.central_bank;
-        cb.next_meeting_date = request.timestamp;
-        let options = crate::economy::PolicyOptions {
-            stress_level: self.stress_vix_max,
-            stress_hold: self.stress_hold_now(),
-            path_before: self.priced_policy_path(),
-            eve_change: None,
-            ..*options
-        };
-        let shadow = update_central_bank_with(&cb, &economy, request.timestamp, &mut Silent, &options);
-        let published = shadow.economy.federal_funds_rate - self.economy.federal_funds_rate;
+        let published = self.shadow_published_change(request, options);
         // THE FED'S GUIDANCE (`policy_anticipation_guidance` q): the market
         // prices q of the decision the Fed's own reading (the economy the
         // meeting reads) implies, and 1 - q of the published one's. A second
@@ -12204,11 +12167,50 @@ impl Engine {
         // published shadow's, as it stood.
         let q = self.params.policy_anticipation_guidance;
         if q != 0.0 {
-            let own = update_central_bank_with(&cb, &self.economy, request.timestamp, &mut Silent, &options);
-            let own = own.economy.federal_funds_rate - self.economy.federal_funds_rate;
+            let own = self.shadow_own_change(request, options);
             (1.0 - q) * published + q * own
         } else {
             published
+        }
+    }
+
+    /// The meeting function's change on the economy as published, as
+    /// [`Engine::shadow_meeting_change`] reads it.
+    pub(crate) fn shadow_published_change(
+        &self,
+        request: &DayAdvanceRequest,
+        options: &crate::economy::PolicyOptions,
+    ) -> f64 {
+        let mut economy = self.economy.clone();
+        economy.cycle_phase = self.published_cycle_phase();
+        economy.gdp_growth = self.published_gdp_growth();
+        economy.vix = self.published_vix();
+        let shadow = update_central_bank_with(
+            &self.shadow_bank(request), &economy, request.timestamp, &mut SilentDraws, &self.shadow_options(options));
+        shadow.economy.federal_funds_rate - self.economy.federal_funds_rate
+    }
+
+    /// The meeting function's change on the economy the meeting reads (the
+    /// Fed's own reading), as [`Engine::shadow_meeting_change`] reads it.
+    pub(crate) fn shadow_own_change(&self, request: &DayAdvanceRequest, options: &crate::economy::PolicyOptions) -> f64 {
+        let own = update_central_bank_with(
+            &self.shadow_bank(request), &self.economy, request.timestamp, &mut SilentDraws, &self.shadow_options(options));
+        own.economy.federal_funds_rate - self.economy.federal_funds_rate
+    }
+
+    fn shadow_bank(&self, request: &DayAdvanceRequest) -> CentralBankState {
+        let mut cb = self.central_bank;
+        cb.next_meeting_date = request.timestamp;
+        cb
+    }
+
+    fn shadow_options(&self, options: &crate::economy::PolicyOptions) -> crate::economy::PolicyOptions {
+        crate::economy::PolicyOptions {
+            stress_level: self.stress_vix_max,
+            stress_hold: self.stress_hold_now(),
+            path_before: self.priced_policy_path(),
+            eve_change: None,
+            ..*options
         }
     }
 

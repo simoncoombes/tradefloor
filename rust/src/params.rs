@@ -1254,36 +1254,44 @@ pub struct ModelParams {
     /// it stood. The stored decision is snapshotted and hashed only with
     /// this set. 0 or 1.
     pub fed_eve_decision: f64,
-    /// The sd, in basis points, of the meeting-day surprise the market's
-    /// policy path carries once the eve holds the decision. 0.0, on every
-    /// shipped preset, is the path as it stood: the next meeting priced at
-    /// `1 - forecast_policy_shadow_discount` of the shadow change plus the
-    /// reversion step, even on the eve, and a value of 0.0 is left out of the
+    /// The sd, in basis points, of the noise through which the market sees
+    /// the Fed's own reading of the next scheduled meeting (its guidance) in
+    /// the forecast's policy path, which the policy-rate and term-rate
+    /// futures read. 0.0, on every shipped preset, is the path as it stood:
+    /// the next meeting priced at `1 - forecast_policy_shadow_discount` of
+    /// the shadow change `policy_anticipation_guidance` blends, plus the
+    /// reversion step, even on the eve; and a value of 0.0 is left out of the
     /// model's digest.
     ///
-    /// Off zero, with `fed_eve_decision` on, the forecast taken at the close
-    /// before a scheduled meeting prices that meeting's change at the
-    /// decision the eve holds (the change the meeting delivers), plus a
-    /// zero-mean surprise of this sd: the first normal of
-    /// `GameRng::keyed(rng::eve_surprise_key(seed), EVE_SURPRISE_TAG, day)`,
-    /// so it takes nothing from any stream and moves no other draw. The
-    /// meeting's own close then moves the policy-rate futures by the surprise
-    /// alone, which no one can know at the eve; at 0.0 the miss is a known
-    /// share of a decision the eve's path reveals. The forecast feeds only
-    /// the contracts, so no stock price moves. Later meetings are priced as
-    /// they stood. Requires `fed_eve_decision`. In [0, 100].
+    /// The blend's own-reading share q priced the reading itself, so with q
+    /// at 1 the path showed the decision a meeting would make, and on the
+    /// eve the decision it would deliver: a rule trading the front fed funds
+    /// future on it won 35 of 36 meetings, and a surprise added to the eve's
+    /// price (round 1) was undone by rounding the price to the decisions'
+    /// 25 bp grid. Off zero, at every close the reading reaches the path
+    /// through a signal, the reading plus this sd times the first normal of
+    /// `GameRng::keyed(rng::guidance_signal_key(seed), GUIDANCE_SIGNAL_TAG,
+    /// meeting)` (one draw a meeting, whichever close forecasts it), and the
+    /// market prices the posterior mean of the reading over the grid of
+    /// decisions around the published shadow, under the model's own prior
+    /// over the gap between the decision and the published shadow
+    /// (`GUIDANCE_PRIOR`, measured on its histories). q then blends the
+    /// published shadow with that posterior mean. On a meeting's eve the
+    /// reading is the decision the eve holds and the meeting is priced at the
+    /// blend whole (no discount, no reversion step), so the meeting's close
+    /// moves the futures by the decision less what the signal let the market
+    /// expect, which no rule on the price can recover. The forecast feeds only
+    /// the contracts, so no stock price moves. Requires `fed_eve_decision`
+    /// and `policy_anticipation_guidance`. In [0, 100].
     ///
-    /// The tape: the Kuttner (2001) surprise, the CME 30-day fed funds
-    /// futures' front-month change on a scheduled FOMC decision day scaled
-    /// by `D / (D - d)` (Yahoo `ZQ=F`; meetings in a month's last seven days
-    /// and on its first session, where the series rolls, left out), net in
-    /// quadrature of an ordinary session's change, 2015 and 2021-2026 (RF2's
-    /// years): 2.55 bp on 33 meetings (bootstrap se 0.69 over meetings, 0.59
-    /// over years). By era: 2015-2019 2.01 (0.43), 2008-2015 3.04 (1.50);
-    /// 2000-2007's meeting RMS 4.77. The series' raw meeting-day changes in
-    /// RF2's years agree with Bauer and Swanson's (2023, NBER Macroeconomics
-    /// Annual 37) 30-minute front-contract surprises at a correlation of 0.96.
-    pub policy_eve_surprise_sd: f64,
+    /// Set so the decision-day surprise, the decision less the eve's
+    /// posterior mean, has the tape's sd under that prior: the Kuttner
+    /// (2001) surprise, the CME 30-day fed funds futures' front-month change
+    /// on a scheduled FOMC decision day scaled by `D / (D - d)` (Yahoo `ZQ=F`;
+    /// meetings in a month's last seven days and on its first session left
+    /// out), net in quadrature of an ordinary session's change, 2015 and
+    /// 2021-2026 (RF2's years): 2.55 bp on 33 meetings (bootstrap se 0.69).
+    pub policy_guidance_signal_sd: f64,
     /// A switch: with `treasury_path_anticipated` on, 1.0 leaves the Fed
     /// put's owed step out of the meeting's path step, so the path moves by
     /// the anticipation's further move alone. 0.0, on every shipped preset,
@@ -1913,27 +1921,23 @@ pub struct ModelParams {
     /// allowance of 1. The scan reads quotes and writes nothing, so no price
     /// moves. Requires `margin_scan_coverage`. In [0, 5].
     pub margin_scan_option_tail: f64,
-    /// The rulebook's minimum margin for a short listed option, as a share of
-    /// the underlying's value for a call and of the exercise price for a put.
-    /// 0.0, on every shipped preset, is the scan alone, and a value of 0.0 is
-    /// left out of the model's digest.
+    /// The portfolio-margin rule's minimum margin for a listed option,
+    /// dollars a unit of the underlying (the rule's dollars a contract over
+    /// the multiplier). 0.0, on every shipped preset, is the scan alone, and
+    /// a value of 0.0 is left out of the model's digest.
     ///
     /// Off zero, an option book's margin (`Engine::option_margin`, and so
     /// each quote's `initial_margin`) is the scan's or, if greater, this
-    /// share times the underlying for each short call and times the strike
-    /// for each short put that nothing covers (long options of the same
-    /// right, long stock for a call, short stock for a put); a short call
-    /// and a short put together ask the greater of the two. FINRA Rule
-    /// 4210(f)(2)(E)(i): a short listed option is margined at its value plus
-    /// 20% of the underlying less the out-of-the-money amount, "but shall not
-    /// be less than" its value plus 10% of the underlying (calls) or of the
-    /// aggregate exercise price (puts), 10% for a broad index too (column
-    /// III); 4210(f)(2)(G) pairs a short call with a short put at the greater
-    /// requirement. The option's value is already in the account's equity,
-    /// so the share is the 10%. A deep out-of-the-money short, which the
-    /// scan charges close to nothing, so asks a tenth of what it is written
-    /// on. The scan reads quotes and writes nothing, so no price moves.
-    /// Requires `margin_scan_coverage`. In [0, 1].
+    /// times the units of every option it holds (contracts times the
+    /// multiplier), long or short, a long's not more than its value. The
+    /// scan is a risk-based theoretical loss, so an account under it is a
+    /// portfolio-margin account: FINRA Rule 4210(g)(7) margins a portfolio at
+    /// the greater of the largest theoretical loss at its valuation points
+    /// and (B) "$.375 for each listed option ... multiplied by the contract's
+    /// or instrument's multiplier, not to exceed the market value in the case
+    /// of long contracts". The rule's value is 0.375. The scan reads quotes
+    /// and writes nothing, so no price moves. Requires
+    /// `margin_scan_coverage`. In [0, 10].
     pub margin_option_minimum: f64,
     /// A switch: 1.0 refuses an account's order when its equity after the
     /// order would be under the initial margin the account then asks
@@ -8922,7 +8926,7 @@ impl ModelParams {
             cycle_inflation_hazard: 0.0,
             cycle_rate_hazard: 0.0,
             fed_eve_decision: 0.0,
-            policy_eve_surprise_sd: 0.0,
+            policy_guidance_signal_sd: 0.0,
             rate_premium_per_fixing: 0.0,
             treasury_path_owed_excluded: 0.0,
             corporate_spread_equity_lag: 0.0,
@@ -11616,7 +11620,7 @@ impl ModelParams {
             "cycle_inflation_hazard" => self.cycle_inflation_hazard,
             "cycle_rate_hazard" => self.cycle_rate_hazard,
             "fed_eve_decision" => self.fed_eve_decision,
-            "policy_eve_surprise_sd" => self.policy_eve_surprise_sd,
+            "policy_guidance_signal_sd" => self.policy_guidance_signal_sd,
             "rate_premium_per_fixing" => self.rate_premium_per_fixing,
             "treasury_path_owed_excluded" => self.treasury_path_owed_excluded,
             "corporate_spread_equity_lag" => self.corporate_spread_equity_lag,
@@ -12075,7 +12079,7 @@ impl ModelParams {
             "cycle_inflation_hazard" => out.cycle_inflation_hazard = value,
             "cycle_rate_hazard" => out.cycle_rate_hazard = value,
             "fed_eve_decision" => out.fed_eve_decision = value,
-            "policy_eve_surprise_sd" => out.policy_eve_surprise_sd = value,
+            "policy_guidance_signal_sd" => out.policy_guidance_signal_sd = value,
             "rate_premium_per_fixing" => out.rate_premium_per_fixing = value,
             "treasury_path_owed_excluded" => out.treasury_path_owed_excluded = value,
             "corporate_spread_equity_lag" => out.corporate_spread_equity_lag = value,
@@ -13745,17 +13749,24 @@ impl ModelParams {
                  (a scheduled meeting delivers the eve's decision).",
                 self.fed_eve_decision));
         }
-        if !(self.policy_eve_surprise_sd >= 0.0 && self.policy_eve_surprise_sd <= 100.0) {
+        if !(self.policy_guidance_signal_sd >= 0.0 && self.policy_guidance_signal_sd <= 100.0) {
             return Err(format!(
-                "policy_eve_surprise_sd is {}. It is the sd of the meeting-day surprise in basis points, \
-                 in [0, 100]; 0 prices the eve's meeting as it stood.",
-                self.policy_eve_surprise_sd));
+                "policy_guidance_signal_sd is {}. It is the sd of the guidance's signal noise in basis points, \
+                 in [0, 100]; 0 prices the Fed's own reading as it stood.",
+                self.policy_guidance_signal_sd));
         }
-        if self.policy_eve_surprise_sd != 0.0 && self.fed_eve_decision == 0.0 {
+        if self.policy_guidance_signal_sd != 0.0 && self.fed_eve_decision == 0.0 {
             return Err(format!(
-                "fed_eve_decision is 0 but policy_eve_surprise_sd is {}: the eve holds no decision to \
-                 price. Set fed_eve_decision to 1.",
-                self.policy_eve_surprise_sd));
+                "fed_eve_decision is 0 but policy_guidance_signal_sd is {}: the eve holds no decision for \
+                 the signal to read. Set fed_eve_decision to 1.",
+                self.policy_guidance_signal_sd));
+        }
+        if self.policy_guidance_signal_sd != 0.0 && self.policy_anticipation_guidance == 0.0 {
+            return Err(format!(
+                "policy_anticipation_guidance is 0 but policy_guidance_signal_sd is {}: the market prices \
+                 none of the Fed's own reading, so there is no guidance to signal. Set \
+                 policy_anticipation_guidance.",
+                self.policy_guidance_signal_sd));
         }
         if !(self.rate_premium_per_fixing == 0.0 || self.rate_premium_per_fixing == 1.0) {
             return Err(format!(
@@ -14087,10 +14098,10 @@ impl ModelParams {
                  first.",
                 self.margin_scan_option_tail));
         }
-        if !(0.0..=1.0).contains(&self.margin_option_minimum) {
+        if !(0.0..=10.0).contains(&self.margin_option_minimum) {
             return Err(format!(
-                "margin_option_minimum is {}. It is the rulebook's minimum margin for a short option, a \
-                 share of the underlying (calls) or the strike (puts), in [0, 1]; FINRA's is 0.10.",
+                "margin_option_minimum is {}. It is the portfolio-margin rule's minimum margin for a listed \
+                 option, dollars a unit of the underlying, in [0, 10]; FINRA Rule 4210(g)(7)(B)'s is 0.375.",
                 self.margin_option_minimum));
         }
         if self.margin_option_minimum != 0.0 && self.margin_scan_coverage == 0.0 {
@@ -14772,7 +14783,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "cycle_inflation_hazard",
     "cycle_rate_hazard",
     "fed_eve_decision",
-    "policy_eve_surprise_sd",
+    "policy_guidance_signal_sd",
     "rate_premium_per_fixing",
     "treasury_path_owed_excluded",
     "corporate_spread_equity_lag",
@@ -15037,7 +15048,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "cycle_inflation_hazard",
         "cycle_rate_hazard",
         "fed_eve_decision",
-        "policy_eve_surprise_sd",
+        "policy_guidance_signal_sd",
         "rate_premium_per_fixing",
         "treasury_path_owed_excluded",
         "corporate_spread_equity_lag",

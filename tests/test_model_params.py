@@ -1004,9 +1004,9 @@ PERTURBATIONS = [
     # The eve's decision: the probe's meetings deliver the eve's silent
     # shadow instead of re-reading the day, which moves its rate path.
     ("fed_eve_decision", 1.0, True),
-    # INERT: the eve's surprise moves only the forecast the contracts read,
-    # and no stock price reads the forecast.
-    ("policy_eve_surprise_sd", 5.0, False),
+    # INERT: the guidance's signal moves only the forecast the contracts
+    # read, and no stock price reads the forecast.
+    ("policy_guidance_signal_sd", 5.0, False),
     # The owed step left out. INERT on the probe: read only with
     # treasury_path_anticipated, which pt-v20 leaves off.
     ("treasury_path_owed_excluded", 1.0, False),
@@ -1302,9 +1302,9 @@ PERTURBATIONS = [
     ("margin_scan_coverage", 0.99, False),
     ("margin_scan_tail", 1.3, False),
     ("margin_scan_option_tail", 0.8, False),
-    # INERT: the rulebook's minimum floors the option margin, which reads
-    # quotes and writes nothing; the pre-trade check is read by accounts.
-    ("margin_option_minimum", 0.1, False),
+    # INERT: the portfolio-margin minimum floors the option margin, which
+    # reads quotes and writes nothing; the pre-trade check is read by accounts.
+    ("margin_option_minimum", 0.375, False),
     ("margin_pretrade_check", 1.0, False),
     # The index options, their surface and their dealer (pt-v22 phase 2).
     # INERT by construction: the surface and the options read public state,
@@ -2224,8 +2224,9 @@ def test_the_perturbation_table_covers_the_whole_settable_surface():
 #: carrying the same companions, none of the three moved. The companions
 #: are the default's 0.375 now, and the three rows are re-valued.
 COMPANIONS: dict[str, dict[str, float]] = {
-    # The eve holds a decision only under fed_eve_decision.
-    "policy_eve_surprise_sd": {"fed_eve_decision": 1.0},
+    # The eve holds a decision only under fed_eve_decision, and the signal
+    # carries the own reading's share under policy_anticipation_guidance.
+    "policy_guidance_signal_sd": {"fed_eve_decision": 1.0, "policy_anticipation_guidance": 1.0},
     # Core differs from headline only where oil pays inflation, which the
     # symmetric pass-through does either side of 81 (the shipped branch pays
     # nothing between 50 and 80).

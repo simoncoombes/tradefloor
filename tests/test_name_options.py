@@ -646,38 +646,40 @@ def test_the_decision_contract_takes_exercise():
     assert ci.recorded_orders({"X": tf.Exercise(2)}) == {"X": {"exercise": 2.0}}
 
 
-def test_the_rulebooks_minimum_floors_an_uncovered_short_and_a_strangle_asks_its_greater_side():
-    # FINRA 4210(f)(2)(E)(i): an uncovered short option asks at least 10% of
-    # the underlying (a call) or of its strike (a put); (f)(2)(G): a short
-    # call with a short put asks the greater of the two.
-    floor = tf.Engine(seed=19, universe=SMALL, model=model(**ON, margin_option_minimum=0.10))
+def test_the_portfolio_minimum_floors_every_contract_and_a_long_at_its_value():
+    # FINRA 4210(g)(7): a portfolio asks the greater of the scan's largest
+    # loss and (B) $.375 for each listed option times its multiplier, a long
+    # not more than its market value.
+    floor = tf.Engine(seed=19, universe=SMALL, model=model(**ON, margin_option_minimum=0.375))
     scan = tf.Engine(seed=19, universe=SMALL, model=model(**ON))
     for _ in range(3):
         day(floor)
         day(scan)
     assert floor.prices() == scan.prices()
     ticker = floor.tickers[3]
-    spot = _price(floor, ticker)
     expiry = sorted({c["expiry"] for c in names(floor, ticker)})[0]
     far_call = strike_near(floor, ticker, expiry, "C", 6)
     far_put = strike_near(floor, ticker, expiry, "P", -6)
-    call_only = scan.option_margin([(far_call["symbol"], -1.0)])
-    assert call_only < 0.10 * spot * 100
-    assert floor.option_margin([(far_call["symbol"], -1.0)]) == pytest.approx(0.10 * spot * 100)
-    assert floor.option_margin([(far_put["symbol"], -1.0)]) == pytest.approx(
-        max(scan.option_margin([(far_put["symbol"], -1.0)]), 0.10 * far_put["strike"] * 100))
-    strangle = floor.option_margin([(far_call["symbol"], -1.0), (far_put["symbol"], -1.0)])
-    assert strangle == pytest.approx(max(scan.option_margin([(far_call["symbol"], -1.0), (far_put["symbol"], -1.0)]),
-                                         0.10 * max(spot, far_put["strike"]) * 100))
-    # Covered by the stock, the call asks the scan's alone.
-    assert floor.option_margin([(far_call["symbol"], -1.0), (ticker, 100.0)]) == \
-        scan.option_margin([(far_call["symbol"], -1.0), (ticker, 100.0)])
-    assert floor.quote(far_call["symbol"])["initial_margin"] == pytest.approx(0.10 * spot * 100)
+    unit = 0.375 * 100
+    for book, contracts in (([(far_call["symbol"], -1.0)], 1),
+                            ([(far_put["symbol"], -1.0)], 1),
+                            ([(far_call["symbol"], -1.0), (far_put["symbol"], -1.0)], 2),
+                            # Stock covers the scan's risk, not the minimum.
+                            ([(far_call["symbol"], -1.0), (ticker, 100.0)], 1)):
+        assert floor.option_margin(book) == pytest.approx(max(scan.option_margin(book), contracts * unit))
+    # A long asks no more than it is worth (the scan values it on its own
+    # surface, near the quote's).
+    value = floor.quote(far_call["symbol"])["fair"] * 100
+    assert value < unit
+    assert floor.option_margin([(far_call["symbol"], 1.0)]) == pytest.approx(
+        max(scan.option_margin([(far_call["symbol"], 1.0)]), value), rel=0.1)
+    assert floor.quote(far_call["symbol"])["initial_margin"] == pytest.approx(
+        floor.option_margin([(far_call["symbol"], -1.0)]))
 
 
 def test_the_pretrade_check_refuses_an_order_the_account_cannot_margin():
     from tradefloor.portfolio import MarginError
-    dials = dict(ON, margin_option_minimum=0.10)
+    dials = dict(ON, margin_option_minimum=0.375)
     for checked in (0.0, 1.0):
         engine = tf.Engine(seed=19, universe=SMALL, model=model(**dials, margin_pretrade_check=checked))
         for _ in range(3):
@@ -685,15 +687,15 @@ def test_the_pretrade_check_refuses_an_order_the_account_cannot_margin():
         engine.open_market()
         ticker = engine.tickers[3]
         expiry = sorted({c["expiry"] for c in names(engine, ticker)})[0]
-        call = strike_near(engine, ticker, expiry, "C", 2)["symbol"]
+        call = strike_near(engine, ticker, expiry, "C", 0)["symbol"]
         p = Portfolio(cash=0.25 * _price(engine, ticker) * 100, owner="a")
         if not checked:
-            p.execute(engine, call, -6.0)
+            p.execute(engine, call, -20.0)
             assert p.margin_requirement(engine) > p.net_worth(engine)
             continue
         p.execute(engine, call, -2.0)
         with pytest.raises(MarginError):
-            p.execute(engine, call, -6.0)
+            p.execute(engine, call, -20.0)
         assert p.options[call].quantity == -2.0
         assert p.net_worth(engine) >= p.margin_requirement(engine)
         # Taking risk off is never refused.

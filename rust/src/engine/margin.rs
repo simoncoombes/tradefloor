@@ -137,53 +137,27 @@ pub(crate) fn option_scan_loss_with(positions: &[ScanOption], linear: f64, index
     worst
 }
 
-/// The rulebook's minimum for short listed options (`margin_option_minimum`,
-/// FINRA Rule 4210(f)(2)(E)(i), column III): `share` of the underlying's
-/// value, `spot`, for each short call and of the exercise price for each
-/// short put, in dollars of `units` (contracts times the multiplier), on the
-/// shorts that nothing in `legs` or `linear` covers: a short call less the
-/// long calls and the long stock, a short put less the long puts and the
-/// short stock, uncovered puts taken from the highest strike down. A short
-/// call and a short put together (a straddle or strangle) ask the greater of
-/// the two (4210(f)(2)(G)), paired a unit at a time with the highest strikes.
-/// Covered positions and spreads ask nothing here: the scan margins them.
-pub(crate) fn short_option_minimum(legs: &[ScanOption], linear: f64, spot: f64, share: f64) -> f64 {
-    if share == 0.0 {
+/// The portfolio-margin rule's minimum (`margin_option_minimum`, FINRA Rule
+/// 4210(g)(7)(B)): `per_unit` dollars for each unit of each listed option in
+/// `legs` (contracts times the multiplier, so the rule's $.375 times the
+/// multiplier is 0.375 a unit), long or short, a long's not more than its
+/// value. Rule 4210(g)(7) margins a portfolio at the greater of this and
+/// the scan's largest theoretical loss.
+pub(crate) fn option_contract_minimum(legs: &[ScanOption], per_unit: f64) -> f64 {
+    if per_unit == 0.0 {
         return 0.0;
     }
-    let (mut long_calls, mut short_calls, mut long_puts) = (0.0, 0.0, 0.0);
-    let mut short_puts: Vec<(f64, f64)> = Vec::new();
-    for leg in legs {
-        match (leg.right, leg.units > 0.0) {
-            (Right::Call, true) => long_calls += leg.units,
-            (Right::Call, false) => short_calls -= leg.units,
-            (Right::Put, true) => long_puts += leg.units,
-            (Right::Put, false) => short_puts.push((leg.strike, -leg.units)),
-        }
-    }
-    let calls = crate::mathx::max(0.0, short_calls - long_calls - crate::mathx::max(0.0, linear));
-    let mut puts = crate::mathx::max(
-        0.0,
-        short_puts.iter().map(|(_, u)| u).sum::<f64>() - long_puts - crate::mathx::max(0.0, -linear),
-    );
-    short_puts.sort_by(|a, b| b.0.total_cmp(&a.0));
-    let call_charge = share * spot;
-    let mut paired = calls;
     let mut total = 0.0;
-    for (strike, units) in short_puts {
-        if puts <= 0.0 {
-            break;
-        }
-        let mut left = crate::mathx::min(units, puts);
-        puts -= left;
-        let put_charge = share * strike;
-        let pair = crate::mathx::min(left, paired);
-        total += pair * crate::mathx::max(call_charge, put_charge);
-        paired -= pair;
-        left -= pair;
-        total += left * put_charge;
+    for leg in legs {
+        let charge = per_unit * leg.units.abs();
+        total += if leg.units > 0.0 {
+            let value = leg.units * black_greeks(leg.right, leg.carry_spot, leg.strike, leg.years, leg.vol, leg.rate).0;
+            crate::mathx::min(charge, crate::mathx::max(0.0, value))
+        } else {
+            charge
+        };
     }
-    total + paired * call_charge
+    total
 }
 
 /// One contract's margin record.
@@ -470,21 +444,22 @@ mod tests {
     }
 
     #[test]
-    fn the_rulebooks_minimum_charges_uncovered_shorts_and_a_strangle_its_greater_side() {
-        let share = 0.10;
+    fn the_portfolio_minimum_charges_every_contract_and_a_long_no_more_than_its_value() {
         let leg = |right, strike, units| ScanOption { right, carry_spot: 1000.0, strike, years: 0.1, vol: 0.2, rate: 0.0, units };
-        // A naked call: 10% of the underlying a unit; a naked put: 10% of its strike.
-        assert!((short_option_minimum(&[leg(Right::Call, 1100.0, -100.0)], 0.0, 1000.0, share) - 10_000.0).abs() < 1e-9);
-        assert!((short_option_minimum(&[leg(Right::Put, 900.0, -100.0)], 0.0, 1000.0, share) - 9_000.0).abs() < 1e-9);
-        // A strangle asks the greater side, not both.
+        // A short contract (100 units) asks $.375 times its multiplier.
+        assert!((option_contract_minimum(&[leg(Right::Call, 1100.0, -100.0)], 0.375) - 37.5).abs() < 1e-9);
+        // A strangle asks it on both legs, and a spread on both too.
         let strangle = [leg(Right::Call, 1100.0, -100.0), leg(Right::Put, 900.0, -100.0)];
-        assert!((short_option_minimum(&strangle, 0.0, 1000.0, share) - 10_000.0).abs() < 1e-9);
-        // Covered by stock, by a long call, or with a put covered by short stock: nothing.
-        assert_eq!(short_option_minimum(&[leg(Right::Call, 1100.0, -100.0)], 100.0, 1000.0, share), 0.0);
-        assert_eq!(short_option_minimum(&[leg(Right::Call, 1100.0, -100.0), leg(Right::Call, 1200.0, 100.0)], 0.0, 1000.0, share), 0.0);
-        assert_eq!(short_option_minimum(&[leg(Right::Put, 900.0, -100.0)], -100.0, 1000.0, share), 0.0);
+        assert!((option_contract_minimum(&strangle, 0.375) - 75.0).abs() < 1e-9);
+        let spread = [leg(Right::Call, 1100.0, -100.0), leg(Right::Call, 1050.0, 100.0)];
+        assert!((option_contract_minimum(&spread, 0.375) - 75.0).abs() < 1e-9);
+        // A long worth less than the minimum asks its value.
+        let far = leg(Right::Call, 2000.0, 100.0);
+        let value = 100.0 * black_greeks(Right::Call, 1000.0, 2000.0, 0.1, 0.2, 0.0).0;
+        assert!(value < 37.5);
+        assert!((option_contract_minimum(&[far], 0.375) - value).abs() < 1e-12);
         // At 0.0 the rule is off.
-        assert_eq!(short_option_minimum(&strangle, 0.0, 1000.0, 0.0), 0.0);
+        assert_eq!(option_contract_minimum(&strangle, 0.0), 0.0);
     }
 
     #[test]

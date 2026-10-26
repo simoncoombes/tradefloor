@@ -48,13 +48,18 @@ stock prices and every known answer are where they were.
 
 ### Company news released before the open
 
-- `policy_eve_surprise_sd` is a new dial, 0.0 on every preset and left out of
-  the digest there: with `fed_eve_decision` on, the forecast taken on a
-  meeting's eve prices the decision the eve holds, plus a zero-mean surprise
-  of this sd (bp) keyed on the seed, instead of a discounted share of it and
-  a reversion step. The meeting then moves the policy-rate futures by the
-  surprise alone; before, the eve's step revealed the decision and a rule
-  trading the front contract by it won 36 of 36 meetings. The tape: the
+- `policy_guidance_signal_sd` is a new dial, 0.0 on every preset and left
+  out of the digest there: the forecast's policy path, which the policy-rate
+  and term-rate futures read, sees the Fed's own reading of the next meeting
+  (the share `policy_anticipation_guidance` gives it) through a signal with
+  noise of this sd (bp, one keyed draw a meeting), and prices its posterior
+  mean over the 25 bp grid around the published shadow, under the model's
+  own prior over the gap between the two; on the eve the reading is the
+  decision the eve holds (`fed_eve_decision`) and the meeting is priced at
+  that whole. Before, the path showed the decision itself: a rule trading
+  the front fed funds future on the eve's step won 35 of 36 meetings, and a
+  surprise added to the eve's price was undone by rounding it to the grid.
+  At 6.48 bp the decision less the eve's price has the sd of the
   Kuttner-scaled ZQ=F surprise on scheduled FOMC days net of an ordinary
   session, 2015 and 2021-2026, 2.55 bp (se 0.69). No stock price moves.
 - `rate_premium_per_fixing` is a new switch, 0.0 on every preset and left out
@@ -87,14 +92,25 @@ stock prices and every known answer are where they were.
   -2.25 bp per 1% on the day and -3.2 by nine sessions; with the gap alone
   the model's moves -2.46 and then eases.
 
+### The night's first step
+
+- With `night_session_steps` on, the index futures' night starts on the
+  close's marks and takes the close's macro re-mark of the index whole at
+  its first step; an order on an index future before that step walks it
+  first. The after-close quote stood on the close's print while the
+  re-marked level was already public, so buying or selling the front future
+  after the close on the re-mark's sign earned about 21 bp a night. Nothing
+  moves with the switch off, and no stock price.
+
 ### The option scan's tail
 
 - `margin_option_minimum` is a new dial, 0.0 on every preset and left out of
-  the digest there: an option book's margin is at least that share of the
-  underlying for each uncovered short call and of the strike for each
-  uncovered short put, a short call and put together asking the greater
-  (FINRA Rule 4210(f)(2)(E)(i) and (f)(2)(G); the rule's 10%). The scan
-  charged a deep out-of-the-money short close to nothing.
+  the digest there: an option book's margin is at least that many dollars a
+  unit of every option it holds, long or short, a long's not more than its
+  value. The scan is a risk-based theoretical loss, so the account it
+  margins is a portfolio-margin account, and FINRA Rule 4210(g)(7) asks the
+  greater of the scan's largest loss and (B) $.375 a listed option times
+  its multiplier: 0.375 a unit.
 - `margin_pretrade_check` is a new switch, 0.0 on every preset and left out
   of the digest there: a `Portfolio` refuses an order that would leave its
   equity under the initial margin it then asks (`MarginError`; FINRA Rule

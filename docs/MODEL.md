@@ -1603,7 +1603,7 @@ centre of 81 is 16.4 and 279.
 | `fed_core_inflation` | 0 (the bank reads headline); 1 (core: headline less `oil_inflation_level`) | same | not set | FRED 1990 to 2025: ff loads on CPILFESL 0.74 (NW se 0.38), on headline less core -0.16 (0.33); in 63-session 10% index falls with headline at 3 or more and core under 3 the funds rate fell 0.85, with core at 3 or more it rose 0.36 |
 | `treasury_zlb_path` | 0 (the put priced up to the rate); up to 20 | same | not set | FRED THREEFY10 less THREEFYTP10 (Kim-Wright expected path), 2008-2015 falls of 10% from the zero bound: -0.35 (se 0.12) with the funds rate unchanged |
 | `rate_premium_per_fixing` | 0 (a rate future's premium at its period's last close); 1 (each close of the period at its own distance, inside the mean or compounding) | same | not set | the fed funds futures' excess returns (free 2000-2026 front month 1.28 bp; Piazzesi and Swanson 2008, 6.3-30.7 bp at two to six months), refitted per close: k 3.1679, p 1.3235 |
-| `policy_eve_surprise_sd` | 0 (the eve's meeting priced at the discounted shadow plus the reversion step); off zero, the eve's held decision priced whole plus a keyed surprise of this sd, bp | same | not set | Kuttner-scaled ZQ=F surprise on scheduled FOMC days net of an ordinary session, 2015 and 2021-2026: 2.55 bp (se 0.69, 33 meetings); 2015-2019 2.01; 2008-2015 3.04 |
+| `policy_guidance_signal_sd` | 0 (the next meeting priced at the discounted blend of the shadows plus the reversion step, the eve's too); off zero, the Fed's own reading seen through a keyed signal of this sd, bp, one draw a meeting, priced at its posterior mean over the 25 bp grid around the published shadow under the model's prior, and the eve's meeting at that whole | same | not set | the prior is the model's own: on 64 histories of 21 years (10,040 eves) the decision is the published shadow at 93.2% of eves, a step off at 4.9%; the signal sd, 6.48 bp, is set so the decision less the eve's posterior mean has the sd of the Kuttner-scaled ZQ=F surprise on scheduled FOMC days net of an ordinary session, 2015 and 2021-2026: 2.55 bp (se 0.69, 33 meetings; 5.65 and 7.42 bp at one se either side) |
 | `fed_eve_decision` | 0 (the meeting re-reads the day); 1 (a scheduled meeting delivers the eve's own-reading decision) | same | not set | scheduled-FOMC surprise sd 4.8 bp off the zero bound 1994-2019 (Bauer and Swanson 2022); the model's eve shadow matches the delivered decision at 80-87% of meetings, the rest stressed-day reversals (surprise 9-12 bp), about 5 bp with the switch |
 | `pinned_vix_sets_variance` | 0 (a pin reaches the variance one GARCH step a close); 1 (every pin sets it, as `vix_sets_variance` does) | same | not set | S&P 500 realized volatility by VIX level over 2020-21: 13% at a VIX of 20-25, 23% at 25-30, 29% at 30-40, 74% at 40-60, 80% at 60-100; replaying the real VIX the model read 29, 39, 47, 62 and 49 stepped and 18, 24, 35, 67 and 75 set |
 | `treasury_term_premium_sd`, `treasury_term_premium_half_life` | 0 (no state: the 10-year's anchor is the policy path, the inflation premium and the havens); sd up to 0.5 points a session, half-life up to 2520 sessions | same | not set | FRED DGS10, 1990-2025: the variance of the 21-session change over 21 times the daily's is 0.974, of the 63-session 0.950 (model without it about 0.70 and 0.55, daily sd matched at 5.8 bp); solved with `treasury_10y_noise` re-solved to keep the daily sd, sd 0.060 and half-life 49 sessions (stationary sd 0.36 points) |
@@ -4076,7 +4076,12 @@ its target on a Brownian bridge, one normal per step for all of them, with
 the night's share of the index's one-session variance
 (`overnight_market_share` of it on pt-v21), stepping the basis and filling
 resting orders beside it. The last step lands on the open's fair value. The
-real open takes its own draws, as it always did. A pin, a listing or
+path starts on the close's marks and takes the close's macro re-mark of the
+index (`macro_publication_repricing`), public from the close, whole at its
+first step, from the published level and each contract's carry on it; an
+order on an index future before that step walks it first and meets the book
+after it, so no one trades on the close's print once the re-mark is known.
+The real open takes its own draws, as it always did. A pin, a listing or
 delisting, a change of status, or a fundamentals write from Python between
 sessions reruns the copy and moves the path at once by the change in its
 targets; a write the copy is not rerun for reaches the futures at the open.
@@ -4573,12 +4578,12 @@ both together covers more than the quantile names. It is a projection on the
 model's held-out histories, as `margin_scan_tail` is. A
 long option's margin is at most its premium, a spread's at most its width,
 and offsetting positions margin net. Under `margin_option_minimum` (0.0 on
-every shipped preset) an option book's margin is at least the rulebook's
-minimum for its uncovered shorts, that share of the underlying for a call
-and of the strike for a put, a short call and put together asking the
-greater (FINRA Rule 4210(f)(2)(E)(i), column III, 10%, and (f)(2)(G)), so a
-deep out-of-the-money short the scan charges close to nothing asks a tenth
-of what it is written on. Maintenance is initial over 1.1. A
+every shipped preset) an option book's margin is at least the
+portfolio-margin rule's minimum, that many dollars a unit of every option
+it holds, long or short, a long's not more than its value: the scan is a
+risk-based theoretical loss, so the account is a portfolio-margin account,
+and FINRA Rule 4210(g)(7) asks the greater of the largest theoretical loss
+and (B) $.375 a listed option times its multiplier (0.375 a unit). Maintenance is initial over 1.1. A
 `Portfolio` pays an option's premium when it trades, marks it at the
 dealer's mid, is paid its settlement at expiry (`Portfolio.settled`), counts
 it at its delta-notional against the leverage limit, adds the scan to
