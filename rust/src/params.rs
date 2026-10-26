@@ -1344,6 +1344,24 @@ pub struct ModelParams {
     /// Of `r_{t-1}`, `r_{t-1} X/20` and `r_{t-1} (X/20)^2` the last fits
     /// best: -0.0267 (se 0.0068). In [0, 4].
     pub market_factor_reversal_vix_power: f64,
+    /// The share of the market's reversal that stays in the name's
+    /// mispricing `s` instead of moving to the fair-value level. 0.0, on
+    /// every shipped preset, moves the whole reversal into the level, as
+    /// `market_factor_reversal` stands (a branch), and a value of 0.0 is left
+    /// out of the model's digest. At 1.0 yesterday's market move is still
+    /// partly undone the next session, but the fair-value level keeps every
+    /// move whole: what the reversal took is part of the transient
+    /// mispricing and is returned at the mispricing's own pace, so a crash's
+    /// level is not taken back. Read only with `market_factor_reversal` set.
+    /// No draw and no state.
+    ///
+    /// ^GSPC's daily log returns, 1990-2025: the Lo-MacKinlay variance ratio
+    /// falls to 0.78 by 10 sessions and stays there (0.76, 0.69, 0.73 and
+    /// 0.79 at 21, 63, 126 and 252; robust se 0.12 to 0.29), and the model
+    /// without the reversal already reads 0.79 at 252 through its slow
+    /// mispricing, so the tape's fast reversal does not lower the long
+    /// horizon's variance further. In [0, 1].
+    pub market_factor_reversal_transient: f64,
     /// The per-session innovation sd of credit's own state, points of the
     /// corporate spread's base. 0.0, on every shipped preset, is no state
     /// (the spread moves only with the VIX, the cycle and the leverage gap),
@@ -9011,6 +9029,7 @@ impl ModelParams {
             corporate_spread_equity_lag_gain: 0.0,
             market_factor_reversal: 0.0,
             market_factor_reversal_vix_power: 0.0,
+            market_factor_reversal_transient: 0.0,
             corporate_spread_noise_sd: 0.0,
             corporate_spread_noise_half_life: 0.0,
             treasury_2y_meeting_carry: 0.0,
@@ -11709,6 +11728,7 @@ impl ModelParams {
             "corporate_spread_equity_lag_gain" => self.corporate_spread_equity_lag_gain,
             "market_factor_reversal" => self.market_factor_reversal,
             "market_factor_reversal_vix_power" => self.market_factor_reversal_vix_power,
+            "market_factor_reversal_transient" => self.market_factor_reversal_transient,
             "corporate_spread_noise_sd" => self.corporate_spread_noise_sd,
             "corporate_spread_noise_half_life" => self.corporate_spread_noise_half_life,
             "treasury_2y_meeting_carry" => self.treasury_2y_meeting_carry,
@@ -12172,6 +12192,7 @@ impl ModelParams {
             "corporate_spread_equity_lag_gain" => out.corporate_spread_equity_lag_gain = value,
             "market_factor_reversal" => out.market_factor_reversal = value,
             "market_factor_reversal_vix_power" => out.market_factor_reversal_vix_power = value,
+            "market_factor_reversal_transient" => out.market_factor_reversal_transient = value,
             "corporate_spread_noise_sd" => out.corporate_spread_noise_sd = value,
             "corporate_spread_noise_half_life" => out.corporate_spread_noise_half_life = value,
             "treasury_2y_meeting_carry" => out.treasury_2y_meeting_carry = value,
@@ -13871,6 +13892,12 @@ impl ModelParams {
                  0 is the spread reading the leverage gap itself.",
                 self.corporate_spread_equity_lag));
         }
+        if !(self.market_factor_reversal_transient >= 0.0 && self.market_factor_reversal_transient <= 1.0) {
+            return Err(format!(
+                "market_factor_reversal_transient is {}. It is the share of the market's reversal that \
+                 stays in the mispricing instead of the fair-value level, in [0, 1]; 0 moves it all to the level.",
+                self.market_factor_reversal_transient));
+        }
         if !(self.market_factor_reversal_vix_power >= 0.0 && self.market_factor_reversal_vix_power <= 4.0) {
             return Err(format!(
                 "market_factor_reversal_vix_power is {}. It is the power of the VIX over 20 the market's \
@@ -14901,6 +14928,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "corporate_spread_equity_lag_gain",
     "market_factor_reversal",
     "market_factor_reversal_vix_power",
+    "market_factor_reversal_transient",
     "corporate_spread_noise_sd",
     "corporate_spread_noise_half_life",
     "treasury_term_premium_sd",
@@ -15170,6 +15198,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "corporate_spread_equity_lag_gain",
         "market_factor_reversal",
         "market_factor_reversal_vix_power",
+        "market_factor_reversal_transient",
         "corporate_spread_noise_sd",
         "corporate_spread_noise_half_life",
         "treasury_term_premium_sd",

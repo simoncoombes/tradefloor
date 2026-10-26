@@ -1621,8 +1621,20 @@ pub fn simulate_market_tick(
             };
             // The market's reversal is permanent whole: it leaves `s` for
             // `v` on the tick it is applied. A branch, so 0.0 is `dv` as it
-            // stood.
-            let dv = if reversal != 0.0 { dv + reversal } else { dv };
+            // stood. Under `market_factor_reversal_transient` tau, tau of it
+            // stays in `s` (the transient mispricing) and only the rest moves
+            // to `v`; a branch, so tau 0.0 is the whole reversal as it stood,
+            // and tau 1.0 adds nothing to `dv`.
+            let dv = if reversal != 0.0 {
+                if p.market_factor_reversal_transient != 0.0 {
+                    let moved = (1.0 - p.market_factor_reversal_transient) * reversal;
+                    if moved != 0.0 { dv + moved } else { dv }
+                } else {
+                    dv + reversal
+                }
+            } else {
+                dv
+            };
             // The component slots keep the WHOLE shock, deliberately: they
             // report what moved the PRICE (the attribution an agent's
             // explanation is scored against), and the close feeds slot 6 to

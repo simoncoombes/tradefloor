@@ -131,3 +131,60 @@ def test_the_vix_power_scales_the_share_by_the_last_close_vix():
 def test_the_vix_power_out_of_range_is_refused(value):
     with pytest.raises(Exception):
         tf.ModelParams.from_preset("pt-v20", market_factor_reversal=K, market_factor_reversal_vix_power=value)
+
+
+def test_the_transient_share_at_zero_is_the_reversal_as_it_stands():
+    a, b = engine(market_factor_reversal=K), engine(market_factor_reversal=K, market_factor_reversal_transient=0.0)
+    assert a.model.fingerprint == b.model.fingerprint
+    for x in (a, b):
+        x.run_days(20, record=False)
+    assert floats(a.prices()) == floats(b.prices())
+    assert a.state_hash() == b.state_hash()
+
+
+@pytest.mark.parametrize("tau", [1.0, 0.25])
+def test_the_transient_share_stays_in_the_mispricing(tau):
+    """The fair-value level takes (1 - tau) of what it takes at tau 0; at tau 1 it is the run without the reversal,
+    to the bit. The crowd slot still carries the reversal (the lean on the mispricing it left moves a little too)."""
+    base = engine()
+    whole = engine(market_factor_reversal=K)
+    live = engine(market_factor_reversal=K, market_factor_reversal_transient=tau)
+    for x in (base, whole, live):
+        x.run_days(1, record=False)
+    f = prev_day_factor(live)
+    assert f == prev_day_factor(base) and f != 0.0
+    for x in (base, whole, live):
+        x.run_days(1, record=False, first_day=1)
+    beta = {c.ticker: c.beta for c in UNIVERSE}
+    ab, al = attribution(base), attribution(live)
+    vb = floats(base.state_snapshot()["fair_value_offset"])
+    vw = floats(whole.state_snapshot()["fair_value_offset"])
+    vl = floats(live.state_snapshot()["fair_value_offset"])
+    if tau == 1.0:
+        assert vl == vb
+    eq = [i for i, t in enumerate(live.tickers) if t in beta]
+    for j, i in enumerate(eq):
+        want = -K * beta[live.tickers[i]] * f
+        assert al[i][CROWD] - ab[i][CROWD] == pytest.approx(want, rel=2e-2)
+        assert vl[j] - vb[j] == pytest.approx((1.0 - tau) * (vw[j] - vb[j]), rel=1e-6, abs=1e-12)
+
+
+def test_the_transient_share_takes_no_draw_and_restores():
+    base, live = engine(), engine(market_factor_reversal=K, market_factor_reversal_transient=1.0)
+    for x in (base, live):
+        x.run_days(30, record=False)
+    assert base.draws_consumed == live.draws_consumed
+    e = engine(market_factor_reversal=K, market_factor_reversal_transient=1.0)
+    e.run_days(6, record=False)
+    twin = engine(market_factor_reversal=K, market_factor_reversal_transient=1.0)
+    twin.restore_state(e.state_snapshot())
+    for x in (e, twin):
+        x.run_days(4, record=False, first_day=6)
+    assert floats(e.prices()) == floats(twin.prices())
+    assert e.state_hash() == twin.state_hash()
+
+
+@pytest.mark.parametrize("value", [-0.1, 1.1])
+def test_the_transient_share_out_of_range_is_refused(value):
+    with pytest.raises(Exception):
+        tf.ModelParams.from_preset("pt-v20", market_factor_reversal=K, market_factor_reversal_transient=value)

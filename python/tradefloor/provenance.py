@@ -773,6 +773,11 @@ OUT_OF_SCOPE = {
         "inert at 0.0 and read only with `market_factor_reversal` set: the "
         "reversal's share is fixed, as it stood (a branch in the tick); no draw "
         "and no state; at 0.0 it is also left out of the model's digest",
+    "market_factor_reversal_transient":
+        "inert at 0.0 and read only with `market_factor_reversal` set: the "
+        "whole reversal moves to the fair-value level, as it stood (a branch in "
+        "the tick); no draw and no state; at 0.0 it is also left out of the "
+        "model's digest",
     "pinned_vix_sets_variance":
         "inert at 0.0: a pinned VIX marks tonight's close forced only when "
         "the caller asks (`vix_sets_variance`), as it stood (a branch in "

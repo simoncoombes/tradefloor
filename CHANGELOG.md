@@ -54,6 +54,13 @@ payload, Arrow and WASM show them; agents trade by symbol.
   of the digest there: the reversal's share follows the VIX as `k (X/20)^q`.
   The S&P 500's next-day reversal is near zero under a VIX of 30 and -0.17
   above it; `(X/20)^2` fits best.
+- `market_factor_reversal_transient` is new, 0.0 on every preset and left out
+  of the digest there: the share of the reversal that stays in the name's
+  mispricing instead of moving to the fair-value level. At 1.0 a move is
+  still partly undone the next session, but the level keeps every move whole,
+  so a crash is not taken back. No draw and no state. The S&P 500's variance
+  ratios fall to 0.78 by 10 sessions and stay there out to 252 (0.79), which
+  the model already reads at 252 without the reversal.
 
 ### The index smile's term scaling
 

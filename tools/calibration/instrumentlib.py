@@ -927,6 +927,7 @@ PARAM_SPECS: dict[str, dict] = {
     "corporate_spread_equity_lag_gain": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 10.0), "derived": False},
     "market_factor_reversal": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 0.5), "derived": False},
     "market_factor_reversal_vix_power": {"kind": "abs", "step_unit": 0.5, "hard_range": (0.0, 4.0), "derived": False},
+    "market_factor_reversal_transient": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 1.0), "derived": False},
     "news_preopen_share": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0), "derived": False},
     "corporate_spread_noise_sd": {"kind": "abs", "step_unit": 0.001, "hard_range": (0.0, 0.5)},
     "pinned_vix_sets_variance": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0), "derived": False},
