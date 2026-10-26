@@ -153,6 +153,10 @@ UNDERIVABLE = {
                                "does, from the market's shocks",
     "opening_market_sigma": "books the rest of the index's opening premium "
                             "as the names' fair-value levels",
+    # pt-v22's market reversal (vol loop): 0.0 on every preset.
+    "market_factor_reversal": "books each name's share of yesterday's market "
+                              "factor as its fair-value level, which the "
+                              "truth table does not carry",
 }
 
 
@@ -216,6 +220,7 @@ def _derived(instrument, economy, scale: float, model, *,
     assert p["opening_mispricing_sigma"] == 0.0, UNDERIVABLE["opening_mispricing_sigma"]
     assert p["fair_value_market_share"] == 0.0, UNDERIVABLE["fair_value_market_share"]
     assert p["opening_market_sigma"] == 0.0, UNDERIVABLE["opening_market_sigma"]
+    assert p["market_factor_reversal"] == 0.0, UNDERIVABLE["market_factor_reversal"]
     if price is None:
         assert p["buyback_payout_share"] == 0.0, (
             "this arm derives the nominal term alone, so the payout share "
