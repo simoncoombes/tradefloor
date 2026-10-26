@@ -214,3 +214,26 @@ def test_a_world_marks_and_settles_a_futures_position():
     world.run(20)
     assert any(s["symbol"] == symbol for s in world.portfolio.settled)
     assert symbol not in world.portfolio.futures
+
+
+def _vix(engine):
+    return [c["symbol"] for c in engine.contracts() if c["root"] == "VIX"][2]
+
+
+def test_a_stock_order_counts_the_futures_held_against_the_leverage_limit():
+    # Futures to 1.9x first; every stock buy after them would take the
+    # account past its 2x limit and is refused, as it is in the other order.
+    import math
+    d = Day(cash=100_000.0, max_leverage=2.0)
+    d.run(3)
+    d.open()
+    sym = _vix(d.e)
+    q = d.e.quote(sym)
+    n = math.floor(1.9 * d.p.net_worth(d.e) / (q["multiplier"] * q["price"]))
+    assert n >= 1
+    d.p.execute(d.e, sym, float(n))
+    marks = d.p.marks(d.e)
+    for t in d.e.tickers[:4]:
+        with pytest.raises(LeverageError):
+            d.p.execute(d.e, t, math.floor(0.45 * 100_000 / marks[t]))
+    assert d.p.leverage(d.e) <= 2.0

@@ -901,6 +901,14 @@ class Portfolio:
         )
         if ticker not in self.positions:
             equity += filled * price
+        if self.futures or self.options:
+            # The futures and options held count as gross_exposure and
+            # net_worth count them, so a stock order after them meets the
+            # same limit as a futures or option order after the stock.
+            gross += (ordered_sum(f.notional(self._future_price(engine, f))
+                                  for f in self.futures.values())
+                      + self._options_exposure(engine))
+            equity += self.futures_value(engine) + self.options_value(engine)
         # Non-positive equity means insolvent, not "infinitely levered".
         # Reporting infinity makes the comparison behave and the message read
         # correctly rather than dividing by zero.
