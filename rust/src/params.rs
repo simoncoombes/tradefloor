@@ -1974,6 +1974,49 @@ pub struct ModelParams {
     /// arbitrage (the paper's Remark 4.4), so the skewness the curvature can
     /// reach falls as it rises past 1. In [0, 2).
     pub surface_curvature: f64,
+    /// The index surface's own curvature, SSVI's `eta` for the index alone
+    /// (`surface_curvature`). 0.0, on every shipped preset, is the shared
+    /// curvature, and a value of 0.0 is left out of the model's digest.
+    ///
+    /// Off zero the index surface is fitted at this curvature, and the names
+    /// keep `surface_curvature`: a name's correlation is its share
+    /// (`surface_name_skew`) of the one the index's VIX and skewness give at
+    /// the shared curvature, so the names' smiles are the ones they have
+    /// without it. A lower curvature puts less of the strip's variance in the
+    /// wings, so at-the-money volatility sits nearer the VIX, and it reaches
+    /// less skew: about SKEW 121 at 0.65 and 131 at 1.0. Read only with
+    /// `surface_ssvi` set. In [0, 2).
+    pub surface_index_curvature: f64,
+    /// The index smile's vertex, moved a share of the way from SSVI's
+    /// (`k = -rho / phi`) to the money: the smile is SSVI's at `k + lambda m`.
+    /// 0.0, on every shipped preset, is SSVI itself, and a value of 0.0 is
+    /// left out of the model's digest. Off zero the fit is the same (theta to
+    /// the VIX on the 21-session strip, rho to its skewness), so the curve's
+    /// shape near the money changes and its two strip moments do not; the
+    /// names keep the shared smile. Off SSVI the surface's check is
+    /// Durrleman's condition on a grid and total variance rising with the
+    /// tenor. Read only with `surface_ssvi` set. In [0, 1].
+    pub surface_index_vertex: f64,
+    /// The index smile's term scaling: off zero, SSVI's power law for the
+    /// index is read at the 21-session fit's total variance and falls from
+    /// there as `theta^-x`, `x` this dial, in place of `surface_curvature_exponent`.
+    /// The 21-session smile is unchanged, so its VIX and SKEW are; the
+    /// at-the-money skew then scales with the tenor as `T^-x` and the
+    /// curvature as `T^-2x`. The S&P's one-month to one-year at-the-money
+    /// skew falls about as `T^-0.4` (Gatheral, Jaisson and Rosenbaum, 2018).
+    /// 0.0, on every shipped preset, is the shared power law, and a value of
+    /// 0.0 is left out of the model's digest. Index only: the names keep the
+    /// shared one. Read only with `surface_ssvi` set. In [0, 1).
+    pub surface_index_tenor_exponent: f64,
+    /// The term scaling with each tenor's strip held: 1.0 sets the index's
+    /// at-the-money total variance at each tenor so that its strip (the VIX
+    /// formula's variance) is the one SSVI's own power law gives there, so
+    /// `surface_index_tenor_exponent` moves variance between the money and
+    /// the wings and leaves the VIX9D, VIX3M, VIX6M and VIX1Y strips as they
+    /// were. 0.0, on every shipped preset, holds the at-the-money variance
+    /// instead, and is left out of the model's digest. Read only with
+    /// `surface_ssvi` set, and only off a zero tenor exponent. 0.0 or 1.0.
+    pub surface_index_tenor_strip: f64,
     /// The surface's curvature exponent, SSVI's `gamma`
     /// (`surface_curvature`): how fast the smile flattens with the tenor.
     /// Read only with `surface_ssvi` set; 0.0, on every shipped preset, is an
@@ -2015,6 +2058,16 @@ pub struct ModelParams {
     /// at the rate maker's 15-tick half-life. Requires
     /// `options_index_listed` or `options_names_listed`. In [0, 0.5].
     pub option_dealer_spread: f64,
+    /// The forward the index options' dealer prices from. 1.0 takes each
+    /// expiry's forward from the listed index future of the same expiry, the
+    /// mid of its book, as a listed market's makers price SPX options off
+    /// the forward the futures trade at, so put-call parity against the
+    /// future holds inside the spread; an expiry with no future of its own
+    /// keeps the carry. 0.0, on every shipped preset, prices every expiry
+    /// off the carry `(S - PV(D)) e^{r tau}`, and is left out of the model's
+    /// digest. Read only with `options_index_listed` and
+    /// `futures_index_listed` set. 0.0 or 1.0.
+    pub options_index_forward_from_future: f64,
     /// Whether the engine lists American options on each roster name. 0.0,
     /// on every shipped preset, lists none: no contract, no state, nothing in
     /// the snapshot or the state hash, and a value of 0.0 is left out of the
@@ -8860,11 +8913,16 @@ impl ModelParams {
             surface_skew_noise_sd: 0.0,
             surface_skew_noise_half_life: 0.0,
             surface_curvature: 0.0,
+            surface_index_curvature: 0.0,
+            surface_index_vertex: 0.0,
+            surface_index_tenor_exponent: 0.0,
+            surface_index_tenor_strip: 0.0,
             surface_curvature_exponent: 0.0,
             surface_term_premium_short: 0.0,
             surface_term_premium_long: 0.0,
             surface_earnings_weight: 0.0,
             option_dealer_spread: 0.0,
+            options_index_forward_from_future: 0.0,
             options_names_listed: 0.0,
             surface_name_premium: 0.0,
             surface_name_skew: 0.0,
@@ -11545,11 +11603,16 @@ impl ModelParams {
             "surface_skew_noise_sd" => self.surface_skew_noise_sd,
             "surface_skew_noise_half_life" => self.surface_skew_noise_half_life,
             "surface_curvature" => self.surface_curvature,
+            "surface_index_curvature" => self.surface_index_curvature,
+            "surface_index_vertex" => self.surface_index_vertex,
+            "surface_index_tenor_exponent" => self.surface_index_tenor_exponent,
+            "surface_index_tenor_strip" => self.surface_index_tenor_strip,
             "surface_curvature_exponent" => self.surface_curvature_exponent,
             "surface_term_premium_short" => self.surface_term_premium_short,
             "surface_term_premium_long" => self.surface_term_premium_long,
             "surface_earnings_weight" => self.surface_earnings_weight,
             "option_dealer_spread" => self.option_dealer_spread,
+            "options_index_forward_from_future" => self.options_index_forward_from_future,
             "options_names_listed" => self.options_names_listed,
             "surface_name_premium" => self.surface_name_premium,
             "surface_name_skew" => self.surface_name_skew,
@@ -11995,11 +12058,16 @@ impl ModelParams {
             "surface_skew_noise_sd" => out.surface_skew_noise_sd = value,
             "surface_skew_noise_half_life" => out.surface_skew_noise_half_life = value,
             "surface_curvature" => out.surface_curvature = value,
+            "surface_index_curvature" => out.surface_index_curvature = value,
+            "surface_index_vertex" => out.surface_index_vertex = value,
+            "surface_index_tenor_exponent" => out.surface_index_tenor_exponent = value,
+            "surface_index_tenor_strip" => out.surface_index_tenor_strip = value,
             "surface_curvature_exponent" => out.surface_curvature_exponent = value,
             "surface_term_premium_short" => out.surface_term_premium_short = value,
             "surface_term_premium_long" => out.surface_term_premium_long = value,
             "surface_earnings_weight" => out.surface_earnings_weight = value,
             "option_dealer_spread" => out.option_dealer_spread = value,
+            "options_index_forward_from_future" => out.options_index_forward_from_future = value,
             "options_names_listed" => out.options_names_listed = value,
             "surface_name_premium" => out.surface_name_premium = value,
             "surface_name_skew" => out.surface_name_skew = value,
@@ -13960,6 +14028,24 @@ impl ModelParams {
                  correlation keeps every smile free of static arbitrage.",
                 self.surface_curvature));
         }
+        if !(0.0..1.0).contains(&self.surface_index_tenor_exponent) {
+            return Err(format!(
+                "surface_index_tenor_exponent is {}. It is in [0, 1).",
+                self.surface_index_tenor_exponent
+            ));
+        }
+        if self.surface_index_tenor_strip != 0.0 && self.surface_index_tenor_strip != 1.0 {
+            return Err(format!("surface_index_tenor_strip is {}. It is 0.0 or 1.0.", self.surface_index_tenor_strip));
+        }
+        if !(0.0..=1.0).contains(&self.surface_index_vertex) {
+            return Err(format!("surface_index_vertex is {}. It is in [0, 1].", self.surface_index_vertex));
+        }
+        if !(self.surface_index_curvature >= 0.0 && self.surface_index_curvature < 2.0) {
+            return Err(format!(
+                "surface_index_curvature is {}. It is the index surface's eta, in [0, 2): at 2 or \
+                 above no correlation keeps every smile free of static arbitrage.",
+                self.surface_index_curvature));
+        }
         for (name, v) in [
             ("surface_skew_physical", self.surface_skew_physical),
             ("surface_skew_physical_slope", self.surface_skew_physical_slope),
@@ -13968,6 +14054,10 @@ impl ModelParams {
             ("surface_skew_noise_sd", self.surface_skew_noise_sd),
             ("surface_skew_noise_half_life", self.surface_skew_noise_half_life),
             ("surface_curvature", self.surface_curvature),
+            ("surface_index_curvature", self.surface_index_curvature),
+            ("surface_index_vertex", self.surface_index_vertex),
+            ("surface_index_tenor_exponent", self.surface_index_tenor_exponent),
+            ("surface_index_tenor_strip", self.surface_index_tenor_strip),
             ("surface_curvature_exponent", self.surface_curvature_exponent),
             ("surface_term_premium_short", self.surface_term_premium_short),
             ("surface_term_premium_long", self.surface_term_premium_long),
@@ -14013,6 +14103,20 @@ impl ModelParams {
                  is 0 too. The spread is the options dealer's, which quotes only what those switches \
                  list: set one of them to 1.0 first.",
                 self.option_dealer_spread));
+        }
+        if !(self.options_index_forward_from_future == 0.0 || self.options_index_forward_from_future == 1.0) {
+            return Err(format!(
+                "options_index_forward_from_future is {}. It is a switch, 0.0 off or 1.0 on.",
+                self.options_index_forward_from_future));
+        }
+        if self.options_index_forward_from_future != 0.0
+            && (self.options_index_listed == 0.0 || self.futures_index_listed == 0.0)
+        {
+            return Err(format!(
+                "options_index_forward_from_future is {} but options_index_listed is {} and \
+                 futures_index_listed is {}. The dealer takes the index options' forward from the \
+                 listed index futures: set both to 1.0 first.",
+                self.options_index_forward_from_future, self.options_index_listed, self.futures_index_listed));
         }
         if !(self.options_names_listed == 0.0 || self.options_names_listed == 1.0) {
             return Err(format!(
@@ -14620,11 +14724,16 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "surface_skew_noise_sd",
     "surface_skew_noise_half_life",
     "surface_curvature",
+    "surface_index_curvature",
+    "surface_index_vertex",
+    "surface_index_tenor_exponent",
+    "surface_index_tenor_strip",
     "surface_curvature_exponent",
     "surface_term_premium_short",
     "surface_term_premium_long",
     "surface_earnings_weight",
     "option_dealer_spread",
+    "options_index_forward_from_future",
     "options_names_listed",
     "surface_name_premium",
     "surface_name_skew",
@@ -14877,11 +14986,16 @@ pub fn settable_names() -> Vec<&'static str> {
         "surface_skew_noise_sd",
         "surface_skew_noise_half_life",
         "surface_curvature",
+        "surface_index_curvature",
+        "surface_index_vertex",
+        "surface_index_tenor_exponent",
+        "surface_index_tenor_strip",
         "surface_curvature_exponent",
         "surface_term_premium_short",
         "surface_term_premium_long",
         "surface_earnings_weight",
         "option_dealer_spread",
+        "options_index_forward_from_future",
         "options_names_listed",
         "surface_name_premium",
         "surface_name_skew",

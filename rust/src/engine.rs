@@ -2624,6 +2624,7 @@ impl Engine {
         pre.params.margin_scan_option_tail = 0.0;
         pre.params.options_index_listed = 0.0;
         pre.params.option_dealer_spread = 0.0;
+        pre.params.options_index_forward_from_future = 0.0;
         pre.params.surface_ssvi = 0.0;
         pre.params.surface_skew_physical = 0.0;
         pre.params.surface_skew_physical_slope = 0.0;
@@ -2632,6 +2633,10 @@ impl Engine {
         pre.params.surface_skew_noise_sd = 0.0;
         pre.params.surface_skew_noise_half_life = 0.0;
         pre.params.surface_curvature = 0.0;
+        pre.params.surface_index_curvature = 0.0;
+        pre.params.surface_index_vertex = 0.0;
+        pre.params.surface_index_tenor_exponent = 0.0;
+        pre.params.surface_index_tenor_strip = 0.0;
         pre.params.surface_curvature_exponent = 0.0;
         pre.params.surface_term_premium_short = 0.0;
         pre.params.surface_term_premium_long = 0.0;

@@ -44,6 +44,25 @@ every known-answer digest is where it was.
 
 <!-- release-note-ends -->
 
+### The index options' forward from the listed future
+
+`options_index_forward_from_future`, 0.0 on every preset: the index
+options' dealer takes an expiry's forward from the book mid of the listed
+index future of the same expiry, so the chain meets put-call parity against
+the future the market trades, not against a carry the future's basis
+departs from. Expiries without a future keep the carry. Known answers are
+unchanged.
+
+### A held future settles from its own expiry's rows
+
+`Portfolio` settled an expired future by reading every settlement of the
+history at each open and close. With the index options listed every
+expiry adds some 700 rows, so a long traded run slowed in proportion to
+its length at every step. It now reads each held contract's expiry session
+and the sessions after it until the contract's row appears. The rows found
+are the same, and a traded history's net worth, settlements and margin
+records are identical (`tests/test_futures_accounts.py`).
+
 ### Company news released before the open
 
 - `news_preopen_share` is a new dial, 0.0 on every preset and left out of the
@@ -56,6 +75,20 @@ every known-answer digest is where it was.
   On the forty names 2015-2025 the night carries 0.259 of the idiosyncratic
   variance on large non-event days; the model's, with every event in the
   session, 0.167.
+### The index smile's term scaling
+
+- `surface_index_tenor_exponent` is new, 0.0 on every preset and left out of
+  the digest there. Off zero the index's SSVI power law is read at the
+  21-session fit's total variance and falls from there as `theta^-x`, in
+  place of `surface_curvature_exponent`: the 21-session smile, its VIX and
+  its SKEW are unchanged, and the at-the-money skew scales with the tenor as
+  `T^-x` (about `T^-0.4` on the S&P). Index only; read only with
+  `surface_ssvi` set.
+- `surface_index_tenor_strip` is new, 0.0 on every preset and left out of
+  the digest there. At 1.0 the term scaling holds each tenor's strip (the
+  VIX formula's variance) where SSVI's own power law puts it, in place of its
+  at-the-money variance: the VIX9D, VIX3M, VIX6M and VIX1Y strips are
+  unchanged and the scaling moves variance between the money and the wings.
 
 ### Credit's lagged leverage term
 
@@ -140,6 +173,17 @@ every known-answer digest is where it was.
   `skew_noise` (the level and its key) while the dial is set, hashed behind
   tag 82, as `manifest.state_hash` does. Every known-answer digest is where
   it was.
+### The index surface's own curvature
+
+- `surface_index_curvature` is a new dial, 0.0 on every preset (the shared
+  `surface_curvature`) and left out of the digest there. Off zero the index
+  surface is fitted at its own curvature and the names keep theirs: a
+  name's correlation is its share of the one the index's VIX and skewness
+  give at the shared curvature, so the names' smiles are the ones they have
+  without it. A lower index curvature puts less of the strip's variance in
+  the wings, so at-the-money volatility sits nearer the VIX, and reaches
+  less skew. No state, nothing in the snapshot; stock prices are the same
+  with it set, and every known-answer digest is where it was.
 
 ### Single-name options
 

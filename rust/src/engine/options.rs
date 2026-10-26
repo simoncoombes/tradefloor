@@ -29,7 +29,9 @@
 //! An option `tau` sessions from expiry is priced by Black on the forward
 //! the index futures' carry gives, `F = (S - PV(D)) e^{r tau}`, at the
 //! surface's implied volatility at `ln(K / F)`, moved by the dealer's
-//! pressure on its expiry (`derivatives::dealer`). `tau` counts a session
+//! pressure on its expiry (`derivatives::dealer`). Under
+//! `options_index_forward_from_future` an expiry with a listed index future
+//! of its own takes `F` from that future's book mid instead. `tau` counts a session
 //! that has run `k` of its 390 ticks as `k / 390` used.
 
 use super::*;
@@ -39,7 +41,9 @@ use crate::derivatives::dealer::{
     chain_violations, dealer_thetas, ladder, pressure_after, read_smile, walk, ExpirySummary, Ladder, OptionQuote,
 };
 use crate::derivatives::pricing::{black_greeks, black_price, intrinsic};
-use crate::derivatives::surface::{fit_smile, term_shape, SmileFit, Ssvi, Surface, TermInputs, ThetaCurve, VIX_SESSIONS};
+use crate::derivatives::surface::{
+    fit_smile_shifted, term_shape, SmileFit, Ssvi, StripHold, Surface, TermInputs, ThetaCurve, VIX_SESSIONS,
+};
 use crate::derivatives::{
     index_option_symbol, ContractKind, ContractSpec, ContractSymbol, Right, Settlement, SymbolKind, INDEX_OPTION,
     INDEX_OPTION_DEALER,
@@ -146,12 +150,24 @@ const SETTLED_WIDTH: usize = 5;
 /// The 21-session fit last made, by its inputs' bits: the fit solves two
 /// strips' worth of prices per step, and a session's quotes read one VIX.
 #[derive(Debug, Default)]
-pub(crate) struct FitCache(std::sync::Mutex<Option<([u64; 4], SmileFit)>>);
+pub(crate) struct FitCache(std::sync::Mutex<Option<([u64; 5], SmileFit)>>);
 
 impl Clone for FitCache {
     fn clone(&self) -> Self {
         let held = self.0.lock().map(|g| *g).unwrap_or(None);
         FitCache(std::sync::Mutex::new(held))
+    }
+}
+
+/// The strip-held map last made (`surface_index_tenor_strip`), by its
+/// smile's bits: a session's quotes read one smile.
+#[derive(Debug, Default)]
+pub(crate) struct HoldCache(std::sync::Mutex<Option<([u64; 6], StripHold)>>);
+
+impl Clone for HoldCache {
+    fn clone(&self) -> Self {
+        let held = self.0.lock().map(|g| g.clone()).unwrap_or(None);
+        HoldCache(std::sync::Mutex::new(held))
     }
 }
 
@@ -168,6 +184,11 @@ pub(crate) struct OptionsState {
     /// option, which open interest is read from.
     pub(crate) book: BookState,
     pub(crate) cache: FitCache,
+    /// The fit the names' correlation is a share of when the index carries
+    /// its own curvature (`surface_index_curvature`): the index's VIX and
+    /// skewness at the names' curvature.
+    pub(crate) name_cache: FitCache,
+    pub(crate) hold_cache: HoldCache,
 }
 
 impl Default for OptionsState {
@@ -178,6 +199,8 @@ impl Default for OptionsState {
             settled: Vec::new(),
             book: BookState::default(),
             cache: FitCache::default(),
+            name_cache: FitCache::default(),
+            hold_cache: HoldCache::default(),
         }
     }
 }
@@ -333,28 +356,80 @@ impl Engine {
 
     // ── The surface ───────────────────────────────────────────────────────
 
-    /// The 21-session fit at `vix` and the skewness `target`, from the cache
-    /// when its inputs are the last fit's.
+    /// The index surface's curvature, SSVI's `eta`: `surface_index_curvature`
+    /// when set, the shared `surface_curvature` otherwise.
+    pub(super) fn index_curvature(&self) -> f64 {
+        let own = self.params.surface_index_curvature;
+        if own == 0.0 {
+            self.params.surface_curvature
+        } else {
+            own
+        }
+    }
+
+    /// The index's 21-session fit at `vix` and the skewness `target`, from
+    /// the cache when its inputs are the last fit's.
     fn surface_fit(&self, vix: f64, target: Option<f64>) -> Option<SmileFit> {
+        self.surface_fit_at(vix, target, self.index_curvature(), self.params.surface_index_vertex, &self.options.cache)
+    }
+
+    /// The 21-session fit at `vix`, the skewness `target`, the curvature
+    /// `eta` and the vertex's move `shift`, from `cache` when its inputs are
+    /// the last fit's there.
+    fn surface_fit_at(&self, vix: f64, target: Option<f64>, eta: f64, shift: f64, cache: &FitCache) -> Option<SmileFit> {
         let p = &self.params;
         let key = [
             vix.to_bits(),
             target.map_or(u64::MAX, f64::to_bits),
-            p.surface_curvature.to_bits(),
+            eta.to_bits(),
             p.surface_curvature_exponent.to_bits(),
+            shift.to_bits(),
         ];
-        if let Ok(guard) = self.options.cache.0.lock() {
+        if let Ok(guard) = cache.0.lock() {
             if let Some((k, fit)) = *guard {
                 if k == key {
                     return Some(fit);
                 }
             }
         }
-        let fit = fit_smile(vix, target, VIX_SESSIONS / 252.0, p.surface_curvature, p.surface_curvature_exponent)?;
-        if let Ok(mut guard) = self.options.cache.0.lock() {
+        let fit = fit_smile_shifted(vix, target, VIX_SESSIONS / 252.0, eta, p.surface_curvature_exponent, shift)?;
+        if let Ok(mut guard) = cache.0.lock() {
             *guard = Some((key, fit));
         }
         Some(fit)
+    }
+
+    /// The strip-held map of the scaled smile `ssvi`
+    /// (`surface_index_tenor_strip`), from the cache when its smile is the
+    /// last map's.
+    fn strip_hold(&self, ssvi: &Ssvi) -> Option<StripHold> {
+        let key = [ssvi.rho, ssvi.eta, ssvi.gamma, ssvi.shift, ssvi.anchor, ssvi.tenor].map(f64::to_bits);
+        if let Ok(guard) = self.options.hold_cache.0.lock() {
+            if let Some((k, hold)) = guard.as_ref() {
+                if *k == key {
+                    return Some(hold.clone());
+                }
+            }
+        }
+        let hold = StripHold::new(ssvi)?;
+        if let Ok(mut guard) = self.options.hold_cache.0.lock() {
+            *guard = Some((key, hold.clone()));
+        }
+        Some(hold)
+    }
+
+    /// The fit the names' smile reads (`surface_name_skew`): the index's own
+    /// while `surface_index_curvature` is 0.0; under it, the index's VIX and
+    /// skewness fitted at the names' curvature, `surface_curvature`, so a
+    /// name's smile is the one the shared curvature gives it.
+    pub(super) fn name_reference_fit(&self, index: &Surface) -> Option<(f64, SmileFit)> {
+        if self.params.surface_index_curvature == 0.0 && self.params.surface_index_vertex == 0.0 {
+            return Some((index.ssvi.eta, index.fit));
+        }
+        let eta = self.params.surface_curvature;
+        let target = if eta > 0.0 { index.skewness_target } else { None };
+        let fit = self.surface_fit_at(index.vix, target, eta, 0.0, &self.options.name_cache)?;
+        Some((eta, fit))
     }
 
     /// The earnings reports the index surface reads (`surface_earnings_weight`):
@@ -415,7 +490,7 @@ impl Engine {
     pub(super) fn surface_at(&self, clock: &Clock) -> Option<Surface> {
         let p = &self.params;
         let vix = self.surface_vix();
-        let (eta, gamma) = (p.surface_curvature, p.surface_curvature_exponent);
+        let (eta, gamma) = (self.index_curvature(), p.surface_curvature_exponent);
         let target = if eta > 0.0 {
             // Both slopes are on ln(VIX / 20); the log is taken only when
             // one is set, so the shipped arithmetic is unchanged.
@@ -450,13 +525,22 @@ impl Engine {
         };
         let shape = term_shape(&inputs, n_max);
         let curve = ThetaCurve::new(&shape, clock.elapsed, fit.theta)?;
+        let ssvi = Ssvi::new(fit.rho, eta, gamma)
+            .with_shift(p.surface_index_vertex)
+            .with_tenor(fit.theta, p.surface_index_tenor_exponent);
+        let hold = if p.surface_index_tenor_strip == 0.0 || ssvi.tenor == 0.0 {
+            None
+        } else {
+            Some(self.strip_hold(&ssvi)?)
+        };
         Some(Surface {
             root: ContractKind::IndexOption.root().to_string(),
-            ssvi: Ssvi::new(fit.rho, eta, gamma),
+            ssvi,
             curve,
             vix,
             skewness_target: target,
             fit,
+            hold,
         })
     }
 
@@ -507,7 +591,17 @@ impl Engine {
         let e = &self.options.expiries[slot];
         let sessions = crate::mathx::max(0.0, e.expiry as f64 - clock.now);
         let years = sessions / 252.0;
-        let (forward, rate, dividends, index) = self.carry_at(clock, e.expiry, sessions);
+        let (mut forward, rate, dividends, index) = self.carry_at(clock, e.expiry, sessions);
+        let mut carry_spot = index - dividends;
+        // `options_index_forward_from_future`: the forward the listed future
+        // of this expiry trades at, so the chain's parity against it holds
+        // inside the spread; the carry where none is listed
+        if self.params.options_index_forward_from_future != 0.0 && sessions > 0.0 {
+            if let Some(f) = self.index_future_mid(e.expiry).filter(|f| f.is_finite() && *f > 0.0) {
+                forward = f;
+                carry_spot = f * crate::mathx::exp(-rate * years);
+            }
+        }
         let (theta, dealer_theta) = thetas[slot];
         ExpiryContext {
             sessions,
@@ -515,7 +609,7 @@ impl Engine {
             rate,
             dividends,
             index,
-            carry_spot: index - dividends,
+            carry_spot,
             forward,
             discount: crate::mathx::exp(-rate * years),
             theta,

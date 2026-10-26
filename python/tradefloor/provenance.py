@@ -576,6 +576,22 @@ OUT_OF_SCOPE = {
         "unread while `surface_ssvi` is 0.0: only `surface_at` and "
         "`surface_fit` read it, and refused without the switch; at 0.0 it is "
         "also left out of the model's digest",
+    "surface_index_curvature":
+        "unread while `surface_ssvi` is 0.0: only `index_curvature` reads it, "
+        "and refused without the switch; at 0.0 it is the shared "
+        "`surface_curvature` and is also left out of the model's digest",
+    "surface_index_vertex":
+        "unread while `surface_ssvi` is 0.0: only `surface_at` reads it, and "
+        "refused without the switch; at 0.0 it is SSVI's own vertex and is "
+        "also left out of the model's digest",
+    "surface_index_tenor_exponent":
+        "unread while `surface_ssvi` is 0.0: only `surface_at` reads it, and "
+        "refused without the switch; at 0.0 it is the shared power law and is "
+        "also left out of the model's digest",
+    "surface_index_tenor_strip":
+        "unread while `surface_ssvi` is 0.0: only `surface_at` reads it, and "
+        "refused without the switch; at 0.0 the term scaling holds the "
+        "at-the-money variance and it is also left out of the model's digest",
     "surface_curvature_exponent":
         "unread while `surface_ssvi` is 0.0: only `surface_at` and "
         "`surface_fit` read it, and refused without the switch; at 0.0 it is "
@@ -593,6 +609,11 @@ OUT_OF_SCOPE = {
         "`surface_at` read it, and refused without the switch and without "
         "`forecast_horizon_sessions`; at 0.0 it is also left out of the "
         "model's digest",
+    "options_index_forward_from_future":
+        "unread while `options_index_listed` is 0.0, as every preset ships "
+        "it: only `expiry_context` in engine/options.rs reads it, and refused "
+        "without the index options and the index futures; at 0.0 it is also "
+        "left out of the model's digest",
     "option_dealer_spread":
         "unread while `options_index_listed` and `options_names_listed` are "
         "0.0, as every preset ships them: only `option_priced` and "

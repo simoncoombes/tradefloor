@@ -725,6 +725,23 @@ impl Engine {
         Valuation { index, fair, rate, dividends, sessions, basis_bp, price: fair + basis_bp * index / 1e4 }
     }
 
+    /// The mid of the book of the listed index future expiring at `expiry`,
+    /// or its valuation's price while a side of the book is empty; `None`
+    /// with the index futures off or no contract of that expiry listed. The
+    /// index options' dealer reads it under
+    /// `options_index_forward_from_future`.
+    pub(super) fn index_future_mid(&self, expiry: i64) -> Option<f64> {
+        if !self.futures_on() {
+            return None;
+        }
+        let slot = self.futures.contracts.iter().position(|c| c.expiry == expiry)?;
+        let book = self.futures_book(slot, None);
+        Some(match (book.best_bid(), book.best_ask()) {
+            (Some(b), Some(a)) => 0.5 * (a + b),
+            _ => self.futures_valuation(slot).price,
+        })
+    }
+
     /// The daily volume the futures' depth is sized to, contracts: the
     /// constituents' daily dollar volume times the spec's share, over a
     /// contract's notional at `index`.
