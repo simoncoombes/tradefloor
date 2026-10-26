@@ -98,7 +98,7 @@ from typing import Any, Sequence
 from ._core import check_seed
 from ._core import (Engine, Instrument, Macro, ModelParams, OrderError,
                     ValidationError)
-from .harness import session_clock
+from .harness import open_day, session_clock
 from .portfolio import Portfolio
 from .sandbox import MarketView, PortfolioView
 from .universe_util import as_universe
@@ -291,7 +291,7 @@ class TradingEnv(_Base):
         # episode and a new one after the next reset, as it always was.
         self._shown = (MarketView(engine), PortfolioView(portfolio, engine))
         self._step = 0
-        engine.open_market()
+        open_day(engine)
         # The cash dividends the open made payable (none at an episode's
         # first open, and none on a model without dividends).
         portfolio.collect_dividends(engine)
@@ -344,7 +344,7 @@ class TradingEnv(_Base):
             # 1); nothing without futures.
             portfolio.settle_close(engine)
             if self._step < self.max_steps:
-                engine.open_market()
+                open_day(engine)
                 # Collected at the open, before the reward is marked, so the
                 # ex-date drop and what the holder is paid net in one step.
                 portfolio.collect_dividends(engine)

@@ -195,7 +195,7 @@ from ._arith import ordered_sum
 from ._core import (Engine, Instrument, Macro, ModelParams, OrderError,
                     ValidationError, check_seed)
 from .checkpoint import Checkpoint, branch
-from .harness import History, Observation, _warm_up, session_clock
+from .harness import History, Observation, _warm_up, open_day, session_clock
 from .manifest import RunManifest, market_digest
 from .portfolio import Cancel, Exercise, Limit, Portfolio, check_order, order_items
 from .sandbox import (HiddenState, MarketView, PortfolioView, TamperGuard,
@@ -742,7 +742,7 @@ class World:
             # at which today's value is known.
             self._adv = _f64(self.engine.column("avg_volume"))
             macro = _macro(self.engine)
-            self.engine.open_market()
+            open_day(self.engine)
             # The cash dividends this open made payable, into each
             # portfolio in label order before any agent is asked, as
             # `evaluate` collects them. Nothing on a model without dividends.

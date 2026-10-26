@@ -111,7 +111,7 @@ from tradefloor._arith import ordered_sum
 from tradefloor._core import OrderError, check_seed
 from tradefloor.facts import REAL_MARKETS
 from tradefloor.harness import (History, Observation, _f64, _unknown_ticker,
-                                session_clock)
+                                open_day, session_clock)
 from tradefloor.portfolio import check_order, is_option_symbol, order_items
 from tradefloor.sandbox import (HiddenState, MarketView, PortfolioView,
                                 TamperGuard, declares_hidden_state)
@@ -3791,7 +3791,7 @@ class _Session:
             step = live["step"]
             day, of_day = divmod(step, spd)
             if of_day == 0:
-                engine.open_market()
+                open_day(engine)
                 # The cash dividends this open made payable, into each
                 # portfolio in label order before any agent is asked, as
                 # `evaluate` and a World collect them. The open is the only
