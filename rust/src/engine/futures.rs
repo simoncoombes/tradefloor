@@ -1435,18 +1435,23 @@ impl Engine {
     }
 
     /// After the close's macro step (`night_session_steps`): the night's
-    /// targets from the next open on a copy, and its path from the close.
-    /// Nothing without a night session.
+    /// targets from the next open on a copy, and its path from the index the
+    /// close left. Nothing without a night session.
     pub(super) fn futures_night_setup(&mut self) {
         let steps = self.night_steps();
         if steps == 0 || self.futures.phase != FuturesPhase::Night || self.futures.contracts.is_empty() {
             return;
         }
         let (index_open, fairs) = self.futures_preview();
-        let index_close = if self.index_close > 0.0 { self.index_close } else { self.futures_live_index() };
-        let mut now = vec![index_close];
+        // From the level the close's macro step left, not the session's last
+        // print: the re-mark (`macro_publication_repricing`) is public from
+        // the close, and a path from the print would walk a drift towards it
+        // that anyone could see. The marks stay on the print.
+        let index_start = self.futures_live_index();
+        let clock = self.futures_now();
+        let mut now = vec![index_start];
         for c in &self.futures.contracts {
-            now.push(c.fair_close);
+            now.push(self.futures_carry(c.expiry, index_start, clock).0);
         }
         let mut target = vec![index_open];
         target.extend(fairs);
@@ -1844,6 +1849,27 @@ mod tests {
         assert_eq!(night.index.to_bits(), open.index.to_bits());
         assert!((night.price - open.price).abs() <= 1e-12 * open.price);
         assert_eq!(open.mark.unwrap().to_bits(), close.mark.unwrap().to_bits());
+    }
+
+    #[test]
+    fn the_night_starts_from_the_index_the_close_left() {
+        let mut e = engine(21, ON);
+        let mut buffer = SessionBuffer::new();
+        let mut remarked = 0;
+        for d in 0..20 {
+            day(&mut e, d, &mut buffer);
+            let level = e.index_level().unwrap();
+            let front = e.contracts()[0].symbol.clone();
+            let q = e.quote(&front).unwrap();
+            // Before any step: the quote's index is the published level,
+            // re-mark and all, and its mark stays on the close's print.
+            assert_eq!(q.index.to_bits(), level.level.to_bits());
+            if level.close.is_some_and(|c| c != level.level) {
+                remarked += 1;
+            }
+            e.night_tick(8);
+        }
+        assert!(remarked > 0, "no close re-marked the index");
     }
 
     #[test]
