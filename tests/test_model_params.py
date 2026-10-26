@@ -2353,10 +2353,13 @@ COMPANIONS: dict[str, dict[str, float]] = {
     # The slow level's nowcast needs the horizon and the level; its half-life
     # and centre need the gain.
     "forecast_vix_level_nowcast": {"forecast_horizon_sessions": 21.0, "vix_level_sigma": 0.0181,
+                                   "vix_level_identity": 1.0,
                                    "forecast_vix_level_nowcast_half_life": 126.0},
     "forecast_vix_level_nowcast_half_life": {"forecast_horizon_sessions": 21.0, "vix_level_sigma": 0.0181,
+                                             "vix_level_identity": 1.0,
                                              "forecast_vix_level_nowcast": 0.4},
     "forecast_vix_level_nowcast_centre": {"forecast_horizon_sessions": 21.0, "vix_level_sigma": 0.0181,
+                                          "vix_level_identity": 1.0,
                                           "forecast_vix_level_nowcast": 0.4,
                                           "forecast_vix_level_nowcast_half_life": 126.0},
     # The stress cut's start at 15, where the probe's burn-in reads it (see
