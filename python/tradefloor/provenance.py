@@ -541,6 +541,10 @@ OUT_OF_SCOPE = {
         "stood (a branch in each margin); read only with "
         "`margin_scan_coverage` on; at 0.0 it is also left out of the model's "
         "digest",
+    "margin_pretrade_check":
+        "inert at 0.0: no margin is checked before an order, as it stood; "
+        "read by `Portfolio`, not the engine, so no price moves at any value; "
+        "at 0.0 it is also left out of the model's digest",
     # The index options, their surface and their dealer (pt-v22 phase 2),
     # inert on every shipped preset. An option and the surface read public
     # state, draw nothing and write only their own state, so off zero they

@@ -1935,6 +1935,20 @@ pub struct ModelParams {
     /// on. The scan reads quotes and writes nothing, so no price moves.
     /// Requires `margin_scan_coverage`. In [0, 1].
     pub margin_option_minimum: f64,
+    /// A switch: 1.0 refuses an account's order when its equity after the
+    /// order would be under the initial margin the account then asks
+    /// (`tradefloor.Portfolio`, `MarginError`). 0.0, on every shipped preset,
+    /// checks no margin before an order, as it stood (a call is made at a
+    /// close only), and a value of 0.0 is left out of the model's digest.
+    ///
+    /// FINRA Rule 4210(b): a customer "shall be required to deposit margin"
+    /// for a new transaction, at Regulation T's initial amounts (12 CFR
+    /// 220.4(c)); a broker checks it before the order goes. Equity counts the
+    /// order's distance from the marks; an order that asks no more margin
+    /// than the account already owes, which takes risk off, is never
+    /// refused, nor is a margin call's liquidation. Read by the account, not
+    /// the engine, so no price moves. Requires `margin_scan_coverage`. 0 or 1.
+    pub margin_pretrade_check: f64,
     /// Whether the engine lists European options on its price index. 0.0,
     /// on every shipped preset, lists none: no contract, no state, nothing in
     /// the snapshot or the state hash, and a value of 0.0 is left out of the
@@ -8918,6 +8932,7 @@ impl ModelParams {
             margin_scan_tail: 0.0,
             margin_scan_option_tail: 0.0,
             margin_option_minimum: 0.0,
+            margin_pretrade_check: 0.0,
             options_index_listed: 0.0,
             surface_ssvi: 0.0,
             surface_skew_physical: 0.0,
@@ -11606,6 +11621,7 @@ impl ModelParams {
             "margin_scan_tail" => self.margin_scan_tail,
             "margin_scan_option_tail" => self.margin_scan_option_tail,
             "margin_option_minimum" => self.margin_option_minimum,
+            "margin_pretrade_check" => self.margin_pretrade_check,
             "options_index_listed" => self.options_index_listed,
             "surface_ssvi" => self.surface_ssvi,
             "surface_skew_physical" => self.surface_skew_physical,
@@ -12059,6 +12075,7 @@ impl ModelParams {
             "margin_scan_tail" => out.margin_scan_tail = value,
             "margin_scan_option_tail" => out.margin_scan_option_tail = value,
             "margin_option_minimum" => out.margin_option_minimum = value,
+            "margin_pretrade_check" => out.margin_pretrade_check = value,
             "options_index_listed" => out.options_index_listed = value,
             "surface_ssvi" => out.surface_ssvi = value,
             "surface_skew_physical" => out.surface_skew_physical = value,
@@ -14035,6 +14052,18 @@ impl ModelParams {
                  margin, which only margin_scan_coverage sets: set margin_scan_coverage first.",
                 self.margin_option_minimum));
         }
+        if !(self.margin_pretrade_check == 0.0 || self.margin_pretrade_check == 1.0) {
+            return Err(format!(
+                "margin_pretrade_check is {}. It is a switch: 0 (no margin checked before an order) or 1 \
+                 (an order is refused when the account's equity after it is under its initial margin).",
+                self.margin_pretrade_check));
+        }
+        if self.margin_pretrade_check != 0.0 && self.margin_scan_coverage == 0.0 {
+            return Err(format!(
+                "margin_scan_coverage is 0 but margin_pretrade_check is {}. The check reads the margin, which \
+                 only margin_scan_coverage sets: set margin_scan_coverage first.",
+                self.margin_pretrade_check));
+        }
         for (name, v) in [("options_index_listed", self.options_index_listed), ("surface_ssvi", self.surface_ssvi)] {
             if !(v == 0.0 || v == 1.0) {
                 return Err(format!("{name} is {v}. It is a switch, 0.0 off or 1.0 on."));
@@ -14720,6 +14749,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "margin_scan_tail",
     "margin_scan_option_tail",
     "margin_option_minimum",
+    "margin_pretrade_check",
     "night_session_steps",
     "futures_impact_memory",
     "futures_impact_memory_half_life",
@@ -14983,6 +15013,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "margin_scan_tail",
         "margin_scan_option_tail",
         "margin_option_minimum",
+        "margin_pretrade_check",
         "options_index_listed",
         "surface_ssvi",
         "surface_skew_physical",

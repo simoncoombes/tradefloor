@@ -112,6 +112,15 @@ def is_name_option(symbol: object) -> bool:
     return is_option_symbol(symbol) and _option_root(symbol) != "IDX"  # type: ignore[arg-type]
 
 
+class MarginError(OrderError):
+    """An order refused because the account's equity after it would be under
+    the initial margin it asks (``margin_pretrade_check``).
+
+    A subclass of :class:`OrderError`, so code that catches that still
+    catches this.
+    """
+
+
 class LeverageError(OrderError):
     """An order refused because it would take the portfolio past
     ``max_leverage``.
@@ -636,6 +645,7 @@ class Portfolio:
             projected = self._projected_leverage(engine, ticker, filled, price, notional)
             if projected > self.max_leverage:
                 raise LeverageError(_leverage_refusal(projected, self.max_leverage))
+        self._check_initial_margin(engine, ticker, filled, price)
 
         position = self.positions.setdefault(ticker, Position(ticker))
         self._apply(position, filled, price)
@@ -798,6 +808,8 @@ class Portfolio:
                                                      filled * price)
             if projected > self.max_leverage:
                 raise LeverageError(_leverage_refusal(projected, self.max_leverage))
+        if not liquidation:
+            self._check_initial_margin(engine, ticker, expected if side == "buy" else -expected, price)
         # A future's or an option's notional is its price times its multiplier.
         multiplier = (float(engine.quote(ticker)["multiplier"])
                       if (is_future_symbol(ticker) or is_option_symbol(ticker))
@@ -1053,6 +1065,65 @@ class Portfolio:
             if scan is not None:
                 total += scan / 1.1 if maintenance else scan
         return total
+
+    def _initial_margin_with(self, engine: Engine, symbol: str, filled: float) -> float:
+        """:meth:`margin_requirement`'s initial requirement with ``filled``
+        more of ``symbol`` held, without trading it."""
+        futures = {s: f.quantity for s, f in self.futures.items()}
+        options = {s: o.quantity for s, o in self.options.items()}
+        stocks = {t: p.quantity for t, p in self.positions.items()}
+        if is_future_symbol(symbol) and symbol not in engine.tickers:
+            futures[symbol] = futures.get(symbol, 0.0) + filled
+        elif is_option_symbol(symbol) and symbol not in engine.tickers:
+            options[symbol] = options.get(symbol, 0.0) + filled
+        else:
+            stocks[symbol] = stocks.get(symbol, 0.0) + filled
+        total = 0.0
+        for s, q in futures.items():
+            try:
+                per = engine.quote(s)["initial_margin"]
+            except ValidationError:
+                per = None
+            total += abs(q) * (per or 0.0)
+        held = [(s, q) for s, q in options.items() if q]
+        if held:
+            names = {_option_root(s) for s, _ in held if is_name_option(s)}
+            held += [(t, q) for t, q in stocks.items() if t in names and q]
+            scan = engine.option_margin(held)
+            if scan is not None:
+                total += scan
+        return total
+
+    def _check_initial_margin(self, engine: Engine, symbol: str, filled: float, price: float) -> None:
+        """Refuse an order that leaves the account's equity under the initial
+        margin it would then ask (``margin_pretrade_check``): FINRA Rule
+        4210(b), margin deposited for a new commitment at Regulation T's
+        initial amounts (12 CFR 220.4(c)), checked before the order goes.
+        Equity counts the order's distance from the marks, which leaves the
+        account at once. An order that asks no more than the account already
+        owes, which takes risk off, is never refused, nor is a liquidation.
+        Nothing on a model with the switch off, or for an account that holds
+        no contract and orders none."""
+        if not getattr(engine.model, "margin_pretrade_check", 0.0):
+            return
+        contract = (is_future_symbol(symbol) or is_option_symbol(symbol)) and symbol not in engine.tickers
+        if not (contract or self.futures or self.options):
+            return
+        before = self.margin_requirement(engine)
+        after = self._initial_margin_with(engine, symbol, filled)
+        if after <= before:
+            return
+        if contract:
+            q = engine.quote(symbol)
+            mark = q["mid"] if is_option_symbol(symbol) else q["price"]
+            cost = filled * float(q["multiplier"]) * (price - mark)
+        else:
+            cost = filled * (price - self.marks(engine)[symbol])
+        equity = self.net_worth(engine) - cost
+        if equity < after:
+            raise MarginError(
+                f"{symbol} {filled:+g}: the account's equity after the order, {equity:,.0f}, would be under "
+                f"the initial margin it asks, {after:,.0f} (margin_pretrade_check)")
 
     def margin(self, engine: Engine) -> dict[str, Any]:
         """The account's margin now, a dict: ``initial`` and ``maintenance``,

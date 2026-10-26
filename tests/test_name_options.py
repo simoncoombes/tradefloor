@@ -673,3 +673,29 @@ def test_the_rulebooks_minimum_floors_an_uncovered_short_and_a_strangle_asks_its
     assert floor.option_margin([(far_call["symbol"], -1.0), (ticker, 100.0)]) == \
         scan.option_margin([(far_call["symbol"], -1.0), (ticker, 100.0)])
     assert floor.quote(far_call["symbol"])["initial_margin"] == pytest.approx(0.10 * spot * 100)
+
+
+def test_the_pretrade_check_refuses_an_order_the_account_cannot_margin():
+    from tradefloor.portfolio import MarginError
+    dials = dict(ON, margin_option_minimum=0.10)
+    for checked in (0.0, 1.0):
+        engine = tf.Engine(seed=19, universe=SMALL, model=model(**dials, margin_pretrade_check=checked))
+        for _ in range(3):
+            day(engine)
+        engine.open_market()
+        ticker = engine.tickers[3]
+        expiry = sorted({c["expiry"] for c in names(engine, ticker)})[0]
+        call = strike_near(engine, ticker, expiry, "C", 2)["symbol"]
+        p = Portfolio(cash=0.25 * _price(engine, ticker) * 100, owner="a")
+        if not checked:
+            p.execute(engine, call, -6.0)
+            assert p.margin_requirement(engine) > p.net_worth(engine)
+            continue
+        p.execute(engine, call, -2.0)
+        with pytest.raises(MarginError):
+            p.execute(engine, call, -6.0)
+        assert p.options[call].quantity == -2.0
+        assert p.net_worth(engine) >= p.margin_requirement(engine)
+        # Taking risk off is never refused.
+        p.execute(engine, call, 2.0)
+        assert call not in p.options

@@ -75,6 +75,11 @@ payload, Arrow and WASM show them; agents trade by symbol.
   uncovered short put, a short call and put together asking the greater
   (FINRA Rule 4210(f)(2)(E)(i) and (f)(2)(G); the rule's 10%). The scan
   charged a deep out-of-the-money short close to nothing.
+- `margin_pretrade_check` is a new switch, 0.0 on every preset and left out
+  of the digest there: a `Portfolio` refuses an order that would leave its
+  equity under the initial margin it then asks (`MarginError`; FINRA Rule
+  4210(b), Regulation T 12 CFR 220.4(c)). Margin was checked only at a
+  close, so an account could open what it could not carry.
 - `margin_scan_option_tail` is new, 0.0 on every preset and left out of the
   digest there. Off zero it is the option scan's own tail allowance, in
   place of `margin_scan_tail` on the scan's price move and volatility

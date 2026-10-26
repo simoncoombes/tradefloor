@@ -4583,7 +4583,11 @@ of what it is written on. Maintenance is initial over 1.1. A
 dealer's mid, is paid its settlement at expiry (`Portfolio.settled`), counts
 it at its delta-notional against the leverage limit, adds the scan to
 `margin_requirement`, and closes options as well as futures on an unmet
-margin call.
+margin call. Under `margin_pretrade_check` (0.0 on every shipped preset) it
+refuses an order that would leave its equity under the initial margin it
+then asks (`MarginError`; FINRA Rule 4210(b) and Regulation T's initial
+amounts, 12 CFR 220.4(c)); an order that asks no more margin than the
+account owes already, and a margin call's liquidation, always go.
 
 **State.** A snapshot carries `options` (the listing, each expiry's strike
 grid and range, the dealer's pressure and the settled expiries) while
