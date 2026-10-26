@@ -403,6 +403,11 @@ class Engine:
     def lists_name_options(self) -> bool: ...
     # The tickers whose options are listed now, in roster order.
     def name_option_roots(self) -> list[str]: ...
+    # The next scheduled meeting's change, percentage points, on the
+    # economy as published and on the Fed's own reading: `(published, own)`,
+    # the shadows `policy_anticipation_guidance` blends. None without a
+    # forecast. A read.
+    def policy_shadows(self) -> tuple[float, float] | None: ...
     # The forecast the last close computed (`forecast_horizon_sessions`):
     # `day`, `horizon`, and per horizon `vix`, `index_variance`,
     # `policy_rate` (fractional), `oil`, and `name_variance` by ticker. None

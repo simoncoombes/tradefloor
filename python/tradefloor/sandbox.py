@@ -187,6 +187,8 @@ HIDDEN_STATE = {
     "model_params": "the model's dials, the cycle's hazards among them",
     "macro_table": "the full macro path, the true phase included",
     "fork": "a copy of the market that can be run ahead: look-ahead",
+    "policy_shadows": "the next meeting's change on the Fed's own reading "
+                      "of the economy, which the meeting delivers",
     "earnings_surprises": "each report's surprise as the opening print "
                           "realised it, split from the night's own move: "
                           "the price shows the gap, not what caused it",

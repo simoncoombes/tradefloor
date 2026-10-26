@@ -38,7 +38,11 @@
 //! [`Engine::night_tick`] walks each future's log fair value to its target
 //! on a Brownian bridge with the night's share of the index's one-session
 //! variance, all on one normal per step, so the last step lands on the
-//! open. The real open takes its own draws as it always did. A host's write
+//! open. The path starts on the close's marks and takes the close's macro
+//! re-mark of the index (`macro_publication_repricing`, public from the
+//! close) whole at its first step; an order on an index future before that
+//! step walks it first, so none trades on the close's print once the
+//! re-mark is known. The real open takes its own draws as it always did. A host's write
 //! between sessions (a pin, a listing or delisting, a change of status, and
 //! from Python a fundamentals write) reruns the copy and moves the night's
 //! path by the change in its targets at once. A write the copy is not rerun
@@ -1096,6 +1100,12 @@ impl Engine {
         if self.contract_order_id_taken(&id) {
             return Err(format!("order id {id:?} is already waiting in the book"));
         }
+        // Before the night's first step the book stands on the close's
+        // print, and the close's re-mark, already public, enters at that
+        // step: the order walks it first and meets the book after it.
+        if self.futures.phase == FuturesPhase::Night && self.futures.night.as_ref().is_some_and(|b| b.done == 0) {
+            self.night_tick(1);
+        }
         let sequence = self.futures.book.sequence;
         self.futures.book.sequence += 1;
         self.futures_cross_resting();
@@ -1289,9 +1299,27 @@ impl Engine {
             }
         }
         if night {
+            // The first step starts from the index the close's macro step
+            // left and each contract's carry on it: the re-mark
+            // (`macro_publication_repricing`) is public from the close, so it
+            // enters whole here and not as a drift along the path that
+            // anyone could see.
+            let start = match self.futures.night.as_ref() {
+                Some(b) if b.done == 0 => {
+                    let index = self.futures_live_index();
+                    let clock = self.futures_now();
+                    let mut start = vec![index];
+                    start.extend(b.expiries.iter().map(|e| self.futures_carry(*e, index, clock).0));
+                    start.iter().all(|v| v.is_finite() && *v > 0.0).then_some(start)
+                }
+                _ => None,
+            };
             self.futures.rng.site(Site::NightBridgeZ, 0);
             let z = self.futures.rng.next_normal();
             if let Some(b) = self.futures.night.as_mut() {
+                if let Some(start) = start {
+                    b.now = start;
+                }
                 let left = b.steps - b.done;
                 if left <= 1 {
                     b.now.clone_from(&b.target);
@@ -1462,23 +1490,20 @@ impl Engine {
     }
 
     /// After the close's macro step (`night_session_steps`): the night's
-    /// targets from the next open on a copy, and its path from the index the
-    /// close left. Nothing without a night session.
+    /// targets from the next open on a copy, and its path from the close's
+    /// marks. Nothing without a night session.
     pub(super) fn futures_night_setup(&mut self) {
         let steps = self.night_steps();
         if steps == 0 || self.futures.phase != FuturesPhase::Night || self.futures.contracts.is_empty() {
             return;
         }
         let (index_open, fairs) = self.futures_preview();
-        // From the level the close's macro step left, not the session's last
-        // print: the re-mark (`macro_publication_repricing`) is public from
-        // the close, and a path from the print would walk a drift towards it
-        // that anyone could see. The marks stay on the print.
-        let index_start = self.futures_live_index();
-        let clock = self.futures_now();
-        let mut now = vec![index_start];
+        // On the close's marks until the first step, which takes the close's
+        // re-mark (`futures_step`).
+        let index_close = if self.index_close > 0.0 { self.index_close } else { self.futures_live_index() };
+        let mut now = vec![index_close];
         for c in &self.futures.contracts {
-            now.push(self.futures_carry(c.expiry, index_start, clock).0);
+            now.push(c.fair_close);
         }
         let mut target = vec![index_open];
         target.extend(fairs);
@@ -1879,8 +1904,15 @@ mod tests {
     }
 
     #[test]
-    fn the_night_starts_from_the_index_the_close_left() {
-        let mut e = engine(21, ON);
+    fn the_night_keeps_the_close_until_its_first_step_takes_the_remark() {
+        // No night variance: the path has no noise, so each step is its
+        // drift alone.
+        let quiet: Vec<(&str, f64)> = ON
+            .iter()
+            .copied()
+            .chain([("overnight_variance_ratio", 0.0), ("overnight_market_share", 0.0), ("overnight_idio_share", 0.0)])
+            .collect();
+        let mut e = engine(21, &quiet);
         let mut buffer = SessionBuffer::new();
         let mut remarked = 0;
         for d in 0..20 {
@@ -1888,15 +1920,51 @@ mod tests {
             let level = e.index_level().unwrap();
             let front = e.contracts()[0].symbol.clone();
             let q = e.quote(&front).unwrap();
-            // Before any step: the quote's index is the published level,
-            // re-mark and all, and its mark stays on the close's print.
-            assert_eq!(q.index.to_bits(), level.level.to_bits());
-            if level.close.is_some_and(|c| c != level.level) {
+            // Before any step: the quote stands on the close's print, as its
+            // mark does.
+            let print = level.close.unwrap_or(level.level);
+            assert_eq!(q.index.to_bits(), print.to_bits());
+            // The first step starts from the published level, re-mark and
+            // all, and takes one step of the drift to the open.
+            assert_eq!(e.night_tick(1), 1);
+            let words = e.night_bridge_words().unwrap();
+            assert_eq!(words[2], 0.0);
+            let n = words[3] as usize;
+            let (now, target) = (words[4 + n], words[4 + n + n + 1]);
+            let expect = (level.level.ln() + (target.ln() - level.level.ln()) / 8.0).exp();
+            assert!((now - expect).abs() <= 1e-9 * expect, "{now} {expect}");
+            if print != level.level {
                 remarked += 1;
             }
-            e.night_tick(8);
+            e.night_tick(7);
         }
         assert!(remarked > 0, "no close re-marked the index");
+    }
+
+    #[test]
+    fn an_order_before_the_nights_first_step_meets_the_book_after_it() {
+        use crate::order_book::Side;
+        let mut e = engine(23, ON);
+        let mut buffer = SessionBuffer::new();
+        for d in 0..5 {
+            day(&mut e, d, &mut buffer);
+            if d + 1 < 5 {
+                e.night_tick(8);
+            }
+        }
+        let front = e.contracts()[0].symbol.clone();
+        let stale = e.quote(&front).unwrap();
+        let mut walked = e.clone();
+        assert_eq!(walked.night_tick(1), 1);
+        let first = walked.quote(&front).unwrap();
+        assert_ne!(stale.index.to_bits(), first.index.to_bits(), "the first step moved nothing");
+        // The order walks the first step, then fills where an order placed
+        // after it would.
+        let a = e.submit_order("a", &front, Side::Buy, 1.0, None, None).unwrap();
+        let b = walked.submit_order("a", &front, Side::Buy, 1.0, None, None).unwrap();
+        assert!(e.night_walked());
+        assert_eq!(a.average_price.unwrap().to_bits(), b.average_price.unwrap().to_bits());
+        assert_eq!(e.night_tick(100), 7);
     }
 
     #[test]

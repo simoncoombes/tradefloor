@@ -496,7 +496,7 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "margin_scan_coverage": (0.0, 0.995),
     "margin_scan_tail": (0.0, 2.0),
     "margin_scan_option_tail": (0.0, 2.0),
-    "margin_option_minimum": (0.0, 1.0),
+    "margin_option_minimum": (0.0, 10.0),
     "margin_pretrade_check": (0.0, 1.0),
     # The index options, their surface and their dealer (pt-v22 phase 2):
     # two switches, the surface's skew, curvature, term premia and earnings
@@ -760,7 +760,7 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "cycle_inflation_hazard": (0.0, 0.1),
     # Two switches.
     "fed_eve_decision": (0.0, 1.0),
-    "policy_eve_surprise_sd": (0.0, 100.0),
+    "policy_guidance_signal_sd": (0.0, 100.0),
     "treasury_path_owed_excluded": (0.0, 1.0),
     # Credit's repricing lag, sessions.
     "corporate_spread_equity_lag": (0.0, 21.0),

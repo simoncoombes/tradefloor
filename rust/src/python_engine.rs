@@ -4845,6 +4845,16 @@ impl PyEngine {
         self.inner.name_option_roots()
     }
 
+    /// The next scheduled meeting's change, percentage points, as the
+    /// economy as published implies it and as the Fed's own reading (the
+    /// economy the meeting reads) does, on the close the standing forecast
+    /// was taken at: `(published, own)`, the two silent shadows
+    /// `policy_anticipation_guidance` blends. None without a forecast. A
+    /// read: no draw is taken and nothing is written.
+    fn policy_shadows(&self) -> Option<(f64, f64)> {
+        self.inner.policy_shadows()
+    }
+
     /// The forecast the last close computed (`forecast_horizon_sessions`), or
     /// None with the dial at 0 and before the first close. Entry `h - 1` of
     /// each list is the expectation `h` sessions ahead: `vix`, the published
