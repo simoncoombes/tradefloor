@@ -91,8 +91,8 @@ pays each ex-date once, with every known-answer digest where it was.
 options' dealer takes an expiry's forward from the book mid of the listed
 index future of the same expiry, so the chain meets put-call parity against
 the future the market trades, not against a carry the future's basis
-departs from. Expiries without a future keep the carry. Known answers are
-unchanged.
+departs from. Expiries without a future keep the carry, and every
+known-answer digest is where it was.
 
 ### A held future settles from its own expiry's rows
 
@@ -122,8 +122,8 @@ records are identical (`tests/test_futures_accounts.py`).
 - `remark_growth_open_share` is a new dial, 0.0 on every preset and left out
   of the digest there: the share of the growth in the close's macro re-mark
   (the change in fair value with only nominal output brought forward, and the
-  aggregate level's close step) that the next opening print prices rather
-  than the re-mark. The re-mark's news (rates, the VIX, the cycle) stays at
+  aggregate level's close step) that waits for the next opening print
+  instead of entering at the re-mark. The re-mark's news (rates, the VIX, the cycle) stays at
   the close. The mispricing is unchanged, so the open takes the rest on the
   night; no draw and no state. Read only with `macro_publication_repricing`;
   refused without a night split. On the forty names 2015-2025 the night
@@ -202,8 +202,8 @@ records are identical (`tests/test_futures_accounts.py`).
   (+0.02 to +0.19 a VIX point) toward its time-series response measured on
   CFE VX, 2004-2026: a contract's daily change less the tape's own expected
   change of its settlement, per point of the day's VIX move, -0.072 (se 0.053)
-  and flat in tenor. At 1.0 a VIX jump compresses the premium, as on CFE. No
-  draw and no state.
+  and flat in tenor. At 1.0 a VIX jump compresses the premium, as on CFE,
+  with no draw and no state of its own.
 ### Company news released before the open
 
 - `policy_guidance_signal_sd` is a new dial, 0.0 on every preset and left
@@ -237,20 +237,6 @@ records are identical (`tests/test_futures_accounts.py`).
   On the forty names 2015-2025 the night carries 0.259 of the idiosyncratic
   variance on large non-event days; the model's, with every event in the
   session, 0.167.
-### The index smile's term scaling
-
-- `surface_index_tenor_exponent` is new, 0.0 on every preset and left out of
-  the digest there. Off zero the index's SSVI power law is read at the
-  21-session fit's total variance and falls from there as `theta^-x`, in
-  place of `surface_curvature_exponent`: the 21-session smile, its VIX and
-  its SKEW are unchanged, and the at-the-money skew scales with the tenor as
-  `T^-x` (about `T^-0.4` on the S&P). Index only; read only with
-  `surface_ssvi` set.
-- `surface_index_tenor_strip` is new, 0.0 on every preset and left out of
-  the digest there. At 1.0 the term scaling holds each tenor's strip (the
-  VIX formula's variance) where SSVI's own power law puts it, in place of its
-  at-the-money variance: the VIX9D, VIX3M, VIX6M and VIX1Y strips are
-  unchanged and the scaling moves variance between the money and the wings.
 
 ### The 10-year's lagged equity term
 
