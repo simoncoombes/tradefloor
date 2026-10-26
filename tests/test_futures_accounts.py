@@ -214,3 +214,31 @@ def test_a_world_marks_and_settles_a_futures_position():
     world.run(20)
     assert any(s["symbol"] == symbol for s in world.portfolio.settled)
     assert symbol not in world.portfolio.futures
+
+
+def test_settling_reads_each_contracts_own_expiry_not_the_whole_history():
+    """A held future is settled from the rows of its own expiry session and
+    after (one settled a session late included), never from the whole
+    history, which grows by hundreds of rows an expiry once the index
+    options are listed."""
+    from tradefloor.portfolio import FuturesPosition
+
+    rows = {56: [{"symbol": "IDX.F0056", "value": 1010.0}, {"symbol": "IDX.O0056.C1000.00", "value": 10.0}],
+            36: [{"symbol": "FF.F0035", "value": 97.5}]}
+    asked = []
+
+    class Stand:
+        def settlements(self, day=None):
+            asked.append(day)
+            return rows.get(day, []) if day is not None else [r for v in rows.values() for r in v]
+
+    p = Portfolio(cash=1e6)
+    for sym, mult, mark in (("IDX.F0056", 250.0, 1000.0), ("FF.F0035", 4167.0, 97.0), ("VIX.F0077", 1000.0, 15.0)):
+        f = FuturesPosition(sym, mult, mark)
+        f.quantity = 3.0
+        p.futures[sym] = f
+    p._settle_expired(Stand(), 56)
+    assert None not in asked
+    assert sorted(p.futures) == ["VIX.F0077"]
+    assert p.cash == pytest.approx(1e6 + 3 * 250.0 * 10.0 + 3 * 4167.0 * 0.5, rel=1e-15)
+    assert sorted((s["symbol"], s["price"]) for s in p.settled) == [("FF.F0035", 97.5), ("IDX.F0056", 1010.0)]

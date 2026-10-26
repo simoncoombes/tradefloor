@@ -83,6 +83,11 @@ def is_future_symbol(ticker: object) -> bool:
     return isinstance(ticker, str) and bool(_FUTURE_SYMBOL.match(ticker))
 
 
+def _future_expiry(symbol: str) -> int:
+    """A future's expiry session, the digits after its ``.F``."""
+    return int(symbol.rsplit(".F", 1)[1])
+
+
 #: A listed option's symbol, ``ROOT.Onnnn.Rk.cc`` (pt-v22 phase 2): the root,
 #: the expiry session, the right and the strike in dollars and cents.
 _OPTION_SYMBOL = re.compile(
@@ -1234,8 +1239,18 @@ class Portfolio:
         margin to the settlement price, and close it."""
         if not self.futures:
             return
-        values = {s["symbol"]: s["value"] for s in engine.settlements()
-                  if s["symbol"] in self.futures}
+        # Each held contract's settlement is read at its own expiry session
+        # (the `Fnnnn` of its symbol) and after, not over the whole history:
+        # with the index options listed every expiry adds some 700 rows, and
+        # reading them all at each open and close made a long traded run
+        # quadratic in its length. The rows found are the same.
+        values = {}
+        for symbol in self.futures:
+            for session in range(_future_expiry(symbol), day + 1):
+                hit = [s["value"] for s in engine.settlements(session) if s["symbol"] == symbol]
+                if hit:
+                    values[symbol] = hit[0]
+                    break
         for symbol, value in values.items():
             held = self.futures.pop(symbol)
             cash = held.quantity * held.multiplier * (value - held.mark)

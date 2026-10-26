@@ -26,6 +26,16 @@ payload, Arrow and WASM show them; agents trade by symbol.
 
 <!-- release-note-ends -->
 
+### A held future settles from its own expiry's rows
+
+`Portfolio` settled an expired future by reading every settlement of the
+history at each open and close. With the index options listed every
+expiry adds some 700 rows, so a long traded run slowed in proportion to
+its length at every step. It now reads each held contract's expiry session
+and the sessions after it until the contract's row appears. The rows found
+are the same, and a traded history's net worth, settlements and margin
+records are identical (`tests/test_futures_accounts.py`).
+
 ### Company news released before the open
 
 - `news_preopen_share` is a new dial, 0.0 on every preset and left out of the
