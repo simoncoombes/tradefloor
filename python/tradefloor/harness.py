@@ -439,7 +439,7 @@ def _warm_up(engine: Engine, days: int, *, steps_per_day: int,
     """
     hour, minute, day_of_week = start
     for k in range(days):
-        engine.open_market()
+        open_day(engine)
         for step in range(steps_per_day):
             engine.run_session(*session_clock((hour, minute, day_of_week),
                                               step, ticks_per_step),
@@ -806,6 +806,17 @@ class Scorecard:
         if gross is not None:
             text += f", exposure={gross:.2f}x"
         return text
+
+
+def open_day(engine: Engine) -> None:
+    """The next open, after the night session when the model has one
+    (``night_session_steps``): between a close and the open the index
+    futures walk the night (:meth:`Engine.run_night`), as the graded runs
+    walk it, so an agent trades the futures market that is measured. With
+    no night, or before the first close, the open alone, as before."""
+    if engine.model.night_session_steps > 0:
+        engine.run_night()
+    engine.open_market()
 
 
 def session_clock(start: tuple[int, int, int], step_within_day: int,
@@ -1201,7 +1212,7 @@ def _run_untraded(seed, universe, macro, days, steps_per_day, ticks_per_step,
     for day in range(days):
         if scenario is not None:
             scenario.apply(engine, day)
-        engine.open_market()
+        open_day(engine)
         for step in range(steps_per_day):
             # The same advancing clock as the traded run. If this stepped
             # differently the two worlds would differ for a reason that had
@@ -1290,7 +1301,7 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
             # daily re-read of every ordinary run would be a column copy
             # nobody asked for.
             adv = _f64(engine.column("avg_volume"))
-        engine.open_market()
+        open_day(engine)
         # The dividends this open made payable, before the agent acts: the
         # price already carries the ex-date drop. Reinvested in the paying
         # name under the portfolio's plan, cash otherwise. Nothing on a

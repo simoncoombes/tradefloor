@@ -1254,6 +1254,36 @@ pub struct ModelParams {
     /// it stood. The stored decision is snapshotted and hashed only with
     /// this set. 0 or 1.
     pub fed_eve_decision: f64,
+    /// The sd, in basis points, of the meeting-day surprise the market's
+    /// policy path carries once the eve holds the decision. 0.0, on every
+    /// shipped preset, is the path as it stood: the next meeting priced at
+    /// `1 - forecast_policy_shadow_discount` of the shadow change plus the
+    /// reversion step, even on the eve, and a value of 0.0 is left out of the
+    /// model's digest.
+    ///
+    /// Off zero, with `fed_eve_decision` on, the forecast taken at the close
+    /// before a scheduled meeting prices that meeting's change at the
+    /// decision the eve holds (the change the meeting delivers), plus a
+    /// zero-mean surprise of this sd: the first normal of
+    /// `GameRng::keyed(rng::eve_surprise_key(seed), EVE_SURPRISE_TAG, day)`,
+    /// so it takes nothing from any stream and moves no other draw. The
+    /// meeting's own close then moves the policy-rate futures by the surprise
+    /// alone, which no one can know at the eve; at 0.0 the miss is a known
+    /// share of a decision the eve's path reveals. The forecast feeds only
+    /// the contracts, so no stock price moves. Later meetings are priced as
+    /// they stood. Requires `fed_eve_decision`. In [0, 100].
+    ///
+    /// The tape: the Kuttner (2001) surprise, the CME 30-day fed funds
+    /// futures' front-month change on a scheduled FOMC decision day scaled
+    /// by `D / (D - d)` (Yahoo `ZQ=F`; meetings in a month's last seven days
+    /// and on its first session, where the series rolls, left out), net in
+    /// quadrature of an ordinary session's change, 2015 and 2021-2026 (RF2's
+    /// years): 2.55 bp on 33 meetings (bootstrap se 0.69 over meetings, 0.59
+    /// over years). By era: 2015-2019 2.01 (0.43), 2008-2015 3.04 (1.50);
+    /// 2000-2007's meeting RMS 4.77. The series' raw meeting-day changes in
+    /// RF2's years agree with Bauer and Swanson's (2023, NBER Macroeconomics
+    /// Annual 37) 30-minute front-contract surprises at a correlation of 0.96.
+    pub policy_eve_surprise_sd: f64,
     /// A switch: with `treasury_path_anticipated` on, 1.0 leaves the Fed
     /// put's owed step out of the meeting's path step, so the path moves by
     /// the anticipation's further move alone. 0.0, on every shipped preset,
@@ -1937,6 +1967,18 @@ pub struct ModelParams {
     /// the session only. A rate futures price feeds nothing a stock price or
     /// the economy reads. A switch.
     pub futures_rates_listed: f64,
+    /// A switch: 1.0 prices each rate future with the premium taken at each
+    /// close of its period, at that close's distance
+    /// (`derivatives::RATE_PREMIUM_PER_FIXING`), inside the period's mean
+    /// (`FF`) or compounding (`TR3`). 0.0, on every shipped preset, is the
+    /// premium at the period's last close (`derivatives::RATE_PREMIUM`),
+    /// which a `TR3` quarter took whole where its three `FF` months took
+    /// theirs, so the quarter sat below its strip (4.5 bp at 63 sessions,
+    /// 8.2 at 126) for a rate-neutral spread; a value of 0.0 is left out of
+    /// the model's digest. The per-fixing premium is refitted to the same
+    /// excess returns as the frozen one. Requires `futures_rates_listed`.
+    /// 0 or 1.
+    pub rate_premium_per_fixing: f64,
     /// Whether the engine lists monthly oil futures. 0.0, on every shipped
     /// preset, lists none: no contract, no state, nothing in the snapshot or
     /// the state hash, and a value of 0.0 is left out of the model's digest.
@@ -1998,6 +2040,42 @@ pub struct ModelParams {
     /// allowance of 1. The scan reads quotes and writes nothing, so no price
     /// moves. Requires `margin_scan_coverage`. In [0, 5].
     pub margin_scan_option_tail: f64,
+    /// The rulebook's minimum margin for a short listed option, as a share of
+    /// the underlying's value for a call and of the exercise price for a put.
+    /// 0.0, on every shipped preset, is the scan alone, and a value of 0.0 is
+    /// left out of the model's digest.
+    ///
+    /// Off zero, an option book's margin (`Engine::option_margin`, and so
+    /// each quote's `initial_margin`) is the scan's or, if greater, this
+    /// share times the underlying for each short call and times the strike
+    /// for each short put that nothing covers (long options of the same
+    /// right, long stock for a call, short stock for a put); a short call
+    /// and a short put together ask the greater of the two. FINRA Rule
+    /// 4210(f)(2)(E)(i): a short listed option is margined at its value plus
+    /// 20% of the underlying less the out-of-the-money amount, "but shall not
+    /// be less than" its value plus 10% of the underlying (calls) or of the
+    /// aggregate exercise price (puts), 10% for a broad index too (column
+    /// III); 4210(f)(2)(G) pairs a short call with a short put at the greater
+    /// requirement. The option's value is already in the account's equity,
+    /// so the share is the 10%. A deep out-of-the-money short, which the
+    /// scan charges close to nothing, so asks a tenth of what it is written
+    /// on. The scan reads quotes and writes nothing, so no price moves.
+    /// Requires `margin_scan_coverage`. In [0, 1].
+    pub margin_option_minimum: f64,
+    /// A switch: 1.0 refuses an account's order when its equity after the
+    /// order would be under the initial margin the account then asks
+    /// (`tradefloor.Portfolio`, `MarginError`). 0.0, on every shipped preset,
+    /// checks no margin before an order, as it stood (a call is made at a
+    /// close only), and a value of 0.0 is left out of the model's digest.
+    ///
+    /// FINRA Rule 4210(b): a customer "shall be required to deposit margin"
+    /// for a new transaction, at Regulation T's initial amounts (12 CFR
+    /// 220.4(c)); a broker checks it before the order goes. Equity counts the
+    /// order's distance from the marks; an order that asks no more margin
+    /// than the account already owes, which takes risk off, is never
+    /// refused, nor is a margin call's liquidation. Read by the account, not
+    /// the engine, so no price moves. Requires `margin_scan_coverage`. 0 or 1.
+    pub margin_pretrade_check: f64,
     /// Whether the engine lists European options on its price index. 0.0,
     /// on every shipped preset, lists none: no contract, no state, nothing in
     /// the snapshot or the state hash, and a value of 0.0 is left out of the
@@ -9119,6 +9197,8 @@ impl ModelParams {
             cycle_inflation_hazard: 0.0,
             cycle_rate_hazard: 0.0,
             fed_eve_decision: 0.0,
+            policy_eve_surprise_sd: 0.0,
+            rate_premium_per_fixing: 0.0,
             treasury_path_owed_excluded: 0.0,
             corporate_spread_equity_lag: 0.0,
             corporate_spread_equity_lag_gain: 0.0,
@@ -9167,6 +9247,8 @@ impl ModelParams {
             margin_scan_coverage: 0.0,
             margin_scan_tail: 0.0,
             margin_scan_option_tail: 0.0,
+            margin_option_minimum: 0.0,
+            margin_pretrade_check: 0.0,
             options_index_listed: 0.0,
             surface_ssvi: 0.0,
             surface_skew_physical: 0.0,
@@ -11823,6 +11905,8 @@ impl ModelParams {
             "cycle_inflation_hazard" => self.cycle_inflation_hazard,
             "cycle_rate_hazard" => self.cycle_rate_hazard,
             "fed_eve_decision" => self.fed_eve_decision,
+            "policy_eve_surprise_sd" => self.policy_eve_surprise_sd,
+            "rate_premium_per_fixing" => self.rate_premium_per_fixing,
             "treasury_path_owed_excluded" => self.treasury_path_owed_excluded,
             "corporate_spread_equity_lag" => self.corporate_spread_equity_lag,
             "corporate_spread_equity_lag_gain" => self.corporate_spread_equity_lag_gain,
@@ -11871,6 +11955,8 @@ impl ModelParams {
             "margin_scan_coverage" => self.margin_scan_coverage,
             "margin_scan_tail" => self.margin_scan_tail,
             "margin_scan_option_tail" => self.margin_scan_option_tail,
+            "margin_option_minimum" => self.margin_option_minimum,
+            "margin_pretrade_check" => self.margin_pretrade_check,
             "options_index_listed" => self.options_index_listed,
             "surface_ssvi" => self.surface_ssvi,
             "surface_skew_physical" => self.surface_skew_physical,
@@ -12292,6 +12378,8 @@ impl ModelParams {
             "cycle_inflation_hazard" => out.cycle_inflation_hazard = value,
             "cycle_rate_hazard" => out.cycle_rate_hazard = value,
             "fed_eve_decision" => out.fed_eve_decision = value,
+            "policy_eve_surprise_sd" => out.policy_eve_surprise_sd = value,
+            "rate_premium_per_fixing" => out.rate_premium_per_fixing = value,
             "treasury_path_owed_excluded" => out.treasury_path_owed_excluded = value,
             "corporate_spread_equity_lag" => out.corporate_spread_equity_lag = value,
             "corporate_spread_equity_lag_gain" => out.corporate_spread_equity_lag_gain = value,
@@ -12340,6 +12428,8 @@ impl ModelParams {
             "margin_scan_coverage" => out.margin_scan_coverage = value,
             "margin_scan_tail" => out.margin_scan_tail = value,
             "margin_scan_option_tail" => out.margin_scan_option_tail = value,
+            "margin_option_minimum" => out.margin_option_minimum = value,
+            "margin_pretrade_check" => out.margin_pretrade_check = value,
             "options_index_listed" => out.options_index_listed = value,
             "surface_ssvi" => out.surface_ssvi = value,
             "surface_skew_physical" => out.surface_skew_physical = value,
@@ -14014,6 +14104,30 @@ impl ModelParams {
                  (a scheduled meeting delivers the eve's decision).",
                 self.fed_eve_decision));
         }
+        if !(self.policy_eve_surprise_sd >= 0.0 && self.policy_eve_surprise_sd <= 100.0) {
+            return Err(format!(
+                "policy_eve_surprise_sd is {}. It is the sd of the meeting-day surprise in basis points, \
+                 in [0, 100]; 0 prices the eve's meeting as it stood.",
+                self.policy_eve_surprise_sd));
+        }
+        if self.policy_eve_surprise_sd != 0.0 && self.fed_eve_decision == 0.0 {
+            return Err(format!(
+                "fed_eve_decision is 0 but policy_eve_surprise_sd is {}: the eve holds no decision to \
+                 price. Set fed_eve_decision to 1.",
+                self.policy_eve_surprise_sd));
+        }
+        if !(self.rate_premium_per_fixing == 0.0 || self.rate_premium_per_fixing == 1.0) {
+            return Err(format!(
+                "rate_premium_per_fixing is {}. It is a switch: 0 (the premium at a period's last close) or 1 \
+                 (the premium at each close of the period).",
+                self.rate_premium_per_fixing));
+        }
+        if self.rate_premium_per_fixing != 0.0 && self.futures_rates_listed == 0.0 {
+            return Err(format!(
+                "futures_rates_listed is 0 but rate_premium_per_fixing is {}: no rate future to price. \
+                 Set futures_rates_listed to 1.",
+                self.rate_premium_per_fixing));
+        }
         if !(self.treasury_path_owed_excluded == 0.0 || self.treasury_path_owed_excluded == 1.0) {
             return Err(format!(
                 "treasury_path_owed_excluded is {}. It is a switch: 0 (the anticipated path's step \
@@ -14404,6 +14518,30 @@ impl ModelParams {
                  option scan's margin, which only margin_scan_coverage sets: set margin_scan_coverage \
                  first.",
                 self.margin_scan_option_tail));
+        }
+        if !(0.0..=1.0).contains(&self.margin_option_minimum) {
+            return Err(format!(
+                "margin_option_minimum is {}. It is the rulebook's minimum margin for a short option, a \
+                 share of the underlying (calls) or the strike (puts), in [0, 1]; FINRA's is 0.10.",
+                self.margin_option_minimum));
+        }
+        if self.margin_option_minimum != 0.0 && self.margin_scan_coverage == 0.0 {
+            return Err(format!(
+                "margin_scan_coverage is 0 but margin_option_minimum is {}. The minimum floors the option \
+                 margin, which only margin_scan_coverage sets: set margin_scan_coverage first.",
+                self.margin_option_minimum));
+        }
+        if !(self.margin_pretrade_check == 0.0 || self.margin_pretrade_check == 1.0) {
+            return Err(format!(
+                "margin_pretrade_check is {}. It is a switch: 0 (no margin checked before an order) or 1 \
+                 (an order is refused when the account's equity after it is under its initial margin).",
+                self.margin_pretrade_check));
+        }
+        if self.margin_pretrade_check != 0.0 && self.margin_scan_coverage == 0.0 {
+            return Err(format!(
+                "margin_scan_coverage is 0 but margin_pretrade_check is {}. The check reads the margin, which \
+                 only margin_scan_coverage sets: set margin_scan_coverage first.",
+                self.margin_pretrade_check));
         }
         for (name, v) in [("options_index_listed", self.options_index_listed), ("surface_ssvi", self.surface_ssvi)] {
             if !(v == 0.0 || v == 1.0) {
@@ -15091,6 +15229,8 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "cycle_inflation_hazard",
     "cycle_rate_hazard",
     "fed_eve_decision",
+    "policy_eve_surprise_sd",
+    "rate_premium_per_fixing",
     "treasury_path_owed_excluded",
     "corporate_spread_equity_lag",
     "corporate_spread_equity_lag_gain",
@@ -15137,6 +15277,8 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "margin_scan_coverage",
     "margin_scan_tail",
     "margin_scan_option_tail",
+    "margin_option_minimum",
+    "margin_pretrade_check",
     "night_session_steps",
     "futures_impact_memory",
     "futures_impact_memory_half_life",
@@ -15364,6 +15506,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "cycle_inflation_hazard",
         "cycle_rate_hazard",
         "fed_eve_decision",
+        "policy_eve_surprise_sd",
+        "rate_premium_per_fixing",
         "treasury_path_owed_excluded",
         "corporate_spread_equity_lag",
         "corporate_spread_equity_lag_gain",
@@ -15414,6 +15558,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "margin_scan_coverage",
         "margin_scan_tail",
         "margin_scan_option_tail",
+        "margin_option_minimum",
+        "margin_pretrade_check",
         "options_index_listed",
         "surface_ssvi",
         "surface_skew_physical",

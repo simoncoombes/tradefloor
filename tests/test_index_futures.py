@@ -421,3 +421,28 @@ def test_the_order_log_replays_the_night_and_the_contract_orders():
     again = replay(engine.order_log, seed=15, universe=SMALL, model=model(**ON))
     assert again.state_hash() == engine.state_hash()
     assert any(e["op"] == "run_night" for e in engine.order_log)
+
+
+def test_the_harnesses_open_walks_the_night_the_graded_runs_walk():
+    # open_day, which every harness opens with, walks the night as the graded
+    # runs do (run_night, then the open), so an agent trades the futures that
+    # are measured; with no night it adds nothing, not even to the order log.
+    from tradefloor.harness import open_day
+    walked = tf.Engine(seed=13, universe=SMALL, model=model(**ON))
+    harness = tf.Engine(seed=13, universe=SMALL, model=model(**ON))
+    for _ in range(12):
+        day(walked)
+        open_day(harness)
+        harness.run_session(9, 30, 3, 390)
+        harness.close_market()
+        marks = [[e.quote(c["symbol"])["mark"] for c in e.contracts()] for e in (harness, walked)]
+        assert marks[0] == marks[1]
+    plain = tf.Engine(seed=13, universe=SMALL, model=model())
+    bare = tf.Engine(seed=13, universe=SMALL, model=model())
+    for e, opener in ((plain, open_day), (bare, lambda x: x.open_market())):
+        for _ in range(2):
+            opener(e)
+            e.run_session(9, 30, 3, 390)
+            e.close_market()
+    assert plain.order_log == bare.order_log
+    assert floats(plain.prices()) == floats(bare.prices())

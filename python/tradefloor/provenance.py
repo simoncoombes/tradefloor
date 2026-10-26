@@ -520,6 +520,11 @@ OUT_OF_SCOPE = {
         "with the switch off, `Engine::contracts` lists no rate future, "
         "`Engine::quote` returns None for one, and nothing is snapshotted or "
         "hashed; at 0.0 it is also left out of the model's digest",
+    "rate_premium_per_fixing":
+        "inert at 0.0: a rate future's premium is the frozen one at its "
+        "period's last close, as it stood (a branch in "
+        "`rate_futures_valuation`); read only with `futures_rates_listed` on; "
+        "at 0.0 it is also left out of the model's digest",
     # The oil futures (pt-v22 phase 1), inert on every shipped preset. An oil
     # future reads the oil price and the forecast and draws nothing.
     "futures_oil_listed":
@@ -550,6 +555,15 @@ OUT_OF_SCOPE = {
         "`margin_scan_tail` is: a short strangle's one-session change over its "
         "scan margin at an allowance of 1, at the coverage's quantile; at 0.0 "
         "it is also left out of the model's digest",
+    "margin_option_minimum":
+        "inert at 0.0: an option book's margin is the scan's alone, as it "
+        "stood (a branch in each margin); read only with "
+        "`margin_scan_coverage` on; at 0.0 it is also left out of the model's "
+        "digest",
+    "margin_pretrade_check":
+        "inert at 0.0: no margin is checked before an order, as it stood; "
+        "read by `Portfolio`, not the engine, so no price moves at any value; "
+        "at 0.0 it is also left out of the model's digest",
     # The index options, their surface and their dealer (pt-v22 phase 2),
     # inert on every shipped preset. An option and the surface read public
     # state, draw nothing and write only their own state, so off zero they
@@ -739,6 +753,11 @@ OUT_OF_SCOPE = {
         "stood (a branch in the meeting); the stored decision is neither "
         "computed, snapshotted nor hashed; at 0.0 it is also left out of the "
         "model's digest",
+    "policy_eve_surprise_sd":
+        "inert at 0.0: the forecast prices the eve's meeting at the "
+        "discounted shadow and the reversion step as it stood (a branch in "
+        "the forecast's policy path); its draw is keyed on the seed, so no "
+        "stream is touched; at 0.0 it is also left out of the model's digest",
     "treasury_path_owed_excluded":
         "inert at 0.0 and read only with `treasury_path_anticipated` on: the "
         "anticipated path's meeting step carries the put's owed step as it "

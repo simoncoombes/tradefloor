@@ -42,7 +42,7 @@ pub use contract::{
     index_future_symbol, index_option_symbol, name_option_symbol, oil_future_symbol, rate_future_symbol,
     vix_future_symbol, ContractKind, ContractSpec, IndexFutureSpec, IndexOptionSpec, NameOptionSpec, OilFutureSpec,
     Quote, RateFutureSpec, RatePremium, Settlement, SettlementEvent, SettlementRule, VixFutureSpec, VixPremium,
-    INDEX_FUTURE, INDEX_OPTION, NAME_OPTION, OIL_FUTURE, POLICY_RATE_FUTURE, RATE_PREMIUM, TERM_RATE_FUTURE,
+    INDEX_FUTURE, INDEX_OPTION, NAME_OPTION, OIL_FUTURE, POLICY_RATE_FUTURE, RATE_PREMIUM, RATE_PREMIUM_PER_FIXING, TERM_RATE_FUTURE,
     VIX_FUTURE,
 };
 pub use dealer::{ExpirySummary, OptionDealerSpec, OptionQuote, INDEX_OPTION_DEALER, NAME_OPTION_DEALER};

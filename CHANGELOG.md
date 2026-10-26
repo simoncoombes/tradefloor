@@ -165,6 +165,22 @@ records are identical (`tests/test_futures_accounts.py`).
   draw and no state.
 ### Company news released before the open
 
+- `policy_eve_surprise_sd` is a new dial, 0.0 on every preset and left out of
+  the digest there: with `fed_eve_decision` on, the forecast taken on a
+  meeting's eve prices the decision the eve holds, plus a zero-mean surprise
+  of this sd (bp) keyed on the seed, instead of a discounted share of it and
+  a reversion step. The meeting then moves the policy-rate futures by the
+  surprise alone; before, the eve's step revealed the decision and a rule
+  trading the front contract by it won 36 of 36 meetings. The tape: the
+  Kuttner-scaled ZQ=F surprise on scheduled FOMC days net of an ordinary
+  session, 2015 and 2021-2026, 2.55 bp (se 0.69). No stock price moves.
+- `rate_premium_per_fixing` is a new switch, 0.0 on every preset and left out
+  of the digest there: each close of a rate future's period takes the
+  premium at its own distance, inside the mean (FF) or the compounding
+  (TR3), so a quarter and its three months carry one premium. At its last
+  close a TR3 took the whole quarter's premium, 4.5 bp under its strip at 63
+  sessions and 8.2 at 126. The per-fixing premium is refitted to the same
+  excess returns (k 3.1679, p 1.3235; every point within 0.39 se).
 - `news_preopen_share` is a new dial, 0.0 on every preset and left out of the
   digest there: the share of the day's endogenous company news released
   before the open, priced by the opening print on the night rather than
@@ -217,6 +233,17 @@ records are identical (`tests/test_futures_accounts.py`).
 
 ### The option scan's tail
 
+- `margin_option_minimum` is a new dial, 0.0 on every preset and left out of
+  the digest there: an option book's margin is at least that share of the
+  underlying for each uncovered short call and of the strike for each
+  uncovered short put, a short call and put together asking the greater
+  (FINRA Rule 4210(f)(2)(E)(i) and (f)(2)(G); the rule's 10%). The scan
+  charged a deep out-of-the-money short close to nothing.
+- `margin_pretrade_check` is a new switch, 0.0 on every preset and left out
+  of the digest there: a `Portfolio` refuses an order that would leave its
+  equity under the initial margin it then asks (`MarginError`; FINRA Rule
+  4210(b), Regulation T 12 CFR 220.4(c)). Margin was checked only at a
+  close, so an account could open what it could not carry.
 - `margin_scan_option_tail` is new, 0.0 on every preset and left out of the
   digest there. Off zero it is the option scan's own tail allowance, in
   place of `margin_scan_tail` on the scan's price move and volatility

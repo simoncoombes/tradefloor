@@ -722,6 +722,18 @@ pub fn skew_noise_key(root_seed: u64) -> u64 {
     splitmix64_mix(root_seed ^ (((SKEW_NOISE_TAG as u64) << 32) | 0xFFFF_FFFF))
 }
 
+/// The tag of the eve's meeting surprise (`policy_eve_surprise_sd`), ASCII
+/// "EVES".
+pub const EVE_SURPRISE_TAG: u32 = 0x4556_4553;
+
+/// The key of a root seed's eve surprises: as [`publication_key`] under
+/// [`EVE_SURPRISE_TAG`]. The forecast taken for `day` on a meeting's eve takes
+/// the first normal of `GameRng::keyed(key, EVE_SURPRISE_TAG, day)`, so it
+/// takes nothing from any stream and moves no other draw.
+pub fn eve_surprise_key(root_seed: u64) -> u64 {
+    splitmix64_mix(root_seed ^ (((EVE_SURPRISE_TAG as u64) << 32) | 0xFFFF_FFFF))
+}
+
 /// The `k`-th publication uniform in [0, 1) of a key:
 /// `splitmix64_mix(key ^ splitmix64_mix(PUBLICATION_TAG << 32 | k)) >> 11`
 /// times `2^-53`. Stateless and integer-only up to the one exact scaling:

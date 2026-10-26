@@ -1194,6 +1194,11 @@ def _nothing_dormant():
                    # The contracts' margin (pt-v22 phase 1).
                    margin_scan_coverage=0.99,
                    margin_scan_tail=1.3,
+                   # The rate futures' premium per fixing and the pre-trade
+                   # margin check (fix round): two switches; the eve's
+                   # surprise and the option minimum take the blanket 0.05.
+                   rate_premium_per_fixing=1.0,
+                   margin_pretrade_check=1.0,
                    # The index options, their surface and their dealer (pt-v22
                    # phase 2): two switches; the surface's companions and the
                    # dealer's spread take the blanket 0.05.
