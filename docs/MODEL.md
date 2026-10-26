@@ -4479,6 +4479,33 @@ to the model:
   strip at the bound, as any skewness does. The names' correlation, a share
   of the index's, moves with it. Both dials are 0.0 on every shipped preset
   (`tests/test_skew_noise.py`).
+- The index's own curvature. `surface_index_curvature`, 0.0 on every
+  shipped preset, is the shared $\eta$. Set, the index surface is fitted at
+  it and the names keep `surface_curvature`: a name's correlation is its
+  share (`surface_name_skew`) of the $\rho$ the index's VIX and skewness give
+  at the shared $\eta$. With the VIX and the skewness held, a lower $\eta$
+  puts less of the strip's variance in the wings, so the at-the-money
+  volatility sits nearer the VIX; it also reaches less skew (SKEW about 121
+  at $\eta = 0.65$, 124 at 0.75, 127 at 0.85, 131 at 1.0, at
+  $\gamma = 1/2$) (`tests/test_index_curvature.py`).
+- The index smile's term scaling. `surface_index_tenor_exponent` $x$, 0.0 on
+  every shipped preset, is SSVI's own power law. Set, the index's $\varphi$ is
+  read at the 21-session fit's $\theta_{21}$ and falls from there,
+  $\varphi(\theta) = \varphi_{\mathrm{SSVI}}(\theta_{21})(\theta/\theta_{21})^{-x}$:
+  the 21-session smile is unchanged, the at-the-money skew scales with the
+  tenor as $T^{-x}$ and the curvature as $T^{-2x}$, where the shared power law
+  gives about $T^{-1/2}$ and $T^{-1}$. The S&P's at-the-money skew falls about
+  as $T^{-0.4}$ (Gatheral, Jaisson and Rosenbaum, 2018). The calendar bound is
+  $d(\theta\varphi)/d\theta = \varphi(1 - x)$ (`tests/test_index_tenor.py`).
+  With `surface_index_tenor_strip` at 1.0 (0.0 on every shipped preset) each
+  tenor's at-the-money total variance is moved from the curve's $\theta$ to
+  the $\theta'$ whose scaled smile prices the strip SSVI's own power law
+  prices at $\theta$. The strip's total variance is a function of the
+  total-variance smile alone, so the map is one of $\theta$: it is solved on
+  a grid of $\ln(\theta/\theta_{21})$ from $-6$ in steps of $1/2$, linear
+  between nodes, and $\theta_{21}$ maps to itself. The VIX formula's strips
+  at every tenor are then the shared power law's to about $10^{-3}$, and only
+  the split between the money and the wings changes.
 - The term structure. $\theta_T$ is $\theta_{21}$ times a shape: the
   forecast's expected index variance summed to $T$ (`forecast_horizon_sessions`;
   a constant variance without the forecast), times
