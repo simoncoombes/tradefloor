@@ -26,6 +26,15 @@ payload, Arrow and WASM show them; agents trade by symbol.
 
 <!-- release-note-ends -->
 
+### The index options' forward from the listed future
+
+`options_index_forward_from_future`, 0.0 on every preset: the index
+options' dealer takes an expiry's forward from the book mid of the listed
+index future of the same expiry, so the chain meets put-call parity against
+the future the market trades, not against a carry the future's basis
+departs from. Expiries without a future keep the carry. Known answers are
+unchanged.
+
 ### A held future settles from its own expiry's rows
 
 `Portfolio` settled an expired future by reading every settlement of the

@@ -29,7 +29,9 @@
 //! An option `tau` sessions from expiry is priced by Black on the forward
 //! the index futures' carry gives, `F = (S - PV(D)) e^{r tau}`, at the
 //! surface's implied volatility at `ln(K / F)`, moved by the dealer's
-//! pressure on its expiry (`derivatives::dealer`). `tau` counts a session
+//! pressure on its expiry (`derivatives::dealer`). Under
+//! `options_index_forward_from_future` an expiry with a listed index future
+//! of its own takes `F` from that future's book mid instead. `tau` counts a session
 //! that has run `k` of its 390 ticks as `k / 390` used.
 
 use super::*;
@@ -589,7 +591,17 @@ impl Engine {
         let e = &self.options.expiries[slot];
         let sessions = crate::mathx::max(0.0, e.expiry as f64 - clock.now);
         let years = sessions / 252.0;
-        let (forward, rate, dividends, index) = self.carry_at(clock, e.expiry, sessions);
+        let (mut forward, rate, dividends, index) = self.carry_at(clock, e.expiry, sessions);
+        let mut carry_spot = index - dividends;
+        // `options_index_forward_from_future`: the forward the listed future
+        // of this expiry trades at, so the chain's parity against it holds
+        // inside the spread; the carry where none is listed
+        if self.params.options_index_forward_from_future != 0.0 && sessions > 0.0 {
+            if let Some(f) = self.index_future_mid(e.expiry).filter(|f| f.is_finite() && *f > 0.0) {
+                forward = f;
+                carry_spot = f * crate::mathx::exp(-rate * years);
+            }
+        }
         let (theta, dealer_theta) = thetas[slot];
         ExpiryContext {
             sessions,
@@ -597,7 +609,7 @@ impl Engine {
             rate,
             dividends,
             index,
-            carry_spot: index - dividends,
+            carry_spot,
             forward,
             discount: crate::mathx::exp(-rate * years),
             theta,

@@ -510,6 +510,7 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "surface_term_premium_long": (-0.3, 0.3),
     "surface_earnings_weight": (0.0, 2.0),
     "option_dealer_spread": (0.0, 0.02),
+    "options_index_forward_from_future": (0.0, 1.0),
     # The single-name options (pt-v22 phase 3): a switch, the single-name
     # volatility premium and the names' share of the index skew. None of
     # them moves a stock price.

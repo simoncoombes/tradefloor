@@ -4527,6 +4527,17 @@ The forward to an expiry is the index futures' carry,
 $F = (S - \mathrm{PV}(D))\,e^{r\tau}$, with the dividends going ex before it
 (declared within 21 sessions, the Lintner projection beyond) and $r$ the
 mean policy rate the forecast expects to it.
+Under `options_index_forward_from_future` (0.0 on every shipped preset and
+left out of the digest there; refused without `options_index_listed` and
+`futures_index_listed`) an expiry with a listed index future of its own
+takes $F$ from that future's book mid instead, as a listed market's makers
+price SPX options off the forward the futures trade at. The future carries
+a basis (`basis_sd`) the carry does not, so off it a conversion against the
+future locks that basis whenever it is wider than the spreads; on, the
+chain's mids meet put-call parity against the future exactly. An expiry with
+no future of its own keeps the carry, and the surface's strips (the VIX and
+its term) read the carry either way. It prices options only: no stock or
+index price moves (`tests/test_index_option_forward.py`).
 
 **The chain.** Options are listed at the next six monthly expiries (session
 15 of each 21-session month, the VIX futures' expiries) and the quarterly

@@ -2624,6 +2624,7 @@ impl Engine {
         pre.params.margin_scan_option_tail = 0.0;
         pre.params.options_index_listed = 0.0;
         pre.params.option_dealer_spread = 0.0;
+        pre.params.options_index_forward_from_future = 0.0;
         pre.params.surface_ssvi = 0.0;
         pre.params.surface_skew_physical = 0.0;
         pre.params.surface_skew_physical_slope = 0.0;

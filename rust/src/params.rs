@@ -2058,6 +2058,16 @@ pub struct ModelParams {
     /// at the rate maker's 15-tick half-life. Requires
     /// `options_index_listed` or `options_names_listed`. In [0, 0.5].
     pub option_dealer_spread: f64,
+    /// The forward the index options' dealer prices from. 1.0 takes each
+    /// expiry's forward from the listed index future of the same expiry, the
+    /// mid of its book, as a listed market's makers price SPX options off
+    /// the forward the futures trade at, so put-call parity against the
+    /// future holds inside the spread; an expiry with no future of its own
+    /// keeps the carry. 0.0, on every shipped preset, prices every expiry
+    /// off the carry `(S - PV(D)) e^{r tau}`, and is left out of the model's
+    /// digest. Read only with `options_index_listed` and
+    /// `futures_index_listed` set. 0.0 or 1.0.
+    pub options_index_forward_from_future: f64,
     /// Whether the engine lists American options on each roster name. 0.0,
     /// on every shipped preset, lists none: no contract, no state, nothing in
     /// the snapshot or the state hash, and a value of 0.0 is left out of the
@@ -8912,6 +8922,7 @@ impl ModelParams {
             surface_term_premium_long: 0.0,
             surface_earnings_weight: 0.0,
             option_dealer_spread: 0.0,
+            options_index_forward_from_future: 0.0,
             options_names_listed: 0.0,
             surface_name_premium: 0.0,
             surface_name_skew: 0.0,
@@ -11601,6 +11612,7 @@ impl ModelParams {
             "surface_term_premium_long" => self.surface_term_premium_long,
             "surface_earnings_weight" => self.surface_earnings_weight,
             "option_dealer_spread" => self.option_dealer_spread,
+            "options_index_forward_from_future" => self.options_index_forward_from_future,
             "options_names_listed" => self.options_names_listed,
             "surface_name_premium" => self.surface_name_premium,
             "surface_name_skew" => self.surface_name_skew,
@@ -12055,6 +12067,7 @@ impl ModelParams {
             "surface_term_premium_long" => out.surface_term_premium_long = value,
             "surface_earnings_weight" => out.surface_earnings_weight = value,
             "option_dealer_spread" => out.option_dealer_spread = value,
+            "options_index_forward_from_future" => out.options_index_forward_from_future = value,
             "options_names_listed" => out.options_names_listed = value,
             "surface_name_premium" => out.surface_name_premium = value,
             "surface_name_skew" => out.surface_name_skew = value,
@@ -14091,6 +14104,20 @@ impl ModelParams {
                  list: set one of them to 1.0 first.",
                 self.option_dealer_spread));
         }
+        if !(self.options_index_forward_from_future == 0.0 || self.options_index_forward_from_future == 1.0) {
+            return Err(format!(
+                "options_index_forward_from_future is {}. It is a switch, 0.0 off or 1.0 on.",
+                self.options_index_forward_from_future));
+        }
+        if self.options_index_forward_from_future != 0.0
+            && (self.options_index_listed == 0.0 || self.futures_index_listed == 0.0)
+        {
+            return Err(format!(
+                "options_index_forward_from_future is {} but options_index_listed is {} and \
+                 futures_index_listed is {}. The dealer takes the index options' forward from the \
+                 listed index futures: set both to 1.0 first.",
+                self.options_index_forward_from_future, self.options_index_listed, self.futures_index_listed));
+        }
         if !(self.options_names_listed == 0.0 || self.options_names_listed == 1.0) {
             return Err(format!(
                 "options_names_listed is {}. It is a switch, 0.0 off or 1.0 on.",
@@ -14706,6 +14733,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "surface_term_premium_long",
     "surface_earnings_weight",
     "option_dealer_spread",
+    "options_index_forward_from_future",
     "options_names_listed",
     "surface_name_premium",
     "surface_name_skew",
@@ -14967,6 +14995,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "surface_term_premium_long",
         "surface_earnings_weight",
         "option_dealer_spread",
+        "options_index_forward_from_future",
         "options_names_listed",
         "surface_name_premium",
         "surface_name_skew",
