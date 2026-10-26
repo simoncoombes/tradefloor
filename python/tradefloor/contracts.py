@@ -38,6 +38,7 @@ from __future__ import annotations
 from typing import Any
 
 from . import _core
+from ._arith import ordered_sum
 
 __all__ = ["FUTURE_ROOTS", "NAME_OPTIONS", "OPTION_ROOTS", "explain_move", "format",
            "is_contract", "parse"]
@@ -206,7 +207,7 @@ def explain_move(before: dict[str, Any], after: dict[str, Any],
             parts = {"underlying": underlying, "carry": (f1 - f0) - underlying,
                      "basis": basis}
     # The parts sum to the move to the last bit: the largest absorbs rounding.
-    gap = move - sum(parts.values())
+    gap = move - ordered_sum(parts.values())
     if gap:
         biggest = max(parts, key=lambda k: abs(parts[k]))
         parts[biggest] += gap
