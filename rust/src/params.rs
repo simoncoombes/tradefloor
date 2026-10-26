@@ -2357,6 +2357,9 @@ pub struct ModelParams {
     /// and are left out of the model's digest. Read only with
     /// `options_names_listed` set. In [0, 5].
     pub option_name_spread_otm: f64,
+    /// The in-the-money side of the name-option dealer's spread shape: the
+    /// half-spread's share of the option's price at a delta of 0.75 over the
+    /// at-the-money one, as `option_name_spread_otm` describes. In [0, 5].
     pub option_name_spread_itm: f64,
     /// The name-option dealer's spread in tenor: the half-spread times
     /// `(sessions / 21)` to this power. 0.0, on every shipped preset, keeps
