@@ -752,6 +752,16 @@ OUT_OF_SCOPE = {
         "term is the lag's own (the priced gap in place of the gap), as it "
         "stood; no draw and no state of its own; at 0.0 it is also left out of "
         "the model's digest",
+    "treasury_equity_lag":
+        "inert at 0.0 and read only with `treasury_equity_lag_gain` set and "
+        "credit's leverage gap carried: no priced gap on the 10-year is "
+        "stepped, snapshotted or hashed; at 0.0 it is also left out of the "
+        "model's digest",
+    "treasury_equity_lag_gain":
+        "inert at 0.0 and read only with credit's leverage gap carried; "
+        "refused without `treasury_equity_lag`: the 10-year's anchor is the "
+        "expression that stood; no draw; at 0.0 it is also left out of the "
+        "model's digest",
     "pinned_vix_sets_variance":
         "inert at 0.0: a pinned VIX marks tonight's close forced only when "
         "the caller asks (`vix_sets_variance`), as it stood (a branch in "

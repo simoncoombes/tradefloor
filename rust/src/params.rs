@@ -1311,6 +1311,33 @@ pub struct ModelParams {
     /// term added to 180 held-out histories' spreads, gives G 0.9 at a lag of
     /// 8 sessions (loss 3.1 against 37.1 without it). In [0, 10].
     pub corporate_spread_equity_lag_gain: f64,
+    /// The 10-year's repricing lag: the half-life, in sessions, at which the
+    /// gap the 10-year's anchor prices (`EconomyState::treasury_equity_priced_gap`)
+    /// follows credit's leverage gap (`EconomyState::spread_equity_gap`, the
+    /// index's log fall below its own slow average). Each close steps
+    /// `P = P + (1 - 0.5^(1/H)) (D - P)` after the gap. Read only with
+    /// `treasury_equity_lag_gain` set and the leverage gap carried. 0.0, on
+    /// every shipped preset, is no such state, and a value of 0.0 is left out
+    /// of the model's digest. No draw. The priced gap is snapshotted and
+    /// hashed only with both set. In [0, 252].
+    pub treasury_equity_lag: f64,
+    /// The 10-year's lagged equity term: points taken off the 10-year's
+    /// anchor per unit of the priced gap (`treasury_equity_lag`), read as the
+    /// gap stood at the session's start, in the daily anchor and in the
+    /// meeting's target. 0.0, on every shipped preset, is no term, and a value
+    /// of 0.0 is left out of the model's digest. Refused without
+    /// `treasury_equity_lag`; read only with the leverage gap carried
+    /// (`corporate_spread_equity_gain` or `cycle_equity_hazard` set).
+    ///
+    /// The tape's 10-year keeps moving with the index for about three months:
+    /// FRED DGS10 on the S&P 500, 1990-2025, by distributed-lag OLS, moves
+    /// +0.88 bp per 1% on the day (se 0.29), +1.19 by 21 sessions (0.38),
+    /// +2.70 by 62 (0.63) and +2.38 by 126 (0.99); the build from the day to
+    /// 62 is +1.85 in 1990-2007 and +1.77 in 2008-2025. The flight to
+    /// quality moves the yield by an increment the anchor's pull erases, so
+    /// without this term the model's response peaks near +1.0 inside the
+    /// month and is about +0.8 by 62. In [0, 10].
+    pub treasury_equity_lag_gain: f64,
     /// The per-session innovation sd of credit's own state, points of the
     /// corporate spread's base. 0.0, on every shipped preset, is no state
     /// (the spread moves only with the VIX, the cycle and the leverage gap),
@@ -8926,6 +8953,8 @@ impl ModelParams {
             treasury_path_owed_excluded: 0.0,
             corporate_spread_equity_lag: 0.0,
             corporate_spread_equity_lag_gain: 0.0,
+            treasury_equity_lag: 0.0,
+            treasury_equity_lag_gain: 0.0,
             corporate_spread_noise_sd: 0.0,
             corporate_spread_noise_half_life: 0.0,
             treasury_2y_meeting_carry: 0.0,
@@ -11618,6 +11647,8 @@ impl ModelParams {
             "treasury_path_owed_excluded" => self.treasury_path_owed_excluded,
             "corporate_spread_equity_lag" => self.corporate_spread_equity_lag,
             "corporate_spread_equity_lag_gain" => self.corporate_spread_equity_lag_gain,
+            "treasury_equity_lag" => self.treasury_equity_lag,
+            "treasury_equity_lag_gain" => self.treasury_equity_lag_gain,
             "corporate_spread_noise_sd" => self.corporate_spread_noise_sd,
             "corporate_spread_noise_half_life" => self.corporate_spread_noise_half_life,
             "treasury_2y_meeting_carry" => self.treasury_2y_meeting_carry,
@@ -12075,6 +12106,8 @@ impl ModelParams {
             "treasury_path_owed_excluded" => out.treasury_path_owed_excluded = value,
             "corporate_spread_equity_lag" => out.corporate_spread_equity_lag = value,
             "corporate_spread_equity_lag_gain" => out.corporate_spread_equity_lag_gain = value,
+            "treasury_equity_lag" => out.treasury_equity_lag = value,
+            "treasury_equity_lag_gain" => out.treasury_equity_lag_gain = value,
             "corporate_spread_noise_sd" => out.corporate_spread_noise_sd = value,
             "corporate_spread_noise_half_life" => out.corporate_spread_noise_half_life = value,
             "treasury_2y_meeting_carry" => out.treasury_2y_meeting_carry = value,
@@ -13788,6 +13821,24 @@ impl ModelParams {
                  lagged term reads the priced gap, which follows the gap at that half-life; set it too.",
                 self.corporate_spread_equity_lag_gain));
         }
+        if !(self.treasury_equity_lag >= 0.0 && self.treasury_equity_lag <= 252.0) {
+            return Err(format!(
+                "treasury_equity_lag is {}. It is a half-life in sessions, in [0, 252]; \
+                 0 is no priced gap on the 10-year.",
+                self.treasury_equity_lag));
+        }
+        if !(self.treasury_equity_lag_gain >= 0.0 && self.treasury_equity_lag_gain <= 10.0) {
+            return Err(format!(
+                "treasury_equity_lag_gain is {}. It is points of the 10-year's anchor per unit \
+                 of the priced gap, in [0, 10]; 0 is no lagged term.",
+                self.treasury_equity_lag_gain));
+        }
+        if self.treasury_equity_lag_gain != 0.0 && self.treasury_equity_lag == 0.0 {
+            return Err(format!(
+                "treasury_equity_lag is 0 but treasury_equity_lag_gain is {}. The term reads \
+                 the priced gap, which follows the leverage gap at that half-life; set it too.",
+                self.treasury_equity_lag_gain));
+        }
         if !(self.corporate_spread_noise_sd >= 0.0 && self.corporate_spread_noise_sd <= 0.5) {
             return Err(format!(
                 "corporate_spread_noise_sd is {}. It is the per-session innovation sd of credit's \
@@ -14768,6 +14819,8 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "treasury_path_owed_excluded",
     "corporate_spread_equity_lag",
     "corporate_spread_equity_lag_gain",
+    "treasury_equity_lag",
+    "treasury_equity_lag_gain",
     "corporate_spread_noise_sd",
     "corporate_spread_noise_half_life",
     "treasury_term_premium_sd",
@@ -15029,6 +15082,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "treasury_path_owed_excluded",
         "corporate_spread_equity_lag",
         "corporate_spread_equity_lag_gain",
+        "treasury_equity_lag",
+        "treasury_equity_lag_gain",
         "corporate_spread_noise_sd",
         "corporate_spread_noise_half_life",
         "treasury_term_premium_sd",

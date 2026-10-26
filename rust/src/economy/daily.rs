@@ -488,6 +488,14 @@ pub struct YieldDials {
     /// is off, the priced gap read in place of the gap. Read only with
     /// `spread_priced_keep` set.
     pub spread_priced_gain: f64,
+    /// The 10-year's repricing lag's keep, `0.5^(1/H)`
+    /// ([`crate::params::ModelParams::treasury_equity_lag`]); 0.0 is off, no
+    /// priced gap stepped.
+    pub treasury_equity_keep: f64,
+    /// The 10-year's lagged equity term, points of the anchor per unit of the
+    /// priced gap ([`crate::params::ModelParams::treasury_equity_lag_gain`]);
+    /// 0.0 is off.
+    pub treasury_equity_gain: f64,
     /// Credit's own state before and after tonight's step, points of the
     /// spread formula's base ([`crate::params::ModelParams::corporate_spread_noise_sd`]);
     /// `None`, on every preset, is no state.
@@ -560,6 +568,8 @@ impl Default for YieldDials {
             spread_equity_decay: 0.0,
             spread_priced_keep: 0.0,
             spread_priced_gain: 0.0,
+            treasury_equity_keep: 0.0,
+            treasury_equity_gain: 0.0,
             spread_noise: None,
             term_premium: None,
         }
@@ -1414,6 +1424,14 @@ fn close_yields(
     } else {
         term_premium_10y
     };
+    // THE 10-YEAR'S LAGGED EQUITY TERM (`treasury_equity_lag_gain`): the
+    // anchor falls with the gap it has priced, as that gap stood at the
+    // session's start. Guarded, so at 0.0 the premium is the expression above.
+    let term_premium_10y = if inputs.yields.treasury_equity_gain != 0.0 {
+        term_premium_10y - inputs.yields.treasury_equity_gain * economy.treasury_equity_priced_gap
+    } else {
+        term_premium_10y
+    };
     let current_10y = new_state.treasury_yield_10y;
     // THE DAMPED PASS-THROUGH (`treasury_policy_damping`): the 10-year's
     // anchor reads the priced rate pulled toward the neutral rate; the
@@ -1533,6 +1551,15 @@ fn close_yields(
     } else {
         (0.0, 0.0)
     };
+    // THE 10-YEAR'S REPRICING LAG (`treasury_equity_lag`): the gap the
+    // 10-year's anchor prices closes a share of its distance to the leverage
+    // gap each session, after the gap's step. No draw. Guarded, so with the
+    // keep at 0.0 nothing is written.
+    if inputs.yields.treasury_equity_keep != 0.0 {
+        let p = economy.treasury_equity_priced_gap;
+        new_state.treasury_equity_priced_gap =
+            p + (1.0 - inputs.yields.treasury_equity_keep) * (new_state.spread_equity_gap - p);
+    }
     // CREDIT'S REPRICING LAG (`corporate_spread_equity_lag`): the spread's
     // leverage term reads the gap it has priced, which closes a share of
     // its distance to the gap each session. No draw. Guarded, so with the

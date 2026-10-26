@@ -215,6 +215,10 @@ pub struct PolicyOptions {
     /// `spread_equity_gain * D + this * P`. 0.0, on every preset, is the
     /// priced gap alone.
     pub spread_priced_gain: f64,
+    /// `treasury_equity_lag_gain`: points taken off the meeting's 10-year
+    /// target per unit of `EconomyState::treasury_equity_priced_gap`, as the
+    /// daily anchor takes them. 0.0, on every preset, is no term.
+    pub treasury_equity_gain: f64,
     /// `corporate_spread_noise_sd`: credit's own state, points added to the
     /// formula's base beside the leverage term. `None`, on every preset, is
     /// no state.
@@ -294,6 +298,7 @@ impl PolicyOptions {
             spread_equity_gain: 0.0,
             spread_priced_gap: false,
             spread_priced_gain: 0.0,
+            treasury_equity_gain: 0.0,
             spread_noise: None,
             term_premium: None,
             policy_inflation: None,
@@ -818,6 +823,13 @@ pub fn update_central_bank_with(
     // target too, as the daily anchor adds it. Guarded.
     let treasury_target_10y = if let Some(x) = options.term_premium {
         treasury_target_10y + x
+    } else {
+        treasury_target_10y
+    };
+    // The 10-year's lagged equity term (`treasury_equity_lag_gain`) in the
+    // target too, as the daily anchor takes it. Guarded.
+    let treasury_target_10y = if options.treasury_equity_gain != 0.0 {
+        treasury_target_10y - options.treasury_equity_gain * economy.treasury_equity_priced_gap
     } else {
         treasury_target_10y
     };

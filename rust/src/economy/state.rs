@@ -470,6 +470,11 @@ pub struct EconomyState {
     /// only with that lag and the credit gain set; 0.0, and never written,
     /// on every preset.
     pub spread_priced_gap: f64,
+    /// The gap the 10-year's anchor prices, following `spread_equity_gap` at
+    /// the half-life `ModelParams::treasury_equity_lag`. Written only with
+    /// that lag, its gain and credit's leverage gap set; 0.0, and never
+    /// written, on every preset.
+    pub treasury_equity_priced_gap: f64,
     /// What the valuation reads beyond `earnings_cycle`: the anticipated
     /// level of the earnings cycle over the valuation's horizon minus the
     /// current one (`ModelParams::earnings_anticipation_half_life`). Derived
@@ -688,6 +693,7 @@ pub fn create_initial_economy_state(options: &InitialEconomyOptions) -> EconomyS
         fed_put_mcap_prev: 0.0,
         spread_equity_gap: 0.0,
         spread_priced_gap: 0.0,
+        treasury_equity_priced_gap: 0.0,
         earnings_anticipation: 0.0,
         earnings_lookthrough: 0.0,
         unemployment_impulse: 0.0,
