@@ -379,7 +379,10 @@ MECHANISMS: tuple[Mechanism, ...] = (
         state=("price",),
         dials=("macro_publication_repricing", "buyback_payout_share",
                "price_hard_cap"),
+        # The body is `reprice_marks`, which also leaves the growth part
+        # `remark_growth_open_share` holds back to the next opening print.
         via=("engine::Engine::published_macro_marks",
+             "engine::Engine::reprice_marks",
              "market::tick::tick_fair_value"),
     ),
 )

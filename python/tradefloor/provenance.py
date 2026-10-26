@@ -708,6 +708,12 @@ OUT_OF_SCOPE = {
         "the spread's leverage term reads the gap itself, as it stood; the "
         "priced gap is neither stepped, snapshotted nor hashed; at 0.0 it is "
         "also left out of the model's digest",
+    "remark_growth_open_share":
+        "inert at 0.0: the close's macro re-mark prices the whole change the "
+        "step makes to fair value, as it stood; read only with "
+        "`macro_publication_repricing`, refused without a night split; no "
+        "draw and no state carried between days; at 0.0 it is also left out "
+        "of the model's digest",
     "news_preopen_share":
         "inert at 0.0: every endogenous news event is priced through the "
         "session from its first tick, as it stood; no draw of its own (the "

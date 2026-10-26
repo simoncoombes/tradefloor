@@ -909,6 +909,7 @@ PARAM_SPECS: dict[str, dict] = {
     "corporate_spread_equity_lag": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 252.0), "derived": False},
     "corporate_spread_equity_lag_gain": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 10.0), "derived": False},
     "news_preopen_share": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0), "derived": False},
+    "remark_growth_open_share": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0), "derived": False},
     "corporate_spread_noise_sd": {"kind": "abs", "step_unit": 0.001, "hard_range": (0.0, 0.5)},
     "pinned_vix_sets_variance": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0), "derived": False},
     "corporate_spread_noise_half_life": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 2520.0)},
