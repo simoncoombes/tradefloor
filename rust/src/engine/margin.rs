@@ -137,6 +137,55 @@ pub(crate) fn option_scan_loss_with(positions: &[ScanOption], linear: f64, index
     worst
 }
 
+/// The rulebook's minimum for short listed options (`margin_option_minimum`,
+/// FINRA Rule 4210(f)(2)(E)(i), column III): `share` of the underlying's
+/// value, `spot`, for each short call and of the exercise price for each
+/// short put, in dollars of `units` (contracts times the multiplier), on the
+/// shorts that nothing in `legs` or `linear` covers: a short call less the
+/// long calls and the long stock, a short put less the long puts and the
+/// short stock, uncovered puts taken from the highest strike down. A short
+/// call and a short put together (a straddle or strangle) ask the greater of
+/// the two (4210(f)(2)(G)), paired a unit at a time with the highest strikes.
+/// Covered positions and spreads ask nothing here: the scan margins them.
+pub(crate) fn short_option_minimum(legs: &[ScanOption], linear: f64, spot: f64, share: f64) -> f64 {
+    if share == 0.0 {
+        return 0.0;
+    }
+    let (mut long_calls, mut short_calls, mut long_puts) = (0.0, 0.0, 0.0);
+    let mut short_puts: Vec<(f64, f64)> = Vec::new();
+    for leg in legs {
+        match (leg.right, leg.units > 0.0) {
+            (Right::Call, true) => long_calls += leg.units,
+            (Right::Call, false) => short_calls -= leg.units,
+            (Right::Put, true) => long_puts += leg.units,
+            (Right::Put, false) => short_puts.push((leg.strike, -leg.units)),
+        }
+    }
+    let calls = crate::mathx::max(0.0, short_calls - long_calls - crate::mathx::max(0.0, linear));
+    let mut puts = crate::mathx::max(
+        0.0,
+        short_puts.iter().map(|(_, u)| u).sum::<f64>() - long_puts - crate::mathx::max(0.0, -linear),
+    );
+    short_puts.sort_by(|a, b| b.0.total_cmp(&a.0));
+    let call_charge = share * spot;
+    let mut paired = calls;
+    let mut total = 0.0;
+    for (strike, units) in short_puts {
+        if puts <= 0.0 {
+            break;
+        }
+        let mut left = crate::mathx::min(units, puts);
+        puts -= left;
+        let put_charge = share * strike;
+        let pair = crate::mathx::min(left, paired);
+        total += pair * crate::mathx::max(call_charge, put_charge);
+        paired -= pair;
+        left -= pair;
+        total += left * put_charge;
+    }
+    total + paired * call_charge
+}
+
 /// One contract's margin record.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct MarginEntry {
@@ -418,6 +467,24 @@ mod tests {
         assert!(covered < naked);
         assert_eq!(option_scan_loss_with(&[], 100.0, m, v), 0.0);
         assert_eq!(option_scan_loss_with(&[], -100.0, m, v), 0.0);
+    }
+
+    #[test]
+    fn the_rulebooks_minimum_charges_uncovered_shorts_and_a_strangle_its_greater_side() {
+        let share = 0.10;
+        let leg = |right, strike, units| ScanOption { right, carry_spot: 1000.0, strike, years: 0.1, vol: 0.2, rate: 0.0, units };
+        // A naked call: 10% of the underlying a unit; a naked put: 10% of its strike.
+        assert!((short_option_minimum(&[leg(Right::Call, 1100.0, -100.0)], 0.0, 1000.0, share) - 10_000.0).abs() < 1e-9);
+        assert!((short_option_minimum(&[leg(Right::Put, 900.0, -100.0)], 0.0, 1000.0, share) - 9_000.0).abs() < 1e-9);
+        // A strangle asks the greater side, not both.
+        let strangle = [leg(Right::Call, 1100.0, -100.0), leg(Right::Put, 900.0, -100.0)];
+        assert!((short_option_minimum(&strangle, 0.0, 1000.0, share) - 10_000.0).abs() < 1e-9);
+        // Covered by stock, by a long call, or with a put covered by short stock: nothing.
+        assert_eq!(short_option_minimum(&[leg(Right::Call, 1100.0, -100.0)], 100.0, 1000.0, share), 0.0);
+        assert_eq!(short_option_minimum(&[leg(Right::Call, 1100.0, -100.0), leg(Right::Call, 1200.0, 100.0)], 0.0, 1000.0, share), 0.0);
+        assert_eq!(short_option_minimum(&[leg(Right::Put, 900.0, -100.0)], -100.0, 1000.0, share), 0.0);
+        // At 0.0 the rule is off.
+        assert_eq!(short_option_minimum(&strangle, 0.0, 1000.0, 0.0), 0.0);
     }
 
     #[test]

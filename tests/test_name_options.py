@@ -644,3 +644,32 @@ def test_the_decision_contract_takes_exercise():
                 {"symbol": "AAA.O0035.C5.00", "side": "EXERCISE", "quantity": 1, "limit_price": 2.0}):
         assert ci.parse_decision({"actions": [bad]}).refused, bad
     assert ci.recorded_orders({"X": tf.Exercise(2)}) == {"X": {"exercise": 2.0}}
+
+
+def test_the_rulebooks_minimum_floors_an_uncovered_short_and_a_strangle_asks_its_greater_side():
+    # FINRA 4210(f)(2)(E)(i): an uncovered short option asks at least 10% of
+    # the underlying (a call) or of its strike (a put); (f)(2)(G): a short
+    # call with a short put asks the greater of the two.
+    floor = tf.Engine(seed=19, universe=SMALL, model=model(**ON, margin_option_minimum=0.10))
+    scan = tf.Engine(seed=19, universe=SMALL, model=model(**ON))
+    for _ in range(3):
+        day(floor)
+        day(scan)
+    assert floor.prices() == scan.prices()
+    ticker = floor.tickers[3]
+    spot = _price(floor, ticker)
+    expiry = sorted({c["expiry"] for c in names(floor, ticker)})[0]
+    far_call = strike_near(floor, ticker, expiry, "C", 6)
+    far_put = strike_near(floor, ticker, expiry, "P", -6)
+    call_only = scan.option_margin([(far_call["symbol"], -1.0)])
+    assert call_only < 0.10 * spot * 100
+    assert floor.option_margin([(far_call["symbol"], -1.0)]) == pytest.approx(0.10 * spot * 100)
+    assert floor.option_margin([(far_put["symbol"], -1.0)]) == pytest.approx(
+        max(scan.option_margin([(far_put["symbol"], -1.0)]), 0.10 * far_put["strike"] * 100))
+    strangle = floor.option_margin([(far_call["symbol"], -1.0), (far_put["symbol"], -1.0)])
+    assert strangle == pytest.approx(max(scan.option_margin([(far_call["symbol"], -1.0), (far_put["symbol"], -1.0)]),
+                                         0.10 * max(spot, far_put["strike"]) * 100))
+    # Covered by the stock, the call asks the scan's alone.
+    assert floor.option_margin([(far_call["symbol"], -1.0), (ticker, 100.0)]) == \
+        scan.option_margin([(far_call["symbol"], -1.0), (ticker, 100.0)])
+    assert floor.quote(far_call["symbol"])["initial_margin"] == pytest.approx(0.10 * spot * 100)

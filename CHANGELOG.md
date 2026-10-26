@@ -69,6 +69,12 @@ payload, Arrow and WASM show them; agents trade by symbol.
 
 ### The option scan's tail
 
+- `margin_option_minimum` is a new dial, 0.0 on every preset and left out of
+  the digest there: an option book's margin is at least that share of the
+  underlying for each uncovered short call and of the strike for each
+  uncovered short put, a short call and put together asking the greater
+  (FINRA Rule 4210(f)(2)(E)(i) and (f)(2)(G); the rule's 10%). The scan
+  charged a deep out-of-the-money short close to nothing.
 - `margin_scan_option_tail` is new, 0.0 on every preset and left out of the
   digest there. Off zero it is the option scan's own tail allowance, in
   place of `margin_scan_tail` on the scan's price move and volatility

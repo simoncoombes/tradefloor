@@ -856,7 +856,14 @@ impl Engine {
                 .and_then(|s| s.first().copied())
                 .unwrap_or(0.0);
             let spot_move = z * crate::mathx::sqrt(crate::mathx::max(0.0, variance)) * ctx.spot;
-            total += super::margin::option_scan_loss_with(&scan, shares, spot_move, z * super::margin::SCAN_VOL_SD);
+            let loss = super::margin::option_scan_loss_with(&scan, shares, spot_move, z * super::margin::SCAN_VOL_SD);
+            // The rulebook's minimum for uncovered shorts (`margin_option_minimum`).
+            total += if p.margin_option_minimum != 0.0 {
+                let floor = super::margin::short_option_minimum(&scan, shares, ctx.spot, p.margin_option_minimum);
+                crate::mathx::max(loss, floor)
+            } else {
+                loss
+            };
         }
         Some(total)
     }

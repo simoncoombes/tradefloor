@@ -1913,6 +1913,28 @@ pub struct ModelParams {
     /// allowance of 1. The scan reads quotes and writes nothing, so no price
     /// moves. Requires `margin_scan_coverage`. In [0, 5].
     pub margin_scan_option_tail: f64,
+    /// The rulebook's minimum margin for a short listed option, as a share of
+    /// the underlying's value for a call and of the exercise price for a put.
+    /// 0.0, on every shipped preset, is the scan alone, and a value of 0.0 is
+    /// left out of the model's digest.
+    ///
+    /// Off zero, an option book's margin (`Engine::option_margin`, and so
+    /// each quote's `initial_margin`) is the scan's or, if greater, this
+    /// share times the underlying for each short call and times the strike
+    /// for each short put that nothing covers (long options of the same
+    /// right, long stock for a call, short stock for a put); a short call
+    /// and a short put together ask the greater of the two. FINRA Rule
+    /// 4210(f)(2)(E)(i): a short listed option is margined at its value plus
+    /// 20% of the underlying less the out-of-the-money amount, "but shall not
+    /// be less than" its value plus 10% of the underlying (calls) or of the
+    /// aggregate exercise price (puts), 10% for a broad index too (column
+    /// III); 4210(f)(2)(G) pairs a short call with a short put at the greater
+    /// requirement. The option's value is already in the account's equity,
+    /// so the share is the 10%. A deep out-of-the-money short, which the
+    /// scan charges close to nothing, so asks a tenth of what it is written
+    /// on. The scan reads quotes and writes nothing, so no price moves.
+    /// Requires `margin_scan_coverage`. In [0, 1].
+    pub margin_option_minimum: f64,
     /// Whether the engine lists European options on its price index. 0.0,
     /// on every shipped preset, lists none: no contract, no state, nothing in
     /// the snapshot or the state hash, and a value of 0.0 is left out of the
@@ -8895,6 +8917,7 @@ impl ModelParams {
             margin_scan_coverage: 0.0,
             margin_scan_tail: 0.0,
             margin_scan_option_tail: 0.0,
+            margin_option_minimum: 0.0,
             options_index_listed: 0.0,
             surface_ssvi: 0.0,
             surface_skew_physical: 0.0,
@@ -11582,6 +11605,7 @@ impl ModelParams {
             "margin_scan_coverage" => self.margin_scan_coverage,
             "margin_scan_tail" => self.margin_scan_tail,
             "margin_scan_option_tail" => self.margin_scan_option_tail,
+            "margin_option_minimum" => self.margin_option_minimum,
             "options_index_listed" => self.options_index_listed,
             "surface_ssvi" => self.surface_ssvi,
             "surface_skew_physical" => self.surface_skew_physical,
@@ -12034,6 +12058,7 @@ impl ModelParams {
             "margin_scan_coverage" => out.margin_scan_coverage = value,
             "margin_scan_tail" => out.margin_scan_tail = value,
             "margin_scan_option_tail" => out.margin_scan_option_tail = value,
+            "margin_option_minimum" => out.margin_option_minimum = value,
             "options_index_listed" => out.options_index_listed = value,
             "surface_ssvi" => out.surface_ssvi = value,
             "surface_skew_physical" => out.surface_skew_physical = value,
@@ -13998,6 +14023,18 @@ impl ModelParams {
                  first.",
                 self.margin_scan_option_tail));
         }
+        if !(0.0..=1.0).contains(&self.margin_option_minimum) {
+            return Err(format!(
+                "margin_option_minimum is {}. It is the rulebook's minimum margin for a short option, a \
+                 share of the underlying (calls) or the strike (puts), in [0, 1]; FINRA's is 0.10.",
+                self.margin_option_minimum));
+        }
+        if self.margin_option_minimum != 0.0 && self.margin_scan_coverage == 0.0 {
+            return Err(format!(
+                "margin_scan_coverage is 0 but margin_option_minimum is {}. The minimum floors the option \
+                 margin, which only margin_scan_coverage sets: set margin_scan_coverage first.",
+                self.margin_option_minimum));
+        }
         for (name, v) in [("options_index_listed", self.options_index_listed), ("surface_ssvi", self.surface_ssvi)] {
             if !(v == 0.0 || v == 1.0) {
                 return Err(format!("{name} is {v}. It is a switch, 0.0 off or 1.0 on."));
@@ -14682,6 +14719,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "margin_scan_coverage",
     "margin_scan_tail",
     "margin_scan_option_tail",
+    "margin_option_minimum",
     "night_session_steps",
     "futures_impact_memory",
     "futures_impact_memory_half_life",
@@ -14944,6 +14982,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "margin_scan_coverage",
         "margin_scan_tail",
         "margin_scan_option_tail",
+        "margin_option_minimum",
         "options_index_listed",
         "surface_ssvi",
         "surface_skew_physical",

@@ -1302,6 +1302,9 @@ PERTURBATIONS = [
     ("margin_scan_coverage", 0.99, False),
     ("margin_scan_tail", 1.3, False),
     ("margin_scan_option_tail", 0.8, False),
+    # INERT: the rulebook's minimum floors the option margin, which reads
+    # quotes and writes nothing.
+    ("margin_option_minimum", 0.1, False),
     # The index options, their surface and their dealer (pt-v22 phase 2).
     # INERT by construction: the surface and the options read public state,
     # draw nothing and write only their own state, so no stock price moves
@@ -2251,6 +2254,7 @@ COMPANIONS: dict[str, dict[str, float]] = {
     # The tail allowance scales the margin, which the coverage sets.
     "margin_scan_tail": {"margin_scan_coverage": 0.99},
     "margin_scan_option_tail": {"margin_scan_coverage": 0.99},
+    "margin_option_minimum": {"margin_scan_coverage": 0.99},
     # The premium per fixing prices the rate futures, listed by their switch.
     "rate_premium_per_fixing": {"futures_rates_listed": 1.0, "index_level_listed": 1.0,
                                 "forecast_horizon_sessions": 252.0},

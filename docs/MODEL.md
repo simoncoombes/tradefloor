@@ -4572,7 +4572,13 @@ in place of $t$ on both the move and the volatility shift: a scan that moves
 both together covers more than the quantile names. It is a projection on the
 model's held-out histories, as `margin_scan_tail` is. A
 long option's margin is at most its premium, a spread's at most its width,
-and offsetting positions margin net. Maintenance is initial over 1.1. A
+and offsetting positions margin net. Under `margin_option_minimum` (0.0 on
+every shipped preset) an option book's margin is at least the rulebook's
+minimum for its uncovered shorts, that share of the underlying for a call
+and of the strike for a put, a short call and put together asking the
+greater (FINRA Rule 4210(f)(2)(E)(i), column III, 10%, and (f)(2)(G)), so a
+deep out-of-the-money short the scan charges close to nothing asks a tenth
+of what it is written on. Maintenance is initial over 1.1. A
 `Portfolio` pays an option's premium when it trades, marks it at the
 dealer's mid, is paid its settlement at expiry (`Portfolio.settled`), counts
 it at its delta-notional against the leverage limit, adds the scan to

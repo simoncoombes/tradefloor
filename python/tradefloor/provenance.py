@@ -536,6 +536,11 @@ OUT_OF_SCOPE = {
         "`margin_scan_tail` is: a short strangle's one-session change over its "
         "scan margin at an allowance of 1, at the coverage's quantile; at 0.0 "
         "it is also left out of the model's digest",
+    "margin_option_minimum":
+        "inert at 0.0: an option book's margin is the scan's alone, as it "
+        "stood (a branch in each margin); read only with "
+        "`margin_scan_coverage` on; at 0.0 it is also left out of the model's "
+        "digest",
     # The index options, their surface and their dealer (pt-v22 phase 2),
     # inert on every shipped preset. An option and the surface read public
     # state, draw nothing and write only their own state, so off zero they
