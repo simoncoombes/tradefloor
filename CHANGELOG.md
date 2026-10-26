@@ -92,6 +92,18 @@ payload, Arrow and WASM show them; agents trade by symbol.
   change of its settlement, per point of the day's VIX move, -0.072 (se 0.053)
   and flat in tenor. At 1.0 a VIX jump compresses the premium, as on CFE. No
   draw and no state.
+### Company news released before the open
+
+- `news_preopen_share` is a new dial, 0.0 on every preset and left out of the
+  digest there: the share of the day's endogenous company news released
+  before the open, priced by the opening print on the night rather than
+  through the session. An event is pre-open when its occurrence uniform is
+  below the share times the intensity, so no draw is added. It reaches each
+  name as the session composes news, lands with the night's own draw and
+  moves fair value at `fair_value_news_share`. Refused without a night split.
+  On the forty names 2015-2025 the night carries 0.259 of the idiosyncratic
+  variance on large non-event days; the model's, with every event in the
+  session, 0.167.
 
 ### Credit's lagged leverage term
 

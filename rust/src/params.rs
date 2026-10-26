@@ -3077,6 +3077,35 @@ pub struct ModelParams {
     /// Real nights have a kurtosis of about 33 against a session's 4.5 (the
     /// forty names 2015-2025). pt-v21 ships 4.
     pub overnight_idio_df: f64,
+    /// The share of the day's endogenous company news released before the
+    /// open, and so priced by the opening print rather than through the
+    /// session. 0.0, on every shipped preset, is the engine as it stood: every
+    /// event is drawn at `open_market` and priced from the session's first
+    /// tick (`news_absorption_half_life`), so none is in the open. A value of
+    /// 0.0 is left out of the model's digest.
+    ///
+    /// Off zero an event is released before the open when its occurrence
+    /// uniform is below `p * endogenous_news_intensity`; given an event that
+    /// uniform over the intensity is uniform and independent of the event's
+    /// size, so `p` is the share of events, and of news variance, the open
+    /// prices. No draw of its own. Such an event reaches each name as the
+    /// session composes news (`market::factors::news_terms`: the named
+    /// company at full weight, a sector peer at the transfer weight), lands
+    /// on `s` with the night's own draw, moves the fair-value level at
+    /// `fair_value_news_share` as the session's news does, joins neither the
+    /// GJR's innovation nor the noise split (the session's news joins
+    /// neither), is booked in the night's `overnight` slot, and is taken out
+    /// of the session. A name with no `s` yet takes no night, its pre-open
+    /// news included. Refused without a night split
+    /// (`overnight_market_share` or `overnight_idio_share`). In [0, 1].
+    ///
+    /// The forty names 2015-07 to 2025-07 (daily bars with the open): with
+    /// each name's four largest idiosyncratic days a year set aside as the
+    /// event proxy, the night carries 0.259 (block bootstrap se 0.013) of the
+    /// idiosyncratic variance on each name's top 5% of the remaining days,
+    /// about the share it carries on ordinary days (0.266); 2005-2015 reads
+    /// 0.178. With every event priced in the session the model's reads 0.167.
+    pub news_preopen_share: f64,
     /// The earnings calendar's master switch and the surprise's size, in
     /// units of the name's current idiosyncratic daily sigma. 0.0, which
     /// every preset through pt-v20 carries, is no calendar.
@@ -9099,6 +9128,7 @@ impl ModelParams {
             overnight_market_share: 0.0,
             overnight_idio_share: 0.0,
             overnight_idio_df: 0.0,
+            news_preopen_share: 0.0,
             earnings_surprise_sigma: 0.0,
             earnings_surprise_df: 0.0,
             earnings_session_sigma: 0.0,
@@ -11796,6 +11826,7 @@ impl ModelParams {
             "overnight_market_share" => self.overnight_market_share,
             "overnight_idio_share" => self.overnight_idio_share,
             "overnight_idio_df" => self.overnight_idio_df,
+            "news_preopen_share" => self.news_preopen_share,
             "earnings_surprise_sigma" => self.earnings_surprise_sigma,
             "earnings_surprise_df" => self.earnings_surprise_df,
             "earnings_session_sigma" => self.earnings_session_sigma,
@@ -12258,6 +12289,7 @@ impl ModelParams {
             "overnight_market_share" => out.overnight_market_share = value,
             "overnight_idio_share" => out.overnight_idio_share = value,
             "overnight_idio_df" => out.overnight_idio_df = value,
+            "news_preopen_share" => out.news_preopen_share = value,
             "earnings_surprise_sigma" => out.earnings_surprise_sigma = value,
             "earnings_surprise_df" => out.earnings_surprise_df = value,
             "earnings_session_sigma" => out.earnings_session_sigma = value,
@@ -12907,6 +12939,22 @@ impl ModelParams {
                  the session; set one or the other.",
                 self.overnight_variance_ratio, self.overnight_market_share,
                 self.overnight_idio_share));
+        }
+        if !(self.news_preopen_share >= 0.0 && self.news_preopen_share <= 1.0) {
+            return Err(format!(
+                "news_preopen_share is {}. It is the share of the day's endogenous company news \
+                 released before the open, in [0, 1]; 0 prices it all in the session.",
+                self.news_preopen_share));
+        }
+        if self.news_preopen_share != 0.0
+            && self.overnight_market_share == 0.0
+            && self.overnight_idio_share == 0.0
+        {
+            return Err(format!(
+                "news_preopen_share is {} but there is no night split (overnight_market_share and \
+                 overnight_idio_share are 0). The open prices the news released before it only \
+                 under a split; set one.",
+                self.news_preopen_share));
         }
         for (name, v) in [("overnight_idio_df", self.overnight_idio_df),
                           ("earnings_surprise_df", self.earnings_surprise_df)] {
@@ -14792,6 +14840,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "market_vol_leverage_standardise",
     "market_vol_slow_gamma",
     "market_vol_vix_hold_half_life",
+    "news_preopen_share",
     "order_flow_depth_law",
     "overnight_idio_df",
     "overnight_idio_share",
@@ -15237,6 +15286,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "overnight_market_share",
         "overnight_idio_share",
         "overnight_idio_df",
+        "news_preopen_share",
         "earnings_surprise_sigma",
         "earnings_surprise_df",
         "earnings_session_sigma",
