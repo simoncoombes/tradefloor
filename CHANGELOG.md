@@ -26,6 +26,15 @@ payload, Arrow and WASM show them; agents trade by symbol.
 
 <!-- release-note-ends -->
 
+### A liquidation takes the shares an assignment delivered
+
+On an unmet margin call `Portfolio` closed its futures and options and left
+the stock an exercise or an assignment had delivered, so an early
+assignment that handed an account several times its equity in shares stayed
+held after the liquidation. The shares in a name whose options the account
+trades now go with them. Shares in other names, and every account without
+single-name options, are as before; known answers are unchanged.
+
 ### The single-name options' dealer on the tape
 
 Five dials, 0.0 on every preset, shape the single-name options' dealer:

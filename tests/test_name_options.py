@@ -699,3 +699,44 @@ def test_the_pretrade_check_refuses_an_order_the_account_cannot_margin():
         # Taking risk off is never refused.
         p.execute(engine, call, 2.0)
         assert call not in p.options
+
+
+def test_an_unmet_call_liquidates_the_shares_an_assignment_delivered():
+    """MG2: an early assignment can hand an account several times its equity
+    in stock; on an unmet margin call the shares go with the options, as a
+    broker's liquidation takes the whole position. Shares in a name the
+    account never traded options on are left."""
+    from types import SimpleNamespace
+
+    class Cost:
+        def __init__(self, size):
+            self.filled, self.average_price, self.worst_price = size, 100.0, 100.0
+
+    class Book:
+        def sweep_cost(self, side, size):
+            return Cost(size)
+
+    class Stand:
+        tickers = ["ABE", "XYZ"]
+        day_count = 50
+        book_live = False
+        model = SimpleNamespace(margin_pretrade_check=0.0)
+
+        def prices(self):
+            return struct.pack("<2d", 100.0, 100.0)
+
+        def book(self, ticker):
+            return Book()
+
+    p = Portfolio(cash=1e6)
+    p.execute(Stand(), "XYZ", 10.0)
+    p.positions.setdefault("ABE", type(p.positions["XYZ"])("ABE")).quantity = 6200.0
+    p.deliveries.append({"day": 49, "symbol": "ABE.O0055.P770.00", "event": "assignment", "contracts": 62.0,
+                         "ticker": "ABE", "shares": 6200.0, "price": 770.0, "cash": -4774000.0})
+    p.cash = -4.0e6
+    p._margin_call = {"day": 49, "equity": -3.4e6, "maintenance": 1.0, "initial": 1.0, "met": None}
+    p.margin_calls.append(p._margin_call)
+    p.settle_open(Stand())
+    assert p.margin_calls[-1]["met"] is False
+    assert p.quantity_of("ABE") == 0.0 and p.quantity_of("XYZ") == 10.0
+    assert p.liquidations[-1] == {"day": 50, "symbol": "ABE", "quantity": -6200.0, "filled": -6200.0}

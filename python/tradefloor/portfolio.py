@@ -1333,8 +1333,10 @@ class Portfolio:
         """At an open, after the engine's: settle the contracts that expired
         at it, then decide the last close's margin call. A call is met when
         the account's equity is back at or above the initial requirement;
-        otherwise every futures position is closed at the market through
-        its book. A no-op, asking the engine nothing, for a portfolio with
+        otherwise every futures and options position is closed at the market
+        through its book, and so are the shares an exercise or an assignment
+        delivered in a name whose options it trades. A no-op, asking the
+        engine nothing, for a portfolio with
         no futures and no call open. The harnesses call it after the open."""
         if not self.futures and not self.options and self._margin_call is None:
             return
@@ -1358,6 +1360,25 @@ class Portfolio:
             except OrderError:
                 pass
             self.liquidations.append({"day": day, "symbol": symbol, "quantity": -quantity,
+                                      "filled": filled})
+        # The shares an exercise or an assignment delivered in a name whose
+        # options the account trades go with them, as a broker's liquidation
+        # takes the whole position: an early assignment can hand an account
+        # several times its equity in stock the option scan no longer
+        # margins once the option is gone. Shares in other names are left.
+        names = {_option_root(s) for s, _ in held if is_name_option(s)}
+        names |= {d["ticker"] for d in self.deliveries}
+        for ticker in sorted(names):
+            position = self.positions.get(ticker)
+            if position is None or not position.quantity:
+                continue
+            quantity = position.quantity
+            filled = 0.0
+            try:
+                filled = self.execute(engine, ticker, -quantity)["quantity"]
+            except OrderError:
+                pass
+            self.liquidations.append({"day": day, "symbol": ticker, "quantity": -quantity,
                                       "filled": filled})
 
     def settle_close(self, engine: Engine) -> None:
