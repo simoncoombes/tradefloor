@@ -6408,6 +6408,15 @@ impl PyEngine {
         self.inner.book_live()
     }
 
+    /// Whether the night has walked a step since the last close
+    /// (``run_night``). From then until the next open the index futures
+    /// show where that open will be, and stocks refuse orders, here and in
+    /// ``Portfolio.execute``. A read.
+    #[getter]
+    fn night_walked(&self) -> bool {
+        self.inner.night_walked()
+    }
+
     /// The order in which a cohort's orders reach the book on one step.
     ///
     /// ``labels`` sorted at ``book_arrival_shuffle`` 0.0, the order every

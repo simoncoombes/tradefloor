@@ -537,6 +537,16 @@ impl Engine {
         }
     }
 
+    /// Whether the night has walked a step since the last close. From then
+    /// until the next open the futures' path shows where that open will be
+    /// (`night_tick`), so stocks, which do not trade at night, refuse
+    /// orders (`Engine::submit_order`).
+    pub fn night_walked(&self) -> bool {
+        self.night_steps() > 0
+            && self.futures.phase == FuturesPhase::Night
+            && self.futures.night.as_ref().is_some_and(|b| b.done > 0)
+    }
+
     /// Now on the futures' clock, in sessions: the session of the last open
     /// plus the share of its ticks run, or the next session's open between
     /// sessions.
@@ -1870,6 +1880,35 @@ mod tests {
             e.night_tick(8);
         }
         assert!(remarked > 0, "no close re-marked the index");
+    }
+
+    #[test]
+    fn a_stock_refuses_orders_once_the_night_has_moved() {
+        use crate::order_book::Side;
+        let mut e = engine(7, ON);
+        let mut buffer = SessionBuffer::new();
+        for d in 0..5 {
+            day(&mut e, d, &mut buffer);
+            if d + 1 < 5 {
+                e.night_tick(8);
+            }
+        }
+        let ticker = e.companies[0].ticker.clone();
+        // At the close, before the night moves, a stock order is taken.
+        assert!(!e.night_walked());
+        assert!(e.submit_order("a", &ticker, Side::Buy, 1.0, None, None).is_ok());
+        // Once it moves the futures show the next open: stocks refuse, and
+        // the front future still trades.
+        assert_eq!(e.night_tick(1), 1);
+        assert!(e.night_walked());
+        let refused = e.submit_order("a", &ticker, Side::Buy, 1.0, None, None);
+        assert!(refused.is_err_and(|m| m.contains("does not trade at night")));
+        assert!(e.submit_order("a", "IDX.F0056", Side::Buy, 1.0, None, None).is_ok());
+        e.night_tick(100);
+        e.set_current_day(5);
+        e.open_market();
+        assert!(!e.night_walked());
+        assert!(e.submit_order("a", &ticker, Side::Buy, 1.0, None, None).is_ok());
     }
 
     #[test]

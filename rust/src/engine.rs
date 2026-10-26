@@ -5969,6 +5969,12 @@ impl Engine {
         if company.is_bankrupt || !company.is_public {
             return Err(format!("{ticker} does not trade: it is bankrupt or no longer public"));
         }
+        if self.night_walked() {
+            return Err(format!(
+                "{ticker} does not trade at night: stocks trade from the next open \
+                 (open_market()); the night session is for index futures"
+            ));
+        }
         let id = match order_id {
             Some(id) => {
                 if id.is_empty() {

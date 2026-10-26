@@ -613,6 +613,9 @@ class Portfolio:
             return self._execute_in_book(engine, ticker, float(quantity), None)
         if getattr(engine, "book_live", False) and ticker not in _RATE_TICKERS:
             return self._execute_in_book(engine, ticker, float(quantity), None)
+        if getattr(engine, "night_walked", False):
+            # The engine refuses the same order on the book's path.
+            raise OrderError(f"{ticker} does not trade at night: stocks trade from the next open")
 
         side: Literal["buy", "sell"] = "buy" if quantity > 0 else "sell"
         size = abs(float(quantity))
