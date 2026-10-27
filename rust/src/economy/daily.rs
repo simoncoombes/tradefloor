@@ -510,6 +510,11 @@ pub struct YieldDials {
     /// its anchor ([`crate::params::ModelParams::treasury_term_premium_sd`]);
     /// `None`, on every preset, is no state.
     pub term_premium: Option<f64>,
+    /// The 2-year's expected path tonight (`treasury_2y_expected_path`):
+    /// the dial's share and the mean policy rate, per cent, the standing
+    /// forecast expects over the next 504 closes. `None`, on every preset,
+    /// is the blend.
+    pub two_year_path: Option<(f64, f64)>,
 }
 
 /// The largest move the corporate yield takes in one session under
@@ -535,6 +540,18 @@ pub const TREASURY_HAVEN_VIX: f64 = 20.0;
 /// rate, 2.9 on FRED DFF 1990-2025 and 2.6 on pt-v19's long run. Read only
 /// with the dial set.
 pub const TREASURY_NEUTRAL_RATE: f64 = 2.5;
+
+/// The 2-year's term premium over the expected path, percentage points
+/// (`treasury_2y_expected_path`): ACM TP02's mean, 43.3 bp (se 15.2, 60-month
+/// blocks), NY Fed monthly 1961-06 to 2026-09. Measured, not solved.
+pub const TWO_YEAR_TERM_PREMIUM: f64 = 0.433;
+
+/// The share of the 10-year's own term-premium state the 2-year's premium
+/// carries (`treasury_2y_expected_path`): the slope of ACM TP02 on TP10 in
+/// levels, 0.452 (se 0.012, correlation 0.97), on the same months. TP02's
+/// half-life (20.5 months) is close to the state's (455 sessions), so the
+/// 2-year takes the 10-year's state rather than one of its own.
+pub const TWO_YEAR_TERM_PREMIUM_BETA: f64 = 0.452;
 
 /// The Treasury haven's cut to the 10-year's term premium: `gain` points per
 /// VIX point above [`TREASURY_HAVEN_VIX`]. Read by the daily anchor and by
@@ -578,6 +595,7 @@ impl Default for YieldDials {
             treasury_equity_gain: 0.0,
             spread_noise: None,
             term_premium: None,
+            two_year_path: None,
         }
     }
 }
@@ -1337,6 +1355,23 @@ pub fn vix_close(
     clamp(stepped_vix, 10.0, inputs.vix_ceiling)
 }
 
+/// The 2-year's target under `treasury_2y_expected_path`: `legacy + d (path
+/// + tp - legacy)`, with `tp` [`TWO_YEAR_TERM_PREMIUM`] plus
+/// [`TWO_YEAR_TERM_PREMIUM_BETA`] of the 10-year's own term-premium state.
+/// `legacy` itself with the dial off.
+fn two_year_target(legacy: f64, yields: &YieldDials) -> f64 {
+    match yields.two_year_path {
+        Some((d, path)) => {
+            let tp = match yields.term_premium {
+                Some(x) => TWO_YEAR_TERM_PREMIUM + TWO_YEAR_TERM_PREMIUM_BETA * x,
+                None => TWO_YEAR_TERM_PREMIUM,
+            };
+            legacy + d * (path + tp - legacy)
+        }
+        None => legacy,
+    }
+}
+
 /// The yields half of [`vix_and_yields`], after the VIX is written.
 fn close_yields(
     economy: &EconomyState,
@@ -1479,6 +1514,11 @@ fn close_yields(
     // its own noise: one more normal on the economy stream, taken only
     // under the dial.
     let target_2y = fed_rate_for_10y * 0.85 + new_state.treasury_yield_10y * 0.15;
+    // THE EXPECTED PATH (`treasury_2y_expected_path` d): the target is
+    // `d` of the way from the blend to the path the strip prices plus the
+    // 2-year's term premium, the tape's mean and its share of the 10-year's
+    // own state. A branch: off, the target is the blend.
+    let target_2y = two_year_target(target_2y, &inputs.yields);
     let own_2y = inputs.yields.treasury_2y_noise != 0.0;
     new_state.treasury_yield_2y = if own_2y {
         clamp(
@@ -1538,7 +1578,10 @@ fn close_yields(
             new_state.treasury_yield_2y = if own_2y {
                 clamp(new_state.treasury_yield_2y + bond_stock_yield_shift, 0.0, 12.0)
             } else {
-                new_state.federal_funds_rate * 0.85 + new_state.treasury_yield_10y * 0.15
+                two_year_target(
+                    new_state.federal_funds_rate * 0.85 + new_state.treasury_yield_10y * 0.15,
+                    &inputs.yields,
+                )
             };
         }
     }

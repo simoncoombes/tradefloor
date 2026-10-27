@@ -1024,6 +1024,9 @@ PERTURBATIONS = [
     # a gap to keep: 0.15% against 0.23% after the third close, measured
     # 2026-10-11), but no column this table reads takes the 2-year.
     ("treasury_2y_meeting_carry", 1.0, False),
+    # The 2-year's expected path. INERT on the probe's market: it moves only
+    # the 2-year's target, and no column this table reads takes the 2-year.
+    ("treasury_2y_expected_path", 1.0, False),
     # The reversed flight to quality's cut. INERT on the probe: pt-v20's curve
     # reads headline, which the probe's path keeps under 4.
     ("flight_to_quality_reversal_cut", 0.5, False),

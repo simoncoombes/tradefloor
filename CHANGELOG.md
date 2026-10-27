@@ -117,6 +117,18 @@ records are identical (`tests/test_futures_accounts.py`).
   land in the first minute and 4.7% in the first half hour; the model's first
   tick prices about 0.6 of the session's news.
 
+### The 2-year as the expected path plus a term premium
+
+- `treasury_2y_expected_path` is a new dial, 0.0 on every preset and left
+  out of the digest there: the share of the 2-year's daily target taken
+  from the expected policy path plus a term premium. At 0.0 the target is
+  the blend `0.85 (ff + priced) + 0.15 x 10y`. The path is the mean, over the next 504
+  closes, of the policy rate the standing forecast expects, the rate the
+  term-rate strip prices before its premium. The premium is ACM TP02's
+  mean, 43.3 bp (NY Fed monthly, 1961-2026), plus 0.452 of the 10-year's
+  own term-premium state (TP02's slope on TP10). No draw. The pull, the
+  noise and the meetings are unchanged.
+
 ### The close's growth priced at the open
 
 - `remark_growth_open_share` is a new dial, 0.0 on every preset and left out

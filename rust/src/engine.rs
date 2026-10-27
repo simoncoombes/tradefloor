@@ -10622,6 +10622,10 @@ impl Engine {
                 // key and the day, so the live mark's projection and the
                 // close read the same; `None` at 0.0.
                 term_premium: self.term_premium_step(request.game_day),
+                // The 2-year's expected path (`treasury_2y_expected_path`),
+                // on the standing forecast, as the strip reads it; `None`
+                // at 0.0.
+                two_year_path: self.two_year_expected_path(),
             },
             volatility: request.volatility,
             active_shocks: request.active_shocks,
@@ -11049,6 +11053,33 @@ impl Engine {
     /// burn-in numbers its days from 1 as the run does, so its days take the
     /// index `day | 1 << 40`, which no session reaches, and the run does not
     /// replay the burn-in's draws.
+    /// The 2-year's expected path (`treasury_2y_expected_path`): the dial
+    /// and the mean, over the 504 closes from the standing forecast's next,
+    /// of the policy rate it expects each to set, past its horizon its last
+    /// rate and without a forecast the policy rate now, as the rate futures
+    /// price their closes to come. `None` with the dial at 0.0. No draw.
+    fn two_year_expected_path(&self) -> Option<(f64, f64)> {
+        let d = self.params.treasury_2y_expected_path;
+        if d == 0.0 {
+            return None;
+        }
+        const CLOSES: usize = 504;
+        let r0 = self.economy.federal_funds_rate;
+        let path = match self.forecast() {
+            Some(f) if !f.policy_rate.is_empty() => {
+                let n = if f.policy_rate.len() < CLOSES { f.policy_rate.len() } else { CLOSES };
+                let last = f.policy_rate[f.policy_rate.len() - 1];
+                let mut sum = 0.0;
+                for r in &f.policy_rate[..n] {
+                    sum += *r;
+                }
+                (sum + last * (CLOSES - n) as f64) / CLOSES as f64
+            }
+            _ => r0,
+        };
+        Some((d, path))
+    }
+
     fn term_premium_step(&self, game_day: i64) -> Option<f64> {
         if !self.carries_term_premium() {
             return None;
