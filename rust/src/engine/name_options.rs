@@ -402,6 +402,9 @@ impl Engine {
     /// one-session variance of the name at the report.
     fn name_events(&self, clock: &Clock, slot: usize, series: &[f64], day: i64, n_max: usize) -> Vec<(usize, f64)> {
         let p = &self.params;
+        if p.surface_name_earnings_premium != 0.0 {
+            return self.name_events_drawn(clock, slot, series, day, n_max);
+        }
         if p.surface_earnings_weight == 0.0 || !self.carries_earnings() || series.is_empty() {
             return Vec::new();
         }
@@ -434,6 +437,87 @@ impl Engine {
         out
     }
 
+    /// The name in `slot`'s reports as the engine draws them
+    /// (`surface_name_earnings_premium`): `(knot, variance)` at each reaction
+    /// session `d` from the next unprinted one on, `earnings_surprise_sigma`
+    /// squared plus `earnings_session_sigma` squared, and at `d + 1`,
+    /// `earnings_followthrough_sigma` squared, each times the name's
+    /// non-market daily variance now ([`Engine::name_drawn_variance`])
+    /// carried to the session on the forecast's path of the name's variance,
+    /// `series` at the session over `series` at the next. A report printed
+    /// at today's open still has its session after ahead.
+    fn name_events_drawn(&self, clock: &Clock, slot: usize, series: &[f64], day: i64, n_max: usize) -> Vec<(usize, f64)> {
+        let p = &self.params;
+        if !self.carries_earnings() || series.is_empty() || series[0] <= 0.0 {
+            return Vec::new();
+        }
+        let c = &self.companies[slot];
+        if !c.is_public || c.is_bankrupt {
+            return Vec::new();
+        }
+        let unit = self.name_drawn_variance(slot);
+        let h = crate::earnings::id_hash(&c.id);
+        let q = crate::earnings::QUARTER_SESSIONS;
+        let from = clock.unprinted;
+        let last = clock.base + n_max as i64 - 1;
+        let report = p.earnings_surprise_sigma * p.earnings_surprise_sigma
+            + p.earnings_session_sigma * p.earnings_session_sigma;
+        let after = p.earnings_followthrough_sigma * p.earnings_followthrough_sigma;
+        let mut out = Vec::new();
+        if last < from {
+            return out;
+        }
+        let mut push = |d: i64, sigma2: f64| {
+            if sigma2 == 0.0 || d < from || d > last {
+                return;
+            }
+            let n = d - clock.base + 1;
+            if n < 1 || n as usize > n_max {
+                return;
+            }
+            let at = std::cmp::max(1, d - day + 1) as usize;
+            let v = series[std::cmp::min(at, series.len()) - 1];
+            out.push((n as usize, sigma2 * unit * (v / series[0])));
+        };
+        for quarter in std::cmp::max(from - 1, 0).div_euclid(q)..=std::cmp::max(last, 0).div_euclid(q) {
+            let d = crate::earnings::reaction_session(self.earnings_key, h, quarter);
+            push(d, report);
+            push(d + 1, after);
+        }
+        out
+    }
+
+    /// The name in `slot`'s non-market daily variance now, in the unit its
+    /// opening print draws the earnings surprise in
+    /// (`Engine::apply_night_split`): its GARCH variance, floored, at its
+    /// idiosyncratic scale, size and idiosyncratic state, and its sector
+    /// loading on the sector's sigma, in quadrature.
+    pub(crate) fn name_drawn_variance(&self, slot: usize) -> f64 {
+        let p = &self.params;
+        let c = &self.companies[slot];
+        let beta = c.stock.beta.unwrap_or(1.0);
+        let sector_sigma = match self.sector_keys.iter().position(|k| *k == c.sector) {
+            Some(k) => {
+                let shared = crate::market::tick::sector_sigma_at(p, &self.economy, self.vix_anchor);
+                let sigma = if p.sector_vol_alpha != 0.0 || p.sector_vol_beta != 0.0 {
+                    match self.sector_variance.get(k) {
+                        Some(v) if *v > 0.0 => shared * crate::mathx::sqrt(*v),
+                        _ => shared,
+                    }
+                } else {
+                    shared
+                };
+                crate::market::factors::sector_loading_for(p, beta) * sigma
+            }
+            None => 0.0,
+        };
+        let daily_sigma = crate::mathx::sqrt(crate::mathx::max(c.stock.garch_variance, p.idio_sigma_floor));
+        let own_unit = crate::market::factors::idio_scale_for(p, beta)
+            * crate::market::factors::cap_size_multiplier_with(p, c.stock.market_cap);
+        let own_unit = if self.idio_state_on() { own_unit * crate::mathx::sqrt(self.idio_ratio_at(slot)) } else { own_unit };
+        (daily_sigma * own_unit) * (daily_sigma * own_unit) + sector_sigma * sector_sigma
+    }
+
     /// The surface of the name in `slot` now, on the index surface `index`:
     /// `None` without a forecast of the name.
     fn name_surface_at(&self, clock: &Clock, slot: usize, index: &Surface) -> Option<Surface> {
@@ -460,7 +544,7 @@ impl Engine {
             p.surface_term_premium_short,
             p.surface_term_premium_long,
             &events,
-            p.surface_earnings_weight,
+            if p.surface_name_earnings_premium != 0.0 { p.surface_name_earnings_premium } else { p.surface_earnings_weight },
         );
         let shape = term_shape(&inputs, n_max);
         let curve = ThetaCurve::from_shape(&shape, clock.elapsed, 1.0)?;

@@ -2740,6 +2740,7 @@ impl Engine {
         pre.params.option_name_spread_otm = 0.0;
         pre.params.option_name_spread_itm = 0.0;
         pre.params.option_name_spread_tenor_exponent = 0.0;
+        pre.params.surface_name_earnings_premium = 0.0;
         pre.options = options::OptionsState::default();
         pre.name_options = name_options::NameOptionsState::default();
         pre.earnings_key = crate::rng::prehistory_key(self.earnings_key);
