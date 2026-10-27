@@ -1451,6 +1451,20 @@ pub struct ModelParams {
     /// mispricing, so the tape's fast reversal does not lower the long
     /// horizon's variance further. In [0, 1].
     pub market_factor_reversal_transient: f64,
+    /// The cap on the market reversal's share
+    /// (`market_factor_reversal`, `market_factor_reversal_vix_power`). 0.0,
+    /// on every shipped preset, is no cap (a branch), and a value of 0.0 is
+    /// left out of the model's digest. Off zero, the share
+    /// `k (VIX / 20)^q` is read no higher than this. Read only with
+    /// `market_factor_reversal` set. No draw and no state.
+    ///
+    /// ^GSPC and the Cboe VIX, 1990-2025: the next session keeps 0.824 of a
+    /// day's move when the VIX stood over 30 the close before (se 0.064),
+    /// the tape's highest regime, so its reversal there is 0.176. The power
+    /// law is fitted where the tape has days; it is not read past them. At
+    /// k 0.058 and q 1.70 it would undo 0.27 of a day at a VIX of 50 and
+    /// 0.62 at 80, the pinned levels of every replayed crisis. In [0, 1].
+    pub market_factor_reversal_cap: f64,
     /// The per-session innovation sd of credit's own state, points of the
     /// corporate spread's base. 0.0, on every shipped preset, is no state
     /// (the spread moves only with the VIX, the cycle and the leverage gap),
@@ -9360,6 +9374,7 @@ impl ModelParams {
             market_factor_reversal: 0.0,
             market_factor_reversal_vix_power: 0.0,
             market_factor_reversal_transient: 0.0,
+            market_factor_reversal_cap: 0.0,
             corporate_spread_noise_sd: 0.0,
             corporate_spread_noise_half_life: 0.0,
             treasury_2y_meeting_carry: 0.0,
@@ -12308,6 +12323,7 @@ impl ModelParams {
             "market_factor_reversal" => self.market_factor_reversal,
             "market_factor_reversal_vix_power" => self.market_factor_reversal_vix_power,
             "market_factor_reversal_transient" => self.market_factor_reversal_transient,
+            "market_factor_reversal_cap" => self.market_factor_reversal_cap,
             "corporate_spread_noise_sd" => self.corporate_spread_noise_sd,
             "corporate_spread_noise_half_life" => self.corporate_spread_noise_half_life,
             "treasury_2y_meeting_carry" => self.treasury_2y_meeting_carry,
@@ -12792,6 +12808,7 @@ impl ModelParams {
             "market_factor_reversal" => out.market_factor_reversal = value,
             "market_factor_reversal_vix_power" => out.market_factor_reversal_vix_power = value,
             "market_factor_reversal_transient" => out.market_factor_reversal_transient = value,
+            "market_factor_reversal_cap" => out.market_factor_reversal_cap = value,
             "corporate_spread_noise_sd" => out.corporate_spread_noise_sd = value,
             "corporate_spread_noise_half_life" => out.corporate_spread_noise_half_life = value,
             "treasury_2y_meeting_carry" => out.treasury_2y_meeting_carry = value,
@@ -14573,6 +14590,12 @@ impl ModelParams {
                  stays in the mispricing instead of the fair-value level, in [0, 1]; 0 moves it all to the level.",
                 self.market_factor_reversal_transient));
         }
+        if !(self.market_factor_reversal_cap >= 0.0 && self.market_factor_reversal_cap <= 1.0) {
+            return Err(format!(
+                "market_factor_reversal_cap is {}. It is the cap on the market reversal's share, in [0, 1]; \
+                 0 is no cap.",
+                self.market_factor_reversal_cap));
+        }
         if !(self.market_factor_reversal_vix_power >= 0.0 && self.market_factor_reversal_vix_power <= 4.0) {
             return Err(format!(
                 "market_factor_reversal_vix_power is {}. It is the power of the VIX over 20 the market's \
@@ -15746,6 +15769,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "market_factor_reversal",
     "market_factor_reversal_vix_power",
     "market_factor_reversal_transient",
+    "market_factor_reversal_cap",
     "corporate_spread_noise_sd",
     "corporate_spread_noise_half_life",
     "treasury_term_premium_sd",
@@ -16034,6 +16058,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "market_factor_reversal",
         "market_factor_reversal_vix_power",
         "market_factor_reversal_transient",
+        "market_factor_reversal_cap",
         "corporate_spread_noise_sd",
         "corporate_spread_noise_half_life",
         "treasury_term_premium_sd",

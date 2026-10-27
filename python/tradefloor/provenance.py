@@ -549,6 +549,11 @@ OUT_OF_SCOPE = {
         "whole reversal moves to the fair-value level, as it stood (a branch in "
         "the tick); no draw and no state; at 0.0 it is also left out of the "
         "model's digest",
+    "market_factor_reversal_cap":
+        "inert at 0.0 and read only with `market_factor_reversal` set: the "
+        "reversal's share is not capped, as it stood (a branch in the tick); "
+        "no draw and no state; at 0.0 it is also left out of the model's "
+        "digest",
     "fair_value_aggregate_half_life":
         "inert at 0.0: no reversion of the aggregate earnings level (a branch "
         "on `== 0.0`), the arithmetic that stood. pt-v22 holds the level "

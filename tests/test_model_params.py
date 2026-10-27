@@ -1558,6 +1558,9 @@ PERTURBATIONS = [
     # INERT: the reversal's transient share is read only with the reversal
     # set, which pt-v20 leaves off.
     ("market_factor_reversal_transient", 1.0, False),
+    # INERT: the reversal's cap is read only with the reversal set, which
+    # pt-v20 leaves off.
+    ("market_factor_reversal_cap", 0.176, False),
     # INERT: the pre-open news is read only under a night split, which
     # pt-v20 leaves off (and it is refused without one).
     ("news_preopen_share", 0.259, False),

@@ -1503,6 +1503,14 @@ pub fn simulate_market_tick(
             } else {
                 p.market_factor_reversal
             };
+            // `market_factor_reversal_cap`: the share read no higher than the
+            // tape's reversal in its highest VIX regime. A branch: 0.0 is the
+            // share as it stands.
+            let k = if p.market_factor_reversal_cap != 0.0 {
+                mathx::min(k, p.market_factor_reversal_cap)
+            } else {
+                k
+            };
             -k * companies[idx].stock.beta.unwrap_or(1.0) * inputs.prev_day_factor / 390.0
         } else {
             0.0

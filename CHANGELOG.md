@@ -184,6 +184,12 @@ records are identical (`tests/test_futures_accounts.py`).
   of the digest there: the reversal's share follows the VIX as `k (X/20)^q`.
   The S&P 500's next-day reversal is near zero under a VIX of 30 and -0.17
   above it; `(X/20)^2` fits best.
+- `market_factor_reversal_cap` is a new dial, 0.0 on every preset and left out of
+  the digest there: the cap on the market reversal's share `k (VIX / 20)^q`,
+  read only with `market_factor_reversal` set. The tape's reversal in its
+  highest VIX regime (over 30) is 0.176 (se 0.064); the power law is not read
+  past the days that set it, which at a pinned crisis VIX of 50-80 it would
+  otherwise take to 0.27-0.62. No draw and no state.
 - `market_factor_reversal_transient` is new, 0.0 on every preset and left out
   of the digest there: the share of the reversal that stays in the name's
   mispricing instead of moving to the fair-value level. At 1.0 a move is

@@ -188,3 +188,42 @@ def test_the_transient_share_takes_no_draw_and_restores():
 def test_the_transient_share_out_of_range_is_refused(value):
     with pytest.raises(Exception):
         tf.ModelParams.from_preset("pt-v20", market_factor_reversal=K, market_factor_reversal_transient=value)
+
+
+def test_the_cap_at_zero_is_the_share_as_it_stands():
+    q = 2.0
+    a = engine(market_factor_reversal=K, market_factor_reversal_vix_power=q)
+    b = engine(market_factor_reversal=K, market_factor_reversal_vix_power=q, market_factor_reversal_cap=0.0)
+    assert a.model.fingerprint == b.model.fingerprint
+    for x in (a, b):
+        x.run_days(20, record=False)
+    assert floats(a.prices()) == floats(b.prices())
+    assert a.state_hash() == b.state_hash()
+
+
+def test_the_cap_holds_the_share_under_it():
+    """With the VIX power lifting k (X/20)^q over the cap, the crowd slot carries -cap * beta * F; a cap above the
+    share changes nothing, to the bit."""
+    q, cap = 2.0, 0.02
+    base = engine()
+    live = engine(market_factor_reversal=K, market_factor_reversal_vix_power=q, market_factor_reversal_cap=cap)
+    loose = engine(market_factor_reversal=K, market_factor_reversal_vix_power=q, market_factor_reversal_cap=1.0)
+    free = engine(market_factor_reversal=K, market_factor_reversal_vix_power=q)
+    for x in (base, live, loose, free):
+        x.run_days(1, record=False)
+    f, vix = prev_day_factor(live), live.state_snapshot()["economy"]["vix"]
+    assert K * (vix / 20.0) ** q > cap
+    for x in (base, live, loose, free):
+        x.run_days(1, record=False, first_day=1)
+    beta = {c.ticker: c.beta for c in UNIVERSE}
+    ab, al = attribution(base), attribution(live)
+    for i, t in enumerate(live.tickers):
+        assert al[i][CROWD] - ab[i][CROWD] == pytest.approx(-cap * beta[t] * f, rel=1e-6, abs=1e-12)
+    assert K * (vix / 20.0) ** q < 1.0
+    assert floats(loose.prices()) == floats(free.prices())
+
+
+@pytest.mark.parametrize("value", [-0.01, 1.01])
+def test_the_cap_out_of_range_is_refused(value):
+    with pytest.raises(Exception):
+        tf.ModelParams.from_preset("pt-v20", market_factor_reversal=K, market_factor_reversal_cap=value)
