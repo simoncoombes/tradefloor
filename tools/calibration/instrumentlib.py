@@ -923,6 +923,7 @@ PARAM_SPECS: dict[str, dict] = {
     "oil_price_ceiling": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1000.0)},
     "oil_forecast_clamp": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0), "derived": False},
     "oil_forecast_opec_spread": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0), "derived": False},
+    "oil_forecast_cycle_growth": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0), "derived": False},
     "fed_core_inflation": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0), "derived": False},
     "treasury_core_inflation": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0), "derived": False},
     "treasury_zlb_path": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 20.0)},

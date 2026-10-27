@@ -362,6 +362,22 @@ stock prices and every known answer are where they were.
   the long factor carrying most of the spread, the short factor's undercounts
   the rule's cuts, which are worth more than its raises, and the forecast
   sits low. It changes what the forecast publishes and nothing in the law.
+- `oil_forecast_cycle_growth` is a new switch, 0.0 on every preset and left
+  out of the digest there. At 0.0 the forecast steps the economy in the
+  believed phase, held for the whole horizon, so oil's target follows that
+  phase's growth; the law changes phase, with shocks on a phase's first
+  session that sum to -2 points a cycle, and the forecast runs high
+  at long horizons. At 1.0 oil's block reads growth's expectation over the
+  cycle's phases on the law's own transitions: each cohort of the belief's
+  mass (the start's at the phase's stationary age under the full law, read
+  from the economy's own long run; the entrants fresh) leaves at the
+  probability the law's transition check reads at its age. Each phase
+  carries its own economy, stepped by the law in that phase with its own
+  central bank's meetings and the market's gap over its spread, so the
+  ladder's state-dependent hazards read that phase's state; each cohort's
+  growth steps by the law in its phase with the law's mean shock on entry.
+  No free parameter. It changes what the forecast publishes and nothing in
+  the law.
 ### The skew noise
 
 - `surface_skew_noise_sd` and `surface_skew_noise_half_life` are new dials,

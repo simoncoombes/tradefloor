@@ -1074,6 +1074,30 @@ pub struct ModelParams {
     /// step's start, which is the price the rule reads. It reads the forecast
     /// only; the law is unchanged.
     pub oil_forecast_opec_spread: f64,
+    /// The growth oil's forecast reads, a switch. 0.0, on every shipped
+    /// preset, steps the economy in the believed phase held for the whole
+    /// horizon, as it stood, so oil's demand and its target's growth term
+    /// (`75 + 3 g`) follow that phase's growth. The law changes phase, and
+    /// its shocks on a phase's first session sum to -2 points a
+    /// cycle, so growth sits below where the held phase would take it, and
+    /// the forecast runs high by more the longer the horizon (row OF4). At
+    /// 1.0 oil's block reads growth's expectation over the cycle's phases,
+    /// on the law's own transitions: the belief's mass on each phase, at the
+    /// phase's stationary age under the full law (the age is not public; the
+    /// occupancy of the economy's own long run, run alone on generators of
+    /// its own), and the mass entering a phase, each leave at the
+    /// probability the law's transition check reads at their age. Each phase
+    /// carries its own economy from the close: the law steps it in that
+    /// phase, its central bank meets on it by the law's rule, and the
+    /// market's gap steps on it with its spread from the forecast's own index
+    /// variance, so the hazard and the ladder read that phase's state (the
+    /// market's fall over the gap's spread, inflation, rates, the curve,
+    /// valuation, unemployment, growth). Every cohort's growth steps by the
+    /// law in its phase, with the law's mean shock on entry, and mass
+    /// entering a phase joins its state at the mass-weighted mean. A
+    /// construction with no free parameter. It reads the forecast only; the
+    /// law is unchanged.
+    pub oil_forecast_cycle_growth: f64,
     /// The share of the dollar index's gap to its target closed each
     /// session. 0.0, on every shipped preset, is the standing 0.02, and a
     /// value of 0.0 is left out of the model's digest.
@@ -9223,6 +9247,7 @@ impl ModelParams {
             oil_inventory_noise_sd: 0.0,
             oil_forecast_clamp: 0.0,
             oil_forecast_opec_spread: 0.0,
+            oil_forecast_cycle_growth: 0.0,
             usd_mean_reversion: 0.0,
             usd_noise_sd: 0.0,
             usd_safe_haven_gain: 0.0,
@@ -11936,6 +11961,7 @@ impl ModelParams {
             "oil_inventory_noise_sd" => self.oil_inventory_noise_sd,
             "oil_forecast_clamp" => self.oil_forecast_clamp,
             "oil_forecast_opec_spread" => self.oil_forecast_opec_spread,
+            "oil_forecast_cycle_growth" => self.oil_forecast_cycle_growth,
             "usd_mean_reversion" => self.usd_mean_reversion,
             "usd_noise_sd" => self.usd_noise_sd,
             "usd_safe_haven_gain" => self.usd_safe_haven_gain,
@@ -12414,6 +12440,7 @@ impl ModelParams {
             "oil_inventory_noise_sd" => out.oil_inventory_noise_sd = value,
             "oil_forecast_clamp" => out.oil_forecast_clamp = value,
             "oil_forecast_opec_spread" => out.oil_forecast_opec_spread = value,
+            "oil_forecast_cycle_growth" => out.oil_forecast_cycle_growth = value,
             "usd_mean_reversion" => out.usd_mean_reversion = value,
             "usd_noise_sd" => out.usd_noise_sd = value,
             "usd_safe_haven_gain" => out.usd_safe_haven_gain = value,
@@ -14285,6 +14312,12 @@ impl ModelParams {
                  decision reads the short factor's spread) or 1 (the price's whole spread).",
                 self.oil_forecast_opec_spread));
         }
+        if !(self.oil_forecast_cycle_growth == 0.0 || self.oil_forecast_cycle_growth == 1.0) {
+            return Err(format!(
+                "oil_forecast_cycle_growth is {}. It is a switch: 0 (oil's forecast reads growth \
+                 in the believed phase held) or 1 (growth's expectation over the cycle's phases).",
+                self.oil_forecast_cycle_growth));
+        }
         if !(0.0..=5.0).contains(&self.oil_inventory_noise_sd) {
             return Err(format!(
                 "oil_inventory_noise_sd is {}. It is the sd of oil inventory's daily noise, in \
@@ -15295,6 +15328,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "oil_inventory_noise_sd",
     "oil_forecast_clamp",
     "oil_forecast_opec_spread",
+    "oil_forecast_cycle_growth",
     "usd_mean_reversion",
     "usd_noise_sd",
     "usd_safe_haven_gain",
@@ -15577,6 +15611,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "oil_inventory_noise_sd",
         "oil_forecast_clamp",
         "oil_forecast_opec_spread",
+        "oil_forecast_cycle_growth",
         "usd_mean_reversion",
         "usd_noise_sd",
         "usd_safe_haven_gain",
