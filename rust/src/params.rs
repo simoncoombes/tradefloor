@@ -1103,15 +1103,21 @@ pub struct ModelParams {
     /// and a value of 0.0 is left out of the model's digest. At 1.0 the
     /// forecast simulates the law forward from the close's public state over
     /// paths of its own (a phase from the belief, an age from the phase's
-    /// stationary law under the full law, the published growth), each path
-    /// taking the law's close at every forecast close: the market's session
-    /// return at the forecast's variance of the index, the economy's step,
-    /// the cycle's roll on the hazard and the ladder from the path's own
-    /// state, and its central bank's meeting. Oil's block reads the paths'
-    /// mean growth, oil's target's mean over them. It takes the place of
+    /// stationary law under the full law, growth at the published figure
+    /// plus the law's own spread about it at that phase and age, the
+    /// market's belief and the close's index), each path taking the law's
+    /// close at every forecast close: the nowcast's report and the belief's
+    /// update, the session's index on the move in its fair value on the
+    /// path's own economy plus a return at the forecast's variance of the
+    /// index, the market's P/E on that index, the economy's step, the
+    /// cycle's roll on the hazard and the ladder from the path's own state,
+    /// the earnings cycle, the volatility feedback, its central bank's
+    /// meeting and the earnings anticipation. Oil's block reads the paths'
+    /// mean growth, oil's target's mean over them. The paths are simulated
+    /// at one close and held for the four after it. It takes the place of
     /// `oil_forecast_cycle_growth` where both are set. The paths draw from a
     /// generator of their own, so the law moves nothing. A construction with
-    /// no free parameter; the number of paths is precision.
+    /// no free parameter; the number of paths and the hold are cost.
     pub oil_forecast_path_law: f64,
     /// The share of the dollar index's gap to its target closed each
     /// session. 0.0, on every shipped preset, is the standing 0.02, and a
