@@ -1644,7 +1644,10 @@ def describe_simulator() -> dict[str, Any]:
                        "hands. The dealer exercises where its tree says to "
                        "and its exercises are assigned to short positions "
                        "pro rata, so an account can be handed stock, or go "
-                       "short, without an order. "
+                       "short, without an order. Options are margined by a "
+                       "scan with the stock in the same name, and delivered "
+                       "stock from the close it arrives; an unmet call "
+                       "closes the contracts and the stock in those names. "
                        + _listed_on(_preset_lists_name_options),
             },
             "options": {

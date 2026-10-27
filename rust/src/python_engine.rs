@@ -5233,13 +5233,17 @@ impl PyEngine {
         Ok(PySurface { inner: surface, carry })
     }
 
-    /// The scan's initial margin on a portfolio of index options, dollars
+    /// The scan's initial margin on a portfolio of listed options, dollars
     /// (`margin_scan_coverage`): `positions` as `(symbol, signed contracts)`
-    /// pairs, symbols not listed left out. The worst loss over seven index
-    /// moves sized to the coverage's quantile of the index's one-session sd
-    /// at the VIX, each at three implied-volatility shifts; a long option
-    /// asks at most its premium and offsetting positions net. None with
-    /// margin or options off. A read.
+    /// pairs, and `(ticker, signed shares)` for the stock held beside a
+    /// name's options, symbols not listed left out. The worst loss over seven
+    /// moves of the underlying sized to the coverage's quantile of its
+    /// one-session sd, each at three implied-volatility shifts, the index's
+    /// options and each name's apart; a long option asks at most its
+    /// premium, and offsetting positions and the name's stock net. Under
+    /// `margin_option_minimum` it is at least that many dollars a unit of
+    /// each option held, a long's not more than its value. None with margin
+    /// or options off. A read.
     fn option_margin(&self, positions: Vec<(String, f64)>) -> Option<f64> {
         self.inner.option_margin(&positions)
     }
