@@ -1497,6 +1497,28 @@ pub struct ModelParams {
     /// the zero bound, 1994-2025: 0.046 (se 0.006) on 0.031 of sessions. In
     /// [0, 1].
     pub treasury_2y_meeting_carry: f64,
+    /// The share of the 2-year's daily target that is the expected policy
+    /// path plus a term premium rather than the legacy blend. 0.0, on every
+    /// shipped preset, is the blend as it stood, and a value of 0.0 is left
+    /// out of the model's digest.
+    ///
+    /// The blend, `0.85 (ff + priced) + 0.15 x 10y`, is not the expected
+    /// path plus a premium, so the eight-quarter policy-rate strip less the
+    /// 2-year (RF4) read +18 bp against the tape's -44.8 (-ACM TP02). Off
+    /// zero the 2-year's target is `legacy + d (path + tp - legacy)`:
+    /// `path` is the mean over the next 504 closes of the policy rate the
+    /// standing forecast expects each close to set (past its horizon its
+    /// last rate; without a forecast the policy rate now), the rate the
+    /// strip prices before its premium, so the two read one path; `tp` is
+    /// [`crate::economy::daily::TWO_YEAR_TERM_PREMIUM`] plus
+    /// [`crate::economy::daily::TWO_YEAR_TERM_PREMIUM_BETA`] times the
+    /// 10-year's own term-premium state (`treasury_term_premium_sd`; none
+    /// without it). Both constants are measured on ACM's monthly TP02,
+    /// 1961-2026: its mean, 43.3 bp (se 15.2), and its slope on TP10, 0.452
+    /// (se 0.012). Only the target moves: the 2-year's pull, its noise, the
+    /// meeting and the anticipated meeting's books are as they stand. No
+    /// draw. In [0, 1].
+    pub treasury_2y_expected_path: f64,
     /// The half-life, in sessions, at which the curve's priced change for the
     /// next meeting (`policy_anticipation`) moves toward the shadow meeting's
     /// change between meetings. 0.0, on every shipped preset, is off: the
@@ -9274,6 +9296,7 @@ impl ModelParams {
             corporate_spread_noise_sd: 0.0,
             corporate_spread_noise_half_life: 0.0,
             treasury_2y_meeting_carry: 0.0,
+            treasury_2y_expected_path: 0.0,
             policy_anticipation_half_life: 0.0,
             treasury_path_anticipated: 0.0,
             policy_anticipation_guidance: 0.0,
@@ -11988,6 +12011,7 @@ impl ModelParams {
             "corporate_spread_noise_sd" => self.corporate_spread_noise_sd,
             "corporate_spread_noise_half_life" => self.corporate_spread_noise_half_life,
             "treasury_2y_meeting_carry" => self.treasury_2y_meeting_carry,
+            "treasury_2y_expected_path" => self.treasury_2y_expected_path,
             "policy_anticipation_half_life" => self.policy_anticipation_half_life,
             "treasury_path_anticipated" => self.treasury_path_anticipated,
             "policy_anticipation_guidance" => self.policy_anticipation_guidance,
@@ -12467,6 +12491,7 @@ impl ModelParams {
             "corporate_spread_noise_sd" => out.corporate_spread_noise_sd = value,
             "corporate_spread_noise_half_life" => out.corporate_spread_noise_half_life = value,
             "treasury_2y_meeting_carry" => out.treasury_2y_meeting_carry = value,
+            "treasury_2y_expected_path" => out.treasury_2y_expected_path = value,
             "policy_anticipation_half_life" => out.policy_anticipation_half_life = value,
             "treasury_path_anticipated" => out.treasury_path_anticipated = value,
             "policy_anticipation_guidance" => out.policy_anticipation_guidance = value,
@@ -14149,6 +14174,12 @@ impl ModelParams {
                  the meeting's formula a meeting keeps, in [0, 1]; 0 is the reset that stood.",
                 self.treasury_2y_meeting_carry));
         }
+        if !(0.0..=1.0).contains(&self.treasury_2y_expected_path) {
+            return Err(format!(
+                "treasury_2y_expected_path is {}. It is the share of the 2-year's target that is the \
+                 expected policy path plus its term premium, in [0, 1]; 0 is the blend that stood.",
+                self.treasury_2y_expected_path));
+        }
         if !(-2.0..=5.0).contains(&self.fed_neutral_real_rate) {
             return Err(format!(
                 "fed_neutral_real_rate is {}. It is the points added to the Taylor rule's neutral \
@@ -15357,6 +15388,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "treasury_term_premium_sd",
     "treasury_term_premium_half_life",
     "treasury_2y_meeting_carry",
+    "treasury_2y_expected_path",
     "flight_to_quality_reversal_cut",
     "policy_anticipation_half_life",
     "treasury_path_anticipated",
@@ -15640,6 +15672,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "treasury_term_premium_sd",
         "treasury_term_premium_half_life",
         "treasury_2y_meeting_carry",
+        "treasury_2y_expected_path",
         "flight_to_quality_reversal_cut",
         "policy_anticipation_half_life",
         "treasury_path_anticipated",

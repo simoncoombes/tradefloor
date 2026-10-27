@@ -810,6 +810,7 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "core_trend_persistence": (0.0, 0.998),
     # The 2-year's carry through a meeting: a share, so its own bounds.
     "treasury_2y_meeting_carry": (0.0, 1.0),
+    "treasury_2y_expected_path": (0.0, 1.0),
     "flight_to_quality_reversal_cut": (0.0, 1.0),
     # The priced meeting's half-life: off at the bottom, a quarter at the top.
     "policy_anticipation_half_life": (0.0, 63.0),
