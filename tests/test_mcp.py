@@ -1659,6 +1659,10 @@ def test_describe_simulator_lists_every_preset_and_which_is_certified():
     assert [n for n, p in shipped.items() if p["certified"]] == [
         envelope.PRESET]
     for name, entry in shipped.items():
+        if name in pt.records.pending():
+            # Committed before its grade: no measurement to quote yet.
+            assert entry["record"] is None, name
+            continue
         record = pt.preset_record(name)
         assert entry["record"]["252"]["in_band"] == record["in_band"]["252"]
         assert entry["record"]["252"]["misses"] == record["misses"]["252"]

@@ -63,6 +63,8 @@ def day(engine, night=True, steps=None):
 def test_every_dial_is_off_on_every_shipped_preset_and_silent_in_the_digest():
     silent = set(tf.ModelParams.digest_silent_at_zero())
     for name in tf.preset_names():
+        if name == "pt-v22":
+            continue  # pt-v22 ships its arm's values, which tests/test_validation.py holds
         params = tf.ModelParams.from_preset(name)
         for dial in NEW:
             assert getattr(params, dial) == 0.0, (name, dial)

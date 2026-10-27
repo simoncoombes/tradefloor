@@ -43,7 +43,8 @@ def same(a, b):
     return True
 
 
-@pytest.mark.parametrize("preset", tf.preset_names())
+# pt-v22 ships its arm's values, which tests/test_validation.py holds.
+@pytest.mark.parametrize("preset", [p for p in tf.preset_names() if p != "pt-v22"])
 def test_off_on_every_shipped_preset(preset):
     assert tf.ModelParams.from_preset(preset).to_dict()["pinned_vix_sets_variance"] == 0.0
 

@@ -34,7 +34,8 @@ def level(e):
     return floats(e.state_snapshot()["term_premium"])[0]
 
 
-@pytest.mark.parametrize("preset", tf.preset_names())
+# pt-v22 ships its arm's values, which tests/test_validation.py holds.
+@pytest.mark.parametrize("preset", [p for p in tf.preset_names() if p != "pt-v22"])
 def test_off_on_every_shipped_preset(preset):
     d = tf.ModelParams.from_preset(preset).to_dict()
     assert d["treasury_term_premium_sd"] == 0.0 and d["treasury_term_premium_half_life"] == 0.0

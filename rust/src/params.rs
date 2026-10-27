@@ -3854,7 +3854,8 @@ pub struct ModelParams {
     /// non-zero. In [0, 1].
     pub vix_stress_premium_memory: f64,
     /// The stress premium as the anchor's own pull, undone above the knee.
-    /// 0.0, which every preset carries, is the shipped form, the capped hinge
+    /// 0.0, which every preset through pt-v21 carries, is the original form,
+    /// the capped hinge
     /// `cap * (1 - exp(-g * max(0, m - knee) / cap))`. Off zero (a switch, in
     /// [0, 1]; any value above 0.0 is on) the premium is
     /// `vix_anchor_weight * max(0, m - knee)`, uncapped (the quote still never

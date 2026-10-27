@@ -25,6 +25,8 @@ def model(**dials):
 
 def test_off_on_every_shipped_preset_silent_in_the_digest_and_refused_without_a_night():
     for name in tf.preset_names():
+        if name == "pt-v22":
+            continue  # pt-v22 ships its arm's values, which tests/test_validation.py holds
         assert tf.ModelParams.from_preset(name).basis_night_share == 0.0, name
     assert "basis_night_share" in set(tf.ModelParams.digest_silent_at_zero())
     assert model(basis_night_share=0.0).fingerprint == "pt-v21"
