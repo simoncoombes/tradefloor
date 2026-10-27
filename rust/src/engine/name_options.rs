@@ -857,7 +857,9 @@ impl Engine {
     /// the margin's quantile of its one-session sd, at each volatility
     /// shift, the stock's gain in each move netted against the options' loss
     /// there (`option_scan_loss_with`), so stock that covers an option's risk
-    /// nets it and stock alone asks nothing. Each
+    /// nets it and stock alone asks nothing. With `margin_option_scan_range`
+    /// set, the moves are instead the portfolio-margin rule's ten points over
+    /// plus and minus that share of the name's price. Each
     /// option is revalued as a European on its escrowed price. 0 where no
     /// name option is held; `None` where a held name does not price.
     pub(super) fn name_option_margin(&self, positions: &[(String, f64)]) -> Option<f64> {
@@ -900,8 +902,17 @@ impl Engine {
                 });
             }
             let shares: f64 = positions.iter().filter(|(s, _)| *s == ctx.ticker).map(|(_, q)| *q).sum();
-            let spot_move = self.name_spot_move(ctx.slot, ctx.spot, z);
-            let loss = super::margin::option_scan_loss_with(&scan, shares, spot_move, z * super::margin::SCAN_VOL_SD);
+            let loss = if p.margin_option_scan_range != 0.0 {
+                // The portfolio-margin rule's range (`margin_option_scan_range`):
+                // ten equidistant moves of the name over plus and minus that
+                // share of its price.
+                let size = p.margin_option_scan_range * ctx.spot;
+                let moves = super::margin::RANGE_POINTS.map(|x| x * size);
+                super::margin::option_scan_loss_at(&scan, shares, &moves, z * super::margin::SCAN_VOL_SD)
+            } else {
+                let spot_move = self.name_spot_move(ctx.slot, ctx.spot, z);
+                super::margin::option_scan_loss_with(&scan, shares, spot_move, z * super::margin::SCAN_VOL_SD)
+            };
             // The portfolio-margin rule's per-contract minimum
             // (`margin_option_minimum`).
             total += if p.margin_option_minimum != 0.0 {
@@ -931,9 +942,10 @@ impl Engine {
     /// worst loss over the scan's moves. The option scan charges stock only
     /// as cover for an option's risk; this is the stock's own scan, for the
     /// shares an exercise or an assignment delivered into an account that no
-    /// longer holds the name's options. Tickers without a listed chain, or
-    /// without a price, are left out. `None` with margin or the name options
-    /// off. A read.
+    /// longer holds the name's options. With `margin_option_scan_range` set,
+    /// each is charged that share of its value instead. Tickers without a
+    /// listed chain, or without a price, are left out. `None` with margin or
+    /// the name options off. A read.
     pub fn stock_scan_margin(&self, positions: &[(String, f64)]) -> Option<f64> {
         if !self.margin_on() || !self.names_on() {
             return None;
@@ -954,7 +966,13 @@ impl Engine {
             if !(spot > 0.0 && spot.is_finite()) {
                 continue;
             }
-            total += shares.abs() * self.name_spot_move(slot, spot, z);
+            // At the portfolio-margin rule's range the stock alone loses that
+            // share of its value at the range's end.
+            total += if p.margin_option_scan_range != 0.0 {
+                shares.abs() * p.margin_option_scan_range * spot
+            } else {
+                shares.abs() * self.name_spot_move(slot, spot, z)
+            };
         }
         Some(total)
     }

@@ -560,6 +560,12 @@ OUT_OF_SCOPE = {
         "stood (a branch in each margin); read only with "
         "`margin_scan_coverage` on; at 0.0 it is also left out of the model's "
         "digest",
+    "margin_option_scan_range":
+        "inert at 0.0: the single-name scan keeps its own size, `z * t` times "
+        "the name's one-session sd at SPAN's seven points (a branch in "
+        "`name_option_margin` and `stock_scan_margin`); read only with "
+        "`margin_scan_coverage` on; at 0.0 it is also left out of the model's "
+        "digest",
     "margin_pretrade_check":
         "inert at 0.0: no margin is checked before an order, as it stood; "
         "read by `Portfolio`, not the engine, so no price moves at any value; "

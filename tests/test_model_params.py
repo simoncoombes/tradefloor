@@ -1324,6 +1324,7 @@ PERTURBATIONS = [
     # INERT: the portfolio-margin minimum floors the option margin, which
     # reads quotes and writes nothing; the pre-trade check is read by accounts.
     ("margin_option_minimum", 0.375, False),
+    ("margin_option_scan_range", 0.15, False),
     ("margin_pretrade_check", 1.0, False),
     # The index options, their surface and their dealer (pt-v22 phase 2).
     # INERT by construction: the surface and the options read public state,
@@ -2308,6 +2309,7 @@ COMPANIONS: dict[str, dict[str, float]] = {
     "margin_scan_tail": {"margin_scan_coverage": 0.99},
     "margin_scan_option_tail": {"margin_scan_coverage": 0.99},
     "margin_option_minimum": {"margin_scan_coverage": 0.99},
+    "margin_option_scan_range": {"margin_scan_coverage": 0.99},
     "margin_pretrade_check": {"margin_scan_coverage": 0.99},
     # The premium per fixing prices the rate futures, listed by their switch.
     "rate_premium_per_fixing": {"futures_rates_listed": 1.0, "index_level_listed": 1.0,
