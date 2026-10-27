@@ -59,6 +59,10 @@ pub const VIX_SESSIONS: f64 = 21.0;
 /// between them and beyond.
 pub const TERM_PREMIUM_TENORS: (f64, f64) = (6.0, 252.0);
 
+/// The tenor, sessions, at which a name's tenor slope (`surface_name_term_slope`)
+/// adds nothing: the 63-session strips the single-name premium is read at.
+pub const NAME_TERM_ANCHOR: f64 = 63.0;
+
 /// Sessions in the model's year.
 const YEAR: f64 = 252.0;
 
@@ -419,6 +423,10 @@ pub struct TermInputs<'a> {
     pub events: &'a [(usize, f64)],
     /// The weight on the events' variance (`surface_earnings_weight`).
     pub event_weight: f64,
+    /// A single name's tenor slope (`surface_name_term_slope`): a log premium
+    /// of `name_slope ln(t / NAME_TERM_ANCHOR)` on the expected variance at
+    /// `t` sessions, the events' variance aside. 0.0 adds none (the index).
+    pub name_slope: f64,
 }
 
 impl<'a> TermInputs<'a> {
@@ -431,7 +439,12 @@ impl<'a> TermInputs<'a> {
         events: &'a [(usize, f64)],
         event_weight: f64,
     ) -> Self {
-        TermInputs { variance, elapsed, premium_short, premium_long, events, event_weight }
+        TermInputs { variance, elapsed, premium_short, premium_long, events, event_weight, name_slope: 0.0 }
+    }
+
+    /// The same inputs with a single name's tenor slope.
+    pub fn with_name_slope(self, name_slope: f64) -> Self {
+        TermInputs { name_slope, ..self }
     }
 }
 
@@ -457,8 +470,8 @@ pub fn term_premium(t: f64, short: f64, long: f64) -> f64 {
 /// The term structure's shape at knots 1 to `n_max`: at knot `n`, `t = n -
 /// elapsed` sessions out, the expected index variance to `t` (the forecast's
 /// one-session variances summed, less the elapsed share of the first)
-/// times `exp(term_premium(t))`, plus the weighted variance of the reports
-/// it reaches.
+/// times `exp(term_premium(t))` (and, for a name, `exp(name_slope ln(t /
+/// NAME_TERM_ANCHOR))`), plus the weighted variance of the reports it reaches.
 pub fn term_shape(inputs: &TermInputs<'_>, n_max: usize) -> Vec<f64> {
     let v = |h: usize| -> f64 {
         if inputs.variance.is_empty() {
@@ -479,6 +492,11 @@ pub fn term_shape(inputs: &TermInputs<'_>, n_max: usize) -> Vec<f64> {
         }
         let t = n as f64 - inputs.elapsed;
         let premium = term_premium(t, inputs.premium_short, inputs.premium_long);
+        let premium = if inputs.name_slope == 0.0 {
+            premium
+        } else {
+            premium + inputs.name_slope * mathx::log(mathx::max(1.0, t) / NAME_TERM_ANCHOR)
+        };
         let scaled = if premium == 0.0 { cumulative } else { cumulative * mathx::exp(premium) };
         out.push(if inputs.event_weight == 0.0 { scaled } else { scaled + inputs.event_weight * events });
     }
@@ -852,6 +870,7 @@ mod tests {
             premium_long: 0.15,
             events: &events,
             event_weight: 1.0,
+            name_slope: 0.0,
         };
         let shape = term_shape(&inputs, 270);
         let fit = fit_smile(24.0, Some(-2.0), T21, 1.3, 0.45).unwrap();
@@ -895,7 +914,7 @@ mod tests {
 
     #[test]
     fn the_term_shape_reads_the_forecast_the_premia_and_the_reports() {
-        let flat = TermInputs { variance: &[], elapsed: 0.0, premium_short: 0.0, premium_long: 0.0, events: &[], event_weight: 0.0 };
+        let flat = TermInputs { variance: &[], elapsed: 0.0, premium_short: 0.0, premium_long: 0.0, events: &[], event_weight: 0.0, name_slope: 0.0 };
         let shape = term_shape(&flat, 252);
         for (i, x) in shape.iter().enumerate() {
             assert_eq!(*x, (i + 1) as f64);

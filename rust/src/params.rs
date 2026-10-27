@@ -2429,6 +2429,32 @@ pub struct ModelParams {
     /// it flat in tenor, and is left out of the model's digest. Read only
     /// with `options_names_listed` set. In [-1, 1].
     pub option_name_spread_tenor_exponent: f64,
+    /// The premium on a report's variance in each single-name surface's
+    /// term structure over the variance the engine draws for it. Off zero a
+    /// report adds this times `earnings_surprise_sigma` squared plus
+    /// `earnings_session_sigma` squared, at its reaction session, and
+    /// `earnings_followthrough_sigma` squared at the session after, each
+    /// times the name's non-market daily variance (the unit the open draws
+    /// the surprise in: its own GARCH variance at its idiosyncratic scale and
+    /// size, and its sector loading on the sector's sigma), carried to the
+    /// report on the forecast's path of the name's variance; and
+    /// `surface_earnings_weight` is not read for the names. 0.0, on every
+    /// shipped preset, prices a name's report at `surface_earnings_weight`
+    /// times `earnings_surprise_sigma` squared times the forecast's whole
+    /// one-session variance of the name, and is left out of the model's
+    /// digest. The index surface's reports are as before either way. Read
+    /// only with `options_names_listed` set. In [0, 5].
+    pub surface_name_earnings_premium: f64,
+    /// The single-name premium's slope in tenor: a log premium on each
+    /// name's implied variance of this times `ln(t / 63)` at `t` sessions
+    /// (held at one session below one), on top of `surface_name_premium`
+    /// and the index's term premia, so a name's 63-session point, where
+    /// `surface_name_premium` holds, is unchanged and its shorter tenors
+    /// fall when the slope is positive. The earnings reports' variance is
+    /// not scaled. 0.0, on every shipped preset, is no slope, and is left out
+    /// of the model's digest. Read only with `options_names_listed` set. In
+    /// [-1, 1].
+    pub surface_name_term_slope: f64,
     /// Switch that makes the fear/greed index read the business cycle and
     /// GDP growth as published instead of as they are. 0.0, on every preset
     /// through pt-v19, is off; pt-v20 sets 1.0.
@@ -9378,6 +9404,8 @@ impl ModelParams {
             option_name_spread_otm: 0.0,
             option_name_spread_itm: 0.0,
             option_name_spread_tenor_exponent: 0.0,
+            surface_name_earnings_premium: 0.0,
+            surface_name_term_slope: 0.0,
             options_names_listed: 0.0,
             surface_name_premium: 0.0,
             surface_name_skew: 0.0,
@@ -12098,6 +12126,8 @@ impl ModelParams {
             "option_name_spread_otm" => self.option_name_spread_otm,
             "option_name_spread_itm" => self.option_name_spread_itm,
             "option_name_spread_tenor_exponent" => self.option_name_spread_tenor_exponent,
+            "surface_name_earnings_premium" => self.surface_name_earnings_premium,
+            "surface_name_term_slope" => self.surface_name_term_slope,
             "fear_greed_published_inputs" => self.fear_greed_published_inputs,
             "macro_publication_repricing" => self.macro_publication_repricing,
             "treasury_10y_noise" => self.treasury_10y_noise,
@@ -12579,6 +12609,8 @@ impl ModelParams {
             "option_name_spread_otm" => out.option_name_spread_otm = value,
             "option_name_spread_itm" => out.option_name_spread_itm = value,
             "option_name_spread_tenor_exponent" => out.option_name_spread_tenor_exponent = value,
+            "surface_name_earnings_premium" => out.surface_name_earnings_premium = value,
+            "surface_name_term_slope" => out.surface_name_term_slope = value,
             "fear_greed_published_inputs" => out.fear_greed_published_inputs = value,
             "macro_publication_repricing" => out.macro_publication_repricing = value,
             "treasury_10y_noise" => out.treasury_10y_noise = value,
@@ -14873,6 +14905,37 @@ impl ModelParams {
                  them to 1.0 first.",
                 self.option_position_limit));
         }
+        if !(-1.0..=1.0).contains(&self.surface_name_term_slope) {
+            return Err(format!(
+                "surface_name_term_slope is {}. It is in [-1, 1].",
+                self.surface_name_term_slope));
+        }
+        if self.surface_name_term_slope != 0.0 && self.options_names_listed == 0.0 {
+            return Err(format!(
+                "options_names_listed is 0 but surface_name_term_slope is {}. It shapes the names' \
+                 surfaces in tenor, which only options_names_listed keeps: set options_names_listed \
+                 to 1.0 first.",
+                self.surface_name_term_slope));
+        }
+        if !(0.0..=5.0).contains(&self.surface_name_earnings_premium) {
+            return Err(format!(
+                "surface_name_earnings_premium is {}. It is in [0, 5].",
+                self.surface_name_earnings_premium));
+        }
+        if self.surface_name_earnings_premium != 0.0 && self.options_names_listed == 0.0 {
+            return Err(format!(
+                "options_names_listed is 0 but surface_name_earnings_premium is {}. It prices the \
+                 reports in the names' surfaces, which only options_names_listed keeps: set \
+                 options_names_listed to 1.0 first.",
+                self.surface_name_earnings_premium));
+        }
+        if self.surface_name_earnings_premium != 0.0 && self.earnings_surprise_sigma == 0.0 {
+            return Err(format!(
+                "earnings_surprise_sigma is 0 but surface_name_earnings_premium is {}. It is a \
+                 premium on the variance the reports draw, and without the surprise there are no \
+                 reports: set earnings_surprise_sigma first.",
+                self.surface_name_earnings_premium));
+        }
         for (name, v, lo, hi) in [
             ("surface_name_premium", self.surface_name_premium, -0.5, 1.0),
             ("surface_name_skew", self.surface_name_skew, 0.0, 1.0),
@@ -15488,6 +15551,8 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "option_name_spread_otm",
     "option_name_spread_itm",
     "option_name_spread_tenor_exponent",
+    "surface_name_earnings_premium",
+    "surface_name_term_slope",
 ];
 
 #[cfg(test)]
@@ -15774,6 +15839,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "option_name_spread_otm",
         "option_name_spread_itm",
         "option_name_spread_tenor_exponent",
+        "surface_name_earnings_premium",
+        "surface_name_term_slope",
         "fear_greed_published_inputs",
         "macro_publication_repricing",
         "treasury_10y_noise",

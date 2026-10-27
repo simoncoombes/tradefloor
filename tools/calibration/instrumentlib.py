@@ -291,6 +291,8 @@ PARAM_SPECS: dict[str, dict] = {
     "option_name_spread_otm": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 5.0), "derived": True},
     "option_name_spread_itm": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 5.0), "derived": True},
     "option_name_spread_tenor_exponent": {"kind": "abs", "step_unit": 0.01, "hard_range": (-1.0, 1.0), "derived": True},
+    "surface_name_earnings_premium": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 5.0), "derived": True},
+    "surface_name_term_slope": {"kind": "abs", "step_unit": 0.01, "hard_range": (-1.0, 1.0), "derived": True},
     "fed_stress_cut": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0)},
     "fed_stress_vix": {"kind": "abs", "step_unit": 1.0, "hard_range": (10.0, 200.0)},
     "fed_stress_inflation_gap": {"kind": "abs", "step_unit": 0.25, "hard_range": (0.0, 10.0)},

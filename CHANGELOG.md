@@ -239,6 +239,28 @@ held after the liquidation. The shares in a name whose options the account
 trades now go with them. Shares in other names, and every account without
 single-name options, are as before; known answers are unchanged.
 
+### A single name's premium shaped in tenor
+
+`surface_name_term_slope` is a new dial, 0.0 on every preset and left out
+of the digest there. Off zero each name's implied variance at `t` sessions
+takes a further log premium of the slope times `ln(t / 63)`, on top of
+`surface_name_premium` and the index's term premia, so a name's 63-session
+point is where it was and, with a positive slope, its shorter tenors fall.
+The earnings reports' variance is not scaled. It prices options only:
+stock prices and every known answer are where they were.
+
+### A name's reports priced on the variance they draw
+
+`surface_name_earnings_premium` is a new dial, 0.0 on every preset and left
+out of the digest there. Off zero a name's surface prices each report at
+that premium on the variance the engine draws for it: the surprise and the
+reaction session's own part at the reaction session, the follow-through at
+the session after, each in the name's non-market daily variance. At 0.0 a
+report is `surface_earnings_weight` times the surprise's sigma squared
+times the name's whole one-session variance, the market's part included,
+as before. It prices options only: stock prices and every known answer are
+where they were.
+
 ### The single-name options' dealer on the tape
 
 Five dials, 0.0 on every preset, shape the single-name options' dealer:

@@ -4749,6 +4749,28 @@ ho|$ no larger than the index's, every
 smile stays inside the paper's Remark 4.4. `Engine.surface("ACME")` reads
 it, with the escrowed price's forward.
 
+`surface_name_earnings_premium`, 0.0 on every shipped preset, prices a
+name's reports on the variance the engine draws for them instead. Off zero
+each report adds that premium times `earnings_surprise_sigma` squared plus
+`earnings_session_sigma` squared at its reaction session, and times
+`earnings_followthrough_sigma` squared at the session after, each times the
+name's non-market daily variance (its GJR variance at its idiosyncratic
+scale and size, and its sector part: the unit the opening print draws the
+surprise in), carried to the report on the forecast's path of the name's
+variance; `surface_earnings_weight` is then not read for the names. The
+weight's basis, the whole one-session variance, carries the market's part,
+which a report does not move. The index surface's reports are as before.
+No price of a stock moves (`tests/test_name_earnings_premium.py`).
+
+`surface_name_term_slope`, 0.0 on every shipped preset, shapes a name's
+premium in tenor: off zero the name's expected variance to `t` sessions
+takes a further log premium of the slope times $\ln(t / 63)$ (`t` held at
+one session below one), on top of `surface_name_premium` and the index's
+term premia; the reports' variance is not scaled. A name's 63-session point,
+the tenor `surface_name_premium` is read at, does not move; a positive slope
+lowers the shorter tenors and raises the longer. No price of a stock moves
+(`tests/test_name_term_slope.py`).
+
 **The price.** An option settling at the close of session $E$ has
 $E + 1 - t$ sessions left at time $t$, a close counting as the next
 session's start. The dealer quotes the American value of a Leisen-Reimer
