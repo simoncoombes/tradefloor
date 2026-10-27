@@ -900,13 +900,7 @@ impl Engine {
                 });
             }
             let shares: f64 = positions.iter().filter(|(s, _)| *s == ctx.ticker).map(|(_, q)| *q).sum();
-            // The name's one-session sd: the forecast's for the next session.
-            let variance = self
-                .forecast()
-                .and_then(|f| f.name_variance.get(ctx.slot))
-                .and_then(|s| s.first().copied())
-                .unwrap_or(0.0);
-            let spot_move = z * crate::mathx::sqrt(crate::mathx::max(0.0, variance)) * ctx.spot;
+            let spot_move = self.name_spot_move(ctx.slot, ctx.spot, z);
             let loss = super::margin::option_scan_loss_with(&scan, shares, spot_move, z * super::margin::SCAN_VOL_SD);
             // The portfolio-margin rule's per-contract minimum
             // (`margin_option_minimum`).
@@ -915,6 +909,52 @@ impl Engine {
             } else {
                 loss
             };
+        }
+        Some(total)
+    }
+
+    /// The scan's move of the name in company slot `slot` at price `spot`,
+    /// dollars a share: `z` times the name's one-session sd, the forecast's
+    /// for the next session.
+    fn name_spot_move(&self, slot: usize, spot: f64, z: f64) -> f64 {
+        let variance = self
+            .forecast()
+            .and_then(|f| f.name_variance.get(slot))
+            .and_then(|s| s.first().copied())
+            .unwrap_or(0.0);
+        z * crate::mathx::sqrt(crate::mathx::max(0.0, variance)) * spot
+    }
+
+    /// The scan's margin on stock held alone in listed names, dollars:
+    /// `(ticker, signed shares)` pairs, each charged its shares times the
+    /// scan's move of the name ([`Engine::name_option_margin`]'s), the stock's
+    /// worst loss over the scan's moves. The option scan charges stock only
+    /// as cover for an option's risk; this is the stock's own scan, for the
+    /// shares an exercise or an assignment delivered into an account that no
+    /// longer holds the name's options. Tickers without a listed chain, or
+    /// without a price, are left out. `None` with margin or the name options
+    /// off. A read.
+    pub fn stock_scan_margin(&self, positions: &[(String, f64)]) -> Option<f64> {
+        if !self.margin_on() || !self.names_on() {
+            return None;
+        }
+        let p = &self.params;
+        let z = super::margin::normal_quantile(0.5 + 0.5 * p.margin_scan_coverage)
+            * super::margin::option_scan_tail(p);
+        let mut total = 0.0;
+        for (ticker, shares) in positions {
+            if *shares == 0.0 {
+                continue;
+            }
+            let Some(chain) = self.name_chain_of(ticker) else {
+                continue;
+            };
+            let slot = self.name_options.chains[chain].slot;
+            let spot = self.companies[slot].stock.price;
+            if !(spot > 0.0 && spot.is_finite()) {
+                continue;
+            }
+            total += shares.abs() * self.name_spot_move(slot, spot, z);
         }
         Some(total)
     }

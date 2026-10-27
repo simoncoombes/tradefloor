@@ -467,6 +467,10 @@ class Engine:
     # options, and `(ticker, signed shares)` of the stock beside a name's
     # options, dollars; None with margin or options off.
     def option_margin(self, positions: list[tuple[str, float]]) -> float | None: ...
+    # The scan's margin on `(ticker, signed shares)` of stock held alone in
+    # listed names: the shares times the scan's move of the name; None with
+    # margin or the name options off.
+    def stock_margin(self, positions: list[tuple[str, float]]) -> float | None: ...
     # Static-arbitrage violations on every listed chain (row SV2).
     def option_arbitrage(self, root: str = ...) -> list[str]: ...
     # Each listed expiry read off its chain, in expiry order: `root`,

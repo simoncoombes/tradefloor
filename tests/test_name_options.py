@@ -730,6 +730,9 @@ def test_an_unmet_call_liquidates_the_shares_an_assignment_delivered():
         def book(self, ticker):
             return Book()
 
+        def stock_margin(self, positions):
+            return 0.0
+
     p = Portfolio(cash=1e6)
     p.execute(Stand(), "XYZ", 10.0)
     p.positions.setdefault("ABE", type(p.positions["XYZ"])("ABE")).quantity = 6200.0
@@ -742,3 +745,99 @@ def test_an_unmet_call_liquidates_the_shares_an_assignment_delivered():
     assert p.margin_calls[-1]["met"] is False
     assert p.quantity_of("ABE") == 0.0 and p.quantity_of("XYZ") == 10.0
     assert p.liquidations[-1] == {"day": 50, "symbol": "ABE", "quantity": -6200.0, "filled": -6200.0}
+
+
+def test_stock_held_alone_asks_its_own_scan_through_stock_margin():
+    """The option scan takes stock only as cover; `stock_margin` charges
+    stock held alone its shares times the scan's move of the name, the
+    coverage's quantile of the forecast's one-session sd."""
+    from statistics import NormalDist
+
+    engine = tf.Engine(seed=19, universe=SMALL, model=model(**ON))
+    for _ in range(3):
+        day(engine)
+    ticker = engine.tickers[3]
+    m = engine.model
+    tail = m.margin_scan_option_tail or m.margin_scan_tail or 1.0
+    z = NormalDist().inv_cdf(0.5 + 0.5 * m.margin_scan_coverage) * tail
+    sd = math.sqrt(engine.forecast()["name_variance"][ticker][0])
+    one = engine.stock_margin([(ticker, 100.0)])
+    assert one > 0.0 and one == pytest.approx(100.0 * z * sd * _price(engine, ticker), rel=1e-9)
+    assert engine.stock_margin([(ticker, -100.0)]) == one
+    assert engine.stock_margin([(ticker, 300.0)]) == pytest.approx(3.0 * one)
+    assert engine.stock_margin([(ticker, 100.0), ("NOPE", 100.0)]) == one
+    assert engine.option_margin([(ticker, 100.0)]) == 0.0
+    off = tf.Engine(seed=19, universe=SMALL, model=model(**dict(ON, margin_scan_coverage=0.0)))
+    assert off.stock_margin([(off.tickers[3], 100.0)]) is None
+
+
+def test_the_close_an_assignment_delivers_margins_the_shares():
+    """MG2: an expiry's assignment settles the account's last option and
+    hands it many times its equity in stock. The close margins the shares on
+    their own scan (`Engine.stock_margin`), so the shortfall is called at that
+    close and an unmet call's open sells them. Stock in a name the account
+    took no delivery in asks nothing, and an account without deliveries asks
+    the engine nothing."""
+    from types import SimpleNamespace
+
+    class Cost:
+        def __init__(self, size):
+            self.filled, self.average_price, self.worst_price = size, 100.0, 100.0
+
+    class Book:
+        def sweep_cost(self, side, size):
+            return Cost(size)
+
+    class Stand:
+        tickers = ["ABE", "XYZ"]
+        day_count = 50
+        book_live = False
+        model = SimpleNamespace(margin_pretrade_check=0.0)
+
+        def __init__(self):
+            self.asked = []
+
+        def prices(self):
+            return struct.pack("<2d", 100.0, 100.0)
+
+        def book(self, ticker):
+            return Book()
+
+        def stock_margin(self, positions):
+            self.asked.append(positions)
+            return 10.0 * sum(abs(q) for _, q in positions)
+
+    class Silent(Stand):
+        def stock_margin(self, positions):
+            raise AssertionError("an account without deliveries asked for a margin")
+
+    p = Portfolio(cash=1e6)
+    p.execute(Stand(), "XYZ", 10.0)
+    p.settle_close(Silent())
+    assert p.margin_calls == [] and p.margin(Silent())["maintenance"] == 0.0
+
+    def deliver(shares, cash):
+        position = p.positions.setdefault("ABE", type(p.positions["XYZ"])("ABE"))
+        position.quantity += shares
+        p.cash += cash
+        p.deliveries.append({"day": 49, "symbol": "ABE.O0055.P100.00", "event": "assignment",
+                             "contracts": shares / 100.0, "ticker": "ABE", "shares": shares, "price": 100.0,
+                             "cash": cash})
+
+    # Covered: equity over the shares' maintenance, no call.
+    deliver(100.0, -10_000.0)
+    stand = Stand()
+    p.settle_close(stand)
+    assert p.margin_calls == [] and stand.asked == [[("ABE", 100.0)]]
+    # 12,700 more at the expiry: $1.28M of stock against $50k of equity.
+    deliver(12_700.0, -1_270_000.0)
+    p.cash += 50_000.0 - p.net_worth(stand)
+    p.settle_close(stand)
+    call = p.margin_calls[-1]
+    assert call["day"] == 50 and call["equity"] == pytest.approx(50_000.0)
+    assert call["maintenance"] == pytest.approx(10.0 * 12_800.0 / 1.1)
+    assert stand.asked[-1] == [("ABE", 12_800.0)], "only the delivered name is margined"
+    p.settle_open(Stand())
+    assert p.margin_calls[-1]["met"] is False
+    assert p.quantity_of("ABE") == 0.0 and p.quantity_of("XYZ") == 10.0
+    assert p.liquidations[-1] == {"day": 50, "symbol": "ABE", "quantity": -12_800.0, "filled": -12_800.0}
