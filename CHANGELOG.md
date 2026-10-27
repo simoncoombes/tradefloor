@@ -123,6 +123,20 @@ payload, Arrow and WASM show them; agents trade by symbol.
   growth steps by the law in its phase with the law's mean shock on entry.
   No free parameter. It changes what the forecast publishes and nothing in
   the law.
+- `oil_forecast_path_law` is a new switch, 0.0 on every preset and left out
+  of the digest there. At 1.0 oil's block reads growth's mean over paths the
+  forecast simulates by the law itself, in place of either reading above: at
+  each close, 256 paths start from the close's public state (a phase drawn
+  from the belief, an age from that phase's stationary law under the full
+  law, the published growth, the close's central bank), and each takes the
+  law's close at every session with draws from a generator of its own (tag
+  "OILP", per close): the market's return at the forecast's variance of the
+  index, the economy's step, the cycle's transition at the law's probability
+  on the path's own state, and the meeting. The transition is read on an
+  exponential clock, the daily roll in distribution, and the start and the
+  first clock are stratified across the paths. No free parameter; the number
+  of paths is precision (Monte Carlo error 0.027 $ at 126 sessions). It
+  changes what the forecast publishes and nothing in the law.
 ### The skew noise
 
 - `surface_skew_noise_sd` and `surface_skew_noise_half_life` are new dials,

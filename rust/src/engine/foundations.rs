@@ -757,8 +757,15 @@ impl Engine {
         let (mut absorb_pending, mut absorb_so_far) = (0.0f64, 0.0f64);
         // `oil_forecast_cycle_growth`: growth's expectation over the cycle's
         // phases, for oil's block, rather than the believed phase held.
-        let mut cycle = if p.oil_forecast_cycle_growth != 0.0 {
+        let mut cycle = if p.oil_forecast_cycle_growth != 0.0 && p.oil_forecast_path_law == 0.0 {
             Some(CycleGrowth::new(self, &belief, &econ, day))
+        } else {
+            None
+        };
+        // `oil_forecast_path_law`: growth's expectation over the law's own
+        // paths, which takes the place of the cycle's above.
+        let mut paths = if p.oil_forecast_path_law != 0.0 {
+            Some(OilPaths::new(self, &belief, &econ, day))
         } else {
             None
         };
@@ -1002,9 +1009,15 @@ impl Engine {
             if let Some(c) = &cycle {
                 inputs.oil_growth = Some(c.growth());
             }
+            if let Some(s) = &paths {
+                inputs.oil_growth = Some(s.growth());
+            }
             let mut next = update_economy_daily(&econ, &inputs, &mut crate::economy::daily::MeanDraws);
             if let Some(c) = cycle.as_mut() {
                 c.step(&inputs, request.volatility, v_session, request.timestamp);
+            }
+            if let Some(s) = paths.as_mut() {
+                s.step(&inputs, v_session, request.timestamp);
             }
             var_inventory = var_after;
             let sd_inv = crate::mathx::sqrt(var_inventory);
@@ -1436,7 +1449,7 @@ impl Engine {
                 counts[k][a] += 1.0;
             }
         }
-        let month = spec.month_days.round().max(1.0) as usize;
+        let month = crate::mathx::max(1.0, spec.month_days.round()) as usize;
         let mut out = Vec::with_capacity(5);
         for c in &counts {
             let total: f64 = c.iter().sum();
@@ -1671,6 +1684,142 @@ impl CycleGrowth {
                     }
                 }
             }
+        }
+    }
+}
+
+/// The paths the oil forecast simulates at a close
+/// (`oil_forecast_path_law`). Precision, not a value of the model: the
+/// Monte Carlo error of the forecast's 126-session oil, read on the arm's
+/// histories, and the cost of a session.
+pub(crate) const OIL_FORECAST_PATHS: usize = 256;
+
+/// Growth's expectation over the law's own paths for oil's forecast
+/// (`oil_forecast_path_law`). Each path starts from the close's public
+/// state: a phase drawn from the belief, an age drawn from that phase's
+/// stationary law under the full law ([`Engine::cycle_age_law`]), the
+/// published growth and the close's central bank. At each forecast close
+/// every path takes the law's own close, with draws from the paths' own
+/// generator ([`crate::rng::oil_paths_rng`]): the market's session return,
+/// normal at the forecast's variance of the index, which the market's gap
+/// steps on; the economy's step; the cycle's transition at the law's
+/// probability on the path's stepped state (the hazard and the ladder); and
+/// its central bank's meeting. Oil's block reads the paths' mean growth,
+/// which is oil's target's mean over the paths (the target is affine in
+/// growth). No value is set here: every part is the law's.
+///
+/// The transition is read on an exponential clock, the law's daily roll in
+/// distribution: a path leaves its phase at the first close whose summed
+/// `-log(1 - q)` passes its clock, a unit exponential, so it survives a
+/// close with probability `1 - q`. The start's (phase, age) and the first
+/// clock are stratified across the paths (each path's draw from its own
+/// N-th of the unit interval, the two strata paired at random), which
+/// leaves every path's law as it is and lowers the mean's Monte Carlo
+/// error; every clock after a transition is a fresh draw.
+struct OilPaths {
+    paths: Vec<OilPath>,
+    rng: GameRng,
+    spec: crate::economy::CycleSpec,
+    /// The meeting's options as the close stands; the bank's and the
+    /// curve's inflation are each path's own.
+    options: crate::economy::PolicyOptions,
+    core: (bool, bool),
+}
+
+struct OilPath {
+    economy: EconomyState,
+    bank: crate::economy::CentralBankState,
+    /// What is left of the phase's clock.
+    clock: f64,
+}
+
+impl OilPaths {
+    fn new(engine: &Engine, belief: &[f64; 5], econ: &EconomyState, day: i64) -> Self {
+        let phases = crate::economy::cycle::phase_cycle();
+        let spec = engine.cycle_spec();
+        let ages = engine.cycle_age_law(day);
+        let mut rng = crate::rng::oil_paths_rng(engine.root_seed, day);
+        let n = OIL_FORECAST_PATHS;
+        // The start's law as one list: each phase's share of the belief
+        // times each of its age bins' share of the phase.
+        let total: f64 = belief.iter().sum();
+        let mut start: Vec<(usize, f64, f64)> = Vec::new();
+        for k in 0..5 {
+            let mass: f64 = ages[k].iter().map(|b| b.1).sum();
+            if belief[k] > 0.0 && mass > 0.0 {
+                for &(age, w) in &ages[k] {
+                    start.push((k, age, belief[k] / total * w / mass));
+                }
+            }
+        }
+        let mut order: Vec<usize> = (0..n).collect();
+        for i in (1..n).rev() {
+            let j = (rng.next_f64() * (i + 1) as f64) as usize;
+            order.swap(i, if j > i { i } else { j });
+        }
+        let mut paths = Vec::with_capacity(n);
+        for (i, &o) in order.iter().enumerate() {
+            let u = (i as f64 + rng.next_f64()) / n as f64;
+            let (mut k, mut age) = start.last().map(|s| (s.0, s.1)).unwrap_or((0, 0.0));
+            let mut acc = 0.0;
+            for &(kk, a, w) in &start {
+                acc += w;
+                if u < acc {
+                    k = kk;
+                    age = a;
+                    break;
+                }
+            }
+            let v = (o as f64 + rng.next_f64()) / n as f64;
+            let mut economy = econ.clone();
+            economy.cycle_phase = phases[k];
+            economy.months_in_current_phase = age / spec.month_days;
+            paths.push(OilPath { economy, bank: engine.central_bank, clock: -crate::mathx::log(1.0 - v) });
+        }
+        let options = crate::economy::PolicyOptions {
+            path_before: engine.priced_policy_path(),
+            eve_change: None,
+            ..engine.policy_options(false)
+        };
+        let core = (engine.params.fed_core_inflation != 0.0, engine.params.treasury_core_inflation != 0.0);
+        OilPaths { paths, rng, spec, options, core }
+    }
+
+    /// The growth oil's block reads at the next step: the paths' mean.
+    fn growth(&self) -> f64 {
+        let g: f64 = self.paths.iter().map(|p| p.economy.gdp_growth).sum();
+        g / self.paths.len() as f64
+    }
+
+    /// One close on every path. `inputs` are the forecast's for the
+    /// session; `variance` is its variance of the session's return.
+    fn step(&mut self, inputs: &DailyInputs, variance: f64, timestamp: i64) {
+        let mut own = *inputs;
+        own.oil_growth = None;
+        let sd = 100.0 * crate::mathx::sqrt(crate::mathx::max(0.0, variance));
+        for path in self.paths.iter_mut() {
+            own.market_day_return_pct = sd * self.rng.next_normal();
+            let mut stepped = update_economy_daily(&path.economy, &own, &mut self.rng);
+            let (q, next) = crate::economy::cycle::get_cycle_transition_probability_for(&stepped, &self.spec);
+            if q > 0.0 {
+                path.clock += crate::mathx::log(1.0 - q);
+                if path.clock <= 0.0 {
+                    stepped.cycle_phase = next;
+                    stepped.months_in_current_phase = 0.0;
+                    path.clock = -crate::mathx::log(1.0 - self.rng.next_f64());
+                }
+            }
+            let mut options = self.options;
+            let core = stepped.inflation_rate - stepped.oil_inflation_level;
+            if self.core.0 {
+                options.policy_inflation = Some(core);
+            }
+            if self.core.1 {
+                options.curve_inflation = Some(core);
+            }
+            let met = crate::economy::update_central_bank_with(&path.bank, &stepped, timestamp, &mut self.rng, &options);
+            path.economy = met.economy;
+            path.bank = met.central_bank;
         }
     }
 }

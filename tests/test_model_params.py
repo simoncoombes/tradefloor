@@ -1249,6 +1249,7 @@ PERTURBATIONS = [
     ("oil_forecast_opec_spread", 1.0, False),
     # The growth oil's forecast reads: INERT for the same reason.
     ("oil_forecast_cycle_growth", 1.0, False),
+    ("oil_forecast_path_law", 1.0, False),
     # The forecast's derived dials: INERT for the same reason, and read only
     # with the horizon set.
     ("forecast_vix_dispersion", 0.3, False),
