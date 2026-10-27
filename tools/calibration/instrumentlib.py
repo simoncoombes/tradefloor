@@ -950,6 +950,7 @@ PARAM_SPECS: dict[str, dict] = {
     "treasury_equity_lag_gain": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 10.0), "derived": False},
     "corporate_spread_noise_sd": {"kind": "abs", "step_unit": 0.001, "hard_range": (0.0, 0.5)},
     "pinned_vix_sets_variance": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0), "derived": False},
+    "pinned_vix_return": {"kind": "abs", "step_unit": 0.001, "hard_range": (0.0, 0.05), "derived": False},
     "corporate_spread_noise_half_life": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 2520.0)},
     "treasury_term_premium_sd": {"kind": "abs", "step_unit": 0.005, "hard_range": (0.0, 0.5)},
     "treasury_term_premium_half_life": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 2520.0)},

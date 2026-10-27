@@ -549,6 +549,12 @@ OUT_OF_SCOPE = {
         "whole reversal moves to the fair-value level, as it stood (a branch in "
         "the tick); no draw and no state; at 0.0 it is also left out of the "
         "model's digest",
+    "pinned_vix_return":
+        "inert at 0.0: a pinned session's market draws keep a zero mean, as "
+        "they stood (a branch at the pin and in the tick); no draw, and its two "
+        "session fields are written only off zero; read only on a session "
+        "whose VIX a caller pins; at 0.0 it is also left out of the model's "
+        "digest",
     "fair_value_aggregate_half_life":
         "inert at 0.0: no reversion of the aggregate earnings level (a branch "
         "on `== 0.0`), the arithmetic that stood. pt-v22 holds the level "

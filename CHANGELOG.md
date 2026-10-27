@@ -130,6 +130,20 @@ records are identical (`tests/test_futures_accounts.py`).
   land in the first minute and 4.7% in the first half hour; the model's first
   tick prices about 0.6 of the session's news.
 
+### A pinned VIX's same-day return
+
+- `pinned_vix_return` is a new dial, 0.0 on every preset and left out of
+  the digest there: the index's same-day return on a pinned VIX's change, a
+  share per VIX point. A replay that pins the real VIX overwrites the VIX the
+  day's return would have moved, so the index fell with no regard to the
+  VIX's moves (2008: a slope of -0.047 on the log VIX change, R^2 0.02,
+  against the S&P 500's -0.217, R^2 0.61). Off zero, each pin sets the
+  session's mean market move to `-b` times the VIX's change, less what the
+  `pinned_vix_feedback` discount already priced, spread over the session's
+  ticks at each name's beta; the variance trim reads the whole move. The
+  S&P 500 measures -0.5375% a point (se 0.0249, 1990-2025), flat across the
+  VIX's level. No draw; free sessions are untouched.
+
 ### The 2-year as the expected path plus a term premium
 
 - `treasury_2y_expected_path` is a new dial, 0.0 on every preset and left
