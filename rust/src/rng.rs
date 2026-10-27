@@ -653,6 +653,18 @@ pub fn prehistory_key(key: u64) -> u64 {
     splitmix64_mix(key ^ (PREHISTORY_TAG << 32 | PREHISTORY_TAG))
 }
 
+/// The tag of the economy's long run for the forecast's cycle
+/// (`oil_forecast_cycle_growth`), ASCII "AGEL": the surgery seed its stream
+/// generators are derived under, and the word its counter keys are mixed
+/// with, so that run draws nothing the run's own sessions draw.
+pub const AGE_LAW_TAG: u64 = 0x4147_454C;
+
+/// A counter key of the economy's long run (`oil_forecast_cycle_growth`):
+/// the run's own key mixed with [`AGE_LAW_TAG`], as [`prehistory_key`].
+pub fn age_law_key(key: u64) -> u64 {
+    splitmix64_mix(key ^ (AGE_LAW_TAG << 32 | AGE_LAW_TAG))
+}
+
 /// The tag of the oil price's long factor (`oil_target_drift_sd`), ASCII
 /// "OILD".
 pub const OIL_DRIFT_TAG: u32 = 0x4F49_4C44;

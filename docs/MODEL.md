@@ -1563,7 +1563,10 @@ factor and the level carriers give it. `oil_forecast_opec_spread` has the
 forecast's expected OPEC decision read that same spread, lognormal, in place
 of the short factor's alone. `oil_forecast_cycle_growth` has oil's forecast read
 growth's expectation over the cycle's phases, in place of the believed phase
-held for the whole horizon. `usd_mean_reversion` and
+held for the whole horizon: each phase's mass leaves on the law's own
+transitions, read on that phase's own economy (its central bank's meetings
+and the market's gap over its spread included), from the phase's stationary
+age under the full law. `usd_mean_reversion` and
 `usd_noise_sd` set the dollar index's law (0.0 the standing 0.02 and 0.3): FRED's
 trade-weighted dollar (DTWEXM, 1987 to 2019) has an AR(1) half-life of 729
 sessions and a daily log change of 0.0043, so the dollar the oil curve carries

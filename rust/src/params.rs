@@ -1083,14 +1083,20 @@ pub struct ModelParams {
     /// the forecast runs high by more the longer the horizon (row OF4). At
     /// 1.0 oil's block reads growth's expectation over the cycle's phases,
     /// on the law's own transitions: the belief's mass on each phase, at the
-    /// phase's stationary age (the age is not public), and the mass entering
-    /// a phase, each leave at the probability the law's transition check
-    /// reads at their age on the forecast's economy at each close (the
-    /// hazard and the ladder from the state: the market's fall, inflation,
-    /// rates, the curve, valuation, unemployment, growth); every cohort's
-    /// growth steps by the law in its phase, with the law's mean shock on
-    /// entry. A construction with no free parameter. It reads the forecast
-    /// only; the law is unchanged.
+    /// phase's stationary age under the full law (the age is not public; the
+    /// occupancy of the economy's own long run, run alone on generators of
+    /// its own), and the mass entering a phase, each leave at the
+    /// probability the law's transition check reads at their age. Each phase
+    /// carries its own economy from the close: the law steps it in that
+    /// phase, its central bank meets on it by the law's rule, and the
+    /// market's gap steps on it with its spread from the forecast's own index
+    /// variance, so the hazard and the ladder read that phase's state (the
+    /// market's fall over the gap's spread, inflation, rates, the curve,
+    /// valuation, unemployment, growth). Every cohort's growth steps by the
+    /// law in its phase, with the law's mean shock on entry, and mass
+    /// entering a phase joins its state at the mass-weighted mean. A
+    /// construction with no free parameter. It reads the forecast only; the
+    /// law is unchanged.
     pub oil_forecast_cycle_growth: f64,
     /// The share of the dollar index's gap to its target closed each
     /// session. 0.0, on every shipped preset, is the standing 0.02, and a

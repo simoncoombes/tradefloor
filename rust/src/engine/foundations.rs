@@ -758,7 +758,7 @@ impl Engine {
         // `oil_forecast_cycle_growth`: growth's expectation over the cycle's
         // phases, for oil's block, rather than the believed phase held.
         let mut cycle = if p.oil_forecast_cycle_growth != 0.0 {
-            Some(CycleGrowth::new(self, &belief, econ.gdp_growth, horizon))
+            Some(CycleGrowth::new(self, &belief, &econ, day))
         } else {
             None
         };
@@ -1004,7 +1004,7 @@ impl Engine {
             }
             let mut next = update_economy_daily(&econ, &inputs, &mut crate::economy::daily::MeanDraws);
             if let Some(c) = cycle.as_mut() {
-                c.step(&econ, &inputs, request.volatility);
+                c.step(&inputs, request.volatility, v_session, request.timestamp);
             }
             var_inventory = var_after;
             let sd_inv = crate::mathx::sqrt(var_inventory);
@@ -1339,45 +1339,244 @@ impl Engine {
 }
 
 
+/// The first day of the economy's long run for the forecast's cycle
+/// (`oil_forecast_cycle_growth`), on the run's own day numbering: far past
+/// any session a run reaches, so the keyed draws the run takes by day are
+/// not the long run's, beside the keys and generators of its own.
+const CYCLE_AGE_LAW_ORIGIN: i64 = 1 << 34;
+
+/// The long run's warm-up and its length, in days. Precision, not a value
+/// of the model: the run starts from the close's state, which the warm-up
+/// forgets, and the age law is its occupancy over the rest.
+const CYCLE_AGE_LAW_WARM_DAYS: i64 = 252 * 50;
+const CYCLE_AGE_LAW_DAYS: i64 = 252 * 10_000;
+
+/// Draws at the middle of their range for a projected meeting: a uniform
+/// of one half and a normal of zero, as the market's shadow meeting reads.
+struct MidDraws;
+
+impl crate::rng::Rng for MidDraws {
+    fn next_f64(&mut self) -> f64 {
+        0.5
+    }
+    fn next_normal(&mut self) -> f64 {
+        0.0
+    }
+}
+
+impl Engine {
+    /// Each phase's stationary age law under the FULL law, for the start of
+    /// the forecast's cycle (`oil_forecast_cycle_growth`): the hazard and the
+    /// ladder on the economy's own state, as the law transitions. There is no
+    /// closed form ([`crate::economy::cycle`], the stationary law), so it is
+    /// read as the occupancy of the economy's own long run: a copy of this
+    /// engine run alone, as before day zero (the cycle reads
+    /// `cycle_equity_hazard_opening` for the index it does not have), with
+    /// every generator and counter key its own (`rng::AGE_LAW_TAG`) and its
+    /// days numbered from [`CYCLE_AGE_LAW_ORIGIN`]. Per phase, `phase_cycle`
+    /// order, in bins of a month: each bin's mass-weighted age in completed
+    /// days and its mass. Bins under a billionth are left out. Worked out
+    /// at the first forecast, from the state it stands on, once per seed and
+    /// model, and kept for the process; nothing the run reads is touched.
+    /// An engine restored from a snapshot works it out from the state it
+    /// restores, so its forecast can differ from the original's in the long
+    /// run's sampling.
+    fn cycle_age_law(&self, day: i64) -> Vec<Vec<(f64, f64)>> {
+        type Key = (u64, String);
+        static MEMO: std::sync::Mutex<Vec<(Key, Vec<Vec<(f64, f64)>>)>> = std::sync::Mutex::new(Vec::new());
+        let key: Key = (self.root_seed, self.model_fingerprint().to_string());
+        if let Some(v) = MEMO.lock().ok().and_then(|m| m.iter().find(|(k, _)| *k == key).map(|(_, v)| v.clone())) {
+            return v;
+        }
+        let tag = crate::rng::AGE_LAW_TAG;
+        let root = self.root_seed;
+        let mut e = self.clone();
+        e.market_rng = GameRng::surgery(root, stream::MARKET, tag);
+        e.economy_rng = GameRng::surgery(root, stream::ECONOMY, tag);
+        e.external_rng = GameRng::surgery(root, stream::EXTERNAL, tag);
+        e.jump_rng = GameRng::surgery(root, stream::JUMPS, tag);
+        e.volume_rng = GameRng::surgery(root, stream::VOLUME, tag);
+        e.volume_idio_rng = GameRng::surgery(root, stream::VOLUME_IDIO, tag);
+        e.news_rng = GameRng::surgery(root, stream::NEWS, tag);
+        e.overnight_rng = GameRng::surgery(root, stream::OVERNIGHT, tag);
+        e.market_vol_level_rng = GameRng::surgery(root, stream::MARKET_VOL_LEVEL, tag);
+        e.crisis_epicentre_rng = GameRng::surgery(root, stream::CRISIS_EPICENTRE, tag);
+        e.cycle_nowcast_rng = GameRng::surgery(root, stream::CYCLE_NOWCAST, tag);
+        e.earnings_key = crate::rng::age_law_key(self.earnings_key);
+        e.skew_noise_key = crate::rng::age_law_key(self.skew_noise_key);
+        e.oil_drift_key = crate::rng::age_law_key(self.oil_drift_key);
+        e.core_trend_key = crate::rng::age_law_key(self.core_trend_key);
+        e.spread_noise_key = crate::rng::age_law_key(self.spread_noise_key);
+        e.term_premium_key = crate::rng::age_law_key(self.term_premium_key);
+        e.cycle_publication.key = crate::rng::age_law_key(self.cycle_publication.key);
+        e.economy_alone = true;
+        // The absolute clocks move with the days, as the burn-in's do.
+        let shift = CYCLE_AGE_LAW_ORIGIN - day;
+        e.central_bank.next_meeting_date += shift * 24 * 60;
+        e.central_bank.last_meeting_date += shift * 24 * 60;
+        e.economy.oil_last_opec_day += shift;
+        let spec = self.cycle_spec();
+        let phases = crate::economy::cycle::phase_cycle();
+        let mut counts: Vec<Vec<f64>> = vec![Vec::new(); 5];
+        for j in 1..=CYCLE_AGE_LAW_WARM_DAYS + CYCLE_AGE_LAW_DAYS {
+            let d = CYCLE_AGE_LAW_ORIGIN + j;
+            e.advance_day(&DayAdvanceRequest {
+                volatility: 1.0,
+                active_shocks: &[],
+                market_return_pct: 0.0,
+                game_day: d,
+                timestamp: d * 24 * 60,
+            });
+            if j > CYCLE_AGE_LAW_WARM_DAYS {
+                let k = phases.iter().position(|ph| *ph == e.economy.cycle_phase).unwrap_or(0);
+                let a = crate::mathx::max(0.0, (e.economy.months_in_current_phase * spec.month_days).round()) as usize;
+                if counts[k].len() <= a {
+                    counts[k].resize(a + 1, 0.0);
+                }
+                counts[k][a] += 1.0;
+            }
+        }
+        let month = spec.month_days.round().max(1.0) as usize;
+        let mut out = Vec::with_capacity(5);
+        for c in &counts {
+            let total: f64 = c.iter().sum();
+            let mut bins: Vec<(f64, f64)> = Vec::new();
+            for chunk in c.chunks(month).enumerate() {
+                let (b, ws) = chunk;
+                let (mut mass, mut age) = (0.0, 0.0);
+                for (i, w) in ws.iter().enumerate() {
+                    mass += w;
+                    age += w * (b * month + i) as f64;
+                }
+                if total > 0.0 && mass / total > 1e-9 {
+                    bins.push((age / mass, mass / total));
+                }
+            }
+            out.push(bins);
+        }
+        if let Ok(mut m) = MEMO.lock() {
+            if m.len() > 8 {
+                m.clear();
+            }
+            m.push((key, out.clone()));
+        }
+        out
+    }
+}
+
+/// One phase's own economy in the forecast's cycle
+/// (`oil_forecast_cycle_growth`): the state the law steps in that phase,
+/// the central bank that meets on it, and the variance of the market's gap
+/// about the state's (`spread_equity_gap`).
+#[derive(Clone)]
+struct CycleTrack {
+    economy: EconomyState,
+    bank: crate::economy::CentralBankState,
+    gap_var: f64,
+}
+
+impl CycleTrack {
+    /// Mass entering the phase joins its state at the mass-weighted mean:
+    /// every continuous field, and the gap's variance as a mixture's. The
+    /// phase, its clock, the OPEC day and the central bank are the
+    /// receiving phase's.
+    fn join(&mut self, w: f64, from: &CycleTrack, wf: f64) {
+        let t = w + wf;
+        if !(t > 0.0) {
+            return;
+        }
+        let (a, b) = (w / t, wf / t);
+        let (g0, g1) = (self.economy.spread_equity_gap, from.economy.spread_equity_gap);
+        let g = a * g0 + b * g1;
+        self.gap_var = a * (self.gap_var + g0 * g0) + b * (from.gap_var + g1 * g1) - g * g;
+        if self.gap_var < 0.0 {
+            self.gap_var = 0.0;
+        }
+        let x = &mut self.economy;
+        let y = &from.economy;
+        macro_rules! mix {
+            ($($f:ident),* $(,)?) => { $( x.$f = a * x.$f + b * y.$f; )* };
+        }
+        mix!(federal_funds_rate, prime_rate, corporate_bond_yield, treasury_yield_10y, treasury_yield_2y,
+             mortgage_rate_30y, cpi, inflation_rate, core_inflation, gdp_growth, gdp, unemployment_rate,
+             jobs_created, labor_force_participation, usd_index, oil_price, gold_price, copper_price,
+             housing_index, home_starts_monthly, housing_transaction_volume, long_term_unemployment_rate,
+             structural_unemployment, consumer_confidence, business_confidence, fear_greed_index, vix,
+             tariff_rate, trade_balance, oil_inventory_level, wage_growth, previous_day_market_return,
+             rolling_market_return_30d, earnings_cycle, vix_feedback, intermeeting_return, fed_put,
+             fed_put_owed, fed_put_mcap_prev, spread_equity_gap, spread_priced_gap, earnings_anticipation,
+             earnings_lookthrough, unemployment_impulse, oil_push_level, usd_haven_level,
+             oil_inflation_level, zlb_unmet, oil_bound_log_ratio, qe_pe_boost, qe_assets_ratio,
+             fiscal_stimulus, government_debt_to_gdp, phase_gdp_target, recession_probability);
+        for (u, v) in x.gdp_trend.iter_mut().zip(y.gdp_trend.iter()) {
+            *u = a * *u + b * *v;
+        }
+        if let (Some(u), Some(v)) = (x.market_pe, y.market_pe) {
+            x.market_pe = Some(a * u + b * v);
+        }
+    }
+}
+
 /// Growth's expectation over the cycle's phases for oil's forecast
 /// (`oil_forecast_cycle_growth`), on the law's own transitions. Each phase
 /// holds cohorts of the belief's mass, each with its own growth and age:
 /// the mass on a phase at the start, spread over the phase's stationary age
-/// law (the age is not public; [`crate::economy::cycle::stationary_age_bins_for`],
-/// in months), and the mass that enters a phase over the horizon, a fresh
-/// sojourn. At each close every phase is stepped by the law, its draws at
-/// their means, from the forecast's economy with the phase and its cohorts'
-/// growth in place; each cohort's growth moves with it, and each cohort
-/// leaves with the probability the law's transition check compares against
-/// on that stepped economy at the cohort's age: the hazard, the ladder from
-/// the state (the market's fall, inflation, rates, the curve, valuation,
-/// unemployment, growth), the clamp and the per-day conversion
+/// law under the full law (the age is not public;
+/// [`Engine::cycle_age_law`], in months), and the mass that enters a phase
+/// over the horizon, a fresh sojourn. Each phase also carries its own
+/// economy ([`CycleTrack`]), from the close's: at each close the law steps
+/// it in that phase, its draws at their means, at its cohorts' mean growth;
+/// its central bank meets on it by the law's rule, the draws at the middle
+/// of their range; and the market's gap steps on it with its variance about
+/// that path, the forecast's own session variance of the index. Each
+/// cohort's growth moves with the step, and each cohort leaves with the
+/// probability the law's transition check compares against on that
+/// phase's stepped economy at the cohort's age: the hazard, the ladder from
+/// the phase's own state (the market's fall over the gap's spread,
+/// inflation, rates, the curve, valuation, unemployment, growth), the clamp
+/// and the per-day conversion
 /// ([`crate::economy::cycle::transition_probability_for`]). Mass entering a
-/// phase takes the step's mean shock on a phase's first session. No value
-/// is set here: every part is the law's.
+/// phase takes the step's mean shock on a phase's first session, and its
+/// state joins the phase's at the mass-weighted mean. No value is set
+/// here: every part is the law's.
 struct CycleGrowth {
     phases: [crate::economy::CyclePhase; 5],
     spec: crate::economy::CycleSpec,
     /// Each phase's cohorts: age in completed sessions, mass and growth.
     cohorts: Vec<Vec<(f64, f64, f64)>>,
+    tracks: Vec<Option<CycleTrack>>,
+    /// The meeting's options as the close stands; the bank's and the
+    /// curve's inflation are each track's own.
+    options: crate::economy::PolicyOptions,
+    core: (bool, bool),
 }
 
 impl CycleGrowth {
-    fn new(engine: &Engine, belief: &[f64; 5], growth: f64, _horizon: usize) -> Self {
+    fn new(engine: &Engine, belief: &[f64; 5], econ: &EconomyState, day: i64) -> Self {
         let phases = crate::economy::cycle::phase_cycle();
         let spec = engine.cycle_spec();
-        let month = spec.month_days.round().max(1.0) as i64;
+        let ages = engine.cycle_age_law(day);
         let total: f64 = belief.iter().sum();
         let mut cohorts = vec![Vec::new(); 5];
+        let mut tracks = vec![None; 5];
         for k in 0..5 {
             let b = if total > 0.0 { belief[k] / total } else { 0.0 };
             if b > 0.0 {
-                for (age, w) in crate::economy::cycle::stationary_age_bins_for(phases[k], &spec, month) {
-                    cohorts[k].push((age, b * w, growth));
+                for &(age, w) in &ages[k] {
+                    cohorts[k].push((age, b * w, econ.gdp_growth));
                 }
+                let mut economy = econ.clone();
+                economy.cycle_phase = phases[k];
+                tracks[k] = Some(CycleTrack { economy, bank: engine.central_bank, gap_var: 0.0 });
             }
         }
-        CycleGrowth { phases, spec, cohorts }
+        let options = crate::economy::PolicyOptions {
+            path_before: engine.priced_policy_path(),
+            eve_change: None,
+            ..engine.policy_options(false)
+        };
+        let core = (engine.params.fed_core_inflation != 0.0, engine.params.treasury_core_inflation != 0.0);
+        CycleGrowth { phases, spec, cohorts, tracks, options, core }
     }
 
     /// The growth oil's block reads at the next step: the cohorts' mean.
@@ -1394,41 +1593,67 @@ impl CycleGrowth {
         }
     }
 
-    /// One close: each phase stepped by the law at its cohorts' mean growth
-    /// and one point above it (the step is affine in growth but for its
-    /// clamp and the pull's doubling against the phase, so each cohort moves
-    /// on the line through the two), then each cohort's leavers, at the law's
-    /// transition probability on the stepped economy, enter the next phase.
-    fn step(&mut self, economy: &EconomyState, inputs: &DailyInputs, volatility: f64) {
+    /// One close: each phase's economy stepped by the law at its cohorts'
+    /// mean growth and one point above it (the step is affine in growth but
+    /// for its clamp and the pull's doubling against the phase, so each
+    /// cohort moves on the line through the two); each cohort's leavers, at
+    /// the law's transition probability on that stepped economy, enter the
+    /// next phase; then the phase's bank meets. `variance` is the forecast's
+    /// variance of the session's return, the return the gap steps on.
+    fn step(&mut self, inputs: &DailyInputs, volatility: f64, variance: f64, timestamp: i64) {
+        let decay = inputs.yields.spread_equity_decay;
+        let mut own = *inputs;
+        own.oil_growth = None;
         let mut leaving = [(0.0, 0.0); 5];
+        let mut stepped_tracks: Vec<Option<CycleTrack>> = vec![None; 5];
         for k in 0..5 {
             let (mut m, mut g) = (0.0, 0.0);
             for c in &self.cohorts[k] {
                 m += c.1;
                 g += c.1 * c.2;
             }
-            if !(m > 0.0) {
-                continue;
-            }
+            let track = match &self.tracks[k] {
+                Some(t) if m > 0.0 => t,
+                _ => continue,
+            };
             let bar = g / m;
-            let mut at = economy.clone();
+            let mut at = track.economy.clone();
             at.cycle_phase = self.phases[k];
             at.gdp_growth = bar + 1.0;
-            let s1 = update_economy_daily(&at, inputs, &mut crate::economy::daily::MeanDraws).gdp_growth;
+            let s1 = update_economy_daily(&at, &own, &mut crate::economy::daily::MeanDraws).gdp_growth;
             at.gdp_growth = bar;
-            let stepped = update_economy_daily(&at, inputs, &mut crate::economy::daily::MeanDraws);
+            let stepped = update_economy_daily(&at, &own, &mut crate::economy::daily::MeanDraws);
             let s0 = stepped.gdp_growth;
             let slope = s1 - s0;
+            let gap_var = if decay != 0.0 { decay * decay * (track.gap_var + variance) } else { 0.0 };
             for c in self.cohorts[k].iter_mut() {
                 c.0 += 1.0;
                 c.2 = s0 + slope * (c.2 - bar);
-                let q = crate::economy::cycle::transition_probability_for(&stepped, self.phases[k], c.0, &self.spec);
+                let q = crate::economy::cycle::transition_probability_for(
+                    &stepped, self.phases[k], c.0, &self.spec, gap_var);
                 let out = c.1 * q;
                 c.1 -= out;
                 leaving[k].0 += out;
                 leaving[k].1 += out * c.2;
             }
             self.cohorts[k].retain(|c| c.1 > 1e-12);
+            let mut options = self.options;
+            let core = stepped.inflation_rate - stepped.oil_inflation_level;
+            if self.core.0 {
+                options.policy_inflation = Some(core);
+            }
+            if self.core.1 {
+                options.curve_inflation = Some(core);
+            }
+            let met = crate::economy::update_central_bank_with(&track.bank, &stepped, timestamp, &mut MidDraws, &options);
+            stepped_tracks[k] = Some(CycleTrack { economy: met.economy, bank: met.central_bank, gap_var });
+        }
+        let mut staying = [0.0; 5];
+        for k in 0..5 {
+            staying[k] = self.cohorts[k].iter().map(|c| c.1).sum();
+            if stepped_tracks[k].is_some() {
+                self.tracks[k] = stepped_tracks[k].clone();
+            }
         }
         for k in 0..5 {
             let (m, g) = leaving[k];
@@ -1436,6 +1661,15 @@ impl CycleGrowth {
                 let next = (k + 1) % 5;
                 let shock = crate::economy::daily::phase_entry_growth_shock(self.phases[next], 0.5, volatility);
                 self.cohorts[next].push((0.0, m, g / m + shock));
+                let from = stepped_tracks[k].as_ref().expect("a phase with leavers was stepped");
+                match self.tracks[next].as_mut() {
+                    Some(t) if staying[next] > 0.0 => t.join(staying[next], from, m),
+                    _ => {
+                        let mut t = from.clone();
+                        t.economy.cycle_phase = self.phases[next];
+                        self.tracks[next] = Some(t);
+                    }
+                }
             }
         }
     }

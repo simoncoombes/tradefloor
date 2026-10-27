@@ -114,12 +114,15 @@ payload, Arrow and WASM show them; agents trade by symbol.
   session that sum to -2 points a cycle, and the forecast runs high
   at long horizons. At 1.0 oil's block reads growth's expectation over the
   cycle's phases on the law's own transitions: each cohort of the belief's
-  mass (the start's at the phase's stationary age, the entrants fresh)
-  leaves at the probability the law's transition check reads at its age on
-  the forecast's economy at each close, the ladder's state-dependent hazards
-  included, and each cohort's growth steps by the law in its phase with the
-  law's mean shock on entry. No free parameter. It changes what the forecast
-  publishes and nothing in the law.
+  mass (the start's at the phase's stationary age under the full law, read
+  from the economy's own long run; the entrants fresh) leaves at the
+  probability the law's transition check reads at its age. Each phase
+  carries its own economy, stepped by the law in that phase with its own
+  central bank's meetings and the market's gap over its spread, so the
+  ladder's state-dependent hazards read that phase's state; each cohort's
+  growth steps by the law in its phase with the law's mean shock on entry.
+  No free parameter. It changes what the forecast publishes and nothing in
+  the law.
 ### The skew noise
 
 - `surface_skew_noise_sd` and `surface_skew_noise_half_life` are new dials,
