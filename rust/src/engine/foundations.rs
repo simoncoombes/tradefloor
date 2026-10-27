@@ -1580,7 +1580,7 @@ impl Engine {
                 counts[k][a] += 1.0;
             }
         }
-        let month = spec.month_days.round().max(1.0) as usize;
+        let month = crate::mathx::max(1.0, spec.month_days.round()) as usize;
         let mut out = Vec::with_capacity(5);
         for c in &counts {
             let total: f64 = c.iter().sum();
