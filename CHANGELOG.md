@@ -333,6 +333,12 @@ stock prices and every known answer are where they were.
   equity under the initial margin it then asks (`MarginError`; FINRA Rule
   4210(b), Regulation T 12 CFR 220.4(c)). Margin was checked only at a
   close, so an account could open what it could not carry.
+- `margin_option_scan_range` is a new dial, 0.0 on every preset and left
+  out of the digest there. Off zero a name's options are margined at ten
+  equidistant moves of the name over plus and minus that share of its price,
+  and stock held without the name's options at that share of its value.
+  FINRA Rule 4210(g)(2)(F) sets +/- 15% for an equity, so the rule's value
+  is 0.15; the scan's own size is a few percent. No price moves.
 - `margin_scan_option_tail` is new, 0.0 on every preset and left out of the
   digest there. Off zero it is the option scan's own tail allowance, in
   place of `margin_scan_tail` on the scan's price move and volatility

@@ -4672,7 +4672,16 @@ portfolio-margin rule's minimum, that many dollars a unit of every option
 it holds, long or short, a long's not more than its value: the scan is a
 risk-based theoretical loss, so the account is a portfolio-margin account,
 and FINRA Rule 4210(g)(7) asks the greater of the largest theoretical loss
-and (B) $.375 a listed option times its multiplier (0.375 a unit). Maintenance is initial over 1.1. A
+and (B) $.375 a listed option times its multiplier (0.375 a unit). Under
+`margin_option_scan_range` (0.0 on every shipped preset) a name's options are
+revalued at ten equidistant moves of the name over plus and minus that share
+of its price, ends included, in place of the scan's seven points at its own
+size, and stock held without the name's options is charged that share of its
+value: FINRA Rule 4210(g)(2)(F) takes a portfolio margin account's
+theoretical gains and losses at ten valuation points over +/- 15% for an
+equity, so the rule's value is 0.15. The scan's volatility shifts are kept at
+each point, the stock's own loss is still not counted beside a name's
+options, and the index options' scan is unchanged. Maintenance is initial over 1.1. A
 `Portfolio` pays an option's premium when it trades, marks it at the
 dealer's mid, is paid its settlement at expiry (`Portfolio.settled`), counts
 it at its delta-notional against the leverage limit, adds the scan to

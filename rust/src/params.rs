@@ -2112,6 +2112,23 @@ pub struct ModelParams {
     /// and writes nothing, so no price moves. Requires
     /// `margin_scan_coverage`. In [0, 10].
     pub margin_option_minimum: f64,
+    /// The single-name option scan's price range, a share of the name's
+    /// price. 0.0, on every shipped preset, is the scan's own size (`z * t`
+    /// times the name's one-session sd, at SPAN's seven points), and is left
+    /// out of the model's digest.
+    ///
+    /// Off zero, each name's options are revalued at ten equidistant moves
+    /// of the name from minus to plus this share of its price, ends
+    /// included, at each of the scan's volatility shifts, and the stock an
+    /// exercise or an assignment delivered, held without the name's options,
+    /// is margined at this share of its value. FINRA Rule 4210(g)(2)(F)
+    /// takes a portfolio margin account's theoretical gains and losses "at
+    /// ten equidistant intervals (valuation points)" over "+/- 15%" for any
+    /// product that is, or is based on, an equity security, so the rule's
+    /// value is 0.15. The index options' scan is unchanged. The scan reads
+    /// quotes and writes nothing, so no price moves. Requires
+    /// `margin_scan_coverage`. In [0, 1].
+    pub margin_option_scan_range: f64,
     /// A switch: 1.0 refuses an account's order when its equity after the
     /// order would be under the initial margin the account then asks
     /// (`tradefloor.Portfolio`, `MarginError`). 0.0, on every shipped preset,
@@ -9335,6 +9352,7 @@ impl ModelParams {
             margin_scan_tail: 0.0,
             margin_scan_option_tail: 0.0,
             margin_option_minimum: 0.0,
+            margin_option_scan_range: 0.0,
             margin_pretrade_check: 0.0,
             options_index_listed: 0.0,
             surface_ssvi: 0.0,
@@ -12050,6 +12068,7 @@ impl ModelParams {
             "margin_scan_tail" => self.margin_scan_tail,
             "margin_scan_option_tail" => self.margin_scan_option_tail,
             "margin_option_minimum" => self.margin_option_minimum,
+            "margin_option_scan_range" => self.margin_option_scan_range,
             "margin_pretrade_check" => self.margin_pretrade_check,
             "options_index_listed" => self.options_index_listed,
             "surface_ssvi" => self.surface_ssvi,
@@ -12530,6 +12549,7 @@ impl ModelParams {
             "margin_scan_tail" => out.margin_scan_tail = value,
             "margin_scan_option_tail" => out.margin_scan_option_tail = value,
             "margin_option_minimum" => out.margin_option_minimum = value,
+            "margin_option_scan_range" => out.margin_option_scan_range = value,
             "margin_pretrade_check" => out.margin_pretrade_check = value,
             "options_index_listed" => out.options_index_listed = value,
             "surface_ssvi" => out.surface_ssvi = value,
@@ -14656,6 +14676,18 @@ impl ModelParams {
                  margin, which only margin_scan_coverage sets: set margin_scan_coverage first.",
                 self.margin_option_minimum));
         }
+        if !(0.0..=1.0).contains(&self.margin_option_scan_range) {
+            return Err(format!(
+                "margin_option_scan_range is {}. It is the single-name option scan's price range, a share of \
+                 the name's price, in [0, 1]; FINRA Rule 4210(g)(2)(F)'s for an equity is 0.15.",
+                self.margin_option_scan_range));
+        }
+        if self.margin_option_scan_range != 0.0 && self.margin_scan_coverage == 0.0 {
+            return Err(format!(
+                "margin_scan_coverage is 0 but margin_option_scan_range is {}. The range sizes the option \
+                 scan's margin, which only margin_scan_coverage sets: set margin_scan_coverage first.",
+                self.margin_option_scan_range));
+        }
         if !(self.margin_pretrade_check == 0.0 || self.margin_pretrade_check == 1.0) {
             return Err(format!(
                 "margin_pretrade_check is {}. It is a switch: 0 (no margin checked before an order) or 1 \
@@ -15423,6 +15455,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "margin_scan_tail",
     "margin_scan_option_tail",
     "margin_option_minimum",
+    "margin_option_scan_range",
     "margin_pretrade_check",
     "night_session_steps",
     "futures_impact_memory",
@@ -15711,6 +15744,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "margin_scan_tail",
         "margin_scan_option_tail",
         "margin_option_minimum",
+        "margin_option_scan_range",
         "margin_pretrade_check",
         "options_index_listed",
         "surface_ssvi",
