@@ -327,6 +327,12 @@ stock prices and every known answer are where they were.
   and stock held without the name's options at that share of its value.
   FINRA Rule 4210(g)(2)(F) sets +/- 15% for an equity, so the rule's value
   is 0.15; the scan's own size is a few percent. No price moves.
+- `margin_liquidation_worked` is a new switch, 0.0 on every preset and left
+  out of the digest there. With it on, a margin call's liquidation sends
+  each contract's sale again for what is left while its book still takes
+  some, as a broker works a market order. Sent once, a sale fills only the
+  ladder the dealer shows then, and a large position in a cheap option was
+  left partly held.
 - `margin_scan_option_tail` is new, 0.0 on every preset and left out of the
   digest there. Off zero it is the option scan's own tail allowance, in
   place of `margin_scan_tail` on the scan's price move and volatility
