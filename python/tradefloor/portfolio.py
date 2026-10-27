@@ -1084,10 +1084,10 @@ class Portfolio:
         margins on its own: the shares held in a name an exercise or an
         assignment delivered (:attr:`deliveries`) and outside ``names``, the
         names whose options are held, which the option scan takes as cover.
-        Once its options settle, an expiry's assignment can leave an account
-        many times its equity in stock that nothing margined (MG2, pt-v22).
-        Stock in a name the account never took delivery in asks nothing, as
-        before."""
+        An expiry's assignment can leave an account many times its equity in
+        stock after its last option settles, and this keeps that stock
+        margined. Stock in a name the account never took delivery in asks
+        nothing."""
         if not self.deliveries:
             return []
         delivered = {d["ticker"] for d in self.deliveries}
@@ -1160,8 +1160,8 @@ class Portfolio:
 
     def margin(self, engine: Engine) -> dict[str, Any]:
         """The account's margin now, a dict: ``initial`` and ``maintenance``,
-        the requirements the futures and options held ask
-        (:meth:`margin_requirement`), dollars; ``equity``, the net worth they
+        the requirements the futures, the options and the delivered stock
+        held ask (:meth:`margin_requirement`), dollars; ``equity``, the net worth they
         are measured against; ``excess``, equity less the initial
         requirement, the room left before a close could call; and ``call``,
         the margin call the last close made and the next open decides
@@ -1378,10 +1378,10 @@ class Portfolio:
         at it, then decide the last close's margin call. A call is met when
         the account's equity is back at or above the initial requirement;
         otherwise every contract held is closed at the market through its
-        book, and so are the shares an exercise or an assignment delivered in
-        a name whose options it trades. A no-op, asking the engine nothing,
-        for a portfolio with
-        no futures and no call open. The harnesses call it after the open."""
+        book, and so is the stock in each name whose options it held or that
+        an exercise or an assignment delivered shares in. A no-op, asking the
+        engine nothing, for a portfolio with no futures, no options and no
+        call open. The harnesses call it after the open."""
         if not self.futures and not self.options and self._margin_call is None:
             return
         day = int(engine.day_count)
@@ -1405,11 +1405,11 @@ class Portfolio:
                 pass
             self.liquidations.append({"day": day, "symbol": symbol, "quantity": -quantity,
                                       "filled": filled})
-        # The shares an exercise or an assignment delivered in a name whose
-        # options the account trades go with them, as a broker's liquidation
-        # takes the whole position: an early assignment can hand an account
-        # several times its equity in stock the option scan no longer
-        # margins once the option is gone. Shares in other names are left.
+        # The stock in each name whose options the account held, or that an
+        # exercise or an assignment delivered shares in, goes with them, as a
+        # broker's liquidation takes the whole position: an assignment can
+        # hand an account several times its equity in stock. Shares in other
+        # names are left.
         names = {_option_root(s) for s, _ in held if is_name_option(s)}
         names |= {d["ticker"] for d in self.deliveries}
         for ticker in sorted(names):

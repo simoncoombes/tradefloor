@@ -4456,8 +4456,10 @@ engine nothing new, so every scorecard without futures is the one it was.
 An agent sees the contracts through `obs.engine.contracts()`,
 `obs.engine.quote(symbol)` and `obs.engine.settlements()`, and trades one by
 its symbol in the mapping `act` returns. The scorecard's impact reads the
-names' prices, which no contract moves. Stock is not liquidated: with the
-contracts closed the requirement is nil.
+names' prices, which no contract moves. An account with no single-name
+options keeps its stock through a liquidation: with the contracts closed the
+requirement is nil. Single-name options add the stock beside them (see
+Single-name options).
 
 ## Index options
 
@@ -4835,12 +4837,13 @@ escrowed price over moves sized to the name's one-session sd. Stock held
 in a name an exercise or an assignment has delivered shares in, while the
 account holds none of that name's options, is margined on its own scan
 (`Engine.stock_margin`): its shares times the same move of the name, the
-stock's worst loss over the scan. So the close an expiry's assignment settles the last option and hands
-the account many times its equity in shares, the shortfall is called, and
-an unmet call's open sells the shares with the rest. Stock in a name the
-account took no delivery in asks nothing, as before.
+stock's worst loss over the scan. So the close that delivers the shares
+calls any shortfall, even when the assignment settled the account's last
+option. An unmet call's liquidation closes the contracts and the stock in
+each name whose options the account held or that it took delivery in.
+Stock in a name the account took no delivery in asks nothing.
 
-**The dealer's shape** (pt-v22, five dials, each 0.0 on every shipped preset
+**The dealer's shape** (five dials, each 0.0 on every shipped preset
 and left out of the digest there; refused without `options_names_listed`).
 `option_name_inventory_slope` moves an expiry's volatility by that share of
 its at-the-money volatility per at-the-money-equivalent contract of
