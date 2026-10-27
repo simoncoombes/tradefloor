@@ -5238,6 +5238,18 @@ impl PyEngine {
         self.inner.option_margin(&positions)
     }
 
+    /// The scan's margin on stock held alone in listed names, dollars:
+    /// `positions` as `(ticker, signed shares)` pairs, each its shares times
+    /// the scan's move of the name, the one `option_margin` sizes the name's
+    /// options on. The option scan charges stock only as cover for an
+    /// option's risk; `Portfolio` asks this for the shares an exercise or an
+    /// assignment delivered once it holds none of the name's options. Tickers
+    /// without a listed chain are left out. None with margin or the name
+    /// options off. A read.
+    fn stock_margin(&self, positions: Vec<(String, f64)>) -> Option<f64> {
+        self.inner.stock_scan_margin(&positions)
+    }
+
     /// Static-arbitrage violations on every listed option chain now (row
     /// SV2), and the surface's own conditions: a list of sentences, empty
     /// when there are none. Refused with `options_index_listed` off. A read.

@@ -4711,7 +4711,14 @@ so a scorecard's trades, turnover and impact leave them out. The scan
 margin scans a name's options with the stock held in it, less the stock's
 own worst loss and floored at 0, so a covered call or a protective put asks
 nothing a naked option does; each option is revalued as a European on its
-escrowed price over moves sized to the name's one-session sd.
+escrowed price over moves sized to the name's one-session sd. Stock an
+exercise or an assignment delivered, in a name whose options the account no
+longer holds, is margined on its own scan (`Engine.stock_margin`): its
+shares times the same move of the name, the stock's worst loss over the
+scan. So the close an expiry's assignment settles the last option and hands
+the account many times its equity in shares, the shortfall is called, and
+an unmet call's open sells the shares with the rest. Stock in a name the
+account took no delivery in asks nothing, as before.
 
 **The dealer's shape** (pt-v22, five dials, each 0.0 on every shipped preset
 and left out of the digest there; refused without `options_names_listed`).

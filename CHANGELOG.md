@@ -26,6 +26,19 @@ payload, Arrow and WASM show them; agents trade by symbol.
 
 <!-- release-note-ends -->
 
+### The close an assignment delivers margins the shares
+
+An expiry's assignment that settled an account's last option left the shares
+it delivered unmargined: `Portfolio` margined stock only beside the name's
+options, and with none held its close asked nothing. So an account handed
+19 times its equity in stock ended the session below zero with no margin
+call, and no liquidation followed. The shares an exercise or an assignment
+delivered, in a name whose options the account no longer holds, are now
+margined on their own scan, `Engine.stock_margin`: the shares times the
+scan's move of the name. The close they arrive at calls a shortfall, and an
+unmet call's open sells them. Accounts without single-name options, so every
+shipped preset, are as before; known answers are unchanged.
+
 ### A liquidation takes the shares an assignment delivered
 
 On an unmet margin call `Portfolio` closed its futures and options and left

@@ -417,6 +417,10 @@ class MarketView:
         """The scan margin on option positions, as ``Engine.option_margin``."""
         return _WRAPPED[self].option_margin(positions)
 
+    def stock_margin(self, positions: list[tuple[str, float]]) -> Any:
+        """The scan margin on stock held alone, as ``Engine.stock_margin``."""
+        return _WRAPPED[self].stock_margin(positions)
+
     @property
     def recorded_days(self) -> int:
         """How many days the engine has recorded, which is what

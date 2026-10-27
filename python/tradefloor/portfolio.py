@@ -1043,8 +1043,11 @@ class Portfolio:
         """The initial (or maintenance) margin the futures and option
         positions ask, dollars: each future's margin as the last close set
         it, times the contracts held, plus the option positions' scan
-        (:meth:`Engine.option_margin`), which nets offsetting options. 0.0 on
-        a model without margin (``margin_scan_coverage``)."""
+        (:meth:`Engine.option_margin`), which nets offsetting options, plus
+        the stock's own scan (:meth:`Engine.stock_margin`) on the shares an
+        exercise or an assignment delivered in a name whose options it no
+        longer holds (:meth:`_delivered_stock`). 0.0 on a model without
+        margin (``margin_scan_coverage``)."""
         key = "maintenance_margin" if maintenance else "initial_margin"
         total = 0.0
         for f in self.futures.values():
@@ -1053,6 +1056,7 @@ class Portfolio:
             except ValidationError:
                 per = None
             total += abs(f.quantity) * (per or 0.0)
+        names: set[str] = set()
         if self.options:
             held = [(o.symbol, o.quantity) for o in self.options.values()]
             # The stock in a name whose options are held, so a covered call
@@ -1064,7 +1068,26 @@ class Portfolio:
             scan = engine.option_margin(held)
             if scan is not None:
                 total += scan / 1.1 if maintenance else scan
+        delivered = self._delivered_stock({t: p.quantity for t, p in self.positions.items()}, names)
+        if delivered:
+            scan = engine.stock_margin(delivered)
+            if scan is not None:
+                total += scan / 1.1 if maintenance else scan
         return total
+
+    def _delivered_stock(self, stocks: dict[str, float], names: set[str]) -> list[tuple[str, float]]:
+        """The stock in ``stocks`` (ticker to signed shares) that the scan
+        margins on its own: the shares held in a name an exercise or an
+        assignment delivered (:attr:`deliveries`) and outside ``names``, the
+        names whose options are held, which the option scan takes as cover.
+        Once its options settle, an expiry's assignment can leave an account
+        many times its equity in stock that nothing margined (MG2, pt-v22).
+        Stock in a name the account never took delivery in asks nothing, as
+        before."""
+        if not self.deliveries:
+            return []
+        delivered = {d["ticker"] for d in self.deliveries}
+        return [(t, q) for t, q in sorted(stocks.items()) if q and t in delivered and t not in names]
 
     def _initial_margin_with(self, engine: Engine, symbol: str, filled: float) -> float:
         """:meth:`margin_requirement`'s initial requirement with ``filled``
@@ -1086,10 +1109,16 @@ class Portfolio:
                 per = None
             total += abs(q) * (per or 0.0)
         held = [(s, q) for s, q in options.items() if q]
+        names: set[str] = set()
         if held:
             names = {_option_root(s) for s, _ in held if is_name_option(s)}
             held += [(t, q) for t, q in stocks.items() if t in names and q]
             scan = engine.option_margin(held)
+            if scan is not None:
+                total += scan
+        delivered = self._delivered_stock(stocks, names)
+        if delivered:
+            scan = engine.stock_margin(delivered)
             if scan is not None:
                 total += scan
         return total
@@ -1135,8 +1164,9 @@ class Portfolio:
         (``day``, ``equity``, ``maintenance``, ``initial``), or None. The
         calls already decided are in :attr:`margin_calls`.
 
-        Every figure is 0.0 for an account without futures or options, which
-        asks the engine nothing new: ``equity`` is then its net worth."""
+        Every figure is 0.0 for an account without futures, options or
+        delivered stock (:meth:`_delivered_stock`), which asks the engine
+        nothing new: ``equity`` is then its net worth."""
         equity = self.net_worth(engine)
         initial = self.margin_requirement(engine)
         maintenance = self.margin_requirement(engine, maintenance=True)
@@ -1386,10 +1416,13 @@ class Portfolio:
         margin to its new settlement mark, the contracts that settle at this
         close paid out, the single-name options exercised and assigned at it
         delivered (:meth:`_deliver`), and a margin call when the account's
-        equity is under the maintenance requirement. A no-op, asking the
-        engine nothing, for a portfolio with no futures and no options. The
-        harnesses call it after the close."""
-        if not self.futures and not self.options:
+        equity is under the maintenance requirement, the delivered stock's
+        own scan counted (:meth:`margin_requirement`), so the call comes at
+        the close the shares arrive even when the assignment settled the
+        last option. A no-op, asking the engine nothing, for a portfolio with
+        no futures, no options and no delivered stock. The harnesses call it
+        after the close."""
+        if not self.futures and not self.options and not self._holds_delivered():
             return
         day = int(engine.day_count)
         for held in self.futures.values():
@@ -1408,7 +1441,7 @@ class Portfolio:
             # The close just made is session `day - 1`: the day count moved
             # on at it.
             self._deliver(engine, day - 1)
-        if not self.futures and not self.options:
+        if not self.futures and not self.options and not self._holds_delivered():
             return
         maintenance = self.margin_requirement(engine, maintenance=True)
         equity = self.net_worth(engine)
@@ -1416,6 +1449,11 @@ class Portfolio:
             self._margin_call = {"day": day, "equity": equity, "maintenance": maintenance,
                                  "initial": self.margin_requirement(engine), "met": None}
             self.margin_calls.append(self._margin_call)
+
+    def _holds_delivered(self) -> bool:
+        """Whether the account holds stock in a name an exercise or an
+        assignment delivered."""
+        return bool(self._delivered_stock({t: p.quantity for t, p in self.positions.items()}, set()))
 
     def pnl(self, engine: Engine) -> float:
         """Total profit and loss against starting cash."""
