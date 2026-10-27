@@ -1199,6 +1199,10 @@ pub struct Engine {
     /// `None` before the first close and always with the dial off. Carried in
     /// the snapshot and the state hash while it is `Some`.
     forecast: Option<crate::derivatives::Forecast>,
+    /// `oil_forecast_path_law`: the oil forecast's paths held between the
+    /// closes that simulate them. Not state: nothing snapshots, restores or
+    /// hashes it ([`foundations::OilPathHold`]).
+    oil_path_hold: Option<foundations::OilPathHold>,
     /// `futures_index_listed`: the index futures, their book, their
     /// settlements and their generator (`stream::DERIVATIVES`); the night's
     /// path under `night_session_steps`. Empty and never drawn from with the
@@ -2430,6 +2434,7 @@ impl Engine {
             index_close: 0.0,
             vix_live: None,
             forecast: None,
+            oil_path_hold: None,
             futures: futures::FuturesState::new(seed),
             vix_futures: vix_futures::VixFuturesState::default(),
             rate_futures: rate_futures::RateFuturesState::default(),

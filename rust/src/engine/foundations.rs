@@ -407,7 +407,18 @@ impl Engine {
             Some(d) => d,
             None => return,
         };
-        self.forecast = Some(self.compute_forecast(day));
+        // `oil_forecast_path_law`: a close within the closes the paths are
+        // held for reads them; the first close past them, and a refresh
+        // after a pin, simulates afresh.
+        let held = match &self.oil_path_hold {
+            Some(h) if game_day.is_some() && day > h.day && day - h.day < OIL_FORECAST_PATHS_HELD => {
+                self.oil_path_hold.take()
+            }
+            _ => None,
+        };
+        let (forecast, hold) = self.compute_forecast(day, held);
+        self.forecast = Some(forecast);
+        self.oil_path_hold = hold;
     }
 
     /// The market's belief over the five phases, `phase_cycle` order: the
@@ -683,7 +694,7 @@ impl Engine {
     /// The first track's VIX is the state's expectation; the published VIX
     /// reported is the published quote's expectation over the same spread
     /// ([`Engine::forecast_published_vix`]).
-    fn compute_forecast(&self, day: i64) -> Forecast {
+    fn compute_forecast(&self, day: i64, held: Option<OilPathHold>) -> (Forecast, Option<OilPathHold>) {
         let p = &self.params;
         let horizon = p.forecast_horizon_sessions as usize;
         let phases = crate::economy::cycle::phase_cycle();
@@ -763,12 +774,15 @@ impl Engine {
             None
         };
         // `oil_forecast_path_law`: growth's expectation over the law's own
-        // paths, which takes the place of the cycle's above.
-        let mut paths = if p.oil_forecast_path_law != 0.0 {
+        // paths, which takes the place of the cycle's above; simulated here,
+        // or read from the paths a close within the week simulated.
+        let mut paths = if p.oil_forecast_path_law != 0.0 && held.is_none() {
             Some(OilPaths::new(self, &belief, &econ, day))
         } else {
             None
         };
+        let mut path_growth: Vec<f64> = Vec::new();
+        let mut path_last: Option<(DailyInputs, f64)> = None;
         let policy = self.forecast_policy_path(day, horizon);
         let k_curve = intraday_variance_factor();
         // The spread's shape (`forecast_vix_dispersion_skew`), and the stress
@@ -1009,15 +1023,21 @@ impl Engine {
             if let Some(c) = &cycle {
                 inputs.oil_growth = Some(c.growth());
             }
+            if let Some(h) = &held {
+                inputs.oil_growth = h.growth.get((day - h.day) as usize + step).copied();
+            }
             if let Some(s) = &paths {
-                inputs.oil_growth = Some(s.growth());
+                let g = s.growth();
+                path_growth.push(g);
+                inputs.oil_growth = Some(g);
             }
             let mut next = update_economy_daily(&econ, &inputs, &mut crate::economy::daily::MeanDraws);
             if let Some(c) = cycle.as_mut() {
                 c.step(&inputs, request.volatility, v_session, request.timestamp);
             }
             if let Some(s) = paths.as_mut() {
-                s.step(&inputs, v_session, request.timestamp);
+                s.step(self, &inputs, v_session, request.timestamp);
+                path_last = Some((inputs, v_session));
             }
             var_inventory = var_after;
             let sd_inv = crate::mathx::sqrt(var_inventory);
@@ -1157,7 +1177,22 @@ impl Engine {
             }
             belief = pred;
         }
-        out
+        // The paths simulated here run on past the horizon for the closes
+        // that read them later in the week, on the last session's inputs
+        // with the days moved on.
+        let hold = match (paths.as_mut(), path_last) {
+            (Some(s), Some((last, variance))) => {
+                for k in 1..OIL_FORECAST_PATHS_HELD {
+                    path_growth.push(s.growth());
+                    let mut inputs = last;
+                    inputs.game_day += k;
+                    s.step(self, &inputs, variance, inputs.game_day * 24 * 60);
+                }
+                Some(OilPathHold { day, growth: path_growth })
+            }
+            _ => held,
+        };
+        (out, hold)
     }
 
     /// The published VIX expected `closes` closes ahead, from the first
@@ -1363,6 +1398,10 @@ const CYCLE_AGE_LAW_ORIGIN: i64 = 1 << 34;
 /// forgets, and the age law is its occupancy over the rest.
 const CYCLE_AGE_LAW_WARM_DAYS: i64 = 252 * 50;
 const CYCLE_AGE_LAW_DAYS: i64 = 252 * 10_000;
+/// The long run the oil forecast's paths draw their start from
+/// (`oil_forecast_path_law`, [`Engine::oil_paths_start_law`]): a tenth of
+/// the cycle's, for the paths' cost. Precision, as above.
+const OIL_PATHS_AGE_LAW_DAYS: i64 = 252 * 1_000;
 
 /// Draws at the middle of their range for a projected meeting: a uniform
 /// of one half and a normal of zero, as the market's shadow meeting reads.
@@ -1378,29 +1417,11 @@ impl crate::rng::Rng for MidDraws {
 }
 
 impl Engine {
-    /// Each phase's stationary age law under the FULL law, for the start of
-    /// the forecast's cycle (`oil_forecast_cycle_growth`): the hazard and the
-    /// ladder on the economy's own state, as the law transitions. There is no
-    /// closed form ([`crate::economy::cycle`], the stationary law), so it is
-    /// read as the occupancy of the economy's own long run: a copy of this
-    /// engine run alone, as before day zero (the cycle reads
-    /// `cycle_equity_hazard_opening` for the index it does not have), with
-    /// every generator and counter key its own (`rng::AGE_LAW_TAG`) and its
-    /// days numbered from [`CYCLE_AGE_LAW_ORIGIN`]. Per phase, `phase_cycle`
-    /// order, in bins of a month: each bin's mass-weighted age in completed
-    /// days and its mass. Bins under a billionth are left out. Worked out
-    /// at the first forecast, from the state it stands on, once per seed and
-    /// model, and kept for the process; nothing the run reads is touched.
-    /// An engine restored from a snapshot works it out from the state it
-    /// restores, so its forecast can differ from the original's in the long
-    /// run's sampling.
-    fn cycle_age_law(&self, day: i64) -> Vec<Vec<(f64, f64)>> {
-        type Key = (u64, String);
-        static MEMO: std::sync::Mutex<Vec<(Key, Vec<Vec<(f64, f64)>>)>> = std::sync::Mutex::new(Vec::new());
-        let key: Key = (self.root_seed, self.model_fingerprint().to_string());
-        if let Some(v) = MEMO.lock().ok().and_then(|m| m.iter().find(|(k, _)| *k == key).map(|(_, v)| v.clone())) {
-            return v;
-        }
+    /// The engine the cycle's long run is played on ([`Engine::cycle_age_law`],
+    /// [`Engine::oil_paths_start_law`]): a copy with every generator moved
+    /// to the age law's own, the economy alone, and the absolute clocks
+    /// moved to the run's origin.
+    fn age_law_engine(&self, day: i64) -> Engine {
         let tag = crate::rng::AGE_LAW_TAG;
         let root = self.root_seed;
         let mut e = self.clone();
@@ -1428,6 +1449,33 @@ impl Engine {
         e.central_bank.next_meeting_date += shift * 24 * 60;
         e.central_bank.last_meeting_date += shift * 24 * 60;
         e.economy.oil_last_opec_day += shift;
+        e
+    }
+
+    /// Each phase's stationary age law under the FULL law, for the start of
+    /// the forecast's cycle (`oil_forecast_cycle_growth`): the hazard and the
+    /// ladder on the economy's own state, as the law transitions. There is no
+    /// closed form ([`crate::economy::cycle`], the stationary law), so it is
+    /// read as the occupancy of the economy's own long run: a copy of this
+    /// engine run alone, as before day zero (the cycle reads
+    /// `cycle_equity_hazard_opening` for the index it does not have), with
+    /// every generator and counter key its own (`rng::AGE_LAW_TAG`) and its
+    /// days numbered from [`CYCLE_AGE_LAW_ORIGIN`]. Per phase, `phase_cycle`
+    /// order, in bins of a month: each bin's mass-weighted age in completed
+    /// days and its mass. Bins under a billionth are left out. Worked out
+    /// at the first forecast, from the state it stands on, once per seed and
+    /// model, and kept for the process; nothing the run reads is touched.
+    /// An engine restored from a snapshot works it out from the state it
+    /// restores, so its forecast can differ from the original's in the long
+    /// run's sampling.
+    fn cycle_age_law(&self, day: i64) -> Vec<Vec<(f64, f64)>> {
+        type Key = (u64, String);
+        static MEMO: std::sync::Mutex<Vec<(Key, Vec<Vec<(f64, f64)>>)>> = std::sync::Mutex::new(Vec::new());
+        let key: Key = (self.root_seed, self.model_fingerprint().to_string());
+        if let Some(v) = MEMO.lock().ok().and_then(|m| m.iter().find(|(k, _)| *k == key).map(|(_, v)| v.clone())) {
+            return v;
+        }
+        let mut e = self.age_law_engine(day);
         let spec = self.cycle_spec();
         let phases = crate::economy::cycle::phase_cycle();
         let mut counts: Vec<Vec<f64>> = vec![Vec::new(); 5];
@@ -1475,7 +1523,77 @@ impl Engine {
         }
         out
     }
+
+    /// The start's law for the oil forecast's paths
+    /// (`oil_forecast_path_law`): [`Engine::cycle_age_law`]'s occupancy, on
+    /// a long run of [`OIL_PATHS_AGE_LAW_DAYS`], with each bin's spread of
+    /// growth about the published figure, `gdp_growth - published`, at
+    /// every session of the bin. A path drawn into a bin starts at the
+    /// close's published growth plus one of its bin's differences: growth
+    /// as the law spreads it about what is public, in that phase at that
+    /// age. Per phase, `phase_cycle` order: each bin's mass-weighted age in
+    /// completed days, its mass, and its differences. Kept for the process
+    /// as the age law is.
+    fn oil_paths_start_law(&self, day: i64) -> std::sync::Arc<OilStartLaw> {
+        type Key = (u64, String);
+        static MEMO: std::sync::Mutex<Vec<(Key, std::sync::Arc<OilStartLaw>)>> = std::sync::Mutex::new(Vec::new());
+        let key: Key = (self.root_seed, self.model_fingerprint().to_string());
+        if let Some(v) = MEMO.lock().ok().and_then(|m| m.iter().find(|(k, _)| *k == key).map(|(_, v)| v.clone())) {
+            return v;
+        }
+        let mut e = self.age_law_engine(day);
+        let spec = self.cycle_spec();
+        let phases = crate::economy::cycle::phase_cycle();
+        let month = crate::mathx::max(1.0, spec.month_days.round()) as usize;
+        // Per phase and bin: the mass, the summed age, the differences.
+        let mut bins: Vec<Vec<(f64, f64, Vec<f64>)>> = vec![Vec::new(); 5];
+        for j in 1..=CYCLE_AGE_LAW_WARM_DAYS + OIL_PATHS_AGE_LAW_DAYS {
+            let d = CYCLE_AGE_LAW_ORIGIN + j;
+            e.advance_day(&DayAdvanceRequest {
+                volatility: 1.0,
+                active_shocks: &[],
+                market_return_pct: 0.0,
+                game_day: d,
+                timestamp: d * 24 * 60,
+            });
+            if j > CYCLE_AGE_LAW_WARM_DAYS {
+                let k = phases.iter().position(|ph| *ph == e.economy.cycle_phase).unwrap_or(0);
+                let a = crate::mathx::max(0.0, (e.economy.months_in_current_phase * spec.month_days).round()) as usize;
+                let b = a / month;
+                if bins[k].len() <= b {
+                    bins[k].resize(b + 1, (0.0, 0.0, Vec::new()));
+                }
+                let bin = &mut bins[k][b];
+                bin.0 += 1.0;
+                bin.1 += a as f64;
+                bin.2.push(e.economy.gdp_growth - e.published_gdp_growth());
+            }
+        }
+        let mut out: OilStartLaw = Vec::with_capacity(5);
+        for c in bins {
+            let total: f64 = c.iter().map(|b| b.0).sum();
+            let mut kept = Vec::new();
+            for (mass, age, diffs) in c {
+                if total > 0.0 && mass / total > 1e-9 {
+                    kept.push((age / mass, mass / total, diffs));
+                }
+            }
+            out.push(kept);
+        }
+        let out = std::sync::Arc::new(out);
+        if let Ok(mut m) = MEMO.lock() {
+            if m.len() > 8 {
+                m.clear();
+            }
+            m.push((key, out.clone()));
+        }
+        out
+    }
 }
+
+/// [`Engine::oil_paths_start_law`]'s law: per phase, each bin's age, mass
+/// and differences of growth from the published figure.
+type OilStartLaw = Vec<Vec<(f64, f64, Vec<f64>)>>;
 
 /// One phase's own economy in the forecast's cycle
 /// (`oil_forecast_cycle_growth`): the state the law steps in that phase,
@@ -1688,25 +1806,57 @@ impl CycleGrowth {
     }
 }
 
+/// The closes the oil forecast's paths are held for
+/// (`oil_forecast_path_law`): the paths are simulated at one close and read
+/// by it and the four after it, each from its own session on. Cost, not a
+/// value of the model.
+pub(crate) const OIL_FORECAST_PATHS_HELD: i64 = 5;
+
+/// The oil forecast's paths held between the closes that simulate them
+/// (`oil_forecast_path_law`): the close that simulated them and their mean
+/// growth at the start of each session after it. Not state: nothing
+/// snapshots, restores or hashes it, so a restored engine simulates afresh
+/// at its first close and its forecast can differ from the original's by
+/// the paths' Monte Carlo error until the original's next simulation.
+#[derive(Clone)]
+pub(crate) struct OilPathHold {
+    day: i64,
+    growth: Vec<f64>,
+}
+
 /// The paths the oil forecast simulates at a close
 /// (`oil_forecast_path_law`). Precision, not a value of the model: the
-/// Monte Carlo error of the forecast's 126-session oil, read on the arm's
-/// histories, and the cost of a session.
-pub(crate) const OIL_FORECAST_PATHS: usize = 256;
+/// cost of a traded history, and the Monte Carlo error that leaves.
+pub(crate) const OIL_FORECAST_PATHS: usize = 20;
 
 /// Growth's expectation over the law's own paths for oil's forecast
 /// (`oil_forecast_path_law`). Each path starts from the close's public
 /// state: a phase drawn from the belief, an age drawn from that phase's
-/// stationary law under the full law ([`Engine::cycle_age_law`]), the
-/// published growth and the close's central bank. At each forecast close
-/// every path takes the law's own close, with draws from the paths' own
-/// generator ([`crate::rng::oil_paths_rng`]): the market's session return,
-/// normal at the forecast's variance of the index, which the market's gap
-/// steps on; the economy's step; the cycle's transition at the law's
-/// probability on the path's stepped state (the hazard and the ladder); and
-/// its central bank's meeting. Oil's block reads the paths' mean growth,
-/// which is oil's target's mean over the paths (the target is affine in
-/// growth). No value is set here: every part is the law's.
+/// stationary law under the full law, and growth at the published figure
+/// plus a difference drawn from the law's own spread of growth about it in
+/// that phase at that age ([`Engine::oil_paths_start_law`]); the close's
+/// central bank, the market's belief and the close's index. At each
+/// forecast close every path takes the law's own close, with draws from the
+/// paths' own generator ([`crate::rng::oil_paths_rng`]), in the law's
+/// order:
+/// - the nowcast's report on the phase the session ran in, and the
+///   belief's predict and update (`cycle_nowcast_accuracy`), with the spread
+///   multiplier the market prices on it;
+/// - the session's index: its return is the move in the index's fair value
+///   on the path's own economy (each name's fair value as the tick reads it,
+///   at its close's price and earnings, weighted by its close's
+///   capitalisation), plus a normal at the forecast's variance of the
+///   index; the market's P/E is the close's moved by the index over the
+///   earnings' restatement;
+/// - the economy's step, which the market's gap steps on that return; the
+///   cycle's transition at the law's probability on the path's stepped
+///   state (the hazard and the ladder, the market's fall and its P/E
+///   among them); the earnings cycle's pull to its phase's level and the
+///   volatility feedback's exposure; its central bank's meeting; and the
+///   earnings anticipation on the path's belief and level.
+/// Oil's block reads the paths' mean growth, which is oil's target's mean
+/// over the paths (the target is affine in growth). No value is set here:
+/// every part is the law's.
 ///
 /// The transition is read on an exponential clock, the law's daily roll in
 /// distribution: a path leaves its phase at the first close whose summed
@@ -1724,6 +1874,15 @@ struct OilPaths {
     /// curve's inflation are each path's own.
     options: crate::economy::PolicyOptions,
     core: (bool, bool),
+    /// The index's names: each one's share of the close's capitalisation,
+    /// its valuation inputs, its beta, and its target P/E and volatility
+    /// discount on the start's economy.
+    names: Vec<OilPathName>,
+    /// The market's P/E at the close and the earnings' restatement there.
+    pe: Option<f64>,
+    nominal: f64,
+    /// The earnings anticipation's terms (`g`, `c`), where it runs.
+    anticipation: Option<([f64; 5], f64)>,
 }
 
 struct OilPath {
@@ -1731,24 +1890,34 @@ struct OilPath {
     bank: crate::economy::CentralBankState,
     /// What is left of the phase's clock.
     clock: f64,
+    /// The market's belief over the phases on the path.
+    belief: [f64; 5],
+    /// The index's fair value and its level, each over the close's.
+    fair: f64,
+    level: f64,
+    /// The anticipation's drift and its last `A - e`
+    /// (`earnings_anticipation_drift_share`).
+    drift: f64,
+    raw: f64,
 }
 
 impl OilPaths {
     fn new(engine: &Engine, belief: &[f64; 5], econ: &EconomyState, day: i64) -> Self {
+        let p = &engine.params;
         let phases = crate::economy::cycle::phase_cycle();
         let spec = engine.cycle_spec();
-        let ages = engine.cycle_age_law(day);
+        let law = engine.oil_paths_start_law(day);
         let mut rng = crate::rng::oil_paths_rng(engine.root_seed, day);
         let n = OIL_FORECAST_PATHS;
         // The start's law as one list: each phase's share of the belief
         // times each of its age bins' share of the phase.
         let total: f64 = belief.iter().sum();
-        let mut start: Vec<(usize, f64, f64)> = Vec::new();
+        let mut start: Vec<(usize, usize, f64)> = Vec::new();
         for k in 0..5 {
-            let mass: f64 = ages[k].iter().map(|b| b.1).sum();
+            let mass: f64 = law[k].iter().map(|b| b.1).sum();
             if belief[k] > 0.0 && mass > 0.0 {
-                for &(age, w) in &ages[k] {
-                    start.push((k, age, belief[k] / total * w / mass));
+                for (b, bin) in law[k].iter().enumerate() {
+                    start.push((k, b, belief[k] / total * bin.1 / mass));
                 }
             }
         }
@@ -1757,32 +1926,83 @@ impl OilPaths {
             let j = (rng.next_f64() * (i + 1) as f64) as usize;
             order.swap(i, if j > i { i } else { j });
         }
+        let (drift, raw) = engine.anticipation_drift();
         let mut paths = Vec::with_capacity(n);
         for (i, &o) in order.iter().enumerate() {
             let u = (i as f64 + rng.next_f64()) / n as f64;
-            let (mut k, mut age) = start.last().map(|s| (s.0, s.1)).unwrap_or((0, 0.0));
+            let (mut k, mut b) = start.last().map(|s| (s.0, s.1)).unwrap_or((0, 0));
             let mut acc = 0.0;
-            for &(kk, a, w) in &start {
+            for &(kk, bb, w) in &start {
                 acc += w;
                 if u < acc {
                     k = kk;
-                    age = a;
+                    b = bb;
                     break;
                 }
             }
             let v = (o as f64 + rng.next_f64()) / n as f64;
             let mut economy = econ.clone();
             economy.cycle_phase = phases[k];
-            economy.months_in_current_phase = age / spec.month_days;
-            paths.push(OilPath { economy, bank: engine.central_bank, clock: -crate::mathx::log(1.0 - v) });
+            if let Some(bin) = law.get(k).and_then(|l| l.get(b)) {
+                economy.months_in_current_phase = bin.0 / spec.month_days;
+                let m = bin.2.len();
+                if m > 0 {
+                    let j = (rng.next_f64() * m as f64) as usize;
+                    economy.gdp_growth += bin.2[if j < m { j } else { m - 1 }];
+                }
+            }
+            paths.push(OilPath {
+                economy,
+                bank: engine.central_bank,
+                clock: -crate::mathx::log(1.0 - v),
+                belief: *belief,
+                fair: 1.0,
+                level: 1.0,
+                drift,
+                raw,
+            });
         }
         let options = crate::economy::PolicyOptions {
             path_before: engine.priced_policy_path(),
             eve_change: None,
             ..engine.policy_options(false)
         };
-        let core = (engine.params.fed_core_inflation != 0.0, engine.params.treasury_core_inflation != 0.0);
-        OilPaths { paths, rng, spec, options, core }
+        let core = (p.fed_core_inflation != 0.0, p.treasury_core_inflation != 0.0);
+        let mut cap = 0.0;
+        for c in engine.companies.iter() {
+            if c.is_public && !c.is_bankrupt && c.stock.market_cap > 0.0 {
+                cap += c.stock.market_cap;
+            }
+        }
+        let mut names = Vec::new();
+        for c in engine.companies.iter() {
+            if cap > 0.0 && c.is_public && !c.is_bankrupt && c.stock.market_cap > 0.0 {
+                let mut name = OilPathName {
+                    weight: c.stock.market_cap / cap,
+                    valuation: c.valuation(),
+                    beta: c.stock.beta,
+                    pe: 1.0,
+                    discount: 1.0,
+                };
+                let (pe, discount) = name.terms(p, econ);
+                if pe > 0.0 && discount > 0.0 {
+                    name.pe = pe;
+                    name.discount = discount;
+                    names.push(name);
+                }
+            }
+        }
+        OilPaths {
+            paths,
+            rng,
+            spec,
+            options,
+            core,
+            names,
+            pe: econ.market_pe,
+            nominal: crate::market::tick::nominal_scale(p, econ, engine.nominal_output_base),
+            anticipation: engine.earnings_anticipation_terms(),
+        }
     }
 
     /// The growth oil's block reads at the next step: the paths' mean.
@@ -1793,34 +2013,203 @@ impl OilPaths {
 
     /// One close on every path. `inputs` are the forecast's for the
     /// session; `variance` is its variance of the session's return.
-    fn step(&mut self, inputs: &DailyInputs, variance: f64, timestamp: i64) {
+    fn step(&mut self, engine: &Engine, inputs: &DailyInputs, variance: f64, timestamp: i64) {
+        let p = &engine.params;
+        let phases = crate::economy::cycle::phase_cycle();
         let mut own = *inputs;
         own.oil_growth = None;
         let sd = 100.0 * crate::mathx::sqrt(crate::mathx::max(0.0, variance));
-        for path in self.paths.iter_mut() {
-            own.market_day_return_pct = sd * self.rng.next_normal();
-            let mut stepped = update_economy_daily(&path.economy, &own, &mut self.rng);
-            let (q, next) = crate::economy::cycle::get_cycle_transition_probability_for(&stepped, &self.spec);
-            if q > 0.0 {
-                path.clock += crate::mathx::log(1.0 - q);
+        let q = p.cycle_nowcast_accuracy;
+        let lambda = engine.cycle_nowcast_terms.0;
+        let OilPaths { paths, rng, spec, options, core, names, pe, nominal, anticipation } = self;
+        for path in paths.iter_mut() {
+            // The nowcast's report on the phase the session ran in, and the
+            // spread the market prices before and after it.
+            let k = phases.iter().position(|ph| *ph == path.economy.cycle_phase).unwrap_or(0);
+            let before = engine.oil_path_spread_multiplier(&path.belief, path.economy.cycle_phase);
+            if q != 0.0 {
+                let u = rng.next_f64();
+                let r = if u < q {
+                    k
+                } else {
+                    let j = ((u - q) / (1.0 - q) * 4.0) as usize;
+                    (k + 1 + if j > 3 { 3 } else { j }) % 5
+                };
+                let mut pred = [0.0; 5];
+                for (j, (&lam, &pj)) in lambda.iter().zip(path.belief.iter()).enumerate() {
+                    pred[j] += pj * (1.0 - lam);
+                    pred[(j + 1) % 5] += pj * lam;
+                }
+                let other = (1.0 - q) / 4.0;
+                let mut total = 0.0;
+                for (j, pj) in pred.iter_mut().enumerate() {
+                    *pj *= if j == r { q } else { other };
+                    total += *pj;
+                }
+                if total > 0.0 && total.is_finite() {
+                    for pj in pred.iter_mut() {
+                        *pj /= total;
+                    }
+                    path.belief = pred;
+                } else {
+                    path.belief = [0.0; 5];
+                    path.belief[k] = 1.0;
+                }
+            }
+            if own.yields.spread_multiplier.is_some() {
+                let after = engine.oil_path_spread_multiplier(&path.belief, path.economy.cycle_phase);
+                own.yields.spread_multiplier = Some((before, after));
+            }
+            // The session's index on the path's economy, and its P/E.
+            let now = crate::market::tick::nominal_scale(p, &path.economy, engine.nominal_output_base);
+            let mut fair = 0.0;
+            for name in names.iter() {
+                let (pe, discount) = name.terms(p, &path.economy);
+                fair += name.weight * pe / name.pe * discount / name.discount;
+            }
+            let fair = if *nominal > 0.0 { fair * now / *nominal } else { fair };
+            let ret = if path.fair > 0.0 { 100.0 * (fair / path.fair - 1.0) } else { 0.0 } + sd * rng.next_normal();
+            path.fair = fair;
+            path.level *= 1.0 + ret / 100.0;
+            if let Some(pe0) = *pe {
+                if now > 0.0 {
+                    path.economy.market_pe = Some(pe0 * path.level * *nominal / now);
+                }
+            }
+            own.market_day_return_pct = ret;
+            let mut stepped = update_economy_daily(&path.economy, &own, rng);
+            let (h, next) = crate::economy::cycle::get_cycle_transition_probability_for(&stepped, spec);
+            if h > 0.0 {
+                path.clock += crate::mathx::log(1.0 - h);
                 if path.clock <= 0.0 {
                     stepped.cycle_phase = next;
                     stepped.months_in_current_phase = 0.0;
-                    path.clock = -crate::mathx::log(1.0 - self.rng.next_f64());
+                    path.clock = -crate::mathx::log(1.0 - rng.next_f64());
                 }
             }
-            let mut options = self.options;
-            let core = stepped.inflation_rate - stepped.oil_inflation_level;
-            if self.core.0 {
-                options.policy_inflation = Some(core);
+            // The earnings cycle's pull to its phase's level, and the
+            // volatility feedback's exposure, as the close steps them.
+            if p.earnings_cycle_depth != 0.0 {
+                let target = match stepped.cycle_phase {
+                    crate::economy::CyclePhase::Contraction | crate::economy::CyclePhase::Trough => {
+                        -p.earnings_cycle_depth
+                    }
+                    _ => p.earnings_cycle_depth * p.earnings_cycle_upside,
+                };
+                let pull = 1.0 - crate::mathx::pow(0.5, 1.0 / p.earnings_cycle_half_life);
+                let mut level = stepped.earnings_cycle + pull * (target - stepped.earnings_cycle);
+                if p.earnings_cycle_sigma != 0.0 {
+                    level += p.earnings_cycle_sigma * rng.next_normal();
+                }
+                stepped.earnings_cycle = level;
             }
-            if self.core.1 {
-                options.curve_inflation = Some(core);
+            if p.fair_value_vix_discount != 0.0 && p.fair_value_vix_half_life != 0.0 {
+                let target = crate::market::tick::vix_excess(p, stepped.vix);
+                let half_life = if p.fair_value_vix_release_half_life != 0.0 && target < stepped.vix_feedback {
+                    p.fair_value_vix_release_half_life
+                } else {
+                    p.fair_value_vix_half_life
+                };
+                let pull = 1.0 - crate::mathx::pow(0.5, 1.0 / half_life);
+                stepped.vix_feedback += pull * (target - stepped.vix_feedback);
             }
-            let met = crate::economy::update_central_bank_with(&path.bank, &stepped, timestamp, &mut self.rng, &options);
+            let mut options = *options;
+            let core_inflation = stepped.inflation_rate - stepped.oil_inflation_level;
+            if core.0 {
+                options.policy_inflation = Some(core_inflation);
+            }
+            if core.1 {
+                options.curve_inflation = Some(core_inflation);
+            }
+            let met = crate::economy::update_central_bank_with(&path.bank, &stepped, timestamp, rng, &options);
             path.economy = met.economy;
             path.bank = met.central_bank;
+            // The anticipation on the path's belief and level.
+            if let Some((g, c)) = anticipation {
+                let share = p.earnings_anticipation_drift_share;
+                if share != 0.0 && p.earnings_anticipation_half_life > 0.0 {
+                    let rho = std::f64::consts::LN_2 / p.earnings_anticipation_half_life;
+                    let hd = if p.earnings_anticipation_drift_half_life == 0.0 {
+                        1260.0
+                    } else {
+                        p.earnings_anticipation_drift_half_life
+                    };
+                    path.drift = path.drift * crate::mathx::exp(-std::f64::consts::LN_2 / hd) + share * rho * path.raw;
+                }
+                let gk = if q != 0.0 {
+                    let mut acc = 0.0;
+                    for (pj, gj) in path.belief.iter().zip(g.iter()) {
+                        acc += pj * gj;
+                    }
+                    acc
+                } else {
+                    let j = phases.iter().position(|ph| *ph == path.economy.cycle_phase).unwrap_or(0);
+                    g[j]
+                };
+                let e = path.economy.earnings_cycle;
+                path.raw = gk + *c * e - e;
+                path.economy.earnings_anticipation = if share == 0.0 { path.raw } else { path.raw - path.drift };
+            }
         }
+    }
+}
+
+/// A name of the index the oil forecast's paths carry
+/// (`oil_forecast_path_law`).
+struct OilPathName {
+    weight: f64,
+    valuation: crate::fair_value::CompanyValuationInputs,
+    beta: Option<f64>,
+    /// [`OilPathName::terms`] on the start's economy.
+    pe: f64,
+    discount: f64,
+}
+
+impl OilPathName {
+    /// The two terms of the name's fair value that read the economy beyond
+    /// the earnings' restatement, as the tick reads them: its target P/E
+    /// (the rates and QE; one on the book's path, which reads neither) and
+    /// the volatility feedback's discount. Its earnings and price, and with
+    /// them its buyback term and accrual, are the close's.
+    fn terms(&self, p: &ModelParams, economy: &EconomyState) -> (f64, f64) {
+        let pe = if self.valuation.eps.unwrap_or(0.0) > 0.0 {
+            let view = crate::fair_value::EconomyValuationInputs {
+                corporate_bond_yield: Some(economy.corporate_bond_yield),
+                federal_funds_rate: economy.federal_funds_rate,
+                qe_pe_boost: Some(economy.qe_pe_boost),
+                qe_assets_ratio: Some(economy.qe_assets_ratio),
+            };
+            crate::fair_value::compute_target_pe_at(
+                &self.valuation, &view, p.qe_pe_gain, p.qe_pe_stock_gain, p.neutral_discount_rate,
+                p.rate_pe_sensitivity)
+            .target_pe
+        } else {
+            1.0
+        };
+        let exposure = crate::market::tick::vix_feedback_exposure(p, economy);
+        (pe, crate::market::tick::with_vix_discount(p, 1.0, exposure, self.beta))
+    }
+}
+
+impl Engine {
+    /// The spread multiplier the market prices on a path's belief
+    /// ([`Engine::priced_spread_multiplier`] on the path's state).
+    fn oil_path_spread_multiplier(&self, belief: &[f64; 5], phase: crate::economy::CyclePhase) -> f64 {
+        let phases = crate::economy::cycle::phase_cycle();
+        let m = if self.params.cycle_nowcast_accuracy != 0.0 {
+            let mut acc = 0.0;
+            for (p, &ph) in belief.iter().zip(phases.iter()) {
+                acc += p * crate::economy::central_bank::spread_multiplier_of(ph);
+            }
+            acc
+        } else {
+            crate::economy::central_bank::spread_multiplier_of(phase)
+        };
+        let s = self.params.corporate_spread_cycle;
+        if s == 0.0 {
+            return m;
+        }
+        (1.0 - s) * m + s * self.cycle_nowcast_terms.1
     }
 }
 

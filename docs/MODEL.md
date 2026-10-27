@@ -1567,13 +1567,16 @@ held for the whole horizon: each phase's mass leaves on the law's own
 transitions, read on that phase's own economy (its central bank's meetings
 and the market's gap over its spread included), from the phase's stationary
 age under the full law. `oil_forecast_path_law` has oil's forecast read
-growth's mean over the law's own paths instead: at each close the forecast
+growth's mean over the law's own paths instead: once a week the forecast
 simulates paths from the close's public state (a phase from the belief, an age
-from that phase's stationary law under the full law), each taking the law's
-close at every session with draws of its own (the market's return at the
-forecast's index variance, the economy's step, the cycle's transition on the
-path's own state, the meeting), so every threshold the ladder reads is read
-over the economy's spread. `usd_mean_reversion` and
+from that phase's stationary law under the full law, growth spread about the
+published figure as the law spreads it at that phase and age), each taking the
+law's close at every session with draws of its own (the nowcast's report, the
+index on its fair value on the path's own economy plus a return at the
+forecast's index variance, its P/E, the economy's step, the cycle's transition
+on the path's own state, the earnings cycle, the volatility feedback, the
+meeting, the anticipation), so every threshold the ladder reads, the market's
+fall and its P/E among them, is read over the economy's spread. `usd_mean_reversion` and
 `usd_noise_sd` set the dollar index's law (0.0 the standing 0.02 and 0.3): FRED's
 trade-weighted dollar (DTWEXM, 1987 to 2019) has an AR(1) half-life of 729
 sessions and a daily log change of 0.0043, so the dollar the oil curve carries

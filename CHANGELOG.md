@@ -125,18 +125,27 @@ payload, Arrow and WASM show them; agents trade by symbol.
   the law.
 - `oil_forecast_path_law` is a new switch, 0.0 on every preset and left out
   of the digest there. At 1.0 oil's block reads growth's mean over paths the
-  forecast simulates by the law itself, in place of either reading above: at
-  each close, 256 paths start from the close's public state (a phase drawn
+  forecast simulates by the law itself, in place of either reading above:
+  at a close, 20 paths start from the close's public state (a phase drawn
   from the belief, an age from that phase's stationary law under the full
-  law, the published growth, the close's central bank), and each takes the
-  law's close at every session with draws from a generator of its own (tag
-  "OILP", per close): the market's return at the forecast's variance of the
-  index, the economy's step, the cycle's transition at the law's probability
-  on the path's own state, and the meeting. The transition is read on an
-  exponential clock, the daily roll in distribution, and the start and the
-  first clock are stratified across the paths. No free parameter; the number
-  of paths is precision (Monte Carlo error 0.027 $ at 126 sessions). It
-  changes what the forecast publishes and nothing in the law.
+  law, growth at the published figure plus a difference drawn from the
+  law's own spread of growth about it at that phase and age, the close's
+  central bank, the market's belief and index), and each takes the law's
+  close at every session with draws from a generator of its own (tag
+  "OILP", per close): the nowcast's report and the belief's update; the
+  session's index, whose return is the move in its fair value on the
+  path's own economy (each name's target P/E and volatility discount, and
+  the earnings' restatement) plus a normal at the forecast's variance of
+  the index; the market's P/E on that index; the economy's step; the
+  cycle's transition at the law's probability on the path's own state; the
+  earnings cycle's pull, the volatility feedback's exposure, the meeting
+  and the earnings anticipation. The transition is read on an exponential
+  clock, the daily roll in distribution, and the start and the first clock
+  are stratified across the paths. The paths are held for the four closes
+  after the one that simulates them. No free parameter; the number of paths
+  and the hold are cost (a traded history at most 10% slower; Monte Carlo
+  error 0.068 $ a forecast at 126 sessions). It changes
+  what the forecast publishes and nothing in the law.
 ### The skew noise
 
 - `surface_skew_noise_sd` and `surface_skew_noise_half_life` are new dials,
