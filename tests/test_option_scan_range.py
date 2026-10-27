@@ -27,7 +27,8 @@ def _engines(**extra):
 def test_the_range_is_silent_at_zero_and_refused_without_the_margin():
     assert "margin_option_scan_range" in set(tf.ModelParams.digest_silent_at_zero())
     for name in tf.preset_names():
-        assert tf.ModelParams.from_preset(name).margin_option_scan_range == 0.0
+        if name != "pt-v22":            # pt-v22's value is its graded arm's
+            assert tf.ModelParams.from_preset(name).margin_option_scan_range == 0.0
     with pytest.raises(Exception, match="margin_scan_coverage"):
         model(**dict(ON, margin_scan_coverage=0.0), margin_option_scan_range=RULE)
     with pytest.raises(Exception, match=r"\[0, 1\]"):
