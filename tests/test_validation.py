@@ -1,4 +1,5 @@
-"""The published grades under `validation/`: pt-v20's (0.8.5) and pt-v21's (0.10.0).
+"""The published grades under `validation/`: pt-v20's (0.8.5) and pt-v21's (0.10.0),
+and pt-v22's slots, empty until its grade has run.
 
 The owner's decision of 2026-09-26 (item 2): publish the grading scripts and
 the grade run's inputs, and point the preset record and MODEL.md at them.
@@ -366,3 +367,170 @@ def test_the_files_the_pt_v21_registration_cites_are_here():
                  "programme/longrun/CRITERIA-pt-v21.md"):
         assert name in cited, name
         assert (GRADE21 / "programme" / name.removeprefix("programme/")).is_file(), name
+
+
+# ---------------------------------------------------------------------------
+# pt-v22: in the engine before its grade, written from a stand-in arm
+# ---------------------------------------------------------------------------
+
+GRADE22_DIR = ROOT / "validation" / "pt-v22"
+RECORD22 = ROOT / "python" / "tradefloor" / "presets" / "pt-v22.json"
+
+#: What pt-v22's grade gives, as named slots, each None until the grade has
+#: run (`validation/pt-v22/README.md` says what fills each one). The tests
+#: below that read the grade run once every slot is filled; the test after
+#: this table fails while some are filled and others are not, so a release
+#: cannot ship half a grade.
+GRADE22 = {
+    # The boxes that ran the grade, as `record.py`'s PT_V22_GRADE_BOXES
+    # names them, joined by "+" in the verdict's `measured.box`.
+    "boxes": None,
+    # The engine commit the boxes ran, and the package version it builds.
+    "engine_commit": None,
+    "package": None,
+    # Per box: (files unpacked, sha256 of the archive), as the box recorded.
+    "scripts": None,
+    # The verdict the record carries: its file under validation/pt-v22/,
+    # its result, the rows passed and the rows graded.
+    "verdict": None,
+}
+
+
+def _arm_tool():
+    sys.path.insert(0, str(ROOT / "tools" / "presets"))
+    import arm_preset  # noqa: PLC0415
+
+    return arm_preset
+
+
+def test_pt_v22_grade_is_either_all_pending_or_all_filled():
+    from tradefloor.records import open_slots  # noqa: PLC0415
+
+    record = json.loads(RECORD22.read_text())
+    filled = {
+        "record.py PT_V22_GRADE_BOXES": bool(rec_tool.PT_V22_GRADE_BOXES),
+        "pt-v22.json's slots": not open_slots(record),
+        **{f"GRADE22[{k!r}]": v is not None for k, v in GRADE22.items()},
+    }
+    assert len(set(filled.values())) == 1, (
+        "pt-v22's grade is half filled: "
+        + ", ".join(f"{k} {'filled' if v else 'empty'}" for k, v in filled.items()))
+    if not all(filled.values()):
+        # Pending: the folder holds its README and nothing a grade wrote.
+        assert sorted(p.name for p in GRADE22_DIR.iterdir()) == ["README.md"]
+
+
+def test_pt_v22_record_refuses_to_load_while_a_slot_is_empty():
+    import tradefloor as tf  # noqa: PLC0415
+    from tradefloor import records  # noqa: PLC0415
+
+    record = json.loads(RECORD22.read_text())
+    empty = records.open_slots(record)
+    if not empty:
+        assert "pt-v22" in records.available()
+        return
+    # Every slot is a block the grade measures, named after itself, with the
+    # writer that fills it.
+    assert empty == [k for k in rec_tool.GRADE_SLOTS if k in empty]
+    assert set(empty) == set(rec_tool.GRADE_SLOTS)
+    for field in empty:
+        assert record[field] == {"slot": field, "filled_by": rec_tool.GRADE_SLOTS[field]}
+    with pytest.raises(LookupError, match="not measured") as raised:
+        tf.preset_record("pt-v22")
+    assert all(field in str(raised.value) for field in empty)
+    assert "pt-v22" in records.pending()
+    assert "pt-v22" not in records.available()
+
+
+def test_pt_v22_is_the_arm_its_file_names():
+    """The arm file, the Rust block written from it, the build and the
+    record's identity are one vector, and the arm says what it is."""
+    import tradefloor as tf  # noqa: PLC0415
+
+    tool = _arm_tool()
+    arm = tool.committed_arm()
+    assert arm.base == "pt-v20" and arm.status in tool.STATUSES
+    assert tool.rust_arm() == arm.values
+    assert tool.preset_is_arm(arm) == []
+    record = json.loads(RECORD22.read_text())
+    assert {k: record.get(k) for k in tool.identity(arm)} == tool.identity(arm)
+    assert record["arm"]["status"] == arm.status
+    # Not the default: known_answer.py's digest does not move with pt-v22.
+    assert tf.model_preset()["name"] == "pt-v21"
+
+
+def test_the_arm_file_reads_both_forms_the_programme_writes():
+    tool = _arm_tool()
+    one = tool.parse_arm("X1@pt-v20:surface_ssvi=1.0,basis_sd=3.753")
+    lines = tool.parse_arm(one.text())
+    assert (lines.label, lines.base, lines.status) == ("X1", "pt-v20", "stand-in")
+    assert lines.values == one.values == {"surface_ssvi": 1.0, "basis_sd": 3.753}
+    assert tool.parse_arm(one.text(), status="graded").status == "graded"
+    with pytest.raises(ValueError, match="twice"):
+        tool.parse_arm("X1@pt-v20:basis_sd=1.0,basis_sd=2.0")
+    with pytest.raises(ValueError, match="@base"):
+        tool.parse_arm("@arm X1\nbasis_sd 1.0\n")
+
+
+def test_a_pt_v22_session_lists_the_contracts():
+    """Index, rate and oil futures and options on every name; no index
+    options and no VIX futures. All but the index futures list from the
+    first close."""
+    import tradefloor as tf  # noqa: PLC0415
+
+    engine = tf.Engine(seed=7, universe=tf.Universe.random(4, seed=1), model="pt-v22")
+    engine.open_market()
+    engine.run_session(9, 30, 3, 78, volatility=1.0)
+    engine.close_market()
+    engine.open_market()
+    listed = {(c["root"], c["kind"]) for c in engine.contracts()}
+    futures = {root for root, kind in listed if kind == "future"}
+    assert futures == {"IDX", "FF", "TR3", "OIL"}
+    names = {root for root, kind in listed if kind == "option"}
+    assert names == set(engine.name_option_roots()) and len(names) == 4
+    assert engine.lists_name_options and not engine.lists_options
+
+
+_PENDING22 = [k for k, v in GRADE22.items() if v is None]
+
+
+@pytest.mark.skipif(bool(_PENDING22),
+                    reason=f"pt-v22's grade has not run: GRADE22 {_PENDING22} empty")
+def test_pt_v22_record_carries_the_published_verdict_with_public_paths():
+    verdict_file, result, passed, of = GRADE22["verdict"]
+    verdict = json.loads((GRADE22_DIR / verdict_file).read_text())
+    assert (verdict["verdict"], verdict["passed"], verdict["of"]) == (result, passed, of)
+    block = dict(json.loads(RECORD22.read_text())["long_run"])
+    block.pop("coefficients")
+    assert block == rec_tool.public_paths(verdict)
+    measured = block["measured"]
+    assert measured["box"] == "+".join(GRADE22["boxes"])
+    assert measured["engine_commit"] == GRADE22["engine_commit"]
+    assert tuple(GRADE22["boxes"]) == tuple(rec_tool.PT_V22_GRADE_BOXES)
+
+
+@pytest.mark.skipif(bool(_PENDING22),
+                    reason=f"pt-v22's grade has not run: GRADE22 {_PENDING22} empty")
+def test_pt_v22_scripts_here_are_the_ones_the_boxes_ran():
+    rows = []
+    for line in (GRADE22_DIR / "scripts-as-run.txt").read_text().splitlines():
+        if line.strip() and not line.startswith("#"):
+            rows.append(line.split())
+    boxes = [inside.split(":", 1)[0] for _, inside, _ in rows]
+    for box, (count, _archive) in GRADE22["scripts"].items():
+        assert boxes.count(box) == count, box
+    wrong = [p for sha, _, p in rows if sha256(GRADE22_DIR / p) != sha]
+    assert not wrong, f"changed since the boxes ran them: {wrong}"
+
+
+@pytest.mark.skipif(bool(_PENDING22),
+                    reason=f"pt-v22's grade has not run: GRADE22 {_PENDING22} empty")
+def test_every_path_the_pt_v22_record_names_is_in_this_repository():
+    block = json.loads(RECORD22.read_text())["long_run"]
+    named = set()
+    for s in _strings(block):
+        assert not re.search(r"(?<![\w./-])programme/", s), (
+            f"an unpublished path a reader cannot open: {s!r}")
+        named.update(re.findall(r"validation/[\w./-]+\.(?:py|md|json)", s))
+    missing = sorted(p for p in named if not (ROOT / p).is_file())
+    assert named and not missing, missing

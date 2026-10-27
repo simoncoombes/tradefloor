@@ -62,6 +62,76 @@ PUBLISHED_GRADES = {"ptv20g6": "validation/pt-v20",
 
 _DESIGN_PATH = re.compile(r"(?<![\w./-])programme/")
 
+#: The boxes that ran pt-v22's grade, for `PUBLISHED_GRADES`. A SLOT: empty
+#: until the grade has run and its files are published under
+#: `validation/pt-v22/`.
+PT_V22_GRADE_BOXES: tuple[str, ...] = ()
+PUBLISHED_GRADES.update({box: "validation/pt-v22" for box in PT_V22_GRADE_BOXES})
+
+#: The blocks a grade measures, in a record's order, and the writer that
+#: fills each. A record committed before its grade has run carries each one
+#: as a slot, `{"slot": NAME, "filled_by": HOW}`, and
+#: `tradefloor.preset_record` refuses it until every slot is filled
+#: (`tradefloor.records`). `default_since` is not here: it is the release's
+#: decision, not a measurement, and `--default-since` writes it.
+GRADE_SLOTS = {
+    **{field: "record.py --panel <the grade's preset_panel.py artefact>"
+       for field in ("measured", "panel_252", "panel_504", "mechanism_252",
+                     "mechanism_heldout_seeds")},
+    **{field: "record.py --panel <the grade's preset_panel.py artefact>, or "
+              "--structure-rows when the artefact keeps no per-seed rows"
+       for field in ("structure_252", "structure_heldout_seeds",
+                     "structure_rise")},
+    **{field: "record.py --panel <the grade's preset_panel.py artefact>"
+       for field in ("in_band", "misses", "unreadable", "absent", "dispersion",
+                     "crisis_lever")},
+    "level_protocol": "record.py --level-rows <the grade's level_rows.py artefact>",
+    "long_run": "record.py --long-run <the grade's criteria.py verdict>",
+}
+
+
+def scaffold(name: str, identity: dict) -> dict:
+    """A record before its grade: `identity` (the preset, its arm and its
+    coefficients) and every `GRADE_SLOTS` block as an empty slot."""
+    record = {"schema": SCHEMA, **identity, "default_since": DEFAULT_SINCE.get(name)}
+    record.update({field: {"slot": field, "filled_by": how}
+                   for field, how in GRADE_SLOTS.items()})
+    return record
+
+
+def _committed(path: pathlib.Path) -> dict:
+    """A committed record with its empty slots left out, so a block carried
+    forward is a measurement and never a slot."""
+    from tradefloor.records import is_slot  # noqa: PLC0415
+
+    record = json.loads(path.read_text(encoding="utf-8"))
+    return {k: v for k, v in record.items() if not is_slot(v)}
+
+
+def carry_slots(record: dict, path: pathlib.Path) -> str:
+    """Keep what a panel cannot rebuild on a record still waiting for its
+    grade: the `arm` block `tools/presets/arm_preset.py` wrote, and each slot
+    this write does not fill, so the record still refuses to load until the
+    last one is."""
+    from tradefloor.records import is_slot  # noqa: PLC0415
+
+    if not path.exists():
+        return ""
+    was = json.loads(path.read_text(encoding="utf-8"))
+    kept = []
+    out = {}
+    for key, value in record.items():
+        out[key] = value
+        if key == "fingerprint" and "arm" in was:
+            out["arm"] = was["arm"]
+    for key, value in was.items():
+        if is_slot(value) and not out.get(key):
+            out[key] = value
+            kept.append(key)
+    record.clear()
+    record.update(out)
+    return f"kept {len(kept)} empty slot(s): {', '.join(kept)}" if kept else ""
+
 
 def _panel_version(panel: dict) -> str:
     """The version a preset_panel.py artefact names: `tradefloor_version` from
@@ -252,7 +322,7 @@ def carry_structure(record: dict, path: pathlib.Path) -> str:
         return ""
     if not path.exists():
         return ""
-    was = json.loads(path.read_text(encoding="utf-8"))
+    was = _committed(path)
     carried = [f for f in fields if was.get(f) and not record.get(f)]
     if not carried:
         return ""
@@ -439,7 +509,7 @@ def carry_level_protocol(record: dict, path: pathlib.Path) -> str:
     """
     if not path.exists():
         return ""
-    was = json.loads(path.read_text(encoding="utf-8")).get("level_protocol")
+    was = _committed(path).get("level_protocol")
     if not was:
         return ""
     stamped = was.get("coefficients")
@@ -475,7 +545,7 @@ def carry_long_run(record: dict, path: pathlib.Path) -> str:
     """
     if not path.exists():
         return ""
-    was = json.loads(path.read_text(encoding="utf-8")).get("long_run")
+    was = _committed(path).get("long_run")
     if not was:
         return ""
     changed = moved_values(was.get("coefficients") or {}, record["coefficients"])
@@ -500,7 +570,10 @@ def mechanism_bar(fresh: dict, committed: dict | None) -> dict:
     """
     from tradefloor import envelope
 
-    if committed is None:
+    # A record committed before its grade carries no certificate either: its
+    # blocks are slots, which `_committed` leaves out.
+    if committed is None or not any(
+            committed.get(f) for f in ("mechanism_252", "mechanism_heldout_seeds")):
         return {"passed": True, "first": True, "lost": [], "absent": [],
                 "reason": "no committed record: this run LAYS ONE DOWN, and "
                           "a first measurement cannot regress against itself"}
@@ -887,6 +960,7 @@ def main() -> int:
         note = carry_level_protocol(record, path)
         note += carry_structure(record, path)
         note += carry_long_run(record, path)
+        note += carry_slots(record, path)
         # After the carry, whichever way the carry went: a block carried
         # UNCHECKED needs the ruler named just as much as a checked one, and
         # more, since nothing else about it has been verified.
@@ -896,7 +970,7 @@ def main() -> int:
             if not path.exists():
                 drift.append(f"{path.name} is missing")
             else:
-                have = json.loads(path.read_text(encoding="utf-8"))
+                have = _committed(path)
                 # THE SUBSET BAR, BEFORE THE FIELD DIFF AND NOT INSTEAD OF
                 # IT. A `differs` line says the block moved and says nothing
                 # about WHICH WAY: a preset that gained a mechanism and one
@@ -961,8 +1035,7 @@ def main() -> int:
             # trace destroys the evidence that it did. Since the owner's
             # ruling of 2026-09-23 the loss is REPORTED rather than refused
             # (see `PASS_BAR_RULING`): the record is written and carries it.
-            have = (json.loads(path.read_text(encoding="utf-8"))
-                    if path.exists() else None)
+            have = _committed(path) if path.exists() else None
             # THE SECOND GATE beside it. `--panel` rebuilds both blocks from
             # the artefact's per-seed rows, so this path is the one that can
             # overwrite a PASS with a REFUSED.
@@ -1094,8 +1167,8 @@ def write_mechanism_gate(panel_path: str) -> int:
         # says the mechanism was never there. Refused per preset until the
         # owner's ruling of 2026-09-23; REPORTED since (`PASS_BAR_RULING`):
         # the certificate is written and the record carries the loss.
-        bar = mechanism_bar(p, record)
-        for line in note_regression(record, dict(record), mechanism=bar):
+        bar = mechanism_bar(p, _committed(path))
+        for line in note_regression(record, _committed(path), mechanism=bar):
             print(f"  {name}: {line}", file=sys.stderr)
             regressed += 1
         for field in ("mechanism_252", "mechanism_heldout_seeds"):

@@ -23,6 +23,7 @@ import pytest
 
 import tradefloor
 from tradefloor import envelope
+from tradefloor.records import is_slot
 
 RECORDS = (pathlib.Path(__file__).resolve().parent.parent
            / "python" / "tradefloor" / "presets")
@@ -187,7 +188,8 @@ def test_the_envelope_agrees_with_the_record_on_the_level_and_crisis_rows():
 
 
 @pytest.mark.parametrize(
-    "path", [p for p in records() if "level_protocol" in load(p)],
+    "path", [p for p in records()
+             if "level_protocol" in load(p) and not is_slot(load(p)["level_protocol"])],
     ids=lambda p: p.stem)
 def test_a_pooled_level_read_rebuilds_from_its_committed_seeds(path):
     """`level_protocol["pooled"]` against the per-seed file it names.
