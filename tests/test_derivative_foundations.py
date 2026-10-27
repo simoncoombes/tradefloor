@@ -51,6 +51,8 @@ def floats(buf):
 
 def test_every_switch_is_off_on_every_shipped_preset():
     for name in tf.preset_names():
+        if name == "pt-v22":
+            continue  # pt-v22 ships its arm's values, which tests/test_validation.py holds
         params = tf.ModelParams.from_preset(name)
         for dial in SWITCHES + tuple(k for k in DERIVED if k != "forecast_policy_neutral"):
             assert getattr(params, dial) == 0.0, (name, dial)

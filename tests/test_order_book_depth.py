@@ -115,7 +115,8 @@ BOOK_ON = {"pt-v20": dict(book_depth_coefficient=0.75, book_depth_exponent=0.5,
 BOOK_ON["pt-v21"] = dict(BOOK_ON["pt-v20"], fill_impact_coefficient=0.15)
 
 
-@pytest.mark.parametrize("preset", tuple(tf.preset_names()))
+# pt-v22 ships its arm's values, which tests/test_validation.py holds.
+@pytest.mark.parametrize("preset", [p for p in tf.preset_names() if p != "pt-v22"])
 def test_every_dial_ships_off(preset):
     values = tf.ModelParams.from_preset(preset).to_dict()
     if preset in BOOK_ON:

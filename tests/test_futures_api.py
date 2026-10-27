@@ -110,7 +110,8 @@ def test_every_listed_contract_is_spelled_as_the_module_spells_it():
 
 # -- the model flag -----------------------------------------------------------
 
-@pytest.mark.parametrize("name", list(tf.preset_names()))
+# pt-v22 ships its arm's values, which tests/test_validation.py holds.
+@pytest.mark.parametrize("name", [p for p in tf.preset_names() if p != "pt-v22"])
 def test_no_shipped_preset_lists_futures(name):
     e = tf.Engine(seed=1, universe=SMALL, model=name)
     assert e.lists_futures is False

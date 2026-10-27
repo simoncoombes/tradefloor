@@ -74,6 +74,8 @@ def test_out_of_range_is_refused():
 
 def test_undo_is_off_on_every_preset_and_silent():
     for preset in tf.preset_names():
+        if preset == "pt-v22":
+            continue  # pt-v22 ships its arm's values, which tests/test_validation.py holds
         assert tf.ModelParams.from_preset(preset).to_dict()["vix_stress_premium_undo"] == 0.0
     assert "vix_stress_premium_undo" in set(tf.ModelParams.digest_silent_at_zero())
     assert tf.ModelParams.from_preset("pt-v21", vix_stress_premium_undo=0.0).fingerprint == "pt-v21"

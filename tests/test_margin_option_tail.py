@@ -50,6 +50,8 @@ def short_strangle(engine):
 def test_off_on_every_shipped_preset_and_silent_in_the_digest():
     silent = set(tf.ModelParams.digest_silent_at_zero())
     for name in tf.preset_names():
+        if name == "pt-v22":
+            continue  # pt-v22 ships its arm's values, which tests/test_validation.py holds
         assert tf.ModelParams.from_preset(name).margin_scan_option_tail == 0.0, name
     assert "margin_scan_option_tail" in silent
 
