@@ -4071,9 +4071,13 @@ impl PyEngine {
             // `pinned_vix_feedback`: the discount lands in this pin's
             // re-mark, and the credit leg, where it applies, in the corporate
             // index's.
+            // `pinned_vix_return` reads the exposure from before this pin, to
+            // net out what the discount prices; nothing with the dial off.
+            let feedback_before = self.inner.economy().vix_feedback;
             if self.inner.price_pinned_vix(vix_before) {
                 self.inner.remark_credit_spread();
             }
+            self.inner.price_pinned_vix_return(vix_before, feedback_before);
         }
         // `macro_pins_hold`: every other field written here holds through
         // tonight's close. The marks are kept only under the dial.

@@ -3133,6 +3133,39 @@ pub struct ModelParams {
     /// February high read 0.32 (S&P 500 0.34, stepped 0.27) and its
     /// drawdown over the path 0.33 (0.34, stepped 0.38).
     pub pinned_vix_sets_variance: f64,
+    /// The index's same-day return on a PINNED VIX's change, as a share per
+    /// VIX point. 0.0, on every shipped preset, leaves a pinned session's
+    /// market draws at a zero mean; a value of 0.0 is left out of the model's
+    /// digest, and nothing is computed or drawn.
+    ///
+    /// Why. The free model carries the tape's same-day co-movement: the VIX
+    /// answers the day's return (`vix_return_gain` and its exponents), so the
+    /// index's log return on the day's log VIX change reads -0.095, -0.126,
+    /// -0.160 and -0.191 under a VIX of 20, 20-30, 30-40 and above 40
+    /// (R22-fixd2's 270 free histories), against the S&P 500's -0.080,
+    /// -0.130, -0.165 and -0.257 (1990-2025). A pin writes the VIX, so that
+    /// law no longer acts, and nothing in a pinned session makes the return
+    /// answer the VIX instead: on the 2008 and 2020 replays the same slope
+    /// reads -0.047 and -0.050 (R^2 0.02) against -0.217 and -0.146 (R^2 0.61
+    /// and 0.49). The discount `pinned_vix_feedback` prices bridges part of
+    /// it above its knee and none below.
+    ///
+    /// Off zero, a VIX pin sets the session's mean market move to the tape's
+    /// conditional mean, `M = -b (vix - vix_before)` in log return at a beta
+    /// of one. The discount the same pin priced counts toward it, so the
+    /// session's draws carry `M` less that priced move, spread evenly over the
+    /// open session's ticks at each name's beta, after the down-day wiring and
+    /// the crash amplifier so that neither rescales it. Under
+    /// `pinned_vix_variance_share` the variance trim reads `M` in place of the
+    /// discount's move, so the draw keeps the variance the VIX does not
+    /// explain. Free sessions are untouched.
+    ///
+    /// The value is measured: the S&P 500's daily log return on the VIX's
+    /// change in points, 1990-2025, reads -0.5375 per cent a point (se
+    /// 0.0249, years resampled), and it is flat in the level: -0.517, -0.559,
+    /// -0.523 and -0.539 under 20, 20-30, 30-40 and above 40 (R^2 0.52 to
+    /// 0.70), so one number carries it. In [0, 0.05].
+    pub pinned_vix_return: f64,
     /// A ceiling on the annual buyback yield `buyback_payout_share * eps /
     /// price` that the buyback term compounds over the elapsed years. In
     /// [0, 1], and 0.0 means no ceiling.
@@ -9475,6 +9508,7 @@ impl ModelParams {
             pinned_vix_calm_share: 0.0,
             pinned_vix_priced_cap: 0.0,
             pinned_vix_sets_variance: 0.0,
+            pinned_vix_return: 0.0,
             buyback_yield_cap: 0.0,
             buyback_accrual: 0.0,
             rate_close_remark: 0.0,
@@ -12423,6 +12457,7 @@ impl ModelParams {
             "pinned_vix_calm_share" => self.pinned_vix_calm_share,
             "pinned_vix_priced_cap" => self.pinned_vix_priced_cap,
             "pinned_vix_sets_variance" => self.pinned_vix_sets_variance,
+            "pinned_vix_return" => self.pinned_vix_return,
             "buyback_yield_cap" => self.buyback_yield_cap,
             "buyback_accrual" => self.buyback_accrual,
             "rate_close_remark" => self.rate_close_remark,
@@ -12907,6 +12942,7 @@ impl ModelParams {
             "pinned_vix_calm_share" => out.pinned_vix_calm_share = value,
             "pinned_vix_priced_cap" => out.pinned_vix_priced_cap = value,
             "pinned_vix_sets_variance" => out.pinned_vix_sets_variance = value,
+            "pinned_vix_return" => out.pinned_vix_return = value,
             "buyback_yield_cap" => out.buyback_yield_cap = value,
             "buyback_accrual" => out.buyback_accrual = value,
             "rate_close_remark" => out.rate_close_remark = value,
@@ -13685,6 +13721,12 @@ impl ModelParams {
                 "pinned_vix_sets_variance is {}. It is a switch: 0 (a pin reaches the variance one \
                  step a close) or 1 (every pin sets it, as vix_sets_variance does).",
                 self.pinned_vix_sets_variance));
+        }
+        if !(self.pinned_vix_return >= 0.0 && self.pinned_vix_return <= 0.05) {
+            return Err(format!(
+                "pinned_vix_return is {}. It is the index's same-day return on a pinned VIX's change, a \
+                 share per VIX point, in [0, 0.05]; the tape measures 0.005375.",
+                self.pinned_vix_return));
         }
         if !(self.market_vol_slow_gamma >= 0.0 && self.market_vol_slow_gamma <= 1.0) {
             return Err(format!(
@@ -15688,6 +15730,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "pinned_vix_feedback",
     "pinned_vix_priced_cap",
     "pinned_vix_sets_variance",
+    "pinned_vix_return",
     "pinned_vix_variance_share",
     "policy_anticipation",
     "policy_anticipation_cut_share",
@@ -16148,6 +16191,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "pinned_vix_calm_share",
         "pinned_vix_priced_cap",
         "pinned_vix_sets_variance",
+        "pinned_vix_return",
         "buyback_yield_cap",
         "buyback_accrual",
         "rate_close_remark",

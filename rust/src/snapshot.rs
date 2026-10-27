@@ -1689,6 +1689,14 @@ impl Engine {
         if self.pinned_vix_jump() != 0.0 {
             out.put("pinned_vix_jump", V::Float(self.pinned_vix_jump()));
         }
+        // Today's conditional move and the draws' mean (`pinned_vix_return`),
+        // keys only while a pin has made them: the session's draws read them.
+        if self.pinned_vix_move() != 0.0 {
+            out.put("pinned_vix_move", V::Float(self.pinned_vix_move()));
+        }
+        if self.pinned_vix_mean() != 0.0 {
+            out.put("pinned_vix_mean", V::Float(self.pinned_vix_mean()));
+        }
         // The day's market t scale (`market_day_tail_df`), a key only between
         // an open that drew one and the close: the session's market draws
         // read it.
@@ -2206,6 +2214,8 @@ impl Engine {
             Gated::dial("policy_anticipation_priced", "policy_anticipation", p.policy_anticipation),
             Gated::held("rate_live_marks", "rate_intraday_live", p.rate_intraday_live),
             Gated::held("pinned_vix_jump", "pinned_vix_variance_share", p.pinned_vix_variance_share),
+            Gated::held("pinned_vix_move", "pinned_vix_return", p.pinned_vix_return),
+            Gated::held("pinned_vix_mean", "pinned_vix_return", p.pinned_vix_return),
             Gated::held("market_day_scale", "market_day_tail_df", p.market_day_tail_df),
             Gated::dial("index_divisor", "index_level_listed", p.index_level_listed),
             Gated::held("vix_live", "vix_intraday_live", p.vix_intraday_live),
@@ -2863,6 +2873,16 @@ impl Engine {
             None => 0.0,
         };
         inner.set_pinned_vix_jump(jump);
+        // Absent means no pin had set a conditional move that session.
+        let moved = match snapshot.get("pinned_vix_move") {
+            Some(_) => read_finite(snapshot, "", "pinned_vix_move")?,
+            None => 0.0,
+        };
+        let mean = match snapshot.get("pinned_vix_mean") {
+            Some(_) => read_finite(snapshot, "", "pinned_vix_mean")?,
+            None => 0.0,
+        };
+        inner.set_pinned_vix_return_state(moved, mean);
         // Absent means no open had drawn a day scale (a snapshot at a close).
         let day_scale = match snapshot.get("market_day_scale") {
             Some(_) => read_finite(snapshot, "", "market_day_scale")?,

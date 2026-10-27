@@ -1057,6 +1057,19 @@ pub struct Engine {
     /// close; 0.0, never written, with the dial off. Carried by the snapshot
     /// and the state hash only while non-zero, as `macro_pins_today` is.
     pinned_vix_jump: f64,
+    /// The tape's conditional mean on today's VIX pins (`pinned_vix_return`):
+    /// `-b` times the VIX's change at each pin, in log points at a beta of
+    /// one, summed over the session's pins and cleared by the close. The
+    /// variance trim reads it in place of `pinned_vix_jump`. 0.0, never
+    /// written, with the dial off; carried by the snapshot and the state hash
+    /// only while non-zero.
+    pinned_vix_move: f64,
+    /// What the session's market draws carry of `pinned_vix_move`: the move
+    /// less the discount the same pins priced (`pinned_vix_feedback`), so the
+    /// pin's same-day total is the conditional mean once. Spread over the
+    /// open session's ticks (`market::tick`). 0.0, never written, with the
+    /// dial off.
+    pinned_vix_mean: f64,
     /// The day's market t scale (`market_day_tail_df`): the multiplier on
     /// the market factor's variance for this session, drawn at the open
     /// and cleared to 1.0 by the close. Exactly 1.0, never written, with
@@ -2480,6 +2493,8 @@ impl Engine {
             macro_pins_today: 0,
             pinned_corporate_spread: 0.0,
             pinned_vix_jump: 0.0,
+            pinned_vix_move: 0.0,
+            pinned_vix_mean: 0.0,
             market_day_scale: 1.0,
             session_news: Vec::new(),
             session_news_release: Vec::new(),
@@ -5111,6 +5126,9 @@ impl Engine {
                 idio_vol_ratios: &idio_vol_ratios,
                 market_sigma_daily,
                 market_permanent_ceiling_scale,
+                // The session's conditional mean from today's VIX pins
+                // (`pinned_vix_return`); 0.0 with the dial off.
+                pinned_mean: self.pinned_vix_mean,
                 vix_anchor: self.vix_anchor,
                 settle_draws,
                 settle_depth_counterfactual: self.settle_depth_counterfactual,
@@ -6964,6 +6982,57 @@ impl Engine {
         true
     }
 
+    /// THE PINNED SESSION'S CONDITIONAL MEAN (`pinned_vix_return`): the pin's
+    /// change times `-b` is the move the tape's index makes on such a change
+    /// the same day. It is recorded for the variance trim
+    /// (`pinned_vix_move`), and, less the discount this pin priced, for the
+    /// session's market draws (`pinned_vix_mean`). `feedback_before` is the
+    /// smoothed exposure before `price_pinned_vix` ran for this pin. Nothing
+    /// with the dial off.
+    pub fn price_pinned_vix_return(&mut self, vix_before: f64, feedback_before: f64) {
+        let b = self.params.pinned_vix_return;
+        if b == 0.0 {
+            return;
+        }
+        let moved = -b * (self.economy.vix - vix_before);
+        // The discount's own price move for this pin, `-gain * change`, at a
+        // beta of one; nothing when `price_pinned_vix` priced nothing.
+        let priced = if self.params.pinned_vix_feedback != 0.0 && self.carries_vix_feedback() {
+            -self.params.fair_value_vix_discount * (self.economy.vix_feedback - feedback_before)
+        } else {
+            0.0
+        };
+        self.pinned_vix_move += moved;
+        self.pinned_vix_mean += moved - priced;
+    }
+
+    /// The session's market draws' mean for the day (`pinned_vix_return`),
+    /// in log points at a beta of one; 0.0 off a pinned session.
+    pub fn pinned_vix_mean(&self) -> f64 {
+        self.pinned_vix_mean
+    }
+
+    /// Today's conditional move (`pinned_vix_return`), for the snapshot.
+    pub fn pinned_vix_move(&self) -> f64 {
+        self.pinned_vix_move
+    }
+
+    /// Put today's conditional move and the draws' mean back, for checkpoints.
+    pub fn set_pinned_vix_return_state(&mut self, moved: f64, mean: f64) {
+        self.pinned_vix_move = moved;
+        self.pinned_vix_mean = mean;
+    }
+
+    /// The priced move the variance trim reads: the conditional move under
+    /// `pinned_vix_return`, else the discount's.
+    fn pinned_vix_trim_move(&self) -> f64 {
+        if self.params.pinned_vix_return != 0.0 {
+            self.pinned_vix_move
+        } else {
+            self.pinned_vix_jump
+        }
+    }
+
     /// The market factor's sigma for today's draws: the state's, or, when
     /// today's VIX pins moved the volatility-feedback discount
     /// (`pinned_vix_variance_share`), the state's times
@@ -6987,7 +7056,7 @@ impl Engine {
     /// sigma, less a priced VIX move's share (`pinned_vix_variance_share`).
     fn market_sigma_before_day_scale(&self) -> f64 {
         let sigma = self.market_vol.sigma_daily();
-        let j = self.pinned_vix_jump;
+        let j = self.pinned_vix_trim_move();
         if j == 0.0 || self.params.pinned_vix_variance_share == 0.0 {
             return sigma;
         }
@@ -7075,7 +7144,7 @@ impl Engine {
                 f * crate::mathx::pow(self.market_day_scale, -0.5 * (1.0 - share))
             }
         };
-        if self.pinned_vix_jump == 0.0 || self.params.pinned_vix_variance_share == 0.0 {
+        if self.pinned_vix_trim_move() == 0.0 || self.params.pinned_vix_variance_share == 0.0 {
             return f;
         }
         let full = self.market_vol.sigma_daily();
@@ -10237,6 +10306,11 @@ impl Engine {
         }
         self.macro_pins_today = 0;
         self.pinned_vix_jump = 0.0;
+        // Guarded rather than written, so the dial off writes nothing.
+        if self.params.pinned_vix_return != 0.0 {
+            self.pinned_vix_move = 0.0;
+            self.pinned_vix_mean = 0.0;
+        }
         self.advance_anticipation_drift();
         self.refresh_earnings_anticipation();
         // The close's phase into the published history. The burn-in runs
@@ -14267,6 +14341,16 @@ impl Engine {
         if self.pinned_vix_jump != 0.0 {
             hash_f64(&mut buf, 10.0);
             hash_f64(&mut buf, self.pinned_vix_jump);
+        }
+        // Today's conditional move and the draws' mean (`pinned_vix_return`),
+        // only while a pin has made one, behind their own tags.
+        if self.pinned_vix_move != 0.0 {
+            hash_f64(&mut buf, 94.0);
+            hash_f64(&mut buf, self.pinned_vix_move);
+        }
+        if self.pinned_vix_mean != 0.0 {
+            hash_f64(&mut buf, 95.0);
+            hash_f64(&mut buf, self.pinned_vix_mean);
         }
         // The day's market t scale (`market_day_tail_df`), only between an
         // open that drew one and the close, behind its own tag.
