@@ -534,3 +534,18 @@ def test_every_path_the_pt_v22_record_names_is_in_this_repository():
         named.update(re.findall(r"validation/[\w./-]+\.(?:py|md|json)", s))
     missing = sorted(p for p in named if not (ROOT / p).is_file())
     assert named and not missing, missing
+
+
+def test_swapping_the_arm_rewrites_only_pt_v22s_value_in_an_entry():
+    """What `arm_preset.py` does to a `provenance.py` entry whose value the
+    graded arm moves: the pt-v22 literal and the sentence that quotes it, and
+    nothing else, so another preset's value or a bar is never touched."""
+    tool = _arm_tool()
+    src = ('X\n    "fed_put_gain": {\n        "kind": "undetermined",\n'
+           '        "presets": {"pt-v21": 3.0, "pt-v22": 2.5},\n'
+           '        "what_would_determine_it": "pt-v22 ships 2.5, pt-v21 3",\n'
+           '    },\n    "other": {\n        "presets": {"pt-v22": 2.5},\n    },\n')
+    out = tool._rewrite_value(src, "fed_put_gain", 2.5, 2.75)
+    assert '"presets": {"pt-v21": 3.0, "pt-v22": 2.75}' in out
+    assert "pt-v22 ships 2.75, pt-v21 3" in out
+    assert out.count('"pt-v22": 2.5}') == 1  # the other entry's
