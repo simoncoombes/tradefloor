@@ -117,6 +117,12 @@ def is_name_option(symbol: object) -> bool:
     return is_option_symbol(symbol) and _option_root(symbol) != "IDX"  # type: ignore[arg-type]
 
 
+#: The most orders a worked liquidation (``margin_liquidation_worked``)
+#: sends for one contract after its first: enough to sell a position many
+#: times a dealer's ladder, and a bound if a book refills at every order.
+LIQUIDATION_ORDERS = 100
+
+
 class MarginError(OrderError):
     """An order refused because the account's equity after it would be under
     the initial margin it asks (``margin_pretrade_check``).
@@ -578,7 +584,8 @@ class Portfolio:
         self.margin_calls: list[dict] = []
         self._margin_call: dict | None = None
         #: One entry per contract liquidated on an unmet call: ``day``,
-        #: ``symbol``, ``quantity`` asked and ``filled``.
+        #: ``symbol``, ``quantity`` asked and ``filled`` (in all, when
+        #: ``margin_liquidation_worked`` sends the sale again).
         self.liquidations: list[dict] = []
         #: One entry per futures or options position settled at expiry:
         #: ``day``, ``symbol``, ``quantity``, ``price`` and ``cash``.
@@ -1379,9 +1386,11 @@ class Portfolio:
         the account's equity is back at or above the initial requirement;
         otherwise every contract held is closed at the market through its
         book, and so is the stock in each name whose options it held or that
-        an exercise or an assignment delivered shares in. A no-op, asking the
-        engine nothing, for a portfolio with no futures, no options and no
-        call open. The harnesses call it after the open."""
+        an exercise or an assignment delivered shares in. With
+        ``margin_liquidation_worked`` each sale is sent again for what is left
+        while the book still takes some. A no-op, asking the engine nothing,
+        for a portfolio with no futures, no options and no call open. The
+        harnesses call it after the open."""
         if not self.futures and not self.options and self._margin_call is None:
             return
         day = int(engine.day_count)
@@ -1396,6 +1405,7 @@ class Portfolio:
             return
         held = [(s, f.quantity) for s, f in self.futures.items()]
         held += [(s, o.quantity) for s, o in self.options.items()]
+        worked = getattr(engine.model, "margin_liquidation_worked", 0.0)
         for symbol, quantity in held:
             filled = 0.0
             try:
@@ -1403,6 +1413,21 @@ class Portfolio:
                                                liquidation=True)["quantity"]
             except OrderError:
                 pass
+            # Worked as a broker works a market order
+            # (``margin_liquidation_worked``): what is left is sent again
+            # while the book, quoting afresh, still takes some of it.
+            for _ in range(LIQUIDATION_ORDERS if worked else 0):
+                left = -quantity - filled
+                if abs(left) <= 1e-9:
+                    break
+                try:
+                    more = self._execute_in_book(engine, symbol, left, None,
+                                                 liquidation=True)["quantity"]
+                except OrderError:
+                    break
+                if not more:
+                    break
+                filled += more
             self.liquidations.append({"day": day, "symbol": symbol, "quantity": -quantity,
                                       "filled": filled})
         # The stock in each name whose options the account held, or that an

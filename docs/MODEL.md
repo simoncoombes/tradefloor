@@ -4673,7 +4673,16 @@ portfolio-margin rule's minimum, that many dollars a unit of every option
 it holds, long or short, a long's not more than its value: the scan is a
 risk-based theoretical loss, so the account is a portfolio-margin account,
 and FINRA Rule 4210(g)(7) asks the greater of the largest theoretical loss
-and (B) $.375 a listed option times its multiplier (0.375 a unit). Maintenance is initial over 1.1. A
+and (B) $.375 a listed option times its multiplier (0.375 a unit). Under
+`margin_option_scan_range` (0.0 on every shipped preset) a name's options are
+revalued at ten equidistant moves of the name over plus and minus that share
+of its price, ends included, in place of the scan's seven points at its own
+size, and stock held without the name's options is charged that share of its
+value: FINRA Rule 4210(g)(2)(F) takes a portfolio margin account's
+theoretical gains and losses at ten valuation points over +/- 15% for an
+equity, so the rule's value is 0.15. The scan's volatility shifts are kept at
+each point, the stock's own loss is still not counted beside a name's
+options, and the index options' scan is unchanged. Maintenance is initial over 1.1. A
 `Portfolio` pays an option's premium when it trades, marks it at the
 dealer's mid, is paid its settlement at expiry (`Portfolio.settled`), counts
 it at its delta-notional against the leverage limit, adds the scan to
@@ -4682,7 +4691,12 @@ margin call. Under `margin_pretrade_check` (0.0 on every shipped preset) it
 refuses an order that would leave its equity under the initial margin it
 then asks (`MarginError`; FINRA Rule 4210(b) and Regulation T's initial
 amounts, 12 CFR 220.4(c)); an order that asks no more margin than the
-account owes already, and a margin call's liquidation, always go.
+account owes already, and a margin call's liquidation, always go. Under
+`margin_liquidation_worked` (0.0 on every shipped preset) a liquidation is
+worked as a broker works a market order: each contract's sale is sent again
+for what is left while its book, quoting afresh, still takes some. A dealer
+shows ten levels a side and none under a tick, so a sale sent once fills only
+that ladder; what no book takes, a long option with no bid, stays held.
 
 **State.** A snapshot carries `options` (the listing, each expiry's strike
 grid and range, the dealer's pressure and the settled expiries) while
@@ -4801,15 +4815,20 @@ so a scorecard's trades, turnover and impact leave them out. The scan
 margin scans a name's options with the stock held in it, less the stock's
 own worst loss and floored at 0, so a covered call or a protective put asks
 nothing a naked option does; each option is revalued as a European on its
-escrowed price over moves sized to the name's one-session sd. Stock held
+escrowed price over moves sized to the name's one-session sd, or, under
+`margin_option_scan_range`, over ten equidistant moves to that share of
+its price either way (FINRA's portfolio-margin range for an equity, 15%). Stock held
 in a name an exercise or an assignment has delivered shares in, while the
 account holds none of that name's options, is margined on its own scan
 (`Engine.stock_margin`): its shares times the same move of the name, the
-stock's worst loss over the scan. So the close that delivers the shares
+stock's worst loss over the scan, or that share of its value under the
+range. So the close that delivers the shares
 calls any shortfall, even when the assignment settled the account's last
 option. An unmet call's liquidation closes the contracts and the stock in
-each name whose options the account held or that it took delivery in.
-Stock in a name the account took no delivery in asks nothing.
+each name whose options the account held or that it took delivery in;
+under `margin_liquidation_worked` each sale is sent again while its book
+still takes some. Stock in a name the account took no delivery in asks
+nothing.
 
 **The dealer's shape** (five dials, each 0.0 on every shipped preset
 and left out of the digest there; refused without `options_names_listed`).

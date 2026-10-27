@@ -1646,7 +1646,9 @@ def describe_simulator() -> dict[str, Any]:
                        "pro rata, so an account can be handed stock, or go "
                        "short, without an order. Options are margined by a "
                        "scan with the stock in the same name, and delivered "
-                       "stock from the close it arrives; an unmet call "
+                       "stock from the close it arrives (on a model with "
+                       "margin_option_scan_range, the worst of ten moves of "
+                       "the name over that share either way); an unmet call "
                        "closes the contracts and the stock in those names. "
                        + _listed_on(_preset_lists_name_options),
             },

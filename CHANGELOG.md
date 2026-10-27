@@ -6,17 +6,18 @@ futures, and American options on every name. An agent trades them by symbol
 in whole contracts, as it trades a ticker, and exercises an option at a
 close with `tf.Exercise`.
 
-Margin is set from a risk scan of each position at every close, with a
-lower maintenance level. A future pays its move to the day's settlement
-mark in cash at each close. Options are margined with the stock held in the
-same name, and a short option asks at least $.375 a share. Shares an
-exercise or an assignment hands an account are margined from the close
-they arrive, so that close can make a call. An order that would leave
-equity under the initial margin is refused. If equity falls below
-maintenance at a close, the call is due by the next open: equity must be
-back at the initial margin, and if it isn't, every contract is closed at
-the market, and so is the stock in each name whose options the account
-held or took delivery in.
+Margin is set at every close, with a lower maintenance level. A future is
+margined from a risk scan and pays its move to the day's settlement mark in
+cash. A name's options and stock are margined together, as a broker's
+portfolio margin is: the worst loss over ten moves of the name up to 15%
+either way, and at least $.375 a share for each option. Stock without its
+options, such as shares an exercise or an assignment delivers, asks 15% of
+its value from the close it arrives. An order that would leave equity under
+the initial margin is refused. If equity falls below maintenance at a close,
+the call is due by the next open: equity must be back at the initial margin,
+and if it isn't, every contract is sold at the market, and so is the stock
+in each name whose options the account held or took delivery in, each order
+sent again while the market still buys.
 
 `tradefloor.contracts.explain_move` says why a contract's price moved, cause
 by cause, and a strategy spec can hold the front index future as a hedge.
@@ -47,17 +48,20 @@ symbol in whole contracts, as it trades a ticker:
 
 Margin works as a clearing house's does. Each future asks an initial
 margin set at each close from its recent volatility, and a maintenance
-margin of the initial over 1.1. Options are margined by a scan of each
-name's options with the stock held in it, so a covered call asks less than
-a naked one, and a short option asks at least $.375 a share, FINRA's
-portfolio-margin minimum. Stock an exercise or an assignment delivered into
-an account that no longer holds the name's options is margined on its own
-scan from the close it arrives. A future pays its move to the day's
+margin of the initial over 1.1. A name's options are margined with the
+stock held in it as FINRA's portfolio margin is: the largest loss over ten
+equidistant moves of the name from 15% down to 15% up, netted within the
+name and summed across names, so a covered call asks less than a naked one,
+and at least $.375 a share for each option. Stock an exercise or an
+assignment delivered into an account that no longer holds the name's
+options asks 15% of its value from the close it arrives. A future pays its move to the day's
 settlement mark in cash at each close. A close that leaves equity under the
 maintenance margin makes a margin call, and if equity is still under the
 initial margin at the next open, every contract held is closed at the
 market, and so is the stock in each name whose options the account held or
-took delivery in. An order that would leave equity under the initial margin
+took delivery in. Each sale is sent again for what is left while the market
+still buys, as a broker works the order; a long option nobody bids stays
+held. An order that would leave equity under the initial margin
 it then asks is refused with `MarginError`. `Portfolio.margin(engine)` reads
 the account's requirement and any open call.
 
@@ -222,7 +226,8 @@ records are identical (`tests/test_futures_accounts.py`).
 
 Stock held in a name an exercise or an assignment delivered shares in,
 while the account holds none of that name's options, is margined on its own
-scan, `Engine.stock_margin`: the shares times the scan's move of the name.
+scan, `Engine.stock_margin`: 15% of the shares' value, the loss at the end
+of the portfolio-margin range.
 The close the shares arrive at calls any shortfall, even when the
 assignment settled the account's last option. Stock in a name the account
 took no delivery in asks nothing, and every known answer is where it was.
@@ -232,8 +237,10 @@ took no delivery in asks nothing, and every known answer is where it was.
 An unmet margin call closes the account's futures and options at the open,
 and the stock in each name whose options it held or that an exercise or an
 assignment delivered shares in. An assignment can hand an account several
-times its equity in shares, and a liquidation takes them. Stock in other
-names is kept. Accounts without single-name options are unaffected; known
+times its equity in shares, and a liquidation takes them. Each sale is sent
+again for what is left while the market still buys: a dealer shows a few
+levels and bids nothing under a cent, so one order could leave much of a
+position unsold. Stock in other names is kept. Accounts without single-name options are unaffected; known
 answers are unchanged.
 
 ### The single-name options' trading cost
@@ -333,6 +340,17 @@ were.
   equity under the initial margin it then asks (`MarginError`, a subclass of
   `OrderError`; FINRA Rule 4210(b), Regulation T 12 CFR 220.4(c)). An order
   that takes risk off, and a liquidation, always go.
+- `margin_option_scan_range` is a new dial, 0.0 on every preset and left
+  out of the digest there. Off zero a name's options are margined at ten
+  equidistant moves of the name over plus and minus that share of its price,
+  and stock held without the name's options at that share of its value.
+  FINRA Rule 4210(g)(2)(F) sets plus or minus 15% for an equity, so the
+  rule's value is 0.15. No price moves.
+- `margin_liquidation_worked` is a new switch, 0.0 on every preset and left
+  out of the digest there. With it on, a margin call's liquidation sends
+  each contract's sale again for what is left while its book still takes
+  some, as a broker works a market order. A long option no book bids stays
+  held.
 - `margin_scan_option_tail` is new, 0.0 on every preset and left out of the
   digest there. Off zero it is the option scan's own tail allowance, in
   place of `margin_scan_tail` on the scan's price move and volatility

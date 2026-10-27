@@ -5241,9 +5241,11 @@ impl PyEngine {
     /// one-session sd, each at three implied-volatility shifts, the index's
     /// options and each name's apart; a long option asks at most its
     /// premium, and offsetting positions and the name's stock net. Under
-    /// `margin_option_minimum` it is at least that many dollars a unit of
-    /// each option held, a long's not more than its value. None with margin
-    /// or options off. A read.
+    /// `margin_option_scan_range` a name's options are revalued at ten
+    /// equidistant moves over plus and minus that share of its price
+    /// instead. Under `margin_option_minimum` it is at least that many
+    /// dollars a unit of each option held, a long's not more than its value.
+    /// None with margin or options off. A read.
     fn option_margin(&self, positions: Vec<(String, f64)>) -> Option<f64> {
         self.inner.option_margin(&positions)
     }
@@ -5251,7 +5253,8 @@ impl PyEngine {
     /// The scan's margin on stock held alone in listed names, dollars:
     /// `positions` as `(ticker, signed shares)` pairs, each its shares times
     /// the scan's move of the name, the one `option_margin` sizes the name's
-    /// options on. The option scan charges stock only as cover for an
+    /// options on (under `margin_option_scan_range`, that share of the
+    /// shares' value). The option scan charges stock only as cover for an
     /// option's risk; `Portfolio` asks this for the shares an exercise or an
     /// assignment delivered once it holds none of the name's options. Tickers
     /// without a listed chain are left out. None with margin or the name
