@@ -546,6 +546,7 @@ impl Engine {
             &events,
             if p.surface_name_earnings_premium != 0.0 { p.surface_name_earnings_premium } else { p.surface_earnings_weight },
         );
+        let inputs = if p.surface_name_term_slope == 0.0 { inputs } else { inputs.with_name_slope(p.surface_name_term_slope) };
         let shape = term_shape(&inputs, n_max);
         let curve = ThetaCurve::from_shape(&shape, clock.elapsed, 1.0)?;
         // The names' curvature and the correlation theirs is a share of: the

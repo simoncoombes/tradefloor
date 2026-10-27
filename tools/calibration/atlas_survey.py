@@ -535,6 +535,7 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "option_name_spread_itm": (0.0, 5.0),
     "option_name_spread_tenor_exponent": (-1.0, 1.0),
     "surface_name_earnings_premium": (0.0, 5.0),
+    "surface_name_term_slope": (-1.0, 1.0),
     # The central bank's stress cut, points per step: 0.5 is a half-point
     # step, two steps a point, which is 2001's and 2008's emergency size.
     "fed_stress_cut": (0.0, 0.5),

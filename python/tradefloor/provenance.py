@@ -705,6 +705,11 @@ OUT_OF_SCOPE = {
         "`name_events_drawn` is not called; refused without "
         "`options_names_listed` and `earnings_surprise_sigma`; at 0.0 it is "
         "also left out of the model's digest",
+    "surface_name_term_slope":
+        "inert at 0.0: `name_surface_at` in engine/name_options.rs leaves "
+        "`TermInputs::name_slope` at 0.0 and `term_shape` adds nothing; "
+        "refused without `options_names_listed`; at 0.0 it is also left out "
+        "of the model's digest",
     # The oil law (pt-v22, decision 3), inert on every shipped preset: each a
     # branch to the standing arithmetic at 0.0.
     "oil_mean_reversion":
