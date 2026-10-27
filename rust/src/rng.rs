@@ -665,6 +665,18 @@ pub fn age_law_key(key: u64) -> u64 {
     splitmix64_mix(key ^ (AGE_LAW_TAG << 32 | AGE_LAW_TAG))
 }
 
+/// The tag of the oil forecast's paths (`oil_forecast_path_law`), ASCII
+/// "OILP": the surgery seed of the economy stream the paths simulated at a
+/// close draw from, mixed with that close's day, so they draw nothing the
+/// run's own sessions draw and no two closes share a draw.
+pub const OIL_PATHS_TAG: u64 = 0x4F49_4C50;
+
+/// The generator of the oil forecast's paths at the close whose day count
+/// is `day` (`oil_forecast_path_law`).
+pub fn oil_paths_rng(root_seed: u64, day: i64) -> GameRng {
+    GameRng::surgery(root_seed, stream::ECONOMY, splitmix64_mix((OIL_PATHS_TAG << 32) ^ day as u64))
+}
+
 /// The tag of the oil price's long factor (`oil_target_drift_sd`), ASCII
 /// "OILD".
 pub const OIL_DRIFT_TAG: u32 = 0x4F49_4C44;

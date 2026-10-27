@@ -51,3 +51,26 @@ def test_it_moves_no_price_and_no_economy_and_only_the_forecasts_oil():
         for c in (x for x in on.contracts() if x["root"] == "OIL"):
             assert on.quote(c["symbol"])["mark"] > 0.0
     assert moved > 0.0
+
+
+def test_the_path_law_is_off_on_every_shipped_preset_and_silent_in_the_digest():
+    for name in tf.preset_names():
+        assert tf.ModelParams.from_preset(name).oil_forecast_path_law == 0.0, name
+    assert "oil_forecast_path_law" in set(tf.ModelParams.digest_silent_at_zero())
+    assert model(oil_forecast_path_law=0.0).fingerprint == "pt-v21"
+
+
+def test_the_path_law_moves_no_price_and_no_economy_and_only_the_forecasts_oil():
+    off = tf.Engine(seed=11, universe=UNIVERSE, model=model(**ON))
+    on = tf.Engine(seed=11, universe=UNIVERSE, model=model(**ON, oil_forecast_path_law=1.0))
+    moved = 0.0
+    for _ in range(20):
+        day(off)
+        day(on)
+        assert on.prices() == off.prices()
+        assert repr(on.economy()) == repr(off.economy())
+        a, b = off.forecast(), on.forecast()
+        for k in ("index_variance", "policy_rate"):
+            assert a[k] == b[k], k
+        moved = max(moved, abs(a["oil"][-1] - b["oil"][-1]))
+    assert moved > 0.0
