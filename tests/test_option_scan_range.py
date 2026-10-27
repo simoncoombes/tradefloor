@@ -79,3 +79,38 @@ def test_the_floor_still_applies_beside_the_range():
     expiry = sorted({c["expiry"] for c in names(rule, ticker)})[0]
     far = strike_near(rule, ticker, expiry, "C", 12)["symbol"]
     assert rule.option_margin([(far, -1.0)]) >= 0.375 * 100 - 1e-9
+
+
+def test_a_worked_liquidation_sells_what_the_book_takes_and_leaves_only_what_it_wont():
+    """`margin_liquidation_worked`: an unmet call's sale of each contract is
+    sent again while the dealer, quoting afresh, still takes some. Sent once,
+    a sale fills only the ladder the dealer shows at that moment."""
+    from tradefloor.portfolio import Portfolio
+
+    left = {}
+    for worked in (0.0, 1.0):
+        engine = tf.Engine(seed=19, universe=SMALL, model=model(**ON, margin_liquidation_worked=worked))
+        for _ in range(3):
+            day(engine)
+        engine.open_market()
+        ticker = engine.tickers[3]
+        expiry = sorted({c["expiry"] for c in names(engine, ticker)})[0]
+        call = strike_near(engine, ticker, expiry, "C", 1)["symbol"]
+        p = Portfolio(cash=1e6, owner="a")
+        for _ in range(30):
+            p.execute(engine, call, 20.0)
+        held = p.options[call].quantity
+        assert held > 200          # more than the dealer's ladder shows on a side
+        p.cash = -1e7
+        p._margin_call = {"day": engine.day_count - 1, "equity": -1.0, "maintenance": 1.0, "initial": 1.0,
+                          "met": None}
+        p.margin_calls.append(p._margin_call)
+        p.settle_open(engine)
+        sale = [x for x in p.liquidations if x["symbol"] == call][-1]
+        left[worked] = held + sale["filled"]
+        if worked:
+            # What is still held, the book won't take.
+            assert left[worked] == 0 or engine.book(call).sweep_cost("sell", left[worked]) is None \
+                or engine.book(call).sweep_cost("sell", left[worked]).filled <= 0
+    assert left[1.0] < left[0.0]
+    assert "margin_liquidation_worked" in set(tf.ModelParams.digest_silent_at_zero())

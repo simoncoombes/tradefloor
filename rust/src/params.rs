@@ -2143,6 +2143,20 @@ pub struct ModelParams {
     /// refused, nor is a margin call's liquidation. Read by the account, not
     /// the engine, so no price moves. Requires `margin_scan_coverage`. 0 or 1.
     pub margin_pretrade_check: f64,
+    /// A switch: 1.0 works a margin call's liquidation as a broker works a
+    /// market order. Each contract's sale is sent again for what is left
+    /// while its book still fills some of it (`tradefloor.Portfolio`,
+    /// `settle_open`). 0.0, on every shipped preset, sends each contract's
+    /// sale once, as it stood, and a value of 0.0 is left out of the model's
+    /// digest.
+    ///
+    /// A dealer shows a few levels a side, and none under a tick, so one
+    /// market order fills only what the ladder holds at that moment; the
+    /// dealer then quotes afresh. A liquidation sent once leaves part of a
+    /// position its book would still take. What no book takes, a long option
+    /// with no bid, stays held. Read by the account, not the engine, so no
+    /// price moves by itself. Requires `margin_scan_coverage`. 0 or 1.
+    pub margin_liquidation_worked: f64,
     /// Whether the engine lists European options on its price index. 0.0,
     /// on every shipped preset, lists none: no contract, no state, nothing in
     /// the snapshot or the state hash, and a value of 0.0 is left out of the
@@ -9390,6 +9404,7 @@ impl ModelParams {
             margin_option_minimum: 0.0,
             margin_option_scan_range: 0.0,
             margin_pretrade_check: 0.0,
+            margin_liquidation_worked: 0.0,
             options_index_listed: 0.0,
             surface_ssvi: 0.0,
             surface_skew_physical: 0.0,
@@ -12337,6 +12352,7 @@ impl ModelParams {
             "margin_option_minimum" => self.margin_option_minimum,
             "margin_option_scan_range" => self.margin_option_scan_range,
             "margin_pretrade_check" => self.margin_pretrade_check,
+            "margin_liquidation_worked" => self.margin_liquidation_worked,
             "options_index_listed" => self.options_index_listed,
             "surface_ssvi" => self.surface_ssvi,
             "surface_skew_physical" => self.surface_skew_physical,
@@ -12820,6 +12836,7 @@ impl ModelParams {
             "margin_option_minimum" => out.margin_option_minimum = value,
             "margin_option_scan_range" => out.margin_option_scan_range = value,
             "margin_pretrade_check" => out.margin_pretrade_check = value,
+            "margin_liquidation_worked" => out.margin_liquidation_worked = value,
             "options_index_listed" => out.options_index_listed = value,
             "surface_ssvi" => out.surface_ssvi = value,
             "surface_skew_physical" => out.surface_skew_physical = value,
@@ -14971,6 +14988,18 @@ impl ModelParams {
                  only margin_scan_coverage sets: set margin_scan_coverage first.",
                 self.margin_pretrade_check));
         }
+        if !(self.margin_liquidation_worked == 0.0 || self.margin_liquidation_worked == 1.0) {
+            return Err(format!(
+                "margin_liquidation_worked is {}. It is a switch: 0 (a liquidation sent once) or 1 (sent again \
+                 while its book fills).",
+                self.margin_liquidation_worked));
+        }
+        if self.margin_liquidation_worked != 0.0 && self.margin_scan_coverage == 0.0 {
+            return Err(format!(
+                "margin_scan_coverage is 0 but margin_liquidation_worked is {}. It works a margin call's \
+                 liquidation, which only margin_scan_coverage makes: set margin_scan_coverage first.",
+                self.margin_liquidation_worked));
+        }
         for (name, v) in [("options_index_listed", self.options_index_listed), ("surface_ssvi", self.surface_ssvi)] {
             if !(v == 0.0 || v == 1.0) {
                 return Err(format!("{name} is {v}. It is a switch, 0.0 off or 1.0 on."));
@@ -15759,6 +15788,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "margin_option_minimum",
     "margin_option_scan_range",
     "margin_pretrade_check",
+    "margin_liquidation_worked",
     "night_session_steps",
     "futures_impact_memory",
     "futures_impact_memory_half_life",
@@ -16050,6 +16080,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "margin_option_minimum",
         "margin_option_scan_range",
         "margin_pretrade_check",
+        "margin_liquidation_worked",
         "options_index_listed",
         "surface_ssvi",
         "surface_skew_physical",

@@ -4692,7 +4692,12 @@ margin call. Under `margin_pretrade_check` (0.0 on every shipped preset) it
 refuses an order that would leave its equity under the initial margin it
 then asks (`MarginError`; FINRA Rule 4210(b) and Regulation T's initial
 amounts, 12 CFR 220.4(c)); an order that asks no more margin than the
-account owes already, and a margin call's liquidation, always go.
+account owes already, and a margin call's liquidation, always go. Under
+`margin_liquidation_worked` (0.0 on every shipped preset) a liquidation is
+worked as a broker works a market order: each contract's sale is sent again
+for what is left while its book, quoting afresh, still takes some. A dealer
+shows ten levels a side and none under a tick, so a sale sent once fills only
+that ladder; what no book takes, a long option with no bid, stays held.
 
 **State.** A snapshot carries `options` (the listing, each expiry's strike
 grid and range, the dealer's pressure and the settled expiries) while

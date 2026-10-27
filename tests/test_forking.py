@@ -1200,6 +1200,7 @@ def _nothing_dormant():
                    # surprise and the option minimum take the blanket 0.05.
                    rate_premium_per_fixing=1.0,
                    margin_pretrade_check=1.0,
+                   margin_liquidation_worked=1.0,
                    # The index options, their surface and their dealer (pt-v22
                    # phase 2): two switches; the surface's companions and the
                    # dealer's spread take the blanket 0.05.

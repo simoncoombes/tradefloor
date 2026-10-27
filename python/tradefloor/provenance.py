@@ -459,7 +459,12 @@ OUT_OF_SCOPE = {
         "without the index options and the index futures; at 0.0 it is also "
         "left out of the model's digest",
     # Added beside pt-v22 and inert on every shipped preset, pt-v22 included:
-    # the single-name scan's range and two terms of the names' surface.
+    # the margin call's worked liquidation, the single-name scan's range, and
+    # two terms of the names' surface.
+    "margin_liquidation_worked":
+        "inert at 0.0: a margin call's liquidation sends each contract's sale "
+        "once, as it stood; read by `Portfolio.settle_open`, not the engine; "
+        "at 0.0 it is also left out of the model's digest",
     "margin_option_scan_range":
         "inert at 0.0: the single-name scan keeps its own size, `z * t` times "
         "the name's one-session sd at SPAN's seven points (a branch in "
