@@ -563,32 +563,34 @@ def _verdict22(**passes):
             "measured": {"fingerprint": "pt-v22", "engine_commit": "x", "box": "b"}}
 
 
-def test_pt_v22_reports_of4_and_r6_and_records_on1s_exception():
+def test_pt_v22_reports_of4_and_r6_and_records_on1s_and_e1s_exceptions():
     """OF4 (draft item 21) and R6 (item 25(i)) are read and reported, not
-    gated; ON1 is gated and carries the owner's exception (item 25(h)). `pass`
-    stays the plain fact of whether a row sits inside its mark."""
+    gated; ON1 and E1 are gated and carry the owner's exceptions (items 25(h)
+    and 25(j)). `pass` stays the plain fact of whether a row sits inside its
+    mark."""
     assert set(rec_tool.REPORTED_ROWS["pt-v22"]) == {"OF4", "R6"}
-    assert set(rec_tool.ROW_EXCEPTIONS["pt-v22"]) == {"ON1"}
-    doc = _verdict22(A1=True, ON1=True, OF4=False, R6=False)
+    assert set(rec_tool.ROW_EXCEPTIONS["pt-v22"]) == {"ON1", "E1"}
+    doc = _verdict22(A1=True, ON1=True, E1=True, OF4=False, R6=False)
     block, problems = rec_tool.mark_rows("pt-v22", doc)
     assert problems == []
     rows = {r["id"]: r for r in block["rows"]}
-    assert [rows[k]["gated"] for k in ("A1", "ON1", "OF4", "R6")] == [True, True, False, False]
+    assert [rows[k]["gated"] for k in ("A1", "ON1", "E1", "OF4", "R6")] == [True, True, True, False, False]
     assert rows["OF4"]["pass"] is False and "item 21" in rows["OF4"]["reported_because"]
     assert "item 25(i)" in rows["R6"]["reported_because"]
     assert "item 25(h)" in rows["ON1"]["exception"] and rows["ON1"]["pass"] is True
-    assert (block["verdict"], block["passed"], block["of"]) == ("pass", 2, 2)
-    assert block["all_rows"] == {"passed": 2, "of": 4}
+    assert "item 25(j)" in rows["E1"]["exception"] and rows["E1"]["pass"] is True
+    assert (block["verdict"], block["passed"], block["of"]) == ("pass", 3, 3)
+    assert block["all_rows"] == {"passed": 3, "of": 5}
     # Every other preset gates every row, as pt-v20's and pt-v21's grades did.
     plain, _ = rec_tool.mark_rows("pt-v21", doc)
     assert all(r["gated"] for r in plain["rows"]) and plain["verdict"] == "fail"
 
 
 def test_a_gated_row_outside_its_mark_fails_and_a_missing_named_row_is_refused():
-    block, problems = rec_tool.mark_rows("pt-v22", _verdict22(A1=True, ON1=False, OF4=True, R6=True))
+    block, problems = rec_tool.mark_rows("pt-v22", _verdict22(A1=True, ON1=False, E1=True, OF4=True, R6=True))
     assert problems == [] and block["verdict"] == "fail"
-    assert (block["passed"], block["of"]) == (1, 2)
-    _, problems = rec_tool.mark_rows("pt-v22", _verdict22(A1=True, ON1=True, OF4=True))
+    assert (block["passed"], block["of"]) == (2, 3)
+    _, problems = rec_tool.mark_rows("pt-v22", _verdict22(A1=True, ON1=True, E1=True, OF4=True))
     assert any("R6" in p and "no such row" in p for p in problems)
 
 
@@ -600,22 +602,22 @@ def test_write_long_run_writes_the_marks_and_a_failing_gated_row_cannot_load(tmp
     (out / "pt-v22.json").write_text(RECORD22.read_text())
     monkeypatch.setattr(rec_tool, "OUT", out)
     ok = tmp_path / "ok.json"
-    ok.write_text(json.dumps(_verdict22(A1=True, ON1=True, OF4=False, R6=True)))
+    ok.write_text(json.dumps(_verdict22(A1=True, ON1=True, E1=True, OF4=False, R6=True)))
     assert rec_tool.write_long_run(str(ok)) == 0
     block = json.loads((out / "pt-v22.json").read_text())["long_run"]
     assert (block["verdict"], block["passed"], block["of"], block["all_rows"]) == (
-        "pass", 2, 2, {"passed": 3, "of": 4})
+        "pass", 3, 3, {"passed": 4, "of": 5})
     assert records.gated_failures({"long_run": block}) == []
     # A gated row outside its mark is written as the grade said, verdict
     # "fail", and the record holding it does not load.
     bad = tmp_path / "bad.json"
-    bad.write_text(json.dumps(_verdict22(A1=False, ON1=True, OF4=True, R6=True)))
+    bad.write_text(json.dumps(_verdict22(A1=False, ON1=True, E1=True, OF4=True, R6=True)))
     assert rec_tool.write_long_run(str(bad)) == 0
     block = json.loads((out / "pt-v22.json").read_text())["long_run"]
     assert block["verdict"] == "fail" and records.gated_failures({"long_run": block}) == ["A1"]
     # A verdict that names no R6 is refused outright.
     short = tmp_path / "short.json"
-    short.write_text(json.dumps(_verdict22(A1=True, ON1=True, OF4=True)))
+    short.write_text(json.dumps(_verdict22(A1=True, ON1=True, E1=True, OF4=True)))
     assert rec_tool.write_long_run(str(short)) == 1
 
 

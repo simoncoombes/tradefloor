@@ -112,6 +112,10 @@ ROW_EXCEPTIONS = {
         "ON1": "worse than v21 on its corrected reader (0.345 against 0.325, real 0.330, both "
                "in band), an exception the owner accepts to the rule that no row is worse "
                "than v21 (draft item 25(h)): the measured pre-open news share",
+        "E1": "worse than v21 on its corrected reader (-0.086 against -0.117, real -0.17), an "
+              "exception the owner accepts to the rule that no row is worse than v21 (draft item "
+              "25(j)): v21's earnings level drifts down by half its variance a year, which pt-v22's "
+              "aggregate earnings-level fix removes; the tape has no such drift",
     },
 }
 
