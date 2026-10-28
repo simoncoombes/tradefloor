@@ -39,7 +39,7 @@ import statistics
 import pytest
 
 import tradefloor
-from tradefloor import envelope
+from tradefloor import envelope, records
 from tradefloor.facts import (
     BAND_RULE_TOLERANCE,
     REAL_MARKETS_WINDOWS,
@@ -1119,7 +1119,8 @@ def test_the_two_panels_are_never_crossed():
     assert crossed["lost"] == ["corr_asymmetry"]
 
 
-@pytest.mark.parametrize("path", sorted(RECORDS.glob("*.json")),
+@pytest.mark.parametrize("path", [p for p in sorted(RECORDS.glob("*.json"))
+                                  if p.stem not in records.pending()],
                          ids=lambda p: p.stem)
 def test_every_committed_record_clears_the_bar_against_itself(path):
     """All eighteen, in the suite rather than in a report.

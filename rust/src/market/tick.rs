@@ -782,6 +782,12 @@ pub struct TickInputs<'a> {
     /// is read against the phase's normal volatility. See
     /// `ModelParams::market_vol_cycle_cap_relative`.
     pub market_permanent_ceiling_scale: f64,
+    /// The session's market mean from today's VIX pins
+    /// (`ModelParams::pinned_vix_return`), in log points at a beta of one
+    /// over the whole session: each open tick moves every name by its beta
+    /// times this over 390, outside the intraday curve. 0.0 on every
+    /// unpinned session and with the dial off, where nothing is added.
+    pub pinned_mean: f64,
     /// The VIX at which every variance coupling reads ONE.
     ///
     /// `params.market_vol_vix_anchor` under every preset before pt-v19,
@@ -892,6 +898,7 @@ impl<'a> TickInputs<'a> {
             forced_flow_eff: 1.0,
             market_sigma_daily: MARKET_FACTOR_SIGMA,
             market_permanent_ceiling_scale: 1.0,
+            pinned_mean: 0.0,
             vix_anchor: params.market_vol_vix_anchor,
             universe_stress: 0.0,
             volume_state: 0.0,
@@ -1507,6 +1514,16 @@ pub fn simulate_market_tick(
         } else {
             0.0
         };
+        // THE PINNED SESSION'S MEAN (`pinned_vix_return`): this name's beta
+        // times the session's conditional mean over its 390 open ticks,
+        // outside the intraday curve, so the session's sum is the mean the
+        // pins set. Exactly 0.0 off a pinned session, and every use below is
+        // a branch on it, so nothing is added.
+        let pin_mean = if open && inputs.pinned_mean != 0.0 {
+            companies[idx].stock.beta.unwrap_or(1.0) * inputs.pinned_mean / 390.0
+        } else {
+            0.0
+        };
         s_components[i] = if open {
             [
                 s_val * (p.s_phi_tick - 1.0),
@@ -1528,7 +1545,11 @@ pub fn simulate_market_tick(
                 raw.company_news * scale,
                 with_fill_impact(raw.order_flow_impact * scale, inputs.fill_impact.get(idx)),
                 raw.short_squeeze_effect * scale,
-                all_noises[i] * intraday_vol_mult,
+                if pin_mean != 0.0 {
+                    all_noises[i] * intraday_vol_mult + pin_mean
+                } else {
+                    all_noises[i] * intraday_vol_mult
+                },
                 // The breaker's slot, filled below if it binds.
                 0.0,
                 // The fair-value shift's, filled below under the permanent share.
@@ -1560,7 +1581,7 @@ pub fn simulate_market_tick(
         // `garch_innovation_commensurate` is non-zero.
         let noise_scale = if open { intraday_vol_mult } else { 0.15 };
         noise_parts[i] = [
-            raw.noise_market * noise_scale,
+            if pin_mean != 0.0 { raw.noise_market * noise_scale + pin_mean } else { raw.noise_market * noise_scale },
             raw.noise_sector * noise_scale,
             raw.noise_idio * noise_scale,
         ];
@@ -1582,6 +1603,9 @@ pub fn simulate_market_tick(
                 + all_noises[i] * intraday_vol_mult;
             if reversal != 0.0 {
                 s_val += reversal;
+            }
+            if pin_mean != 0.0 {
+                s_val += pin_mean;
             }
         } else {
             s_val = s_val + all_drifts[i] + all_noises[i];
@@ -1615,9 +1639,12 @@ pub fn simulate_market_tick(
                 } else {
                     raw.noise_market_linear
                 };
-                own_noise + own_news
+                let dv = own_noise + own_news
                     + psim * (market_draw * noise_scale)
-                    + psim * (raw.company_news_market * scale)
+                    + psim * (raw.company_news_market * scale);
+                // The pinned mean leaves `s` on the market draw's own share,
+                // as the plain loading does.
+                if pin_mean != 0.0 { dv + psim * pin_mean } else { dv }
             };
             // The market's reversal is permanent whole: it leaves `s` for
             // `v` on the tick it is applied. A branch, so 0.0 is `dv` as it

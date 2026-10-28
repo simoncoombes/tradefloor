@@ -1,4 +1,5 @@
-"""The published grades under `validation/`: pt-v20's (0.8.5) and pt-v21's (0.10.0).
+"""The published grades under `validation/`: pt-v20's (0.8.5) and pt-v21's (0.10.0),
+and pt-v22's slots, empty until its grade has run.
 
 The owner's decision of 2026-09-26 (item 2): publish the grading scripts and
 the grade run's inputs, and point the preset record and MODEL.md at them.
@@ -366,3 +367,284 @@ def test_the_files_the_pt_v21_registration_cites_are_here():
                  "programme/longrun/CRITERIA-pt-v21.md"):
         assert name in cited, name
         assert (GRADE21 / "programme" / name.removeprefix("programme/")).is_file(), name
+
+
+# ---------------------------------------------------------------------------
+# pt-v22: in the engine before its grade, written from a stand-in arm
+# ---------------------------------------------------------------------------
+
+GRADE22_DIR = ROOT / "validation" / "pt-v22"
+RECORD22 = ROOT / "python" / "tradefloor" / "presets" / "pt-v22.json"
+
+#: What pt-v22's grade gives, as named slots, each None until the grade has
+#: run (`validation/pt-v22/README.md` says what fills each one). The tests
+#: below that read the grade run once every slot is filled; the test after
+#: this table fails while some are filled and others are not, so a release
+#: cannot ship half a grade.
+GRADE22 = {
+    # The boxes that ran the grade, as `record.py`'s PT_V22_GRADE_BOXES
+    # names them, joined by "+" in the verdict's `measured.box`.
+    "boxes": None,
+    # The engine commit the boxes ran, and the package version it builds.
+    "engine_commit": None,
+    "package": None,
+    # Per box: (files unpacked, sha256 of the archive), as the box recorded.
+    "scripts": None,
+    # The verdict the record carries: its file under validation/pt-v22/,
+    # its result, the rows passed and the rows graded.
+    "verdict": None,
+}
+
+
+def _arm_tool():
+    sys.path.insert(0, str(ROOT / "tools" / "presets"))
+    import arm_preset  # noqa: PLC0415
+
+    return arm_preset
+
+
+def test_pt_v22_grade_is_either_all_pending_or_all_filled():
+    from tradefloor.records import open_slots  # noqa: PLC0415
+
+    record = json.loads(RECORD22.read_text())
+    filled = {
+        "record.py PT_V22_GRADE_BOXES": bool(rec_tool.PT_V22_GRADE_BOXES),
+        "pt-v22.json's slots": not open_slots(record),
+        **{f"GRADE22[{k!r}]": v is not None for k, v in GRADE22.items()},
+    }
+    assert len(set(filled.values())) == 1, (
+        "pt-v22's grade is half filled: "
+        + ", ".join(f"{k} {'filled' if v else 'empty'}" for k, v in filled.items()))
+    if not all(filled.values()):
+        # Pending: the folder holds its README and nothing a grade wrote.
+        assert sorted(p.name for p in GRADE22_DIR.iterdir()) == ["README.md"]
+
+
+def test_pt_v22_record_refuses_to_load_while_a_slot_is_empty():
+    import tradefloor as tf  # noqa: PLC0415
+    from tradefloor import records  # noqa: PLC0415
+
+    record = json.loads(RECORD22.read_text())
+    empty = records.open_slots(record)
+    if not empty:
+        assert "pt-v22" in records.available()
+        return
+    # Every slot is a block the grade measures, named after itself, with the
+    # writer that fills it.
+    assert empty == [k for k in rec_tool.GRADE_SLOTS if k in empty]
+    assert set(empty) == set(rec_tool.GRADE_SLOTS)
+    for field in empty:
+        assert record[field] == {"slot": field, "filled_by": rec_tool.GRADE_SLOTS[field]}
+    with pytest.raises(LookupError, match="not measured") as raised:
+        tf.preset_record("pt-v22")
+    assert all(field in str(raised.value) for field in empty)
+    assert "pt-v22" in records.pending()
+    assert "pt-v22" not in records.available()
+
+
+def test_pt_v22_is_the_arm_its_file_names():
+    """The arm file, the Rust block written from it, the build and the
+    record's identity are one vector, and the arm says what it is."""
+    import tradefloor as tf  # noqa: PLC0415
+
+    tool = _arm_tool()
+    arm = tool.committed_arm()
+    assert arm.base == "pt-v20" and arm.status in tool.STATUSES
+    assert tool.rust_arm() == arm.values
+    assert tool.preset_is_arm(arm) == []
+    record = json.loads(RECORD22.read_text())
+    assert {k: record.get(k) for k in tool.identity(arm)} == tool.identity(arm)
+    assert record["arm"]["status"] == arm.status
+    # Not the default: known_answer.py's digest does not move with pt-v22.
+    assert tf.model_preset()["name"] == "pt-v21"
+
+
+def test_the_arm_file_reads_both_forms_the_programme_writes():
+    tool = _arm_tool()
+    one = tool.parse_arm("X1@pt-v20:surface_ssvi=1.0,basis_sd=3.753")
+    lines = tool.parse_arm(one.text())
+    assert (lines.label, lines.base, lines.status) == ("X1", "pt-v20", "stand-in")
+    assert lines.values == one.values == {"surface_ssvi": 1.0, "basis_sd": 3.753}
+    assert tool.parse_arm(one.text(), status="graded").status == "graded"
+    with pytest.raises(ValueError, match="twice"):
+        tool.parse_arm("X1@pt-v20:basis_sd=1.0,basis_sd=2.0")
+    with pytest.raises(ValueError, match="@base"):
+        tool.parse_arm("@arm X1\nbasis_sd 1.0\n")
+
+
+def test_a_pt_v22_session_lists_the_contracts():
+    """Index, rate and oil futures and options on every name; no index
+    options and no VIX futures. All but the index futures list from the
+    first close."""
+    import tradefloor as tf  # noqa: PLC0415
+
+    engine = tf.Engine(seed=7, universe=tf.Universe.random(4, seed=1), model="pt-v22")
+    engine.open_market()
+    engine.run_session(9, 30, 3, 78, volatility=1.0)
+    engine.close_market()
+    engine.open_market()
+    listed = {(c["root"], c["kind"]) for c in engine.contracts()}
+    futures = {root for root, kind in listed if kind == "future"}
+    assert futures == {"IDX", "FF", "TR3", "OIL"}
+    names = {root for root, kind in listed if kind == "option"}
+    assert names == set(engine.name_option_roots()) and len(names) == 4
+    assert engine.lists_name_options and not engine.lists_options
+
+
+_PENDING22 = [k for k, v in GRADE22.items() if v is None]
+
+
+@pytest.mark.skipif(bool(_PENDING22),
+                    reason=f"pt-v22's grade has not run: GRADE22 {_PENDING22} empty")
+def test_pt_v22_record_carries_the_published_verdict_with_public_paths():
+    verdict_file, result, passed, of = GRADE22["verdict"]
+    verdict = json.loads((GRADE22_DIR / verdict_file).read_text())
+    assert (verdict["verdict"], verdict["passed"], verdict["of"]) == (result, passed, of)
+    block = dict(json.loads(RECORD22.read_text())["long_run"])
+    block.pop("coefficients")
+    assert block == rec_tool.public_paths(verdict)
+    measured = block["measured"]
+    assert measured["box"] == "+".join(GRADE22["boxes"])
+    assert measured["engine_commit"] == GRADE22["engine_commit"]
+    assert tuple(GRADE22["boxes"]) == tuple(rec_tool.PT_V22_GRADE_BOXES)
+
+
+@pytest.mark.skipif(bool(_PENDING22),
+                    reason=f"pt-v22's grade has not run: GRADE22 {_PENDING22} empty")
+def test_pt_v22_scripts_here_are_the_ones_the_boxes_ran():
+    rows = []
+    for line in (GRADE22_DIR / "scripts-as-run.txt").read_text().splitlines():
+        if line.strip() and not line.startswith("#"):
+            rows.append(line.split())
+    boxes = [inside.split(":", 1)[0] for _, inside, _ in rows]
+    for box, (count, _archive) in GRADE22["scripts"].items():
+        assert boxes.count(box) == count, box
+    wrong = [p for sha, _, p in rows if sha256(GRADE22_DIR / p) != sha]
+    assert not wrong, f"changed since the boxes ran them: {wrong}"
+
+
+@pytest.mark.skipif(bool(_PENDING22),
+                    reason=f"pt-v22's grade has not run: GRADE22 {_PENDING22} empty")
+def test_every_path_the_pt_v22_record_names_is_in_this_repository():
+    block = json.loads(RECORD22.read_text())["long_run"]
+    named = set()
+    for s in _strings(block):
+        assert not re.search(r"(?<![\w./-])programme/", s), (
+            f"an unpublished path a reader cannot open: {s!r}")
+        named.update(re.findall(r"validation/[\w./-]+\.(?:py|md|json)", s))
+    missing = sorted(p for p in named if not (ROOT / p).is_file())
+    assert named and not missing, missing
+
+
+def test_swapping_the_arm_rewrites_only_pt_v22s_value_in_an_entry():
+    """What `arm_preset.py` does to a `provenance.py` entry whose value the
+    graded arm moves: the pt-v22 literal and the sentence that quotes it, and
+    nothing else, so another preset's value or a bar is never touched."""
+    tool = _arm_tool()
+    src = ('X\n    "fed_put_gain": {\n        "kind": "undetermined",\n'
+           '        "presets": {"pt-v21": 3.0, "pt-v22": 2.5},\n'
+           '        "what_would_determine_it": "pt-v22 ships 2.5, pt-v21 3",\n'
+           '    },\n    "other": {\n        "presets": {"pt-v22": 2.5},\n    },\n')
+    out = tool._rewrite_value(src, "fed_put_gain", 2.5, 2.75)
+    assert '"presets": {"pt-v21": 3.0, "pt-v22": 2.75}' in out
+    assert "pt-v22 ships 2.75, pt-v21 3" in out
+    assert out.count('"pt-v22": 2.5}') == 1  # the other entry's
+
+
+# ---------------------------------------------------------------------------
+# Rows a registration reports without gating, and accepted exceptions
+# ---------------------------------------------------------------------------
+
+def _verdict22(**passes):
+    rows = [{"id": rid, "words": rid, "value": 0.0, "real": 0.0, "rule": "band", "pass": ok}
+            for rid, ok in passes.items()]
+    n = sum(1 for ok in passes.values() if ok)
+    return {"verdict": "pass" if n == len(rows) else "fail", "passed": n, "of": len(rows), "rows": rows,
+            "measured": {"fingerprint": "pt-v22", "engine_commit": "x", "box": "b"}}
+
+
+def test_pt_v22_reports_of4_and_r6_and_records_on1s_exception():
+    """OF4 (draft item 21) and R6 (item 25(i)) are read and reported, not
+    gated; ON1 is gated and carries the owner's exception (item 25(h)). `pass`
+    stays the plain fact of whether a row sits inside its mark."""
+    assert set(rec_tool.REPORTED_ROWS["pt-v22"]) == {"OF4", "R6"}
+    assert set(rec_tool.ROW_EXCEPTIONS["pt-v22"]) == {"ON1"}
+    doc = _verdict22(A1=True, ON1=True, OF4=False, R6=False)
+    block, problems = rec_tool.mark_rows("pt-v22", doc)
+    assert problems == []
+    rows = {r["id"]: r for r in block["rows"]}
+    assert [rows[k]["gated"] for k in ("A1", "ON1", "OF4", "R6")] == [True, True, False, False]
+    assert rows["OF4"]["pass"] is False and "item 21" in rows["OF4"]["reported_because"]
+    assert "item 25(i)" in rows["R6"]["reported_because"]
+    assert "item 25(h)" in rows["ON1"]["exception"] and rows["ON1"]["pass"] is True
+    assert (block["verdict"], block["passed"], block["of"]) == ("pass", 2, 2)
+    assert block["all_rows"] == {"passed": 2, "of": 4}
+    # Every other preset gates every row, as pt-v20's and pt-v21's grades did.
+    plain, _ = rec_tool.mark_rows("pt-v21", doc)
+    assert all(r["gated"] for r in plain["rows"]) and plain["verdict"] == "fail"
+
+
+def test_a_gated_row_outside_its_mark_fails_and_a_missing_named_row_is_refused():
+    block, problems = rec_tool.mark_rows("pt-v22", _verdict22(A1=True, ON1=False, OF4=True, R6=True))
+    assert problems == [] and block["verdict"] == "fail"
+    assert (block["passed"], block["of"]) == (1, 2)
+    _, problems = rec_tool.mark_rows("pt-v22", _verdict22(A1=True, ON1=True, OF4=True))
+    assert any("R6" in p and "no such row" in p for p in problems)
+
+
+def test_write_long_run_writes_the_marks_and_a_failing_gated_row_cannot_load(tmp_path, monkeypatch):
+    from tradefloor import records  # noqa: PLC0415
+
+    out = tmp_path / "presets"
+    out.mkdir()
+    (out / "pt-v22.json").write_text(RECORD22.read_text())
+    monkeypatch.setattr(rec_tool, "OUT", out)
+    ok = tmp_path / "ok.json"
+    ok.write_text(json.dumps(_verdict22(A1=True, ON1=True, OF4=False, R6=True)))
+    assert rec_tool.write_long_run(str(ok)) == 0
+    block = json.loads((out / "pt-v22.json").read_text())["long_run"]
+    assert (block["verdict"], block["passed"], block["of"], block["all_rows"]) == (
+        "pass", 2, 2, {"passed": 3, "of": 4})
+    assert records.gated_failures({"long_run": block}) == []
+    # A gated row outside its mark is written as the grade said, verdict
+    # "fail", and the record holding it does not load.
+    bad = tmp_path / "bad.json"
+    bad.write_text(json.dumps(_verdict22(A1=False, ON1=True, OF4=True, R6=True)))
+    assert rec_tool.write_long_run(str(bad)) == 0
+    block = json.loads((out / "pt-v22.json").read_text())["long_run"]
+    assert block["verdict"] == "fail" and records.gated_failures({"long_run": block}) == ["A1"]
+    # A verdict that names no R6 is refused outright.
+    short = tmp_path / "short.json"
+    short.write_text(json.dumps(_verdict22(A1=True, ON1=True, OF4=True)))
+    assert rec_tool.write_long_run(str(short)) == 1
+
+
+def test_a_record_that_gates_a_failing_row_does_not_load(tmp_path, monkeypatch):
+    from tradefloor import records  # noqa: PLC0415
+
+    def record(gated):
+        return {"schema": 1, "preset": "pt-x", "long_run": {
+            "verdict": "pass", "passed": 1, "of": 1 + gated, "all_rows": {"passed": 1, "of": 2},
+            "rows": [{"id": "A1", "pass": True, "gated": True},
+                     {"id": "OF4", "pass": False, "gated": gated}]}}
+    (tmp_path / "presets").mkdir()
+    monkeypatch.setattr(records, "_dir", lambda: tmp_path / "presets")
+    (tmp_path / "presets" / "pt-x.json").write_text(json.dumps(record(False)))
+    assert records.preset_record("pt-x")["long_run"]["rows"][1]["pass"] is False
+    (tmp_path / "presets" / "pt-x.json").write_text(json.dumps(record(True)))
+    with pytest.raises(LookupError, match="outside their mark"):
+        records.preset_record("pt-x")
+    # Written with the marks, a failing gated row is refused whatever the
+    # verdict says.
+    marked = record(True)
+    marked["long_run"]["verdict"] = "fail"
+    (tmp_path / "presets" / "pt-x.json").write_text(json.dumps(marked))
+    with pytest.raises(LookupError, match="outside their mark"):
+        records.preset_record("pt-x")
+    monkeypatch.undo()
+    # Every shipped record loads. pt-v19's carries the grade it failed as
+    # pt-v20's control (C4a, C4b), written before the marks, and loads as it did.
+    for name in records.available():
+        assert records.refused_rows(json.loads(
+            (ROOT / "python" / "tradefloor" / "presets" / f"{name}.json").read_text())) == [], name
+    assert records.gated_failures(records.preset_record("pt-v19")) == ["C4a", "C4b"]

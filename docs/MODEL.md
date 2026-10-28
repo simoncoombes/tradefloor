@@ -1611,6 +1611,7 @@ centre of 81 is 16.4 and 279.
 | `policy_guidance_signal_sd` | 0 (the next meeting priced at the discounted blend of the shadows plus the reversion step, the eve's too); off zero, the Fed's own reading seen through a keyed signal of this sd, bp, one draw a meeting, priced at its posterior mean over the 25 bp grid around the published shadow under the model's prior, and the eve's meeting at that whole | same | not set | the prior is the model's own: on 64 histories of 21 years (10,040 eves) the decision is the published shadow at 93.2% of eves, a step off at 4.9%; the signal sd, 6.48 bp, is set so the decision less the eve's posterior mean has the sd of the Kuttner-scaled ZQ=F surprise on scheduled FOMC days net of an ordinary session, 2015 and 2021-2026: 2.55 bp (se 0.69, 33 meetings; 5.65 and 7.42 bp at one se either side) |
 | `fed_eve_decision` | 0 (the meeting re-reads the day); 1 (a scheduled meeting delivers the eve's own-reading decision) | same | not set | scheduled-FOMC surprise sd 4.8 bp off the zero bound 1994-2019 (Bauer and Swanson 2022); the model's eve shadow matches the delivered decision at 80-87% of meetings, the rest stressed-day reversals (surprise 9-12 bp), about 5 bp with the switch |
 | `pinned_vix_sets_variance` | 0 (a pin reaches the variance one GARCH step a close); 1 (every pin sets it, as `vix_sets_variance` does) | same | not set | S&P 500 realized volatility by VIX level over 2020-21: 13% at a VIX of 20-25, 23% at 25-30, 29% at 30-40, 74% at 40-60, 80% at 60-100; replaying the real VIX the model read 29, 39, 47, 62 and 49 stepped and 18, 24, 35, 67 and 75 set |
+| `pinned_vix_return` | 0 (a pinned session draws the market at a zero mean); up to 0.05 a VIX point (the session's mean move is `-b` times the pin's change, less what the discount priced) | same | not set | S&P 500 1990-2025: the day's log return on the VIX's change in points, -0.5375% a point (se 0.0249, years resampled); -0.517, -0.559, -0.523 and -0.539 under a VIX of 20, 20-30, 30-40 and above 40 (R^2 0.52 to 0.70). The 2008 and 2020 replays read a slope of -0.047 and -0.050 on the log change without it, against -0.217 and -0.146 |
 | `treasury_term_premium_sd`, `treasury_term_premium_half_life` | 0 (no state: the 10-year's anchor is the policy path, the inflation premium and the havens); sd up to 0.5 points a session, half-life up to 2520 sessions | same | not set | FRED DGS10, 1990-2025: the variance of the 21-session change over 21 times the daily's is 0.974, of the 63-session 0.950 (model without it about 0.70 and 0.55, daily sd matched at 5.8 bp); solved with `treasury_10y_noise` re-solved to keep the daily sd, sd 0.060 and half-life 49 sessions (stationary sd 0.36 points) |
 | `corporate_spread_noise_sd`, `corporate_spread_noise_half_life` | 0 (no state: the spread moves with the VIX, the cycle and the leverage gap); sd up to 0.5 points a session, half-life up to 2520 sessions | same | not set | the IG closing-price spread (LQD's return less 0.913 IEF's at duration 8.5, on SPY, 2015-2025, off the zero bound): the part of its change the index does not explain has sd 2.54 bp a session, 11.5 over 21 and 16.7 over 63 (model 1.36, 6.4, 11.6); the 21- and 63-session pair gives a half-life of 16 sessions and a stationary sd of 8.8 bp |
 | `corporate_spread_equity_lag` | sessions: the half-life at which the gap the corporate spread prices follows credit's leverage gap; 0 is the gap itself | same | not set | FRED BAA10Y on the S&P 500, off the zero bound 1990-2025: beta -0.47 bp per 1% over one session, -0.91 over five, -2.28 over 21, -2.51 over 63; ICE BofA IG OAS -0.65 a session (2023-2025); read whole, the model's is -2.2 at every horizon |
@@ -1633,6 +1634,7 @@ centre of 81 is 16.4 and 279.
 | `treasury_path_anticipated` | 0 (the meeting steps the priced path by the rate's change); 1 (by the further move the anticipation priced) | same | not set | FRED DGS2 on the Fed's scheduled FOMC days, 1994-2025 off the zero bound: the day's move sd 7.1 bp (hikes -2.2, cuts -1.2 on average) |
 | `policy_anticipation_half_life` | 0 (the priced change is the shadow meeting's every close); up to 252 sessions | same | not set | FRED DGS2 on the Fed's scheduled FOMC days, 1994-2025 off the zero bound: those days carry 0.046 of the variance and the other days' sd is 6.16 bp; the 2-year moves +14.0 bp over the 20 sessions before a hike and -12.3 before a cut |
 | `treasury_2y_meeting_carry` | 0 (the meeting sets the 2-year from the rate); up to 1 (it keeps the 2-year's gap to that formula and moves it by the decision's news) | same | not set | FRED DGS2 on the Fed's scheduled FOMC decision days, 1994-02-04 to 2025-07-31, funds rate over 0.25: those days carry 0.046 (se 0.006) of the daily-change variance on 0.031 of sessions |
+| `treasury_2y_expected_path` | 0 (the 2-year's target is the blend `0.85 (ff + priced) + 0.15 x 10y`); up to 1 (the expected policy path over 504 closes plus the term premium) | same | not set | NY Fed ACM monthly, 1961-06 to 2026-09: TP02 mean 43.3 bp (se 15.2), slope of TP02 on TP10 0.452 (se 0.012); TP02 half-life 20.5 months |
 | `treasury_zlb_haven_gain` | 0 (none); up to 1 | same | not set | FRED THREEFYTP10 (Kim-Wright term premium), the same windows: -0.36 (se 0.13) |
 | `treasury_core_inflation` | 0 (the curve reads headline); 1 (core) | same | not set | FRED DGS10, CPI and the S&P 500, 1990 to 2025: corr(index, 10-year change) +0.28 with headline 3 to 4 and core under 3 (+0.22 both under 3), -0.35 with core 3 to 4; the 10-year's level loads on neither core nor the gap given the funds rate |
 | `oil_price_floor`, `oil_price_ceiling` | 0 (35 and 150); the floor in (0, 35], the ceiling in [150, 1000] | same | not set | EIA RCLC1 deflated by FRED CPIAUCSL, 1987 to 2024: 0.203 and 3.44 times the median, at the model's 81 |
@@ -4754,6 +4756,28 @@ skew share below 1 and, with $|
 ho|$ no larger than the index's, every
 smile stays inside the paper's Remark 4.4. `Engine.surface("ACME")` reads
 it, with the escrowed price's forward.
+
+`surface_name_earnings_premium`, 0.0 on every shipped preset, prices a
+name's reports on the variance the engine draws for them instead. Off zero
+each report adds that premium times `earnings_surprise_sigma` squared plus
+`earnings_session_sigma` squared at its reaction session, and times
+`earnings_followthrough_sigma` squared at the session after, each times the
+name's non-market daily variance (its GJR variance at its idiosyncratic
+scale and size, and its sector part: the unit the opening print draws the
+surprise in), carried to the report on the forecast's path of the name's
+variance; `surface_earnings_weight` is then not read for the names. The
+weight's basis, the whole one-session variance, carries the market's part,
+which a report does not move. The index surface's reports are as before.
+No price of a stock moves (`tests/test_name_earnings_premium.py`).
+
+`surface_name_term_slope`, 0.0 on every shipped preset, shapes a name's
+premium in tenor: off zero the name's expected variance to `t` sessions
+takes a further log premium of the slope times $\ln(t / 63)$ (`t` held at
+one session below one), on top of `surface_name_premium` and the index's
+term premia; the reports' variance is not scaled. A name's 63-session point,
+the tenor `surface_name_premium` is read at, does not move; a positive slope
+lowers the shorter tenors and raises the longer. No price of a stock moves
+(`tests/test_name_term_slope.py`).
 
 **The price.** An option settling at the close of session $E$ has
 $E + 1 - t$ sessions left at time $t$, a close counting as the next

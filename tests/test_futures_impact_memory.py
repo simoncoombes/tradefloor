@@ -46,6 +46,8 @@ def day(engine):
 
 def test_off_on_every_shipped_preset_silent_in_the_digest_and_refused_without_futures():
     for name in tf.preset_names():
+        if name == "pt-v22":
+            continue  # pt-v22 ships its arm's values, which tests/test_validation.py holds
         assert tf.ModelParams.from_preset(name).futures_impact_memory == 0.0, name
     assert "futures_impact_memory" in set(tf.ModelParams.digest_silent_at_zero())
     assert model(futures_impact_memory=0.0).fingerprint == "pt-v21"
@@ -209,6 +211,8 @@ HALF_LIFE = 780.0
 
 def test_half_life_off_on_every_preset_silent_and_refused_without_the_memory():
     for name in tf.preset_names():
+        if name == "pt-v22":
+            continue  # pt-v22 ships its arm's values, which tests/test_validation.py holds
         assert tf.ModelParams.from_preset(name).futures_impact_memory_half_life == 0.0, name
     assert "futures_impact_memory_half_life" in set(tf.ModelParams.digest_silent_at_zero())
     assert model(futures_impact_memory_half_life=0.0).fingerprint == "pt-v21"

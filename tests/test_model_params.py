@@ -1024,6 +1024,9 @@ PERTURBATIONS = [
     # a gap to keep: 0.15% against 0.23% after the third close, measured
     # 2026-10-11), but no column this table reads takes the 2-year.
     ("treasury_2y_meeting_carry", 1.0, False),
+    # The 2-year's expected path. INERT on the probe's market: it moves only
+    # the 2-year's target, and no column this table reads takes the 2-year.
+    ("treasury_2y_expected_path", 1.0, False),
     # The reversed flight to quality's cut. INERT on the probe: pt-v20's curve
     # reads headline, which the probe's path keeps under 4.
     ("flight_to_quality_reversal_cut", 0.5, False),
@@ -1360,6 +1363,8 @@ PERTURBATIONS = [
     ("option_name_spread_otm", 1.4, False),
     ("option_name_spread_itm", 0.7, False),
     ("option_name_spread_tenor_exponent", -0.2, False),
+    ("surface_name_earnings_premium", 1.2, False),
+    ("surface_name_term_slope", 0.1, False),
     # The VIX's fear memory (pt-v22 phase 1). LIVE: the first close's VIX
     # sits off its target, the memory takes up a share of the gap, and the
     # target the step reverts to moves, which the factor's VIX-coupled
@@ -1574,6 +1579,8 @@ PERTURBATIONS = [
     ("corporate_spread_noise_sd", 0.025, True),
     # INERT: read only by a VIX pin; the probe pins nothing.
     ("pinned_vix_sets_variance", 1.0, False),
+    # INERT: read only by a VIX pin; the probe pins nothing.
+    ("pinned_vix_return", 0.005375, False),
     # INERT: the half-life alone is read by nothing (the sd is 0).
     ("corporate_spread_noise_half_life", 16.0, False),
     # The 10-year's own term premium: its opening draw moves the 10-year's
@@ -2359,6 +2366,11 @@ COMPANIONS: dict[str, dict[str, float]] = {
        for name in ("surface_name_premium", "surface_name_skew", "option_position_limit",
                     "option_name_inventory_slope", "option_name_inventory_half_life",
                     "option_name_spread_tenor_exponent")},
+    "surface_name_earnings_premium": {"index_level_listed": 1.0, "surface_ssvi": 1.0,
+                                      "forecast_horizon_sessions": 63.0, "options_names_listed": 1.0,
+                                      "earnings_surprise_sigma": 3.5, "overnight_idio_share": 0.1},
+    "surface_name_term_slope": {"index_level_listed": 1.0, "surface_ssvi": 1.0,
+                                "forecast_horizon_sessions": 63.0, "options_names_listed": 1.0},
     **{name: {"index_level_listed": 1.0, "surface_ssvi": 1.0, "forecast_horizon_sessions": 63.0,
               "options_names_listed": 1.0}
        for name in ("option_name_spread_otm", "option_name_spread_itm")},

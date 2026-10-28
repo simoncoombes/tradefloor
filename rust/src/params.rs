@@ -1497,6 +1497,28 @@ pub struct ModelParams {
     /// the zero bound, 1994-2025: 0.046 (se 0.006) on 0.031 of sessions. In
     /// [0, 1].
     pub treasury_2y_meeting_carry: f64,
+    /// The share of the 2-year's daily target that is the expected policy
+    /// path plus a term premium rather than the legacy blend. 0.0, on every
+    /// shipped preset, is the blend as it stood, and a value of 0.0 is left
+    /// out of the model's digest.
+    ///
+    /// The blend, `0.85 (ff + priced) + 0.15 x 10y`, is not the expected
+    /// path plus a premium, so the eight-quarter policy-rate strip less the
+    /// 2-year (RF4) read +18 bp against the tape's -44.8 (-ACM TP02). Off
+    /// zero the 2-year's target is `legacy + d (path + tp - legacy)`:
+    /// `path` is the mean over the next 504 closes of the policy rate the
+    /// standing forecast expects each close to set (past its horizon its
+    /// last rate; without a forecast the policy rate now), the rate the
+    /// strip prices before its premium, so the two read one path; `tp` is
+    /// [`crate::economy::daily::TWO_YEAR_TERM_PREMIUM`] plus
+    /// [`crate::economy::daily::TWO_YEAR_TERM_PREMIUM_BETA`] times the
+    /// 10-year's own term-premium state (`treasury_term_premium_sd`; none
+    /// without it). Both constants are measured on ACM's monthly TP02,
+    /// 1961-2026: its mean, 43.3 bp (se 15.2), and its slope on TP10, 0.452
+    /// (se 0.012). Only the target moves: the 2-year's pull, its noise, the
+    /// meeting and the anticipated meeting's books are as they stand. No
+    /// draw. In [0, 1].
+    pub treasury_2y_expected_path: f64,
     /// The half-life, in sessions, at which the curve's priced change for the
     /// next meeting (`policy_anticipation`) moves toward the shadow meeting's
     /// change between meetings. 0.0, on every shipped preset, is off: the
@@ -2421,6 +2443,32 @@ pub struct ModelParams {
     /// it flat in tenor, and is left out of the model's digest. Read only
     /// with `options_names_listed` set. In [-1, 1].
     pub option_name_spread_tenor_exponent: f64,
+    /// The premium on a report's variance in each single-name surface's
+    /// term structure over the variance the engine draws for it. Off zero a
+    /// report adds this times `earnings_surprise_sigma` squared plus
+    /// `earnings_session_sigma` squared, at its reaction session, and
+    /// `earnings_followthrough_sigma` squared at the session after, each
+    /// times the name's non-market daily variance (the unit the open draws
+    /// the surprise in: its own GARCH variance at its idiosyncratic scale and
+    /// size, and its sector loading on the sector's sigma), carried to the
+    /// report on the forecast's path of the name's variance; and
+    /// `surface_earnings_weight` is not read for the names. 0.0, on every
+    /// shipped preset, prices a name's report at `surface_earnings_weight`
+    /// times `earnings_surprise_sigma` squared times the forecast's whole
+    /// one-session variance of the name, and is left out of the model's
+    /// digest. The index surface's reports are as before either way. Read
+    /// only with `options_names_listed` set. In [0, 5].
+    pub surface_name_earnings_premium: f64,
+    /// The single-name premium's slope in tenor: a log premium on each
+    /// name's implied variance of this times `ln(t / 63)` at `t` sessions
+    /// (held at one session below one), on top of `surface_name_premium`
+    /// and the index's term premia, so a name's 63-session point, where
+    /// `surface_name_premium` holds, is unchanged and its shorter tenors
+    /// fall when the slope is positive. The earnings reports' variance is
+    /// not scaled. 0.0, on every shipped preset, is no slope, and is left out
+    /// of the model's digest. Read only with `options_names_listed` set. In
+    /// [-1, 1].
+    pub surface_name_term_slope: f64,
     /// Switch that makes the fear/greed index read the business cycle and
     /// GDP growth as published instead of as they are. 0.0, on every preset
     /// through pt-v19, is off; pt-v20 sets 1.0.
@@ -3085,6 +3133,39 @@ pub struct ModelParams {
     /// February high read 0.32 (S&P 500 0.34, stepped 0.27) and its
     /// drawdown over the path 0.33 (0.34, stepped 0.38).
     pub pinned_vix_sets_variance: f64,
+    /// The index's same-day return on a PINNED VIX's change, as a share per
+    /// VIX point. 0.0, on every shipped preset, leaves a pinned session's
+    /// market draws at a zero mean; a value of 0.0 is left out of the model's
+    /// digest, and nothing is computed or drawn.
+    ///
+    /// Why. The free model carries the tape's same-day co-movement: the VIX
+    /// answers the day's return (`vix_return_gain` and its exponents), so the
+    /// index's log return on the day's log VIX change reads -0.095, -0.126,
+    /// -0.160 and -0.191 under a VIX of 20, 20-30, 30-40 and above 40
+    /// (R22-fixd2's 270 free histories), against the S&P 500's -0.080,
+    /// -0.130, -0.165 and -0.257 (1990-2025). A pin writes the VIX, so that
+    /// law no longer acts, and nothing in a pinned session makes the return
+    /// answer the VIX instead: on the 2008 and 2020 replays the same slope
+    /// reads -0.047 and -0.050 (R^2 0.02) against -0.217 and -0.146 (R^2 0.61
+    /// and 0.49). The discount `pinned_vix_feedback` prices bridges part of
+    /// it above its knee and none below.
+    ///
+    /// Off zero, a VIX pin sets the session's mean market move to the tape's
+    /// conditional mean, `M = -b (vix - vix_before)` in log return at a beta
+    /// of one. The discount the same pin priced counts toward it, so the
+    /// session's draws carry `M` less that priced move, spread evenly over the
+    /// open session's ticks at each name's beta, after the down-day wiring and
+    /// the crash amplifier so that neither rescales it. Under
+    /// `pinned_vix_variance_share` the variance trim reads `M` in place of the
+    /// discount's move, so the draw keeps the variance the VIX does not
+    /// explain. Free sessions are untouched.
+    ///
+    /// The value is measured: the S&P 500's daily log return on the VIX's
+    /// change in points, 1990-2025, reads -0.5375 per cent a point (se
+    /// 0.0249, years resampled), and it is flat in the level: -0.517, -0.559,
+    /// -0.523 and -0.539 under 20, 20-30, 30-40 and above 40 (R^2 0.52 to
+    /// 0.70), so one number carries it. In [0, 0.05].
+    pub pinned_vix_return: f64,
     /// A ceiling on the annual buyback yield `buyback_payout_share * eps /
     /// price` that the buyback term compounds over the elapsed years. In
     /// [0, 1], and 0.0 means no ceiling.
@@ -3885,7 +3966,8 @@ pub struct ModelParams {
     /// non-zero. In [0, 1].
     pub vix_stress_premium_memory: f64,
     /// The stress premium as the anchor's own pull, undone above the knee.
-    /// 0.0, which every preset carries, is the shipped form, the capped hinge
+    /// 0.0, which every preset through pt-v21 carries, is the original form,
+    /// the capped hinge
     /// `cap * (1 - exp(-g * max(0, m - knee) / cap))`. Off zero (a switch, in
     /// [0, 1]; any value above 0.0 is on) the premium is
     /// `vix_anchor_weight * max(0, m - knee)`, uncapped (the quote still never
@@ -8971,6 +9053,9 @@ pub const PT_V20: ModelParams = ModelParams::pt_v20();
 /// `DEFAULT_PRESET_NAME` names it and `Engine::default_model` returns it,
 /// and the test at the bottom of this file asserts the two agree.
 pub const PT_V21: ModelParams = ModelParams::pt_v21();
+/// pt-v21's successor, which lists the contracts; see
+/// [`ModelParams::pt_v22`]. Not the default.
+pub const PT_V22: ModelParams = ModelParams::pt_v22();
 
 /// pt-v21's `cycle_equity_hazard_opening`, held apart because it is the one
 /// value the vectors graded for pt-v21 differ in: a larger opening hazard
@@ -8985,6 +9070,12 @@ const PT_V21_OPENING_HAZARD: f64 = 0.011;
 /// overrides on pt-v20 (`custom-2dc32068`). A test pins it.
 #[cfg(test)]
 const PT_V21_DIGEST_PREFIX: &str = "2dc32068";
+
+/// The first eight hex digits of pt-v22's digest: the fingerprint its arm
+/// has as overrides on the arm's base. `tools/presets/arm_preset.py` writes
+/// it with the arm, and a test pins it.
+#[cfg(test)]
+const PT_V22_DIGEST_PREFIX: &str = "8f77ba8f";
 
 /// The name of the preset an engine runs when none is named.
 ///
@@ -9305,6 +9396,7 @@ impl ModelParams {
             corporate_spread_noise_sd: 0.0,
             corporate_spread_noise_half_life: 0.0,
             treasury_2y_meeting_carry: 0.0,
+            treasury_2y_expected_path: 0.0,
             policy_anticipation_half_life: 0.0,
             treasury_path_anticipated: 0.0,
             policy_anticipation_guidance: 0.0,
@@ -9370,6 +9462,8 @@ impl ModelParams {
             option_name_spread_otm: 0.0,
             option_name_spread_itm: 0.0,
             option_name_spread_tenor_exponent: 0.0,
+            surface_name_earnings_premium: 0.0,
+            surface_name_term_slope: 0.0,
             options_names_listed: 0.0,
             surface_name_premium: 0.0,
             surface_name_skew: 0.0,
@@ -9414,6 +9508,7 @@ impl ModelParams {
             pinned_vix_calm_share: 0.0,
             pinned_vix_priced_cap: 0.0,
             pinned_vix_sets_variance: 0.0,
+            pinned_vix_return: 0.0,
             buyback_yield_cap: 0.0,
             buyback_accrual: 0.0,
             rate_close_remark: 0.0,
@@ -11727,6 +11822,234 @@ impl ModelParams {
         p
     }
 
+    /// pt-v21's successor, which lists the contracts: index, rate and oil
+    /// futures with their night session and margin, and options on every
+    /// name with their dealer, beside the economy, curve and variance terms
+    /// pt-v21 moved. Index options (`options_index_listed`) and VIX futures
+    /// (`futures_vix_listed`) stay off. NOT the default: `DEFAULT_PRESET_NAME`
+    /// is pt-v21's.
+    ///
+    /// The values are an arm, written between the two marker lines by
+    /// `tools/presets/arm_preset.py` from `tools/presets/arms/pt-v22.txt`:
+    /// change the arm and re-run the tool, not these lines. The arm file's
+    /// `@status` says whether it is the graded arm or a stand-in, and so does
+    /// the comment on the block's first line. Its base is pt-v20, so a dial
+    /// pt-v21 moved and the arm does not set is at pt-v20's value here. The
+    /// test at the bottom of this file pins the digest the arm has as
+    /// overrides on its base (`PT_V22_DIGEST_PREFIX`).
+    pub const fn pt_v22() -> ModelParams {
+        let mut p = ModelParams::pt_v20();
+        // ARM BEGIN: written by tools/presets/arm_preset.py from tools/presets/arms/pt-v22.txt.
+        // Arm R22-fixd2 on pt-v20, a STAND-IN until the graded arm replaces it.
+        p.cycle_equity_hazard_opening = 0.011;
+        p.cycle_equity_hazard = 5.0;
+        p.cycle_equity_hazard_knee = 0.1;
+        p.cycle_nowcast_accuracy = 0.4;
+        p.corporate_spread_cycle = 0.75;
+        p.fed_growth_cut = 2.0;
+        p.cycle_publication_lag_draw = 1.0;
+        p.earnings_anticipation_drift_half_life = 252.0;
+        p.earnings_anticipation_drift_share = 0.9;
+        p.buyback_accrual = 1.0;
+        p.rate_close_remark = 1.0;
+        p.rate_intraday_live = 1.0;
+        p.fed_stress_cut = 0.1;
+        p.fed_stress_inflation_gap = 2.0;
+        p.macro_pins_hold = 1.0;
+        p.market_vol_vix_coupling = 0.75;
+        p.flight_to_quality_gain = 0.0245;
+        p.buyback_payout_share = 0.9;
+        p.dividend_payout_share = 1.2;
+        p.dividend_buyback_substitution = 1.0;
+        p.impact_memory_coefficient = 0.65;
+        p.impact_memory_half_life = 12.0;
+        p.impact_memory_slow_half_life = 780.0;
+        p.impact_memory_slow_weight = 0.1;
+        p.impact_memory_crossover = 0.001;
+        p.fill_impact_coefficient = 0.15;
+        p.book_arrival_shuffle = 1.0;
+        p.overnight_market_share = 0.55;
+        p.overnight_idio_share = 0.1;
+        p.overnight_idio_df = 4.0;
+        p.earnings_surprise_sigma = 3.5;
+        p.earnings_session_sigma = 1.9;
+        p.earnings_followthrough_sigma = 1.1;
+        p.earnings_volume_multiple = 1.2;
+        p.jump_intensity_idio = 0.009;
+        p.jump_sigma_idio = 0.0318;
+        p.idio_sigma_scale = 0.52;
+        p.idio_vol_alpha = 0.25;
+        p.idio_vol_beta = 0.5;
+        p.idio_vol_jump_bump = 1.0;
+        p.market_vol_slow_gamma = 0.05;
+        p.vix_stress_premium = 3.0;
+        p.vix_stress_premium_knee = 0.4;
+        p.vix_stress_premium_cap = 0.25;
+        p.fed_put_gain = 2.5;
+        p.fed_put_half_life = 126.0;
+        p.treasury_put_pricing = 1.0;
+        p.treasury_haven_gain = 0.0147;
+        p.fed_stress_hold = 42.0;
+        p.treasury_path_pricing = 1.0;
+        p.treasury_path_half_life = 63.0;
+        p.treasury_policy_damping = 0.5;
+        p.corporate_spread_vix_cut = 1.0;
+        p.corporate_spread_equity_gain = 1.8;
+        p.corporate_spread_equity_half_life = 126.0;
+        p.pinned_vix_feedback = 0.8;
+        p.pinned_vix_variance_share = 0.7;
+        p.market_vol_cycle_ratio = 2.4705882352941178;
+        p.market_vol_cycle_expansion = 0.82;
+        p.market_vol_cycle_half_life = 10.0;
+        p.market_vol_cycle_relative = 0.75;
+        p.market_vol_cycle_cap_relative = 1.0;
+        p.market_vol_cycle_pin_neutral = 1.0;
+        p.market_vol_cycle_pin_phase = 1.0;
+        p.market_vol_leverage = 2.25;
+        p.market_vol_leverage_half_life = 15.0;
+        p.market_vol_leverage_standardise = 1.0;
+        p.vix_level_sigma = 0.009;
+        p.market_vol_vix_smooth = 3.0;
+        p.market_vol_gamma = 0.06;
+        p.market_vol_beta = 0.9446;
+        p.price_hard_cap = 1000000000.0;
+        p.book_depth_nesting = 1.0;
+        p.fair_value_market_excess_share = 0.5;
+        p.fair_value_vix_release_half_life = 504.0;
+        p.book_cross_at_limit = 1.0;
+        p.impact_memory_refill = 1.0;
+        p.pinned_vix_calm_knee = 17.6;
+        p.pinned_vix_calm_share = 0.2;
+        p.pinned_vix_priced_cap = 1.0;
+        p.policy_anticipation = 0.75;
+        p.fair_value_relative_knee = 4.0;
+        p.fair_value_relative_half_life = 63.0;
+        p.market_beta_normalise = 1.0;
+        p.market_factor_sigma = 0.0067;
+        p.market_prehistory_sessions = 504.0;
+        p.market_prehistory_valuation = 1.0;
+        p.fed_put_carry = 1.0;
+        p.fed_put_emergency_vix = 50.0;
+        p.fed_drawdown_hold = 0.12;
+        p.market_vol_cycle_recovery_release = 0.45;
+        p.market_vol_cycle_recovery_scale = 0.1;
+        p.order_flow_depth_law = 1.0;
+        p.order_flow_impact_law = 1.0;
+        p.order_flow_coefficient = 800.0;
+        p.jump_intensity_market = 0.005;
+        p.jump_mean_market = -0.03;
+        p.jump_sigma_market = 0.01;
+        p.unemployment_okun_coefficient = 0.75;
+        p.oil_inventory_reversion = 0.002;
+        p.oil_inflation_passthrough = 1.0;
+        p.treasury_2y_noise = 0.044;
+        p.volume_idio_variance_gain = 0.65;
+        p.earnings_cycle_half_life = 150.0;
+        p.index_level_listed = 1.0;
+        p.vix_intraday_live = 1.0;
+        p.forecast_horizon_sessions = 130.0;
+        p.forecast_vix_dispersion = 0.285;
+        p.forecast_vix_dispersion_half_life = 28.0;
+        p.forecast_policy_shadow_discount = 0.2;
+        p.forecast_policy_persistence = 0.7;
+        p.forecast_policy_reversion = 0.015;
+        p.forecast_policy_neutral = 2.84;
+        p.vix_anchor_memory = 0.035;
+        p.vix_anchor_weight = 0.6;
+        p.forecast_vix_dispersion_skew = 0.99;
+        p.oil_mean_reversion = 0.006;
+        p.oil_inventory_noise_sd = 0.35;
+        p.oil_inventory_level_gain = 1.0;
+        p.oil_pushes_in_target = 1.0;
+        p.oil_noise_log_sd = 0.006;
+        p.oil_target_drift_sd = 0.012;
+        p.oil_dollar_elasticity = 0.69;
+        p.oil_forecast_clamp = 1.0;
+        p.usd_mean_reversion = 0.00095;
+        p.usd_noise_sd = 0.43;
+        p.oil_price_floor = 16.4;
+        p.oil_price_ceiling = 279.0;
+        p.usd_safe_haven_gain = 0.001;
+        p.oil_convenience_yield = 2.65;
+        p.fed_core_inflation = 1.0;
+        p.treasury_core_inflation = 1.0;
+        p.treasury_zlb_path = 0.972;
+        p.treasury_zlb_haven_gain = 0.0595;
+        p.fed_neutral_real_rate = 1.25;
+        p.treasury_2y_meeting_carry = 1.0;
+        p.policy_anticipation_cut_share = 0.42;
+        p.policy_anticipation_guidance = 1.0;
+        p.policy_anticipation_half_life = 0.625;
+        p.core_trend_persistence = 0.993;
+        p.core_trend_sd = 0.17;
+        p.cycle_inflation_hazard = 0.0219;
+        p.cycle_rate_hazard = 0.0013;
+        p.vix_stress_premium_undo = 1.0;
+        p.treasury_path_anticipated = 1.0;
+        p.fed_eve_decision = 1.0;
+        p.treasury_path_owed_excluded = 1.0;
+        p.treasury_10y_noise = 0.049;
+        p.corporate_spread_noise_sd = 0.0209;
+        p.corporate_spread_noise_half_life = 16.0;
+        p.fair_value_vix_discount = 0.3;
+        p.pinned_vix_sets_variance = 1.0;
+        p.flight_to_quality_reversal_cut = 0.8;
+        p.treasury_term_premium_sd = 0.03;
+        p.treasury_term_premium_half_life = 49.0;
+        p.market_vol_cycle_hold_onset = 0.9;
+        p.market_vol_cycle_hold_fade = 0.335;
+        p.market_vol_cycle_hold_half_life = 295.0;
+        p.market_vol_vix_hold_half_life = 198.0;
+        p.oil_forecast_opec_spread = 1.0;
+        p.fair_value_aggregate_jensen = 1.0;
+        p.fair_value_aggregate_remark = 1.0;
+        p.fair_value_aggregate_expected = 1.0;
+        p.earnings_lookthrough_half_life = 598.0;
+        p.earnings_lookthrough_gain = 0.1605;
+        p.earnings_lookthrough_discount_half_life = 5267.0;
+        p.futures_index_listed = 1.0;
+        p.basis_sd = 3.753;
+        p.basis_persistence = 0.429;
+        p.night_session_steps = 10.0;
+        p.futures_rates_listed = 1.0;
+        p.futures_oil_listed = 1.0;
+        p.margin_scan_coverage = 0.99;
+        p.futures_impact_memory = 1.4;
+        p.futures_impact_memory_half_life = 780.0;
+        p.margin_scan_tail = 1.258;
+        p.basis_night_share = 0.761;
+        p.surface_ssvi = 1.0;
+        p.surface_skew_physical = -0.698;
+        p.surface_skew_physical_slope = -0.51;
+        p.surface_curvature = 1.0;
+        p.surface_curvature_exponent = 0.5;
+        p.options_names_listed = 1.0;
+        p.surface_name_skew = 0.5;
+        p.surface_name_premium = 0.22;
+        p.surface_skew_premium_slope = 1.12;
+        p.surface_skew_premium = -1.15;
+        p.surface_term_premium_short = -0.08;
+        p.surface_term_premium_long = 0.35;
+        p.surface_earnings_weight = 0.9;
+        p.surface_skew_noise_sd = 1.155;
+        p.surface_skew_noise_half_life = 346.0;
+        p.margin_scan_option_tail = 0.8;
+        p.news_preopen_share = 0.259;
+        p.policy_guidance_signal_sd = 6.4759;
+        p.rate_premium_per_fixing = 1.0;
+        p.margin_option_minimum = 0.375;
+        p.margin_pretrade_check = 1.0;
+        p.option_dealer_spread = 0.02;
+        p.option_position_limit = 100.0;
+        p.option_name_inventory_slope = 0.000138;
+        p.option_name_inventory_half_life = 11.4;
+        p.option_name_spread_otm = 1.431;
+        p.option_name_spread_itm = 0.724;
+        p.option_name_spread_tenor_exponent = -0.167;
+        // ARM END
+        p
+    }
+
     /// Look a shipped preset up by name. `"pt-v1"` remains selectable and
     /// bit-reproducing forever; `"pt-v2"` is the calibrated candidate that
     /// joined the table on 2026-08-22; `"pt-v3"` is
@@ -11761,6 +12084,7 @@ impl ModelParams {
             "pt-v19" => Some(PT_V19),
             "pt-v20" => Some(PT_V20),
             "pt-v21" => Some(PT_V21),
+            "pt-v22" => Some(PT_V22),
             _ => None,
         }
     }
@@ -11769,7 +12093,7 @@ impl ModelParams {
     pub fn preset_names() -> &'static [&'static str] {
         &["pt-v1", "pt-v2", "pt-v3", "pt-v4", "pt-v5", "pt-v6", "pt-v7", "pt-v8", "pt-v9", "pt-v10",
           "pt-v11", "pt-v12", "pt-v13", "pt-v14", "pt-v15",
-          "pt-v16", "pt-v18", "pt-v19", "pt-v20", "pt-v21"]
+          "pt-v16", "pt-v18", "pt-v19", "pt-v20", "pt-v21", "pt-v22"]
     }
 
     /// Read one parameter by name — the settable surface, the derived bits,
@@ -12021,6 +12345,7 @@ impl ModelParams {
             "corporate_spread_noise_sd" => self.corporate_spread_noise_sd,
             "corporate_spread_noise_half_life" => self.corporate_spread_noise_half_life,
             "treasury_2y_meeting_carry" => self.treasury_2y_meeting_carry,
+            "treasury_2y_expected_path" => self.treasury_2y_expected_path,
             "policy_anticipation_half_life" => self.policy_anticipation_half_life,
             "treasury_path_anticipated" => self.treasury_path_anticipated,
             "policy_anticipation_guidance" => self.policy_anticipation_guidance,
@@ -12090,6 +12415,8 @@ impl ModelParams {
             "option_name_spread_otm" => self.option_name_spread_otm,
             "option_name_spread_itm" => self.option_name_spread_itm,
             "option_name_spread_tenor_exponent" => self.option_name_spread_tenor_exponent,
+            "surface_name_earnings_premium" => self.surface_name_earnings_premium,
+            "surface_name_term_slope" => self.surface_name_term_slope,
             "fear_greed_published_inputs" => self.fear_greed_published_inputs,
             "macro_publication_repricing" => self.macro_publication_repricing,
             "treasury_10y_noise" => self.treasury_10y_noise,
@@ -12130,6 +12457,7 @@ impl ModelParams {
             "pinned_vix_calm_share" => self.pinned_vix_calm_share,
             "pinned_vix_priced_cap" => self.pinned_vix_priced_cap,
             "pinned_vix_sets_variance" => self.pinned_vix_sets_variance,
+            "pinned_vix_return" => self.pinned_vix_return,
             "buyback_yield_cap" => self.buyback_yield_cap,
             "buyback_accrual" => self.buyback_accrual,
             "rate_close_remark" => self.rate_close_remark,
@@ -12502,6 +12830,7 @@ impl ModelParams {
             "corporate_spread_noise_sd" => out.corporate_spread_noise_sd = value,
             "corporate_spread_noise_half_life" => out.corporate_spread_noise_half_life = value,
             "treasury_2y_meeting_carry" => out.treasury_2y_meeting_carry = value,
+            "treasury_2y_expected_path" => out.treasury_2y_expected_path = value,
             "policy_anticipation_half_life" => out.policy_anticipation_half_life = value,
             "treasury_path_anticipated" => out.treasury_path_anticipated = value,
             "policy_anticipation_guidance" => out.policy_anticipation_guidance = value,
@@ -12571,6 +12900,8 @@ impl ModelParams {
             "option_name_spread_otm" => out.option_name_spread_otm = value,
             "option_name_spread_itm" => out.option_name_spread_itm = value,
             "option_name_spread_tenor_exponent" => out.option_name_spread_tenor_exponent = value,
+            "surface_name_earnings_premium" => out.surface_name_earnings_premium = value,
+            "surface_name_term_slope" => out.surface_name_term_slope = value,
             "fear_greed_published_inputs" => out.fear_greed_published_inputs = value,
             "macro_publication_repricing" => out.macro_publication_repricing = value,
             "treasury_10y_noise" => out.treasury_10y_noise = value,
@@ -12611,6 +12942,7 @@ impl ModelParams {
             "pinned_vix_calm_share" => out.pinned_vix_calm_share = value,
             "pinned_vix_priced_cap" => out.pinned_vix_priced_cap = value,
             "pinned_vix_sets_variance" => out.pinned_vix_sets_variance = value,
+            "pinned_vix_return" => out.pinned_vix_return = value,
             "buyback_yield_cap" => out.buyback_yield_cap = value,
             "buyback_accrual" => out.buyback_accrual = value,
             "rate_close_remark" => out.rate_close_remark = value,
@@ -13389,6 +13721,12 @@ impl ModelParams {
                 "pinned_vix_sets_variance is {}. It is a switch: 0 (a pin reaches the variance one \
                  step a close) or 1 (every pin sets it, as vix_sets_variance does).",
                 self.pinned_vix_sets_variance));
+        }
+        if !(self.pinned_vix_return >= 0.0 && self.pinned_vix_return <= 0.05) {
+            return Err(format!(
+                "pinned_vix_return is {}. It is the index's same-day return on a pinned VIX's change, a \
+                 share per VIX point, in [0, 0.05]; the tape measures 0.005375.",
+                self.pinned_vix_return));
         }
         if !(self.market_vol_slow_gamma >= 0.0 && self.market_vol_slow_gamma <= 1.0) {
             return Err(format!(
@@ -14186,6 +14524,12 @@ impl ModelParams {
                  the meeting's formula a meeting keeps, in [0, 1]; 0 is the reset that stood.",
                 self.treasury_2y_meeting_carry));
         }
+        if !(0.0..=1.0).contains(&self.treasury_2y_expected_path) {
+            return Err(format!(
+                "treasury_2y_expected_path is {}. It is the share of the 2-year's target that is the \
+                 expected policy path plus its term premium, in [0, 1]; 0 is the blend that stood.",
+                self.treasury_2y_expected_path));
+        }
         if !(-2.0..=5.0).contains(&self.fed_neutral_real_rate) {
             return Err(format!(
                 "fed_neutral_real_rate is {}. It is the points added to the Taylor rule's neutral \
@@ -14871,6 +15215,37 @@ impl ModelParams {
                  them to 1.0 first.",
                 self.option_position_limit));
         }
+        if !(-1.0..=1.0).contains(&self.surface_name_term_slope) {
+            return Err(format!(
+                "surface_name_term_slope is {}. It is in [-1, 1].",
+                self.surface_name_term_slope));
+        }
+        if self.surface_name_term_slope != 0.0 && self.options_names_listed == 0.0 {
+            return Err(format!(
+                "options_names_listed is 0 but surface_name_term_slope is {}. It shapes the names' \
+                 surfaces in tenor, which only options_names_listed keeps: set options_names_listed \
+                 to 1.0 first.",
+                self.surface_name_term_slope));
+        }
+        if !(0.0..=5.0).contains(&self.surface_name_earnings_premium) {
+            return Err(format!(
+                "surface_name_earnings_premium is {}. It is in [0, 5].",
+                self.surface_name_earnings_premium));
+        }
+        if self.surface_name_earnings_premium != 0.0 && self.options_names_listed == 0.0 {
+            return Err(format!(
+                "options_names_listed is 0 but surface_name_earnings_premium is {}. It prices the \
+                 reports in the names' surfaces, which only options_names_listed keeps: set \
+                 options_names_listed to 1.0 first.",
+                self.surface_name_earnings_premium));
+        }
+        if self.surface_name_earnings_premium != 0.0 && self.earnings_surprise_sigma == 0.0 {
+            return Err(format!(
+                "earnings_surprise_sigma is 0 but surface_name_earnings_premium is {}. It is a \
+                 premium on the variance the reports draw, and without the surprise there are no \
+                 reports: set earnings_surprise_sigma first.",
+                self.surface_name_earnings_premium));
+        }
         for (name, v, lo, hi) in [
             ("surface_name_premium", self.surface_name_premium, -0.5, 1.0),
             ("surface_name_skew", self.surface_name_skew, 0.0, 1.0),
@@ -15355,6 +15730,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "pinned_vix_feedback",
     "pinned_vix_priced_cap",
     "pinned_vix_sets_variance",
+    "pinned_vix_return",
     "pinned_vix_variance_share",
     "policy_anticipation",
     "policy_anticipation_cut_share",
@@ -15418,6 +15794,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "treasury_term_premium_sd",
     "treasury_term_premium_half_life",
     "treasury_2y_meeting_carry",
+    "treasury_2y_expected_path",
     "flight_to_quality_reversal_cut",
     "policy_anticipation_half_life",
     "treasury_path_anticipated",
@@ -15486,6 +15863,8 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "option_name_spread_otm",
     "option_name_spread_itm",
     "option_name_spread_tenor_exponent",
+    "surface_name_earnings_premium",
+    "surface_name_term_slope",
 ];
 
 #[cfg(test)]
@@ -15703,6 +16082,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "treasury_term_premium_sd",
         "treasury_term_premium_half_life",
         "treasury_2y_meeting_carry",
+        "treasury_2y_expected_path",
         "flight_to_quality_reversal_cut",
         "policy_anticipation_half_life",
         "treasury_path_anticipated",
@@ -15772,6 +16152,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "option_name_spread_otm",
         "option_name_spread_itm",
         "option_name_spread_tenor_exponent",
+        "surface_name_earnings_premium",
+        "surface_name_term_slope",
         "fear_greed_published_inputs",
         "macro_publication_repricing",
         "treasury_10y_noise",
@@ -15809,6 +16191,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "pinned_vix_calm_share",
         "pinned_vix_priced_cap",
         "pinned_vix_sets_variance",
+        "pinned_vix_return",
         "buyback_yield_cap",
         "buyback_accrual",
         "rate_close_remark",
@@ -16351,6 +16734,10 @@ mod tests {
         // pt-v21 is the graded vector: its digest is the one the vector had
         // as overrides on pt-v20 while it was graded.
         assert_eq!(&crate::params::PT_V21.digest()[..8], PT_V21_DIGEST_PREFIX);
+        // pt-v22 is not the default. Its digest is the one its arm has as
+        // overrides on the arm's base.
+        assert_eq!(crate::params::PT_V22.fingerprint(), "pt-v22");
+        assert_eq!(&crate::params::PT_V22.digest()[..8], PT_V22_DIGEST_PREFIX);
     }
 
     #[test]

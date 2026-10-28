@@ -74,6 +74,8 @@ def test_every_dial_is_off_on_every_shipped_preset_and_silent_in_the_digest():
     for name in DIALS:
         assert name in silent
         for preset in tf.preset_names():
+            if preset == "pt-v22":
+                continue  # pt-v22 ships its arm's values, which tests/test_validation.py holds
             assert getattr(tf.ModelParams.from_preset(preset), name) == 0.0
     assert model(**ON).fingerprint == model(**ON, **{d: 0.0 for d in DIALS}).fingerprint
 

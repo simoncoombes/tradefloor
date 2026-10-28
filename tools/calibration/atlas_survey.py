@@ -536,6 +536,8 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "option_name_spread_otm": (0.0, 5.0),
     "option_name_spread_itm": (0.0, 5.0),
     "option_name_spread_tenor_exponent": (-1.0, 1.0),
+    "surface_name_earnings_premium": (0.0, 5.0),
+    "surface_name_term_slope": (-1.0, 1.0),
     # The central bank's stress cut, points per step: 0.5 is a half-point
     # step, two steps a point, which is 2001's and 2008's emergency size.
     "fed_stress_cut": (0.0, 0.5),
@@ -790,6 +792,7 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "corporate_spread_noise_sd": (0.0, 0.05),
     # Every pin sets the variance: a switch.
     "pinned_vix_sets_variance": (0.0, 1.0),
+    "pinned_vix_return": (0.0, 0.05),
     "corporate_spread_noise_half_life": (0.0, 252.0),
     # The 10-year's own term premium: off to twice the measured sd; half-life
     # off to a year.
@@ -812,6 +815,7 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "core_trend_persistence": (0.0, 0.998),
     # The 2-year's carry through a meeting: a share, so its own bounds.
     "treasury_2y_meeting_carry": (0.0, 1.0),
+    "treasury_2y_expected_path": (0.0, 1.0),
     "flight_to_quality_reversal_cut": (0.0, 1.0),
     # The priced meeting's half-life: off at the bottom, a quarter at the top.
     "policy_anticipation_half_life": (0.0, 63.0),

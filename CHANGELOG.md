@@ -70,6 +70,15 @@ read a session's contracts, and `session_step` trades and exercises them.
 The framework payload, the Arrow tables and the WASM build show them too.
 Listing the contracts moves no stock price.
 
+### The 2008 recession scenario
+
+`Scenario.load("recession_2008")` is a new packaged scenario: the 2007-09
+recession on the NBER's months, with every company's earnings cut to 70% by
+the trough, the credit spread over the 10-year widened 150 basis points, and
+the VIX on its real 2008-09 path from Lehman, as a multiple of the model's
+own VIX on that day. pt-v22's recession rows are read on it. The older
+`recession` scenario and the fingerprint batteries are unchanged.
+
 ### The causes of a contract's price change
 
 `tradefloor.contracts.explain_move(before, after, quantity)` says why a
@@ -133,6 +142,32 @@ records are identical (`tests/test_futures_accounts.py`).
   forty's 8-Ks without item 2.02 (2014-2025, 1,372 in-session filings), 0.6%
   land in the first minute and 4.7% in the first half hour; the model's first
   tick prices about 0.6 of the session's news.
+
+### A pinned VIX's same-day return
+
+- `pinned_vix_return` is a new dial, 0.0 on every preset and left out of
+  the digest there: the index's same-day return on a pinned VIX's change, a
+  share per VIX point. A replay that pins the real VIX overwrites the VIX the
+  day's return would have moved, so the index fell with no regard to the
+  VIX's moves (2008: a slope of -0.047 on the log VIX change, R^2 0.02,
+  against the S&P 500's -0.217, R^2 0.61). Off zero, each pin sets the
+  session's mean market move to `-b` times the VIX's change, less what the
+  `pinned_vix_feedback` discount already priced, spread over the session's
+  ticks at each name's beta; the variance trim reads the whole move. The
+  S&P 500 measures -0.5375% a point (se 0.0249, 1990-2025), flat across the
+  VIX's level. No draw; free sessions are untouched.
+
+### The 2-year as the expected path plus a term premium
+
+- `treasury_2y_expected_path` is a new dial, 0.0 on every preset and left
+  out of the digest there: the share of the 2-year's daily target taken
+  from the expected policy path plus a term premium. At 0.0 the target is
+  the blend `0.85 (ff + priced) + 0.15 x 10y`. The path is the mean, over the next 504
+  closes, of the policy rate the standing forecast expects, the rate the
+  term-rate strip prices before its premium. The premium is ACM TP02's
+  mean, 43.3 bp (NY Fed monthly, 1961-2026), plus 0.452 of the 10-year's
+  own term-premium state (TP02's slope on TP10). No draw. The pull, the
+  noise and the meetings are unchanged.
 
 ### The close's growth priced at the open
 
@@ -240,8 +275,30 @@ assignment delivered shares in. An assignment can hand an account several
 times its equity in shares, and a liquidation takes them. Each sale is sent
 again for what is left while the market still buys: a dealer shows a few
 levels and bids nothing under a cent, so one order could leave much of a
-position unsold. Stock in other names is kept. Accounts without single-name options are unaffected; known
-answers are unchanged.
+position unsold. Stock in other names is kept. Accounts without single-name
+options are unaffected; known answers are unchanged.
+
+### A single name's premium shaped in tenor
+
+`surface_name_term_slope` is a new dial, 0.0 on every preset and left out
+of the digest there. Off zero each name's implied variance at `t` sessions
+takes a further log premium of the slope times `ln(t / 63)`, on top of
+`surface_name_premium` and the index's term premia, so a name's 63-session
+point is where it was and, with a positive slope, its shorter tenors fall.
+The earnings reports' variance is not scaled. It prices options only:
+stock prices and every known answer are where they were.
+
+### A name's reports priced on the variance they draw
+
+`surface_name_earnings_premium` is a new dial, 0.0 on every preset and left
+out of the digest there. Off zero a name's surface prices each report at
+that premium on the variance the engine draws for it: the surprise and the
+reaction session's own part at the reaction session, the follow-through at
+the session after, each in the name's non-market daily variance. At 0.0 a
+report is `surface_earnings_weight` times the surprise's sigma squared
+times the name's whole one-session variance, the market's part included,
+as before. It prices options only: stock prices and every known answer are
+where they were.
 
 ### The single-name options' trading cost
 
@@ -349,8 +406,8 @@ were.
 - `margin_liquidation_worked` is a new switch, 0.0 on every preset and left
   out of the digest there. With it on, a margin call's liquidation sends
   each contract's sale again for what is left while its book still takes
-  some, as a broker works a market order. A long option no book bids stays
-  held.
+  some, as a broker works a market order. Sent once, a sale fills only the
+  ladder the dealer shows then; a long option no book bids stays held.
 - `margin_scan_option_tail` is new, 0.0 on every preset and left out of the
   digest there. Off zero it is the option scan's own tail allowance, in
   place of `margin_scan_tail` on the scan's price move and volatility
