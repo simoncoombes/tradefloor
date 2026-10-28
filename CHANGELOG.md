@@ -54,8 +54,8 @@ equidistant moves of the name from 15% down to 15% up, netted within the
 name and summed across names, so a covered call asks less than a naked one,
 and at least $.375 a share for each option. Stock an exercise or an
 assignment delivered into an account that no longer holds the name's
-options asks 15% of its value from the close it arrives. A future pays its move to the day's
-settlement mark in cash at each close. A close that leaves equity under the
+options asks 15% of its value from the close it arrives. A future pays its
+move to the day's settlement mark in cash at each close. A close that leaves equity under the
 maintenance margin makes a margin call, and if equity is still under the
 initial margin at the next open, every contract held is closed at the
 market, and so is the stock in each name whose options the account held or

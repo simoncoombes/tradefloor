@@ -185,11 +185,13 @@ with a digest per preset. A run with agent orders in it replays exactly on the
 same release. Across releases the promise is narrower. 0.8.5 changed how an
 agent's fills reach the market, on every preset, so a traded run recorded
 before 0.8.5 matches up to its first trade and differs after it. The default
-preset is `pt-v21`, and any earlier one can be named:
+preset is `pt-v21`, and any other shipped one can be named:
 
 ```python
 eng = tf.Engine(seed=42, universe=u, model="pt-v10")
 ```
+
+`pt-v22` lists index, rate and oil futures and options on every name.
 
 To let a reader rerun a result, publish its `RunManifest`. It records the
 version, preset, seed, universe, macro state and scenario, and `reproduce()`
@@ -218,7 +220,9 @@ statistics of the two-year panel are inside their two-year ranges. The
 long-run criteria are 40 rows over 21 years, covering crash depth, how long
 fear lasts, bear markets per decade, the 2008 and 2020 replays, the rate
 indices and the cost of size in the book. pt-v21 meets all 40, read on 270
-histories.
+histories. pt-v22 meets {{G19:long_run_passed}} of the {{G19:long_run_of}}
+that count toward its grade, and its futures and options rows are read on
+their own histories ([docs/MODEL.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/MODEL.md)).
 
 Read those claims narrowly:
 
