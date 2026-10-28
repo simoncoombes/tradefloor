@@ -32,11 +32,13 @@ def make():
 
 @pytest.fixture(scope="module")
 def ranking():
+    # pt-v21 by name: the default the findings below were last measured on
+    # (was model=None until pt-v22 took the default).
     return tradefloor.rank(make, seeds=range(12), universe=HEADLINE, days=10,
-                        workers=4)
+                        workers=4, model="pt-v21")
 
 
-#: The preset the capture tests run on. pt-v20, and pt-v21, the default, report no
+#: The preset the capture tests run on. pt-v20 to pt-v22 report no
 #: capture (`baselines.ORACLE_NOT_A_CEILING`), so what a capture table does
 #: is checked where the Oracle is a ceiling: pt-v19, the last such preset.
 CEILING_PRESET = "pt-v19"
@@ -333,8 +335,8 @@ def test_on_pt_v20_no_capture_is_reported_and_the_reason_is(ranking):
     `capture_withheld` and the report."""
     from tradefloor.baselines import ORACLE_NOT_A_CEILING
 
-    # The default: pt-v21 from 0.10.0, which keeps pt-v20's permanent
-    # share. These two read "pt-v20" while it was the default.
+    # pt-v21, the default from 0.10.0 until pt-v22, which keeps pt-v20's
+    # permanent share. These two read "pt-v20" while it was the default.
     assert ranking.model_fingerprint == "pt-v21"
     assert ranking.capture_withheld == ORACLE_NOT_A_CEILING["pt-v21"]
     assert ranking.unmeasurable == []
@@ -676,7 +678,7 @@ def test_buy_and_hold_under_another_label_is_found_and_named():
     it read."""
     ranking = tradefloor.rank(
         lambda: {"mine": Momentum(), "bh": BuyAndHold()},
-        seeds=[1, 2, 3], universe=UNIVERSE, days=2)
+        seeds=[1, 2, 3], universe=UNIVERSE, days=2, model="pt-v21")
     assert ranking.benchmark == "bh"
     mine, bh = ranking.records["mine"], ranking.records["bh"]
     assert mine.excess_pnls == pytest.approx(
@@ -710,13 +712,13 @@ def test_the_benchmark_can_be_named():
 
 def test_no_benchmark_says_how_to_name_one():
     ranking = tradefloor.rank(lambda: {"mine": Momentum()}, seeds=[1, 2],
-                              universe=UNIVERSE, days=1)
+                              universe=UNIVERSE, days=1, model="pt-v21")
     assert ranking.benchmark is None
     assert "rank(..., benchmark='<label>')" in ranking.report()
 
     two = tradefloor.rank(
         lambda: {"mine": Momentum(), "a": BuyAndHold(), "b": BuyAndHold()},
-        seeds=[1, 2], universe=UNIVERSE, days=1)
+        seeds=[1, 2], universe=UNIVERSE, days=1, model="pt-v21")
     assert two.benchmark is None
     assert "2 entrants hold the market ('a', 'b')" in two.report()
 
@@ -750,14 +752,15 @@ def test_the_withheld_capture_reason_is_printed_only_when_the_oracle_ran():
     paragraph is left out."""
     from tradefloor.baselines import ORACLE_NOT_A_CEILING
 
-    reason = ORACLE_NOT_A_CEILING["pt-v21"]  # the default's; was "pt-v20"
+    # pt-v21 by name; the default's while it was (and "pt-v20" before).
+    reason = ORACLE_NOT_A_CEILING["pt-v21"]
     without = tradefloor.rank(
         lambda: {"mine": Momentum(), "buy_and_hold": BuyAndHold()},
-        seeds=[1, 2], universe=UNIVERSE, days=1)
+        seeds=[1, 2], universe=UNIVERSE, days=1, model="pt-v21")
     assert without.capture_withheld == reason
     assert reason not in without.report()
     with_oracle = tradefloor.rank(make, seeds=[1, 2], universe=UNIVERSE,
-                                  days=1)
+                                  days=1, model="pt-v21")
     assert reason in with_oracle.report()
 
 

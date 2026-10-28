@@ -2,9 +2,10 @@
 tables, the observation and decision payloads at version 3, and the
 browser getters' Python twins.
 
-Every surface here reads; none moves a price. On every shipped preset the
-futures switches are off, and each surface says so in the shape it had
-before: no payload key, an empty table, an empty list.
+Every surface here reads; none moves a price. On every shipped preset but
+pt-v22 the futures switches are off, and each surface says so in the shape
+it had before: no payload key, an empty table, an empty list. The tests of
+that shape read pt-v21 by name.
 """
 from __future__ import annotations
 
@@ -129,7 +130,7 @@ def test_the_flag_is_the_models_before_the_first_close_lists_anything():
 
 def test_the_tables_are_empty_and_versioned_on_a_shipped_preset():
     pa = pytest.importorskip("pyarrow")
-    e = tf.Engine(seed=3, universe=SMALL)
+    e = tf.Engine(seed=3, universe=SMALL, model="pt-v21")
     run_days(e, 2, record=True)
     for stream in (e.futures_bars(), e.settlements_table()):
         table = pa.table(stream)
@@ -213,7 +214,8 @@ class Capture:
 
 def test_a_shipped_preset_payload_gains_no_key():
     seen = Capture()
-    tf.evaluate({"a": CallableAgentAdapter(seen, every=6)}, seed=3, universe=SMALL, days=2)
+    tf.evaluate({"a": CallableAgentAdapter(seen, every=6)}, seed=3, universe=SMALL, days=2,
+                model="pt-v21")
     assert seen.payloads
     for payload in seen.payloads:
         assert not DERIVATIVE_KEYS & set(payload)

@@ -388,9 +388,26 @@ def default_edits(version: str) -> list[tuple[str, str, str]]:
          "the payload is version 2's and a version-2 recording replays. pt-v22, the\n"
          f"default from {v}, lists both, so the default's payload carries all four\n"
          "keys; a recording made on the default before then replays on `pt-v21` by name."),
+        ("docs/AGENTS.md",
+         "On a model that lists futures (pt-v22 lists index, rate and oil futures),",
+         f"On a model that lists futures (pt-v22, the default from {v}, lists index,\n"
+         "rate and oil futures),"),
+        ("docs/AGENTS.md",
+         "`margin` on such a model, and an action may name a listed future, counted\n"
+         "in contracts.",
+         "`margin` on such a model, and an action may name a listed future, counted\n"
+         f"in contracts. The default's payload carries them from {v}, with\n"
+         "`options`; a recording made on the default before then replays on\n"
+         "`pt-v21` by name."),
+        ("docs/AGENTS.md",
+         "`options_names_listed`; pt-v22\nlists them)",
+         f"`options_names_listed`; pt-v22,\nthe default from {v}, lists them)"),
+        ("docs/AGENTS.md",
+         "On pt-v20, on pt-v21, the\ndefault, and on pt-v22 it returns `{}`",
+         "On pt-v20, on pt-v21 and on\npt-v22, the default, it returns `{}`"),
         ("CHANGELOG.md",
          "<!-- release-note-ends -->\n\n### pt-v22: the contracts\n",
-         "<!-- release-note-ends -->\n\n### pt-v22 is the default\n\n"
+         "<!-- release-note-ends -->\n\n### pt-v22 as the default\n\n"
          f"From {v} the library's default preset is pt-v22 (`DEFAULT_PRESET_NAME`,\n"
          "`Engine::default_model`); pt-v21 stays selectable by name and replays\n"
          "exactly. Every seeded default trajectory changes: `KAT_VERSION` goes to 30\n"

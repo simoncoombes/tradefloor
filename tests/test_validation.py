@@ -253,10 +253,11 @@ def test_pt_v21_boxes_ran_on_the_release_engine_the_record_names():
     assert (record["box"], record["fingerprint"]) == ("ptv21c1+ptv21c1s", "pt-v21")
     kat = (BOX21 / "known-answer.txt").read_text()
     # pt-v21's default-trajectory digest, KAT_VERSION 29: the build the
-    # boxes ran is the 0.10.0 engine.
-    expected = json.loads((ROOT / "tests" / "known_answer.json").read_text())
+    # boxes ran is the 0.10.0 engine. A literal, since known_answer.json
+    # reads the default's, which moves with it.
     assert "package  0.10.0" in kat
-    assert f"sha256   {expected['sha256']}" in kat
+    assert ("sha256   4ea1d56340a3357db730764c3e24c131"
+            "c5e0883efa4cd6f7f56c83ea9674033c") in kat
     sim = "3a063f0d207bc37b5ade3b23c60f5e358b275507550b7f75f172a8d7cafb075c"
     assert f"sim      {sim}" in kat
 

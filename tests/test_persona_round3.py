@@ -79,7 +79,7 @@ def test_a_refused_line_ends_on_one_full_stop():
     ranking = tf.rank(
         lambda: {"v2": callable_agent(_hallucinating, every=6),
                  "buy_and_hold": BuyAndHold()},
-        seeds=[100], universe=UNIVERSE, days=2)
+        seeds=[100], universe=UNIVERSE, days=2, model="pt-v21")
     line = next(x for x in ranking.report().splitlines() if "REFUSED v2" in x)
     assert ".." not in line, line
     assert "AAF. Its adapter" in line, line
@@ -131,7 +131,7 @@ def test_the_report_names_the_benchmark_it_used():
     """Elena's score.py: benchmark='flat' printed 'vs buy-and-hold'."""
     ranking = tf.rank(lambda: {"flat": Flat(), "hold": BuyAndHold()},
                       seeds=range(2), universe=UNIVERSE, days=2,
-                      benchmark="flat")
+                      benchmark="flat", model="pt-v21")
     report = ranking.report()
     assert ranking.capture_withheld is not None
     assert "buy-and-hold" not in report, report
@@ -142,7 +142,8 @@ def test_an_agent_that_raised_on_every_step_reads_no_score_not_ahead():
     """Elena's raising.py: a broken agent printed 'ahead 2/3'."""
     ranking = tf.rank(lambda: {"broken": Broken(),
                                "buy_and_hold": BuyAndHold()},
-                      seeds=range(3), universe=UNIVERSE, days=2)
+                      seeds=range(3), universe=UNIVERSE, days=2,
+                      model="pt-v21")
     row = next(x for x in ranking.report().splitlines()
                if x.strip().startswith("broken"))
     assert "ahead" not in row, row
@@ -157,7 +158,7 @@ def test_an_agent_that_raised_on_every_step_reads_no_score_not_ahead():
 def test_rank_on_pt_v20_says_the_oracle_ran_and_was_left_out():
     """Jordan: the oracle dropped out of the table without a word."""
     ranking = tf.rank(lambda: reference_agents(seed=3), seeds=range(2),
-                      universe=UNIVERSE, days=2)
+                      universe=UNIVERSE, days=2, model="pt-v21")
     assert "oracle" not in ranking.records
     report = ranking.report()
     line = next(x for x in report.splitlines() if "'oracle' ran" in x)

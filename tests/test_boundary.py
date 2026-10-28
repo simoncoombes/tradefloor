@@ -254,7 +254,9 @@ def test_identical_inputs_never_report_a_flip():
         seen.append(1)
         return _order(payload, "BUY" if len(seen) % 2 else "SELL")
 
-    world = build(flaky)
+    # pt-v21 by name: no contract there reads oil, so the agent is not shown
+    # it. pt-v22's oil future is.
+    world = build(flaky, model="pt-v21")
     found = search(world, "commodity.oil", operation="multiply",
                    bracket=(0.6, 1.5), steps=3)
     assert found.status == "unseen"
@@ -454,10 +456,11 @@ def test_a_bracket_whose_ends_agree_reports_no_flip():
 
 
 def test_a_target_the_agent_is_not_shown_is_said_to_be_unseen():
-    """Oil is not in the observation, so both ends send the same input,
-    and the no-flip verdict says the bracket could not have flipped it."""
-    found = search(build(), "commodity.oil", operation="multiply",
-                   bracket=(0.6, 1.5), steps=3)
+    """Oil is not in the observation on pt-v21, so both ends send the same
+    input, and the no-flip verdict says the bracket could not have flipped
+    it. (pt-v22's oil future shows it.)"""
+    found = search(build(model="pt-v21"), "commodity.oil",
+                   operation="multiply", bracket=(0.6, 1.5), steps=3)
     assert found.status == "no flip"
     assert any("byte-identical inputs" in c for c in found.caveats)
 

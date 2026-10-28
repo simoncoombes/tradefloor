@@ -578,12 +578,13 @@ ASSET_KEYS = {"symbol", "price", "return_1d", "return_5d", "volatility",
               "position", "fundamentals"}
 #: And two more on a model that pays dividends or runs the earnings
 #: calendar, as the shared serializer adds them; pt-v21, the default from
-#: 0.10.0, does both (these read `ASSET_KEYS` until then).
+#: 0.10.0 until pt-v22, does both (these read `ASSET_KEYS` until then).
 DEFAULT_ASSET_KEYS = ASSET_KEYS | {"dividend", "next_earnings_in_sessions"}
 
 
 def test_the_payload_carries_exactly_the_allowlisted_keys():
-    world, agent = one_observation(days=2)
+    # pt-v21 by name; pt-v22's contracts add four keys (test_integrations.py).
+    world, agent = one_observation(days=2, model="pt-v21")
     payload = fr.observe(_observation(world), history=agent.history)
     assert set(payload) == PAYLOAD_KEYS
     assert set(payload["assets"][0]) == DEFAULT_ASSET_KEYS
@@ -2539,11 +2540,12 @@ def big_universe(n: int = 12) -> list:
     return list(tf.Universe.random(n, seed=7))
 
 
-def big_world(agent, *, days: int = 3, n: int = 12) -> World:
+def big_world(agent, *, days: int = 3, n: int = 12,
+              model: str | None = None) -> World:
     world = World(seed=4242, universe=big_universe(n), agent=agent,
                   pins={"federal_funds_rate": 0.04,
                         "corporate_bond_yield": 0.055},
-                  cash=5_000_000.0, label="big")
+                  cash=5_000_000.0, label="big", model=model)
     if days:
         world.run(days=days)
     return world
@@ -2570,7 +2572,7 @@ def test_the_default_rendering_is_byte_identical():
     got, because the replay key is the SHA-256 of this string and a changed
     byte invalidates every recorded run in the repository.
     """
-    world, agent = one_observation(days=3)
+    world, agent = one_observation(days=3, model="pt-v21")
     facts = {"TECH_A": {"sector": "technology", "eps": 3.0}}
     payload = fr.observe(_observation(world), history=agent.history,
                          fundamentals=facts)
@@ -2599,7 +2601,7 @@ def test_the_shipped_fixture_still_hashes_to_the_keys_it_is_filed_under():
 
 def test_the_large_form_adds_two_keys_and_removes_none():
     agent = Scripted(answer())
-    world = big_world(agent)
+    world = big_world(agent, model="pt-v21")
     facts = {t: {"sector": "technology"} for t in world.engine.tickers}
     payload = fr.observe(_observation(world), history=agent.history,
                          fundamentals=facts, detail=[world.engine.tickers[0]])

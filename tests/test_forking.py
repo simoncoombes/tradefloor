@@ -1024,7 +1024,10 @@ def test_a_snapshot_carries_the_dormant_engine_dials():
 #:   measured from the raw open, nothing writes the carried jump, and
 #:   `jump_move` is a snapshot field no market here could reach.
 def _nothing_dormant():
-    shipped = tf.ModelParams.from_preset().to_dict()
+    # pt-v21 by name, the default the notes below were written against. On
+    # pt-v22 its contracts read `skew_noise` and `vix_stress_memory`, which
+    # the notes record as out of this scenario's reach.
+    shipped = tf.ModelParams.from_preset("pt-v21").to_dict()
     dormant = {name: 0.05 for name in tf.ModelParams.settable()
                if float(shipped[name]) == 0.0}
     assert dormant, "no dial ships at zero; this model is not testing anything"
@@ -1262,7 +1265,7 @@ def _nothing_dormant():
                    # sessions keep the build short and still hand on state.
                    market_prehistory_sessions=5.0,
                    market_prehistory_valuation=1.0)
-    return tf.ModelParams.from_preset(**dormant)
+    return tf.ModelParams.from_preset("pt-v21", **dormant)
 
 
 #: A crisis, so the stress term has something to remember.
