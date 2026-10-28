@@ -1,9 +1,9 @@
 # The tradefloor model
 
 This document states the tradefloor market model as equations. It describes
-**pt-v22**, which lists futures and single-name options, beside **pt-v21**,
-the default preset from 0.10.0. pt-v22 is pt-v20 with 208 dials moved and
-pt-v21 is pt-v20 with 104, and most of the text below was
+**pt-v22**, the default preset, which lists futures and single-name options,
+beside **pt-v21**, the default from 0.10.0 to 0.10.2. pt-v22 is pt-v20
+with 208 dials moved and pt-v21 is pt-v20 with 104, and most of the text below was
 written for pt-v20, the default from 0.8.5 to 0.9.1. Every equation was read
 off the code on the `release/0.8.5` branch at commit `8b7ed44`, and the
 sections on what pt-v20's graded arm added (published macro data, the

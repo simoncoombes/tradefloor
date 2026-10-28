@@ -6,6 +6,9 @@ futures, and American options on every name. An agent trades them by symbol
 in whole contracts, as it trades a ticker, and exercises an option at a
 close with `tf.Exercise`.
 
+pt-v22 is the default preset, and pt-v21 and earlier presets stay available
+by name. A run that left `model` out gives a different market.
+
 Margin is set at every close, with a lower maintenance level. A future is
 margined from a risk scan and pays its move to the day's settlement mark in
 cash. A name's options and stock are margined together, as a broker's
@@ -14,15 +17,14 @@ either way, and at least $.375 a share for each option. Stock without its
 options, such as shares an exercise or an assignment delivers, asks 15% of
 its value from the close it arrives. An order that would leave equity under
 the initial margin is refused. If equity falls below maintenance at a close,
-the call is due by the next open: equity must be back at the initial margin,
-and if it isn't, every contract is sold at the market, and so is the stock
-in each name whose options the account held or took delivery in, each order
-sent again while the market still buys.
+the call is due by the next open, and if equity isn't back at the initial
+margin, the account's contracts and its options' stock are sold at the
+market.
 
 `tradefloor.contracts.explain_move` says why a contract's price moved, cause
 by cause, and a strategy spec can hold the front index future as a hedge.
-An MCP market session now pays dividends. Listing the contracts moves no
-stock price.
+An MCP market session pays dividends. Listing the contracts moves no stock
+price.
 
 <!-- release-note-ends -->
 
