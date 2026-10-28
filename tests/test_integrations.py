@@ -2026,7 +2026,7 @@ def test_preset_of_reads_the_engine_the_observation_carries():
 #: The five on the default were re-recorded live on pt-v21 at 0.10.0, when
 #: it took the default; they read pt-v20 until then.
 FIXTURE_PRESETS = {
-    "callable/five-days.json": "pt-v21",
+    "callable/five-days.json": "pt-v22",
     "finrobot/liquidity-crisis.json": "pt-v21",
     "finrobot/rate-ladder.json": "pt-v16",
     "finrobot/rate-shock.json": "pt-v21",
