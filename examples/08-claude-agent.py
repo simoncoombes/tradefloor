@@ -198,7 +198,7 @@ class ClaudeTrader:
     def __init__(
         self,
         *,
-        model: str = "claude-opus-5",
+        model: str = "claude-opus-5-5",
         effort: str = "medium",
         max_names: int = 12,
         client: "anthropic.Anthropic | None" = None,
