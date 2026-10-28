@@ -90,6 +90,65 @@ GRADE_SLOTS = {
 }
 
 
+#: Rows a registration READS AND REPORTS but does not gate, by preset: a row
+#: here is written onto the record's `long_run` block with `gated: false` and
+#: the reason, its `pass` still the plain fact of whether it sits inside its
+#: mark. The block's `passed` and `of` count gated rows only, and `all_rows`
+#: counts every row; the verdict is "pass" when every gated row passes. A row
+#: not named here is gated, as every row of pt-v20's and pt-v21's grades was.
+REPORTED_ROWS = {
+    "pt-v22": {
+        "OF4": "reported, not gated (draft item 21): six attempts to remove the oil "
+               "forecast's 126-session bias failed; the bias is about 0.3% of the price",
+        "R6": "reported, not gated (draft item 25(i))",
+    },
+}
+
+#: Rows a registration GATES but records an accepted exception for, by
+#: preset: a rule the row breaks that the owner accepted for it alone. The
+#: row stays gated (it must still pass its mark) and carries `exception`.
+ROW_EXCEPTIONS = {
+    "pt-v22": {
+        "ON1": "worse than v21 on its corrected reader (0.345 against 0.325, real 0.330, both "
+               "in band), an exception the owner accepts to the rule that no row is worse "
+               "than v21 (draft item 25(h)): the measured pre-open news share",
+    },
+}
+
+
+def mark_rows(name: str, doc: dict) -> tuple[dict, list[str]]:
+    """A verdict's rows marked for `name`'s record, and its counts redone.
+
+    Returns the block and the problems that refuse it: a reported or excepted
+    row the verdict does not hold. A GATED row outside its mark makes the
+    block's verdict "fail", and `tradefloor.records` refuses to load a record
+    that carries one; a reported row outside its mark is written, and says so.
+    """
+    reported = REPORTED_ROWS.get(name, {})
+    excepted = ROW_EXCEPTIONS.get(name, {})
+    rows = [dict(r) for r in doc.get("rows") or []]
+    ids = {r.get("id") for r in rows}
+    problems = [f"{name}'s registration names row {rid} ({what}), and the verdict has no such row"
+                for what, table in (("reported", reported), ("exception", excepted))
+                for rid in sorted(set(table) - ids)]
+    for r in rows:
+        rid = r.get("id")
+        r["gated"] = rid not in reported
+        if rid in reported:
+            r["reported_because"] = reported[rid]
+        if rid in excepted:
+            r["exception"] = excepted[rid]
+    gated = [r for r in rows if r["gated"]]
+    failing = [r.get("id") for r in gated if r.get("pass") is not True]
+    block = dict(doc)
+    block["rows"] = rows
+    block["passed"] = sum(1 for r in gated if r.get("pass") is True)
+    block["of"] = len(gated)
+    block["all_rows"] = {"passed": sum(1 for r in rows if r.get("pass") is True), "of": len(rows)}
+    block["verdict"] = "pass" if gated and not failing else "fail"
+    return block, problems
+
+
 def scaffold(name: str, identity: dict) -> dict:
     """A record before its grade: `identity` (the preset, its arm and its
     coefficients) and every `GRADE_SLOTS` block as an empty slot."""
@@ -1441,15 +1500,24 @@ def write_long_run(verdict_path: str) -> int:
     if not name or name.startswith("custom-"):
         problems.append(f"the long run ran fingerprint {name!r}, not a named "
                         "preset, so there is no record it describes")
-    if not rows or doc.get("of") != len(rows) or doc.get("passed") != passed:
+    # criteria.py counts every row it grades. A registration that reports some
+    # rows without gating them (`REPORTED_ROWS`) gates the rest, so its
+    # verdict may count either way; `mark_rows` redoes the counts below.
+    gated_n = sum(1 for r in rows if r.get("id") not in REPORTED_ROWS.get(name, {}))
+    gated_p = sum(1 for r in rows if r.get("pass") is True
+                  and r.get("id") not in REPORTED_ROWS.get(name, {}))
+    if not rows or (doc.get("of"), doc.get("passed")) not in ((len(rows), passed), (gated_n, gated_p)):
         problems.append(f"the counts do not add up: of {doc.get('of')!r} and "
                         f"passed {doc.get('passed')!r} against {len(rows)} rows "
                         f"of which {passed} pass")
     if any(r.get("pass") not in (True, False) for r in rows):
         problems.append("a row carries no verdict")
-    want = "pass" if rows and passed == len(rows) else "fail"
-    if doc.get("verdict") != want:
-        problems.append(f"verdict {doc.get('verdict')!r} where the rows say {want!r}")
+    marked, refused = mark_rows(name or "", doc)
+    problems += refused
+    every = "pass" if rows and passed == len(rows) else "fail"
+    if doc.get("verdict") not in (every, marked["verdict"]):
+        problems.append(f"verdict {doc.get('verdict')!r} where the rows say {every!r} "
+                        f"and the gated rows {marked['verdict']!r}")
     path = OUT / f"{name}.json"
     if not problems and not path.exists():
         problems.append(f"no committed record at {path} to write the block onto")
@@ -1458,7 +1526,7 @@ def write_long_run(verdict_path: str) -> int:
             print(f"REFUSED: {p}", file=sys.stderr)
         return 1
     record = json.loads(path.read_text(encoding="utf-8"))
-    block = public_paths(dict(doc))
+    block = public_paths(marked)
     block["coefficients"] = dict(sorted(record["coefficients"].items()))
     record["long_run"] = block
     path.write_text(json.dumps(record, indent=2, ensure_ascii=False) + "\n",
@@ -1468,8 +1536,9 @@ def write_long_run(verdict_path: str) -> int:
             f"  (NOTE: the long run was measured on {measured.get('engine_commit')}, "
             f"the record's panel on {rec_commit})")
     shown = path.relative_to(ROOT) if path.is_relative_to(ROOT) else path
-    print(f"  wrote {shown}  long_run: {doc['verdict']} "
-          f"{passed} of {len(rows)}" + note)
+    print(f"  wrote {shown}  long_run: {block['verdict']} {block['passed']} of "
+          f"{block['of']} gated ({block['all_rows']['passed']} of "
+          f"{block['all_rows']['of']} rows)" + note)
     return 0
 
 

@@ -549,3 +549,102 @@ def test_swapping_the_arm_rewrites_only_pt_v22s_value_in_an_entry():
     assert '"presets": {"pt-v21": 3.0, "pt-v22": 2.75}' in out
     assert "pt-v22 ships 2.75, pt-v21 3" in out
     assert out.count('"pt-v22": 2.5}') == 1  # the other entry's
+
+
+# ---------------------------------------------------------------------------
+# Rows a registration reports without gating, and accepted exceptions
+# ---------------------------------------------------------------------------
+
+def _verdict22(**passes):
+    rows = [{"id": rid, "words": rid, "value": 0.0, "real": 0.0, "rule": "band", "pass": ok}
+            for rid, ok in passes.items()]
+    n = sum(1 for ok in passes.values() if ok)
+    return {"verdict": "pass" if n == len(rows) else "fail", "passed": n, "of": len(rows), "rows": rows,
+            "measured": {"fingerprint": "pt-v22", "engine_commit": "x", "box": "b"}}
+
+
+def test_pt_v22_reports_of4_and_r6_and_records_on1s_exception():
+    """OF4 (draft item 21) and R6 (item 25(i)) are read and reported, not
+    gated; ON1 is gated and carries the owner's exception (item 25(h)). `pass`
+    stays the plain fact of whether a row sits inside its mark."""
+    assert set(rec_tool.REPORTED_ROWS["pt-v22"]) == {"OF4", "R6"}
+    assert set(rec_tool.ROW_EXCEPTIONS["pt-v22"]) == {"ON1"}
+    doc = _verdict22(A1=True, ON1=True, OF4=False, R6=False)
+    block, problems = rec_tool.mark_rows("pt-v22", doc)
+    assert problems == []
+    rows = {r["id"]: r for r in block["rows"]}
+    assert [rows[k]["gated"] for k in ("A1", "ON1", "OF4", "R6")] == [True, True, False, False]
+    assert rows["OF4"]["pass"] is False and "item 21" in rows["OF4"]["reported_because"]
+    assert "item 25(i)" in rows["R6"]["reported_because"]
+    assert "item 25(h)" in rows["ON1"]["exception"] and rows["ON1"]["pass"] is True
+    assert (block["verdict"], block["passed"], block["of"]) == ("pass", 2, 2)
+    assert block["all_rows"] == {"passed": 2, "of": 4}
+    # Every other preset gates every row, as pt-v20's and pt-v21's grades did.
+    plain, _ = rec_tool.mark_rows("pt-v21", doc)
+    assert all(r["gated"] for r in plain["rows"]) and plain["verdict"] == "fail"
+
+
+def test_a_gated_row_outside_its_mark_fails_and_a_missing_named_row_is_refused():
+    block, problems = rec_tool.mark_rows("pt-v22", _verdict22(A1=True, ON1=False, OF4=True, R6=True))
+    assert problems == [] and block["verdict"] == "fail"
+    assert (block["passed"], block["of"]) == (1, 2)
+    _, problems = rec_tool.mark_rows("pt-v22", _verdict22(A1=True, ON1=True, OF4=True))
+    assert any("R6" in p and "no such row" in p for p in problems)
+
+
+def test_write_long_run_writes_the_marks_and_a_failing_gated_row_cannot_load(tmp_path, monkeypatch):
+    from tradefloor import records  # noqa: PLC0415
+
+    out = tmp_path / "presets"
+    out.mkdir()
+    (out / "pt-v22.json").write_text(RECORD22.read_text())
+    monkeypatch.setattr(rec_tool, "OUT", out)
+    ok = tmp_path / "ok.json"
+    ok.write_text(json.dumps(_verdict22(A1=True, ON1=True, OF4=False, R6=True)))
+    assert rec_tool.write_long_run(str(ok)) == 0
+    block = json.loads((out / "pt-v22.json").read_text())["long_run"]
+    assert (block["verdict"], block["passed"], block["of"], block["all_rows"]) == (
+        "pass", 2, 2, {"passed": 3, "of": 4})
+    assert records.gated_failures({"long_run": block}) == []
+    # A gated row outside its mark is written as the grade said, verdict
+    # "fail", and the record holding it does not load.
+    bad = tmp_path / "bad.json"
+    bad.write_text(json.dumps(_verdict22(A1=False, ON1=True, OF4=True, R6=True)))
+    assert rec_tool.write_long_run(str(bad)) == 0
+    block = json.loads((out / "pt-v22.json").read_text())["long_run"]
+    assert block["verdict"] == "fail" and records.gated_failures({"long_run": block}) == ["A1"]
+    # A verdict that names no R6 is refused outright.
+    short = tmp_path / "short.json"
+    short.write_text(json.dumps(_verdict22(A1=True, ON1=True, OF4=True)))
+    assert rec_tool.write_long_run(str(short)) == 1
+
+
+def test_a_record_that_gates_a_failing_row_does_not_load(tmp_path, monkeypatch):
+    from tradefloor import records  # noqa: PLC0415
+
+    def record(gated):
+        return {"schema": 1, "preset": "pt-x", "long_run": {
+            "verdict": "pass", "passed": 1, "of": 1 + gated, "all_rows": {"passed": 1, "of": 2},
+            "rows": [{"id": "A1", "pass": True, "gated": True},
+                     {"id": "OF4", "pass": False, "gated": gated}]}}
+    (tmp_path / "presets").mkdir()
+    monkeypatch.setattr(records, "_dir", lambda: tmp_path / "presets")
+    (tmp_path / "presets" / "pt-x.json").write_text(json.dumps(record(False)))
+    assert records.preset_record("pt-x")["long_run"]["rows"][1]["pass"] is False
+    (tmp_path / "presets" / "pt-x.json").write_text(json.dumps(record(True)))
+    with pytest.raises(LookupError, match="outside their mark"):
+        records.preset_record("pt-x")
+    # Written with the marks, a failing gated row is refused whatever the
+    # verdict says.
+    marked = record(True)
+    marked["long_run"]["verdict"] = "fail"
+    (tmp_path / "presets" / "pt-x.json").write_text(json.dumps(marked))
+    with pytest.raises(LookupError, match="outside their mark"):
+        records.preset_record("pt-x")
+    monkeypatch.undo()
+    # Every shipped record loads. pt-v19's carries the grade it failed as
+    # pt-v20's control (C4a, C4b), written before the marks, and loads as it did.
+    for name in records.available():
+        assert records.refused_rows(json.loads(
+            (ROOT / "python" / "tradefloor" / "presets" / f"{name}.json").read_text())) == [], name
+    assert records.gated_failures(records.preset_record("pt-v19")) == ["C4a", "C4b"]

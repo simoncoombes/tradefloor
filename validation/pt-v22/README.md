@@ -41,6 +41,20 @@ are not the values pt-v22 will ship.
    | `level_protocol` | `record.py --level-rows <the grade's level_rows.py artefact>` |
    | `long_run` | `record.py --long-run <the grade's criteria.py verdict>` |
 
+   The `long_run` block marks each row (`tools/presets/record.py` `REPORTED_ROWS` and `ROW_EXCEPTIONS`):
+
+   | row | on the record | why |
+   |---|---|---|
+   | OF4 | `gated: false`, `reported_because` | read and reported, not gated (draft item 21) |
+   | R6 | `gated: false`, `reported_because` | read and reported, not gated (draft item 25(i)) |
+   | ON1 | gated, `exception` | worse than v21, an exception the owner accepts (draft item 25(h)) |
+
+   - **`pass`** stays the plain fact of whether a row sits inside its mark, on every row.
+   - **The counts:** the block's `passed` and `of` count gated rows, and `all_rows` counts every row.
+   - **The verdict** is "pass" when every gated row passes.
+   - **Refusal:** `tf.preset_record("pt-v22")` refuses a record that gates a row outside its mark, and
+     `record.py --long-run` refuses a verdict that has no OF4, R6 or ON1.
+
 4. **Fill the named values the tests hold.** Each is empty until the grade has
    run, and `tests/test_validation.py` fails if some are filled and others are
    not:
