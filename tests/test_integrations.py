@@ -2031,7 +2031,7 @@ FIXTURE_PRESETS = {
     "finrobot/rate-ladder.json": "pt-v16",
     "finrobot/rate-shock.json": "pt-v21",
     "langgraph/rate-shock.json": "pt-v21",
-    "openai_agents/five-days.json": "pt-v21",
+    "openai_agents/five-days.json": "pt-v22",
     "pydantic_ai/rate-shock.json": "pt-v21",
 }
 
