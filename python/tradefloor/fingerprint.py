@@ -70,10 +70,11 @@ rostered by :func:`tradefloor.Universe.random`, running one shipped
 :class:`~tradefloor.Scenario` from day zero at the library's own six
 steps a day.
 
-Version 2 has seven cells, one for each scenario the package ships:
-``curve_shock``, ``geopolitical_conflict``, ``liquidity_crisis``,
-``oil_price_spike``, ``policy_regime_shift``, ``rate_shock`` and
-``recession``. Every cell runs 120 days, the length the scenario files
+Version 2 has seven cells, one for each scenario the package shipped when
+it was fixed: ``curve_shock``, ``geopolitical_conflict``,
+``liquidity_crisis``, ``oil_price_spike``, ``policy_regime_shift``,
+``rate_shock`` and ``recession``. ``recession_2008``, packaged later, is
+in neither version. Every cell runs 120 days, the length the scenario files
 were measured over. Six of the seven fire their main shock at day 50, so
 their cells see seventy days after it, and ``policy_regime_shift`` moves
 credit at day 30, tariffs at day 40 and inflation at day 50. That covers
