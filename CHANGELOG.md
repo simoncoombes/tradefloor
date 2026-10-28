@@ -66,6 +66,15 @@ read a session's contracts, and `session_step` trades and exercises them.
 The framework payload, the Arrow tables and the WASM build show them too.
 Listing the contracts moves no stock price.
 
+### The 2008 recession scenario
+
+`Scenario.load("recession_2008")` is a new packaged scenario: the 2007-09
+recession on the NBER's months, with every company's earnings cut to 70% by
+the trough, the credit spread over the 10-year widened 150 basis points, and
+the VIX on its real 2008-09 path from Lehman, as a multiple of the model's
+own VIX on that day. pt-v22's recession rows are read on it. The older
+`recession` scenario and the fingerprint batteries are unchanged.
+
 ### The causes of a contract's price change
 
 `tradefloor.contracts.explain_move(before, after, quantity)` says why a
