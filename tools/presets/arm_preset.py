@@ -59,6 +59,10 @@ PARAMS = ROOT / "rust" / "src" / "params.rs"
 RECORD = ROOT / "python" / "tradefloor" / "presets" / f"{NAME}.json"
 KAT = ROOT / "tests" / "known_answer_presets.json"
 PROVENANCE = ROOT / "python" / "tradefloor" / "provenance.py"
+#: Provenance entries written beside the arm, for dials the graded arm moves
+#: that no entry covers yet: the swap moves each out of `OUT_OF_SCOPE` and into
+#: `DIAL_PROVENANCE` with the value the arm ships.
+PENDING = ROOT / "tools" / "presets" / "arms" / f"{NAME}-provenance.json"
 
 BEGIN = "        // ARM BEGIN: written by tools/presets/arm_preset.py from tools/presets/arms/pt-v22.txt."
 END = "        // ARM END"
@@ -282,8 +286,18 @@ def provenance_values(arm: Arm, write: bool) -> list[str]:
         if write:
             src = _rewrite_value(src, dial, rec, have[dial])
     moved = {k for k, v in have.items() if k in base and v != base[k]}
+    pending = json.loads(PENDING.read_text(encoding="utf-8")) if PENDING.exists() else {}
     for dial in sorted(moved - set(P.DIAL_PROVENANCE) - set(P.UNPROVENANCED)):
-        todo.append(f"{dial}: pt-v22 now moves it and it has no entry")
+        entry = pending.get(dial)
+        if entry is None:
+            todo.append(f"{dial}: pt-v22 now moves it and it has no entry")
+            continue
+        recorded = (entry.get("presets") or {}).get(NAME)
+        if recorded != have[dial]:
+            todo.append(f"{dial}: {PENDING.name} records {recorded!r}, pt-v22 ships {have[dial]!r}")
+            continue
+        if write:
+            src = _insert_entry(_drop_out_of_scope(src, dial), dial, entry)
     for dial in sorted(d for d, e in P.DIAL_PROVENANCE.items()
                        if NAME in (e.get("presets") or {}) and d not in moved
                        and d not in P.POST_BASELINE):
@@ -291,6 +305,56 @@ def provenance_values(arm: Arm, write: bool) -> list[str]:
     if write:
         PROVENANCE.write_text(src, encoding="utf-8")
     return todo
+
+
+def _block(src: str, opener: str) -> tuple[int, int]:
+    """The span of a top-level dict literal in provenance.py, from its opener to its closing brace."""
+    start = src.index(opener)
+    return start, src.index("\n}\n", start)
+
+
+def _drop_out_of_scope(src: str, dial: str) -> str:
+    """Remove `dial`'s note from `OUT_OF_SCOPE`, if it has one: its key line and the string lines under it."""
+    start, end = _block(src, "\nOUT_OF_SCOPE = {")
+    key = f'\n    "{dial}":'
+    at = src.find(key, start, end)
+    if at < 0:
+        return src
+    nxt = at + len(key)
+    while True:
+        line_end = src.find("\n", nxt + 1)
+        line = src[nxt + 1:line_end]
+        if not line.startswith("        ") or line_end > end:
+            break
+        nxt = line_end
+    return src[:at] + src[nxt:]
+
+
+def _render(value, indent: int) -> str:
+    """A value as provenance.py writes it: long strings split on spaces into adjacent literals."""
+    if not isinstance(value, str):
+        return json.dumps(value, ensure_ascii=False)
+    words, lines, cur = value.split(" "), [], ""
+    for w in words:
+        if cur and len(cur) + len(w) + 1 > 64:
+            lines.append(cur + " ")
+            cur = w
+        else:
+            cur = f"{cur} {w}" if cur else w
+    lines.append(cur)
+    pad = "\n" + " " * indent
+    return pad.join(json.dumps(x, ensure_ascii=False) for x in lines)
+
+
+def _insert_entry(src: str, dial: str, entry: dict) -> str:
+    """Add `dial`'s entry to `DIAL_PROVENANCE`, before the first key that sorts after it."""
+    start, end = _block(src, "\nDIAL_PROVENANCE: dict[str, dict[str, Any]] = {")
+    keys = [(m.start(), m.group(1)) for m in re.finditer(r'\n    "([a-z0-9_]+)": \{', src[start:end])]
+    after = [pos for pos, k in keys if k > dial]
+    at = start + min(after) if after else end
+    order = ["kind", "presets"] + [k for k in entry if k not in ("kind", "presets")]
+    body = "".join(f'\n        "{k}": {_render(entry[k], 8 + len(k) + 4)},' for k in order)
+    return src[:at] + f'\n    "{dial}": {{{body}\n    }},' + src[at:]
 
 
 def _rewrite_value(src: str, dial: str, old: float, new: float) -> str:

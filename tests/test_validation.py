@@ -550,6 +550,42 @@ def test_swapping_the_arm_rewrites_only_pt_v22s_value_in_an_entry():
     assert out.count('"pt-v22": 2.5}') == 1  # the other entry's
 
 
+def test_swapping_the_arm_writes_a_pending_entry_out_of_out_of_scope():
+    """A dial the graded arm moves that no entry covers: the swap takes its
+    entry from `arms/pt-v22-provenance.json`, removes the dial's
+    `OUT_OF_SCOPE` note and adds the entry to `DIAL_PROVENANCE` in key order,
+    so release day applies no patch by hand (the rehearsal's blocker 1)."""
+    tool = _arm_tool()
+    src = ('X\nOUT_OF_SCOPE = {\n    "a_dial":\n        "inert at 0.0 "\n        "as it stood",\n'
+           '    "new_dial":\n        "inert at 0.0: off, as it stood; "\n        "left out of the digest",\n'
+           '    "z_dial":\n        "inert",\n}\n'
+           'DIAL_PROVENANCE: dict[str, dict[str, Any]] = {\n'
+           '    "m_dial": {\n        "kind": "derived",\n    },\n'
+           '    "q_dial": {\n        "kind": "derived",\n    },\n}\n')
+    entry = {"kind": "measured", "presets": {"pt-v22": 0.005375}, "estimate": 0.005375,
+             "standard_error": 0.000249, "estimator": "least squares " * 12}
+    out = tool._insert_entry(tool._drop_out_of_scope(src, "new_dial"), "new_dial", entry)
+    ns = {"Any": object}
+    exec(out.split("\n", 1)[1], ns)
+    assert list(ns["OUT_OF_SCOPE"]) == ["a_dial", "z_dial"]
+    assert list(ns["DIAL_PROVENANCE"]) == ["m_dial", "new_dial", "q_dial"]
+    assert ns["DIAL_PROVENANCE"]["new_dial"] == entry
+    assert max(len(line) for line in out.splitlines()) < 100
+
+
+def test_each_pending_provenance_entry_is_a_valid_entry():
+    """The entries the swap will write are held to provenance.py's own schema
+    now, before the dials they cover reach this branch."""
+    from tradefloor import provenance as pv
+
+    pending = json.loads((ROOT / "tools" / "presets" / "arms" / "pt-v22-provenance.json").read_text())
+    assert pending, "no pending entries"
+    for dial, entry in pending.items():
+        assert pv.validate_entry(dial, entry) == [], dial
+        assert set(entry["presets"]) == {"pt-v22"}, dial
+        assert "TO CONFIRM" not in json.dumps(entry), dial
+
+
 # ---------------------------------------------------------------------------
 # Rows a registration reports without gating, and accepted exceptions
 # ---------------------------------------------------------------------------

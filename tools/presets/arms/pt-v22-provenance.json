@@ -1,0 +1,38 @@
+{
+ "margin_liquidation_worked": {
+  "kind": "derived",
+  "presets": {
+   "pt-v22": 1.0
+  },
+  "identity": "a switch whose identity is the value: a margin call's liquidation sends each contract's sale again for what is left while its book still takes some, as a broker works a market order; a long option no book bids stays held",
+  "terms": {
+   "1.0": "on, as pt-v22 ships it"
+  },
+  "source": "rust/src/params.rs, `ModelParams::margin_liquidation_worked`",
+  "date": "2026-10-27",
+  "inert_through_pt_v21": "inert at 0.0 as shipped through pt-v21: a margin call's liquidation sends each contract's sale once, as it stood; read by `Portfolio.settle_open`, not the engine; at 0.0 it is also left out of the model's digest"
+ },
+ "margin_option_scan_range": {
+  "kind": "undetermined",
+  "presets": {
+   "pt-v22": 0.15
+  },
+  "what_would_determine_it": "pt-v22 ships 0.15. FINRA Rule 4210(g)(2)(F) takes a portfolio-margin account's theoretical gains and losses at ten equidistant valuation points over plus and minus 15% for any product that is, or is based on, an equity security (`ModelParams::margin_option_scan_range` doc; docs/MODEL.md). A rule's figure taken as written, not an estimate, and graded with pt-v22's whole vector (validation/pt-v22/).",
+  "source": "rust/src/params.rs, `ModelParams::margin_option_scan_range`; validation/pt-v22/",
+  "date": "2026-10-27",
+  "inert_through_pt_v21": "inert at 0.0 as shipped through pt-v21: the single-name scan keeps its own size, at SPAN's seven points; read only with `margin_scan_coverage` on; at 0.0 it is also left out of the model's digest"
+ },
+ "pinned_vix_return": {
+  "kind": "measured",
+  "presets": {
+   "pt-v22": 0.005375
+  },
+  "estimate": 0.005375,
+  "standard_error": 0.000249,
+  "estimator": "least squares of the S&P 500's daily log return on the VIX's daily change in points, 1990-2025, standard error by resampling years; flat in the VIX's level (-0.517, -0.559, -0.523 and -0.539 per cent a point under 20, 20-30, 30-40 and above 40), so one slope",
+  "source": "rust/src/params.rs, `ModelParams::pinned_vix_return`",
+  "date": "2026-10-27",
+  "script": "a least-squares fit without intercept, per VIX point, of the tape's same-day ^GSPC log return on the Cboe VIX's change, 1990-2025, by the day's VIX level and pooled; the standard error from 1,000 resamples of years (seed 20261027), in the project's unpublished design notes",
+  "inert_through_pt_v21": "inert at 0.0 as shipped through pt-v21: a pinned session's market draws keep a zero mean, as they stood; read only on a session whose VIX a caller pins; at 0.0 it is also left out of the model's digest"
+ }
+}
