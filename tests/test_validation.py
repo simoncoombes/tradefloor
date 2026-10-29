@@ -700,6 +700,10 @@ def _fill_tool():
 
 def _fill_tree(tmp_path):
     """A copy of the files the fill writes, with a mock grade beside it."""
+    if GRADE22["boxes"] is not None:
+        # The release tree: the fill has run, and these tests of it on an
+        # unfilled tree retire with it (the release rehearsal's finding).
+        pytest.skip("the fill has run on this tree")
     tool = _fill_tool()
     tree = tmp_path / "tree"
     for rel in tool.TOUCHED[:3] + ("rust/src/params.rs",):
@@ -709,7 +713,7 @@ def _fill_tree(tmp_path):
     shutil.copy2(tmp_path / "mock" / "README.md", tree / "README.md")
     m = tmp_path / "mock"
     args = type("A", (), dict(desk=str(m / "desk"), box=[f"ptv22g1={m / 'ptv22g1'}", f"ptv22g2={m / 'ptv22g2'}"],
-                              panel=None, level_rows=None, fill=["README.md"], values=None,
+                              panel=None, level_rows=None, pooled=None, fill=["README.md"], values=None,
                               graded_fingerprint=f"custom-{tool.digest_prefix()}"))()
     return tool, tree, args
 
@@ -757,3 +761,30 @@ def test_the_fill_refuses_another_arm_and_an_unfilled_placeholder(tmp_path, monk
     (tree / "README.md").write_text("{{G19:SS1}} and {{G19:long_run_of}}\n")
     with pytest.raises(SystemExit, match="no value for .*SS1"):
         tool.run(tree, args)
+
+
+def test_the_fill_records_the_pooled_read_with_a_public_source(tmp_path, monkeypatch):
+    """`--pooled` hands `level_pool.py measure`'s file to `level_pool.py
+    record` after the level rows, writing the tree's record, and names a
+    public source rather than the file's local path."""
+    tool, tree, args = _fill_tree(tmp_path)
+    monkeypatch.setattr(rec_tool, "OUT", rec_tool.OUT)
+    monkeypatch.setattr(rec_tool, "PUBLISHED_GRADES", dict(rec_tool.PUBLISHED_GRADES))
+    import level_pool  # noqa: PLC0415
+
+    seen = {}
+    monkeypatch.setattr(level_pool, "record", lambda ns: seen.update(vars(ns), records=level_pool.RECORDS) or 0)
+    monkeypatch.setattr(level_pool, "RECORDS", level_pool.RECORDS)
+    args.pooled = str(tmp_path / "box" / "pt-v22.json")
+    assert tool.run(tree, args) == 0
+    assert seen["file"] == args.pooled and seen["records"] == tree / "python/tradefloor/presets"
+    assert seen["source"] == "tools/presets/level_pool.py measure pt-v22 (pt-v22.json)"
+
+
+def test_with_no_fill_named_the_fill_finds_every_page_with_a_placeholder(tmp_path):
+    tool = _fill_tool()
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "README.md").write_text("{{G19:long_run_of}}\n")
+    (tmp_path / "docs" / "REALISM.md").write_text("{{G19:one_year_in}} in\n")
+    (tmp_path / "docs" / "MODEL.md").write_text("no placeholder\n")
+    assert tool.placeholder_files(tmp_path) == ["README.md", "docs/REALISM.md"]

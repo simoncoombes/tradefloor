@@ -2,7 +2,7 @@
 `{{G19:...}}` placeholders.
 
     python tools/presets/fill_grade22.py --desk OUT --box NAME=DIR [--box ...] [--dry] \\
-        [--panel PANEL.json] [--level-rows ROWS.json] [--fill FILE ...] [--values VALUES.json]
+        [--panel PANEL.json] [--level-rows ROWS.json] [--pooled POOLED.json] [--fill FILE ...] [--values VALUES.json]
 
 The release runbook's step 1.7, 1.8 and 1.10 from the grade's outputs. `--desk` is grade19.sh's OUT folder:
 `verdict-ARM.json` (verdict16.py --registration19), `amend19-ARM.json` and `ptv22-ARM.json`. Each `--box` is one
@@ -21,6 +21,8 @@ grading box's output folder, holding `commit.txt`, `scripts-sha256.txt` and `kno
    XXXXXXXX is `PT_V22_DIGEST_PREFIX`, the swapped preset's own digest, and the script refuses otherwise.
 2. **The record's slots**, through `record.py`'s writers: `--long-run` on that verdict, and `--panel` and
    `--level-rows` when their artefacts are given. Without them those slots stay empty and the record won't load.
+   `--pooled` records the pooled level read (`level_pool.py measure pt-v22`'s file, 360 seeds) after the level
+   rows, through `level_pool.py record`.
 3. **The named values:** `record.py`'s `PT_V22_GRADE_BOXES` and `tests/test_validation.py`'s `GRADE22`.
 4. **The `{{G19:KEY}}` placeholders** in each `--fill` file. The keys are `long_run_passed` and `long_run_of`
    (the record's gated counts), `long_run_all_passed` and `long_run_all_of`, and any in `--values` (a JSON
@@ -177,6 +179,14 @@ def run(root: pathlib.Path, a) -> int:
             sys.argv = argv
     if a.level_rows and rec.write_level_protocol(a.level_rows) != 0:
         return 1
+    if getattr(a, "pooled", None):
+        import level_pool  # noqa: PLC0415
+        level_pool.RECORDS = root / "python/tradefloor/presets"
+        # A public source: the file's own path is a local one.
+        ns = argparse.Namespace(file=a.pooled, commit=None, package_version=None, date=None, check=False,
+                                source=f"tools/presets/level_pool.py measure pt-v22 ({pathlib.Path(a.pooled).name})")
+        if level_pool.record(ns) != 0:
+            return 1
     if rec.write_long_run(str(vf)) != 0:
         return 1
     set_named(root, boxes, verdict)
@@ -185,11 +195,17 @@ def run(root: pathlib.Path, a) -> int:
               "long_run_all_passed": lr["all_rows"]["passed"], "long_run_all_of": lr["all_rows"]["of"]}
     if a.values:
         values.update(json.loads(pathlib.Path(a.values).read_text()))
-    fill_placeholders([root / f for f in a.fill], values)
+    fill_placeholders([root / f for f in (a.fill or placeholder_files(root))], values)
     print(f"verdict {verdict['verdict']}: {verdict['passed']} of {verdict['of']} gated rows "
           f"({verdict['all_rows']['passed']} of {verdict['all_rows']['of']} rows); "
           f"amend19 replaced {verdict['replaced_by_amendments']}; boxes {'+'.join(boxes)}")
     return 0
+
+
+def placeholder_files(root: pathlib.Path) -> list[str]:
+    """With no --fill: README.md and every docs page that holds a {{G19:...}} placeholder."""
+    pages = [root / "README.md", *sorted((root / "docs").glob("*.md"))]
+    return [str(p.relative_to(root)) for p in pages if p.exists() and "{{G19:" in p.read_text(encoding="utf-8")]
 
 
 def _rel(f: str) -> str:
@@ -258,7 +274,7 @@ def mock(d: pathlib.Path) -> None:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--desk"); ap.add_argument("--box", action="append", default=[])
-    ap.add_argument("--panel"); ap.add_argument("--level-rows", dest="level_rows")
+    ap.add_argument("--panel"); ap.add_argument("--level-rows", dest="level_rows"); ap.add_argument("--pooled")
     ap.add_argument("--fill", action="append", default=[]); ap.add_argument("--values")
     ap.add_argument("--graded-fingerprint", dest="graded_fingerprint",
                     help="the arm's fingerprint as the grade recorded it, when its files don't carry one")
@@ -268,6 +284,7 @@ def main() -> int:
         mock(pathlib.Path(a.mock)); return 0
     if not a.desk or not a.box:
         ap.error("--desk and at least one --box are required")
+    a.fill = a.fill or placeholder_files(ROOT)
     if not a.dry:
         a.fill = [_rel(f) for f in a.fill]
         if any(f.startswith("fill/") for f in a.fill):
