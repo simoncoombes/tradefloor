@@ -1205,14 +1205,14 @@ Collin-Dufresne, Goldstein and Martin 2001). A VIX pin removes the VIX term
 only. The gap is `EconomyState::spread_equity_gap`, carried by the snapshot
 and the state hash only while $g_L$ is set. No draw.
 
-| Symbol | Dial | pt-v20 (pt-v19) | pt-v21 | Kind | Source |
-|---|---|---|---|---|---|
-| $\sigma_{10}$ | `treasury_10y_noise` | 0.038 (0.03) pp a session | same | measured | daily sd of the 10-year's change, FRED DGS10 2015 to 2025, 5.41 bp; 5.12 bp at 0.038 on 90 held-out histories (box ptv20vr9), and graded row R2 reads 4.96 bp against a band of 4.54 to 6.27 (box ptv20g6). pt-v20 before its graded arm had 0.025, which read 4.16 to 4.25 bp and failed R2 |
-| $\sigma_{2}$ | `treasury_2y_noise` | 0.022 (0, formula only) | 0.008 | measured | FRED DGS2, 5.23 bp; row R1 reads 3.87 against 3.65 to 6.80 (box ptv20g6) |
-| $g_Q$ | `flight_to_quality_gain` | 0.008 (0.02, never fired) pp per % | 0.013 | measured | correlation of stock and Treasury returns, SPY against IEF 2015 to 2025, -0.16; row R3 reads -0.136 (box ptv20g6) |
-| | `flight_to_quality_day` | 1 (0) | same | derived | a switch: the step reads the session's own return |
-| | `corporate_yield_daily` | 1 (0) | same | derived | a switch; stock and investment-grade bond returns, SPY against LQD, correlate +0.27, and row R4 reads +0.200 (box ptv20g6) |
-| | `daily_credit_floor_gain` | 1.0 | same | chosen | without the floor the spread drifted to 0.42 points within 121 days (`params.rs:4884-4899`) |
+| Symbol | Dial | pt-v20 (pt-v19) | pt-v21 | pt-v22 | Kind | Source |
+|---|---|---|---|---|---|---|
+| $\sigma_{10}$ | `treasury_10y_noise` | 0.038 (0.03) pp a session | same | 0.049 | measured | daily sd of the 10-year's change, FRED DGS10 2015 to 2025, 5.41 bp; 5.12 bp at 0.038 on 90 held-out histories (box ptv20vr9), and graded row R2 reads 4.96 bp against a band of 4.54 to 6.27 (box ptv20g6). pt-v20 before its graded arm had 0.025, which read 4.16 to 4.25 bp and failed R2 |
+| $\sigma_{2}$ | `treasury_2y_noise` | 0.022 (0, formula only) | 0.008 | 0.044 | measured | FRED DGS2, 5.23 bp; row R1 reads 3.87 against 3.65 to 6.80 (box ptv20g6) |
+| $g_Q$ | `flight_to_quality_gain` | 0.008 (0.02, never fired) pp per % | 0.013 | 0.0245 | measured | correlation of stock and Treasury returns, SPY against IEF 2015 to 2025, -0.16; row R3 reads -0.136 (box ptv20g6) |
+| | `flight_to_quality_day` | 1 (0) | same | same | derived | a switch: the step reads the session's own return |
+| | `corporate_yield_daily` | 1 (0) | same | same | derived | a switch; stock and investment-grade bond returns, SPY against LQD, correlate +0.27, and row R4 reads +0.200 (box ptv20g6) |
+| | `daily_credit_floor_gain` | 1.0 | same | same | chosen | without the floor the spread drifted to 0.42 points within 121 days (`params.rs:4884-4899`) |
 
 The 2-year's 0.05 pull, the regime thresholds, the spread multipliers and
 the 0.8 floor are chosen. One limit: the model's inflation almost never
@@ -1245,11 +1245,11 @@ company's restated earnings and book value through $n_d$ in
 [Fair value](#fair-value), so a move written at the close reaches prices on
 the next session.
 
-| Symbol | Dial | pt-v20 (pt-v19) | pt-v21 | Kind | Source |
-|---|---|---|---|---|---|
-| $\delta_E$ | `earnings_cycle_depth` | 0.2 (0, off) | same | measured | the depth at which row E1, the median fall of aggregate earnings in a contraction, meets Shiller's reported earnings around NBER recessions (median -17%) once the market's plain shocks are permanent: -0.280 at 0.35, -0.173 at 0.2, -0.132 at 0.15 (box ptv20vr4); graded, E1 reads -0.172 (box ptv20g6). pt-v20 before its graded arm had 0.35, picked on row B9 when the cycle carried the index's yearly spread; no error bar |
-| $u_E$ | `earnings_cycle_upside` | 0.09 (0) | same | derived | $q/(1-q)$ with $q$ = 9/108, the share of months in contraction and trough in the US phase table |
-| $H_E$ | `earnings_cycle_half_life` | 60 sessions | 150 | chosen | not searched |
+| Symbol | Dial | pt-v20 (pt-v19) | pt-v21 | pt-v22 | Kind | Source |
+|---|---|---|---|---|---|---|
+| $\delta_E$ | `earnings_cycle_depth` | 0.2 (0, off) | same | same | measured | the depth at which row E1, the median fall of aggregate earnings in a contraction, meets Shiller's reported earnings around NBER recessions (median -17%) once the market's plain shocks are permanent: -0.280 at 0.35, -0.173 at 0.2, -0.132 at 0.15 (box ptv20vr4); graded, E1 reads -0.172 (box ptv20g6). pt-v20 before its graded arm had 0.35, picked on row B9 when the cycle carried the index's yearly spread; no error bar |
+| $u_E$ | `earnings_cycle_upside` | 0.09 (0) | same | same | derived | $q/(1-q)$ with $q$ = 9/108, the share of months in contraction and trough in the US phase table |
+| $H_E$ | `earnings_cycle_half_life` | 60 sessions | 150 | same | chosen | not searched |
 
 With the cycle carrying part of the index's year-to-year variance, pt-v20
 took transient variance out by as much before its graded arm, and keeps it
@@ -2116,10 +2116,10 @@ at the open: $V_{i,0} e^{v_{i,0}} e^{s_{i,0}} = P_{i,0}$. A company listed
 later opens with $s_0 = \mathrm{clip}(g_i;\ -0.9,\ 0.9)$
 (`market/tick.rs:1130-1138`).
 
-| Symbol | Dial | pt-v20 (pt-v19) | pt-v21 | Kind | Source |
-|---|---|---|---|---|---|
-| $\sigma_o$ | `opening_mispricing_sigma` | 0.016 (0, off) | same | measured | the cross-sectional sd of $s$ over sessions 250 to 2,660 on seeds 201 to 212; 0.0155 to 0.0165 |
-| $\sigma_c$ | `opening_market_sigma` | 0.001 (0, off) | same | chosen | with the market's plain shocks permanent, little of the market's variance stays in $s$, and 0.001 is the smallest opening that keeps the stationary form (0 would take the roster's day-zero premium). Not measured on the graded arm; pt-v20 before it had 0.10, the time-series sd of the cap-weighted $s$ on seeds 201 to 203 (0.148, 0.105, 0.042) |
+| Symbol | Dial | pt-v20 (pt-v19) | pt-v21 | pt-v22 | Kind | Source |
+|---|---|---|---|---|---|---|
+| $\sigma_o$ | `opening_mispricing_sigma` | 0.016 (0, off) | same | same | measured | the cross-sectional sd of $s$ over sessions 250 to 2,660 on seeds 201 to 212; 0.0155 to 0.0165 |
+| $\sigma_c$ | `opening_market_sigma` | 0.001 (0, off) | same | same | chosen | with the market's plain shocks permanent, little of the market's variance stays in $s$, and 0.001 is the smallest opening that keeps the stationary form (0 would take the roster's day-zero premium). Not measured on the graded arm; pt-v20 before it had 0.10, the time-series sd of the cap-weighted $s$ on seeds 201 to 203 (0.148, 0.105, 0.042) |
 
 Graded: the start-up ratio in row B9, the index's volatility over the first
 60 sessions against sessions 250 to 490, reads 0.80 against a band of two
@@ -2244,10 +2244,10 @@ term, reversion, herding, the crowd and the breaker. On pt-v20 the plain
 market loading, market-wide news and the market jump move to $v$ too, up
 to the volatility ceiling.
 
-| Symbol | Dial | pt-v20 (pt-v19) | pt-v21 | Kind | Source |
-|---|---|---|---|---|---|
-| $\psi$ | `fair_value_news_share` | 1.0 (0, off) | same | derived | the end point: a company's variance ratio at 60 sessions (row C5) moves from 0.59 to 0.95 against a real 0.92, and the value and momentum signals that a transient $s$ made profitable (rows C6, C7) fall to real sizes |
-| $\psi_m$ | `fair_value_market_share` | 1 (0, off) | same | fitted | see [The permanent share of market moves](#the-permanent-share-of-market-moves) |
+| Symbol | Dial | pt-v20 (pt-v19) | pt-v21 | pt-v22 | Kind | Source |
+|---|---|---|---|---|---|---|
+| $\psi$ | `fair_value_news_share` | 1.0 (0, off) | same | same | derived | the end point: a company's variance ratio at 60 sessions (row C5) moves from 0.59 to 0.95 against a real 0.92, and the value and momentum signals that a transient $s$ made profitable (rows C6, C7) fall to real sizes |
+| $\psi_m$ | `fair_value_market_share` | 1 (0, off) | same | same | fitted | see [The permanent share of market moves](#the-permanent-share-of-market-moves) |
 
 #### The knee under a name's level
 
@@ -3646,27 +3646,27 @@ registered and proposed row reads as at $k = 0$, bar C4b (-0.1 points
 against -0.0), R7b (-1.00 against -0.98), AO2 to AO4 (22.9 bp, 18 of 30,
 +0.03). At $k = 0.5$ the day TWAP costs 0.75 and 0.70 of a block.
 
-| Symbol | Dial | pt-v20 (pt-v19) | pt-v21 | Kind | Source |
-|---|---|---|---|---|---|
-| $Y$ | `book_depth_coefficient` | 0.75 (0, off) | same | measured | the cost of size fitted as 0.469 $\sigma (Q/V)^{0.495}$ (tools/calibration/impact_curve.py) inside the 0.33 to 0.67 band of Tóth et al. (2011); row C9 reads exponent 0.484 and coefficient 0.424 on pt-v20, and on pt-v21 row C9 reads exponent 0.515 and coefficient 0.438, for one immediate order of 1% to 100% of a day's volume |
-| $\delta$ | `book_depth_exponent` | 0.5 | same | derived | the square-root law (Tóth et al. 2011) |
-| $R$ | `book_depth_reach` | 1.0 | same | derived | the latent book reaches one day's volume |
-| $k$ | `book_depth_nesting` | 0 (beside) | 1 | for a new registration | the share of the maker's ladder the latent curve counts as its own front; 1 makes the depth the larger of ladder and law (Tóth et al. 2011) |
-| | `book_shared` | 1 (0) | same | derived | a switch: agents consume one book |
-| $H_B$ | `book_refill_half_life` | 27 ticks (0) | same | measured | refill after a 10% of volume order: 23.1 bp at once, 9.7 after 30 ticks, 1.6 after 130; $39 \ln 2$ at a minute's share of volume (Obizhaeva and Wang 2013) |
-| | `book_resting` | 1 (0) | same | derived | a switch: limit orders rest with queue priority |
-| | `book_arrival_shuffle` | 0 | 1 | out of scope | a switch: a cohort's arrival order at the book is a seeded shuffle, fresh every step; 0 is label order |
-| $\gamma$ | `fill_impact_coefficient` | 0.314 (0) | 0.15 | derived | the permanent coefficient of Almgren, Thum, Hauptmann and Li (2005); linear, so no round trip profits (Huberman and Stanzl 2004) |
-| $Y_M$ | `impact_memory_coefficient` | 0 (off) | 0.65 | for a new registration | the square-root law on the tape for agents' metaorders; at most $Y$; Tóth et al. (2011), Zarinelli et al. (2015), Bucci et al. (2019) |
-| $H_1$ | `impact_memory_half_life` | 0 | 12 | for a new registration | the memory's fast half-life in open ticks; required with $Y_M$ |
-| $H_2$ | `impact_memory_slow_half_life` | 0 (none) | 780 | for a new registration | the slow part; 0.3 to 0.4 of the peak remains after weeks (Bucci et al. 2019) |
-| $w$ | `impact_memory_slow_weight` | 0 | 0.1 | for a new registration | the slow part's weight; refused without $H_2$ |
-| | `impact_memory_refill` | 0 (off) | 1 | for a new registration | a switch: a resting order filled against the memory's lean takes its size off $M$, never past zero (Obizhaeva and Wang 2013; Alfonsi, Fruth and Schied 2010; Eisler, Bouchaud and Kockelkoren 2012) |
-| | `book_cross_at_limit` | 0 (off) | 1 | for a new registration | a switch: a resting order crossed during the session trades at its own limit (price-time priority, Nasdaq Rule 4757) |
-| $m^*$ | `impact_memory_crossover` | 0 (pure power) | 0.001 | for a new registration | a size: ANcerno impact is about linear below a volume fraction of about $10^{-3}$ (Zarinelli et al. 2015; Bucci, Mastromatteo et al. 2018; as reported in Bucci et al., PRL 122, 108302, 2019, whose own crossover is in the participation rate) |
-| $c_{OF}$ | `order_flow_coefficient` | 50 | 800 | chosen | reference implementation |
-| | `order_flow_depth_law` | 0 | 1 | derived | a switch: 1 divides by depth once, restated at a million shares a day (Cont, Kukanov and Stoikov 2014) |
-| $f_I$ | `informed_flow_fraction` | 0.35 | same | chosen | the permanent share of impact; published decompositions of 0.3 to 0.5, none named |
+| Symbol | Dial | pt-v20 (pt-v19) | pt-v21 | pt-v22 | Kind | Source |
+|---|---|---|---|---|---|---|
+| $Y$ | `book_depth_coefficient` | 0.75 (0, off) | same | same | measured | the cost of size fitted as 0.469 $\sigma (Q/V)^{0.495}$ (tools/calibration/impact_curve.py) inside the 0.33 to 0.67 band of Tóth et al. (2011); row C9 reads exponent 0.484 and coefficient 0.424 on pt-v20, and on pt-v21 row C9 reads exponent 0.515 and coefficient 0.438, for one immediate order of 1% to 100% of a day's volume |
+| $\delta$ | `book_depth_exponent` | 0.5 | same | same | derived | the square-root law (Tóth et al. 2011) |
+| $R$ | `book_depth_reach` | 1.0 | same | same | derived | the latent book reaches one day's volume |
+| $k$ | `book_depth_nesting` | 0 (beside) | 1 | same | for a new registration | the share of the maker's ladder the latent curve counts as its own front; 1 makes the depth the larger of ladder and law (Tóth et al. 2011) |
+| | `book_shared` | 1 (0) | same | same | derived | a switch: agents consume one book |
+| $H_B$ | `book_refill_half_life` | 27 ticks (0) | same | same | measured | refill after a 10% of volume order: 23.1 bp at once, 9.7 after 30 ticks, 1.6 after 130; $39 \ln 2$ at a minute's share of volume (Obizhaeva and Wang 2013) |
+| | `book_resting` | 1 (0) | same | same | derived | a switch: limit orders rest with queue priority |
+| | `book_arrival_shuffle` | 0 | 1 | same | out of scope | a switch: a cohort's arrival order at the book is a seeded shuffle, fresh every step; 0 is label order |
+| $\gamma$ | `fill_impact_coefficient` | 0.314 (0) | 0.15 | same | derived | the permanent coefficient of Almgren, Thum, Hauptmann and Li (2005); linear, so no round trip profits (Huberman and Stanzl 2004) |
+| $Y_M$ | `impact_memory_coefficient` | 0 (off) | 0.65 | same | for a new registration | the square-root law on the tape for agents' metaorders; at most $Y$; Tóth et al. (2011), Zarinelli et al. (2015), Bucci et al. (2019) |
+| $H_1$ | `impact_memory_half_life` | 0 | 12 | same | for a new registration | the memory's fast half-life in open ticks; required with $Y_M$ |
+| $H_2$ | `impact_memory_slow_half_life` | 0 (none) | 780 | same | for a new registration | the slow part; 0.3 to 0.4 of the peak remains after weeks (Bucci et al. 2019) |
+| $w$ | `impact_memory_slow_weight` | 0 | 0.1 | same | for a new registration | the slow part's weight; refused without $H_2$ |
+| | `impact_memory_refill` | 0 (off) | 1 | same | for a new registration | a switch: a resting order filled against the memory's lean takes its size off $M$, never past zero (Obizhaeva and Wang 2013; Alfonsi, Fruth and Schied 2010; Eisler, Bouchaud and Kockelkoren 2012) |
+| | `book_cross_at_limit` | 0 (off) | 1 | same | for a new registration | a switch: a resting order crossed during the session trades at its own limit (price-time priority, Nasdaq Rule 4757) |
+| $m^*$ | `impact_memory_crossover` | 0 (pure power) | 0.001 | same | for a new registration | a size: ANcerno impact is about linear below a volume fraction of about $10^{-3}$ (Zarinelli et al. 2015; Bucci, Mastromatteo et al. 2018; as reported in Bucci et al., PRL 122, 108302, 2019, whose own crossover is in the participation rate) |
+| $c_{OF}$ | `order_flow_coefficient` | 50 | 800 | same | chosen | reference implementation |
+| | `order_flow_depth_law` | 0 | 1 | same | derived | a switch: 1 divides by depth once, restated at a million shares a day (Cont, Kukanov and Stoikov 2014) |
+| $f_I$ | `informed_flow_fraction` | 0.35 | same | same | chosen | the permanent share of impact; published decompositions of 0.3 to 0.5, none named |
 
 ### Cash and borrowing
 
