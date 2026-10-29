@@ -764,9 +764,10 @@ def test_the_fill_refuses_another_arm_and_an_unfilled_placeholder(tmp_path, monk
 
 
 def test_the_fill_records_the_pooled_read_with_a_public_source(tmp_path, monkeypatch):
-    """`--pooled` hands `level_pool.py measure`'s file to `level_pool.py
-    record` after the level rows, writing the tree's record, and names a
-    public source rather than the file's local path."""
+    """`--pooled` publishes `level_pool.py measure`'s file beside the grade
+    and records it from there after the level rows, so the record names a
+    file in this repository, as pt-v21's does, and the pooled-read test can
+    rebuild it."""
     tool, tree, args = _fill_tree(tmp_path)
     monkeypatch.setattr(rec_tool, "OUT", rec_tool.OUT)
     monkeypatch.setattr(rec_tool, "PUBLISHED_GRADES", dict(rec_tool.PUBLISHED_GRADES))
@@ -775,10 +776,15 @@ def test_the_fill_records_the_pooled_read_with_a_public_source(tmp_path, monkeyp
     seen = {}
     monkeypatch.setattr(level_pool, "record", lambda ns: seen.update(vars(ns), records=level_pool.RECORDS) or 0)
     monkeypatch.setattr(level_pool, "RECORDS", level_pool.RECORDS)
-    args.pooled = str(tmp_path / "box" / "pt-v22.json")
+    box = tmp_path / "box"
+    box.mkdir()
+    (box / "pt-v22.json").write_text('{"preset": "pt-v22"}')
+    args.pooled = str(box / "pt-v22.json")
     assert tool.run(tree, args) == 0
-    assert seen["file"] == args.pooled and seen["records"] == tree / "python/tradefloor/presets"
-    assert seen["source"] == "tools/presets/level_pool.py measure pt-v22 (pt-v22.json)"
+    published = tree / "validation/pt-v22/level-pool/pt-v22.json"
+    assert published.read_text() == '{"preset": "pt-v22"}'
+    assert seen["file"] == str(published) and seen["records"] == tree / "python/tradefloor/presets"
+    assert seen["source"] == "validation/pt-v22/level-pool/pt-v22.json"
 
 
 def test_with_no_fill_named_the_fill_finds_every_page_with_a_placeholder(tmp_path):

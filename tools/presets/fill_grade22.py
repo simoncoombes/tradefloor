@@ -21,8 +21,9 @@ grading box's output folder, holding `commit.txt`, `scripts-sha256.txt` and `kno
    XXXXXXXX is `PT_V22_DIGEST_PREFIX`, the swapped preset's own digest, and the script refuses otherwise.
 2. **The record's slots**, through `record.py`'s writers: `--long-run` on that verdict, and `--panel` and
    `--level-rows` when their artefacts are given. Without them those slots stay empty and the record won't load.
-   `--pooled` records the pooled level read (`level_pool.py measure pt-v22`'s file, 360 seeds) after the level
-   rows, through `level_pool.py record`.
+   `--pooled` publishes the pooled level read (`level_pool.py measure pt-v22`'s file, 360 seeds) at
+   `validation/pt-v22/level-pool/pt-v22.json` and records it from there after the level rows (`level_pool.py
+   record`), as pt-v21's record names its own per-seed file.
 3. **The named values:** `record.py`'s `PT_V22_GRADE_BOXES` and `tests/test_validation.py`'s `GRADE22`.
 4. **The `{{G19:KEY}}` placeholders** in each `--fill` file. The keys are `long_run_passed` and `long_run_of`
    (the record's gated counts), `long_run_all_passed` and `long_run_all_of`, and any in `--values` (a JSON
@@ -162,6 +163,10 @@ def fill_placeholders(files: list[pathlib.Path], values: dict[str, object]) -> N
         f.write_text(PLACEHOLDER.sub(lambda m: str(values[m.group(1)]), text))
 
 
+#: Where the pooled level read's per-seed file is published, and what the record names as its source.
+POOLED_FILE = "validation/pt-v22/level-pool/pt-v22.json"
+
+
 def run(root: pathlib.Path, a) -> int:
     boxes = boxes_of(a.box)
     verdict = assemble(pathlib.Path(a.desk), boxes, a.graded_fingerprint)
@@ -182,9 +187,14 @@ def run(root: pathlib.Path, a) -> int:
     if getattr(a, "pooled", None):
         import level_pool  # noqa: PLC0415
         level_pool.RECORDS = root / "python/tradefloor/presets"
-        # A public source: the file's own path is a local one.
-        ns = argparse.Namespace(file=a.pooled, commit=None, package_version=None, date=None, check=False,
-                                source=f"tools/presets/level_pool.py measure pt-v22 ({pathlib.Path(a.pooled).name})")
+        # The per-seed file is published beside the grade and the record names
+        # it there, as pt-v21's names its own: `test_preset_records` rebuilds
+        # the pooled read from it.
+        dest = root / POOLED_FILE
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(a.pooled, dest)
+        ns = argparse.Namespace(file=str(dest), commit=None, package_version=None, date=None, check=False,
+                                source=POOLED_FILE)
         if level_pool.record(ns) != 0:
             return 1
     if rec.write_long_run(str(vf)) != 0:
