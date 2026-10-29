@@ -765,6 +765,13 @@ def test_the_map_runs_against_the_recorded_finrobot_agent_without_a_provider():
     # earnings write before the open reaches the first price the agent is
     # shown. On pt-v20 the open was the last close and the write did not.
     shown.add("market.earnings")
+    # pt-v22, the default from 0.11.0, lists contracts and the prompt quotes
+    # them, and their quotes read most of the macro state (the oil future's
+    # forecast, the rate futures' expected path). Measured on this recording:
+    # every target reaches what the agent is shown except these three.
+    if tf.ModelParams.from_preset().futures_index_listed:
+        shown = set(targets) - {"macro.treasury_2y", "macro.treasury_10y",
+                                "policy.tariff_rate"}
 
     atlas = map_boundaries(world, targets=targets,
                            scenarios=[None, "rate_shock"],
@@ -787,10 +794,13 @@ def test_the_map_runs_against_the_recorded_finrobot_agent_without_a_provider():
         assert found.scenario == "shared"
         if found.target in shown:
             assert found.status == "unreachable", found.target
-            assert found.probes[0].outcome == "unreachable"
+            # The search stops at the first probe the recording cannot
+            # answer. On pt-v22 unemployment at half leaves the prompt as
+            # recorded and only the top of the bracket moves it.
+            missed = found.unreachable
+            assert missed == found.probes[-1:], found.target
             assert f"no recorded FinRobot response for step {first_step}" \
-                in found.probes[0].detail
-            assert found.unreachable == found.probes
+                in missed[0].detail
         else:
             assert found.status == "no flip", found.target
             assert len(found.probes) == 2
@@ -933,7 +943,7 @@ def test_the_runner_help_renders():
 def test_the_runner_replays_the_recording_and_writes_the_map(tmp_path):
     proc = subprocess.run(
         [sys.executable, str(RUNNER), "--scenarios", "none",
-         "--targets", "commodity.oil", "macro.policy_rate",
+         "--targets", "policy.tariff_rate", "macro.policy_rate",
          "--steps", "1", "--out", str(tmp_path)],
         capture_output=True, text=True, timeout=300, env=_env())
     assert proc.returncode == 0, proc.stderr[-2000:]
@@ -942,7 +952,9 @@ def test_the_runner_replays_the_recording_and_writes_the_map(tmp_path):
                          .read_text(encoding="utf-8"))
     assert written["counts"] == {"no flip": 1, "unreachable": 1}
     statuses = {s["target"]: s["status"] for s in written["searches"]}
-    assert statuses == {"commodity.oil": "no flip",
+    # The tariff rate, not oil, as the target the prompt does not show:
+    # pt-v22's oil future puts oil in it.
+    assert statuses == {"policy.tariff_rate": "no flip",
                         "macro.policy_rate": "unreachable"}
 
 

@@ -197,11 +197,10 @@ DEFAULT_OUT = Path(__file__).resolve().parent / "artifacts"
 #: One constraint comes from FinRobot's dependency rather than from here:
 #: `autogen` 0.2.35's Anthropic client sets `temperature` unconditionally
 #: (`load_config` gives it a default of 1.0 and `create` always forwards it),
-#: so a model that has deprecated the parameter answers 400 and cannot be
-#: driven through FinRobot at all. That rules out the newest Anthropic
-#: models until `pyautogen` moves.
-LIVE_MODEL = os.environ.get("TRADEFLOOR_FINROBOT_MODEL",
-                            "claude-sonnet-4-5-20250929")
+#: and the Messages API has refused `temperature` on every model since
+#: 2026-10-21. :func:`_send_no_temperature` takes it back out of the request
+#: that client builds, on the live path only.
+LIVE_MODEL = os.environ.get("TRADEFLOOR_FINROBOT_MODEL", "claude-sonnet-5-5")
 LIVE_API_TYPE = os.environ.get("TRADEFLOOR_FINROBOT_API_TYPE", "anthropic")
 LIVE_KEY_VAR = "ANTHROPIC_API_KEY" if LIVE_API_TYPE == "anthropic" \
     else "OPENAI_API_KEY"
@@ -248,14 +247,36 @@ def can_run_live() -> bool:
     return True
 
 
+def _send_no_temperature() -> None:
+    """Drop `temperature` from what autogen 0.2.35's Anthropic client sends.
+
+    That client puts it in every request, defaulting it to 1.0 when the
+    config has none, and the Messages API now refuses the parameter on every
+    model. Nothing else in the request changes. Called on the live path
+    only: a replay imports neither autogen nor FinRobot.
+    """
+    from autogen.oai import anthropic as client  # noqa: PLC0415
+
+    load = client.AnthropicClient.load_config
+    if getattr(load, "_drops_temperature", False):
+        return
+
+    def load_config(self, params):
+        out = load(self, params)
+        out.pop("temperature", None)
+        return out
+
+    load_config._drops_temperature = True
+    client.AnthropicClient.load_config = load_config
+
+
 def llm_config() -> dict:
     """The autogen configuration FinRobot runs under, in `--live`.
 
-    Temperature zero: the experiment measures the agent's response to the
-    OBSERVATION, and sampling noise would add a second source of difference
-    between the arms that the design cannot separate from the intervention.
-    Zero does not make the agent deterministic, and nothing here claims it
-    does. See the provenance block in the printed report.
+    No sampling parameter: the API takes none (see `LIVE_MODEL`), and the
+    recording, not a temperature, is what makes the experiment reproducible.
+    The arms differ by the intervention and by the model's own sampling,
+    which the provenance block in the printed report says.
     """
     key = os.environ.get(LIVE_KEY_VAR)
     if not key:
@@ -264,7 +285,6 @@ def llm_config() -> dict:
     return {
         "config_list": [{"model": LIVE_MODEL, "api_key": key,
                          "api_type": LIVE_API_TYPE}],
-        "temperature": 0.0,
         "cache_seed": None,
     }
 
@@ -291,6 +311,8 @@ def main(*, live: bool = False, record: bool = False,
     # between them is the observation each is handed.
     recorder = Transcript() if (live and record) else None
     if live:
+        if LIVE_API_TYPE == "anthropic":
+            _send_no_temperature()
         agent = FinRobotAdapter(
             mode="live", llm_config=llm_config(), recorder=recorder,
             fundamentals=FUNDAMENTALS, objective=OBJECTIVE,
@@ -450,7 +472,6 @@ def _provenance(live: bool, agent: FinRobotAdapter,
         meta.update({
             "provider": LIVE_API_TYPE,
             "model": LIVE_MODEL,
-            "temperature": 0.0,
             "recorded": recorder is not None,
         })
     elif agent.transcript is not None:
