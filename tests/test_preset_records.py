@@ -706,3 +706,25 @@ def test_level_rows_carries_the_pooled_read_or_drops_it_by_name(
         assert "carried level_protocol.pooled forward" in said
         keys = list(written)
         assert keys.index("pooled") == keys.index("certified_crisis") + 1
+
+
+def test_level_rows_checks_a_control_against_its_own_thirty_seed_block():
+    """The rehearsal's blocker 2. Since the pooled read (`facts.LEVEL_POOL`,
+    360 seeds) the envelope certifies the drift and tail rows of the
+    envelope's preset from it, while `level_panel.py` reads a control on
+    `facts.LEVEL_PROTOCOL`'s thirty. A control is checked against its own
+    record's thirty-seed block, which reads the instrument it runs, and not
+    against the envelope's pooled constants, which no thirty-seed arm can
+    reproduce."""
+    import sys
+
+    sys.path.insert(0, str(RECORDS.parent.parent.parent / "tools" / "presets"))
+    import level_rows  # noqa: PLC0415
+
+    control = envelope.PRESET
+    rec = json.loads((RECORDS / f"{control}.json").read_text(encoding="utf-8"))
+    keys = list(envelope.CERTIFIED_LEVEL) + list(envelope.CERTIFIED_CRISIS)
+    block, source = level_rows.published_block(control, keys)
+    assert source == f"{control}.json level_protocol"
+    lp = rec["level_protocol"]
+    assert block == {**lp["certified_level"], **lp["certified_crisis"]}
