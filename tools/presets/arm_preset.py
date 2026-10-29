@@ -1,6 +1,6 @@
 """Write pt-v22 from an arm: the preset, its record's identity, its known answer.
 
-    python tools/presets/arm_preset.py --arm ARM [--graded]
+    python tools/presets/arm_preset.py --arm ARM [--graded] [--default --version X.Y.Z]
     python tools/presets/arm_preset.py --check
 
 pt-v21 went in as hand-typed overrides and a record assembled after its
@@ -28,6 +28,12 @@ says so.
    value moved, unless the entry is `measured` (a bar belongs to one
    estimate), and lists the dials whose entries need a person: a measured
    value that moved, a dial the new arm brings into scope or takes out.
+
+`--default --version X.Y.Z` (the owner's ruling, 2026-10-28) then makes pt-v22 the library's default:
+`DEFAULT_PRESET_NAME` and `Engine::default_model`, their tests and docstrings, `DEFAULT_SINCE` and the
+manifest's table, the payload's text in `docs/SUPPORT.md`, a CHANGELOG section, and `KAT_VERSION` 30 with
+`tests/known_answer.json` re-based on a fresh build. Every edit's text must stand once in the tree, or nothing
+is written. pt-v21 stays selectable by name.
 
 `--check` writes nothing and exits 1 on any difference between the arm file,
 the Rust block, the build, the record's identity and the known answer.
@@ -304,6 +310,149 @@ def _short(v: float) -> str:
 
 
 # ---------------------------------------------------------------------------
+# The default switch (owner, 2026-10-28): pt-v22 is the library's default
+# from the release that ships it, pt-v21 stays selectable by name.
+# ---------------------------------------------------------------------------
+
+def default_edits(version: str) -> list[tuple[str, str, str]]:
+    """Every text edit the default switch makes: (file, old, new). Each old
+    text must stand exactly once, so a tree that has moved under the switch
+    stops it rather than half-switching."""
+    v = version
+    return [
+        ("rust/src/params.rs",
+         'pub const DEFAULT_PRESET_NAME: &str = "pt-v21";',
+         'pub const DEFAULT_PRESET_NAME: &str = "pt-v22";'),
+        ("rust/src/params.rs",
+         "/// [`ModelParams::pt_v21`]. THE DEFAULT since 0.10.0:\n"
+         "/// `DEFAULT_PRESET_NAME` names it and `Engine::default_model` returns it,\n"
+         "/// and the test at the bottom of this file asserts the two agree.\n",
+         f"/// [`ModelParams::pt_v21`]. The default from 0.10.0 until {v}.\n"),
+        ("rust/src/params.rs",
+         "/// [`ModelParams::pt_v22`]. Not the default.\n",
+         f"/// [`ModelParams::pt_v22`]. THE DEFAULT since {v}:\n"
+         "/// `DEFAULT_PRESET_NAME` names it and `Engine::default_model` returns it,\n"
+         "/// and the test at the bottom of this file asserts the two agree.\n"),
+        ("rust/src/params.rs",
+         "    /// that reverts to its inventory level. THE DEFAULT since 0.10.0.\n",
+         f"    /// that reverts to its inventory level. The default from 0.10.0 until {v}.\n"),
+        ("rust/src/params.rs",
+         "    /// (`futures_vix_listed`) stay off. NOT the default: `DEFAULT_PRESET_NAME`\n"
+         "    /// is pt-v21's.\n",
+         f"    /// (`futures_vix_listed`) stay off. THE DEFAULT since {v}\n"
+         "    /// (`DEFAULT_PRESET_NAME`); pt-v21 stays selectable by name.\n"),
+        ("rust/src/params.rs",
+         '        assert_eq!(DEFAULT_PRESET_NAME, "pt-v21");\n',
+         "        // pt-v22 took it at " + v + ". Before it did, the line below asserted\n"
+         '        // `DEFAULT_PRESET_NAME == "pt-v21"`.\n'
+         '        assert_eq!(DEFAULT_PRESET_NAME, "pt-v22");\n'),
+        ("rust/src/params.rs",
+         "        // pt-v22 is not the default. Its digest is the one its arm has as\n",
+         "        // pt-v22, the default from " + v + ": its digest is the one its arm has as\n"),
+        ("rust/src/engine.rs",
+         "    /// Since 0.10.0 this is [`PT_V21`]: pt-v20 with 104 dials moved, each\n",
+         f"    /// Since {v} this is [`PT_V22`]: the preset that lists the contracts\n"
+         "    /// (index, rate and oil futures, and options on every name), graded as\n"
+         "    /// its record says (`tf.preset_record(\"pt-v22\")`, `validation/pt-v22/`).\n"
+         "    ///\n"
+         f"    /// From 0.10.0 until {v} it was [`PT_V21`]: pt-v20 with 104 dials moved, each\n"),
+        ("rust/src/engine.rs",
+         "    /// [`PT_V21`]: crate::params::PT_V21\n"
+         "    pub const fn default_model() -> crate::params::ModelParams {\n"
+         "        crate::params::PT_V21\n",
+         "    /// [`PT_V21`]: crate::params::PT_V21\n"
+         "    /// [`PT_V22`]: crate::params::PT_V22\n"
+         "    pub const fn default_model() -> crate::params::ModelParams {\n"
+         "        crate::params::PT_V22\n"),
+        ("rust/src/engine.rs",
+         "        // And the default engine, which is pt-v21 from 0.10.0.\n"
+         '        assert_eq!(engine(8).model_fingerprint(), "pt-v21");\n',
+         f"        // And the default engine, which is pt-v22 from {v} (pt-v21 from 0.10.0).\n"
+         '        assert_eq!(engine(8).model_fingerprint(), "pt-v22");\n'),
+        ("tools/presets/record.py",
+         '    "pt-v20": "0.8.5", "pt-v21": "0.10.0",\n}',
+         f'    "pt-v20": "0.8.5", "pt-v21": "0.10.0", "pt-v22": "{v}",\n}}'),
+        ("python/tradefloor/manifest.py",
+         '    ("0.8.0", "pt-v19"), ("0.8.5", "pt-v20"), ("0.10.0", "pt-v21"),\n)',
+         f'    ("0.8.0", "pt-v19"), ("0.8.5", "pt-v20"), ("0.10.0", "pt-v21"),\n    ("{v}", "pt-v22"),\n)'),
+        ("docs/SUPPORT.md",
+         "pt-v22 lists the index, rate and oil futures)",
+         f"pt-v22, the default from {v}, lists the index, rate and oil futures)"),
+        ("docs/SUPPORT.md",
+         "`options_names_listed`; pt-v22 lists them)",
+         f"`options_names_listed`; pt-v22, the default from {v}, lists them)"),
+        ("docs/SUPPORT.md",
+         "a model that lists futures or options, so on every shipped preset the\n"
+         "payload is version 2's and a version-2 recording replays.",
+         "a model that lists futures or options. On pt-v21 and every earlier preset\n"
+         "the payload is version 2's and a version-2 recording replays. pt-v22, the\n"
+         f"default from {v}, lists both, so the default's payload carries all four\n"
+         "keys; a recording made on the default before then replays on `pt-v21` by name."),
+        ("CHANGELOG.md",
+         "<!-- release-note-ends -->\n\n### pt-v22: the contracts\n",
+         "<!-- release-note-ends -->\n\n### pt-v22 is the default\n\n"
+         f"From {v} the library's default preset is pt-v22 (`DEFAULT_PRESET_NAME`,\n"
+         "`Engine::default_model`); pt-v21 stays selectable by name and replays\n"
+         "exactly. Every seeded default trajectory changes: `KAT_VERSION` goes to 30\n"
+         "and `tests/known_answer.json` is re-based. The default market lists\n"
+         "futures, options and margin, so an agent's observation on it carries\n"
+         "`index`, `futures`, `margin` and `options`: payload version 3, which\n"
+         "adds those keys only on a model that lists contracts. On pt-v21 the\n"
+         "payload is version 2's, and a recording made on the old default replays\n"
+         "with `model=\"pt-v21\"`.\n\n### pt-v22: the contracts\n"),
+        ("tests/known_answer.py",
+         "KAT_VERSION = 29\n",
+         f"#\n# v30: pt-v22 IS THE DEFAULT ({v}). pt-v20 with the arm in\n"
+         "# tools/presets/arms/pt-v22.txt: index, rate and oil futures with their\n"
+         "# night session and margin, options on every name with their dealer, and\n"
+         "# the economy, curve and variance terms pt-v21 moved. Every seeded default\n"
+         "# trajectory changes. pt-v21 and every preset before it replay exactly\n"
+         "# (tests/known_answer_presets.py), and pt-v22's own row there does not move\n"
+         "# with this bump.\n"
+         "KAT_VERSION = 30\n"),
+    ]
+
+
+def apply_default(version: str, write: bool = True) -> list[str]:
+    """Apply the text edits; returns the problems (an anchor missing or doubled)."""
+    problems, files = [], {}
+    for rel, old, new in default_edits(version):
+        text = files.setdefault(rel, (ROOT / rel).read_text(encoding="utf-8"))
+        n = text.count(old)
+        if n != 1:
+            problems.append(f"{rel}: expected one {old.splitlines()[0].strip()[:70]!r}, found {n}")
+            continue
+        files[rel] = text.replace(old, new, 1)
+    if write and not problems:
+        for rel, text in files.items():
+            (ROOT / rel).write_text(text, encoding="utf-8")
+    return problems
+
+
+def write_default_known_answers(version: str) -> None:
+    """known_answer.json at v30 on the new default, from the rebuilt engine."""
+    sys.path.insert(0, str(ROOT / "tests"))
+    import known_answer as ka  # noqa: PLC0415
+
+    path = ROOT / "tests" / "known_answer.json"
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    was = {k: doc[k] for k in ("sha256", "simulationSha256", "bondsSha256", "metadataSha256")}
+    doc.update(katVersion=ka.KAT_VERSION, bytes=len(ka.known_answer_buffer()),
+               sha256=ka.known_answer_digest(), simulationSha256=ka.simulation_digest(),
+               bondsSha256=ka.bonds_digest(), metadataSha256=ka.metadata_digest())
+    doc["note"] = (f"Re-based for {version}, where pt-v22 becomes the default: pt-v20 with the arm in "
+                   "tools/presets/arms/pt-v22.txt, which lists index, rate and oil futures and options "
+                   "on every name. Every seeded default trajectory changes; pt-v21 and every earlier "
+                   f"preset replay exactly (tests/known_answer_presets.json). Was sha256 {was['sha256'][:8]}, "
+                   f"simulation {was['simulationSha256'][:8]}.")
+    doc["bondsNote"] = (f"Re-based for {version} with the default trajectory when pt-v22 became the default "
+                        f"(was {was['bondsSha256'][:8]}).")
+    if doc["metadataSha256"] != was["metadataSha256"]:
+        doc["note"] += f" metadataSha256 moved from {was['metadataSha256'][:8]}: pt-v22 reports other coefficients."
+    path.write_text(json.dumps(doc, indent=1) + "\n", encoding="utf-8")
+    print(f"  wrote tests/known_answer.json: v{ka.KAT_VERSION}, sha {doc['sha256'][:8]}, "
+          f"sim {doc['simulationSha256'][:8]}, bonds {doc['bondsSha256'][:8]}")
+
 
 def after_build() -> int:
     arm = committed_arm()
@@ -350,6 +499,12 @@ def main() -> int:
     ap.add_argument("--no-build", action="store_true",
                     help="write the arm file and the Rust block and stop")
     ap.add_argument("--after-build", action="store_true", help=argparse.SUPPRESS)
+    ap.add_argument("--default", action="store_true",
+                    help="also make pt-v22 the library's default (with --version): the two "
+                         "constants, their tests and docs, DEFAULT_SINCE, KAT_VERSION 30 and the "
+                         "re-based known answers")
+    ap.add_argument("--version", help="the release that makes pt-v22 the default, X.Y.Z")
+    ap.add_argument("--after-default", metavar="VERSION", help=argparse.SUPPRESS)
     ap.add_argument("--check", action="store_true",
                     help="write nothing; exit 1 on any difference")
     args = ap.parse_args()
@@ -357,8 +512,18 @@ def main() -> int:
         return check()
     if args.after_build:
         return after_build()
+    if args.after_default:
+        write_default_known_answers(args.after_default)
+        sys.path.insert(0, str(ROOT / "tools" / "presets"))
+        import record  # noqa: PLC0415
+
+        return record.write_default_since()
+    if args.default and not re.fullmatch(r"\d+\.\d+\.\d+", args.version or ""):
+        ap.error("--default needs --version X.Y.Z, the release that makes pt-v22 the default")
+    if not args.arm and not args.default:
+        ap.error("--arm, --default or --check is required")
     if not args.arm:
-        ap.error("--arm or --check is required")
+        return make_default(args.version, build_engine=not args.no_build)
     arm = parse_arm(pathlib.Path(args.arm).read_text(encoding="utf-8"),
                     status="graded" if args.graded else "stand-in")
     prefix = digest_prefix(arm)
@@ -371,7 +536,23 @@ def main() -> int:
         return 0
     build()
     # A fresh interpreter: this one has the old engine loaded.
-    return subprocess.run([sys.executable, __file__, "--after-build"], cwd=ROOT).returncode
+    rc = subprocess.run([sys.executable, __file__, "--after-build"], cwd=ROOT).returncode
+    if rc != 0 or not args.default:
+        return rc
+    return make_default(args.version)
+
+
+def make_default(version: str, build_engine: bool = True) -> int:
+    """The default switch: the edits, a build, then the known answers re-based on it."""
+    problems = apply_default(version)
+    if problems:
+        print("the default switch did not apply:\n  " + "\n  ".join(problems))
+        return 1
+    print(f"pt-v22 is the default from {version}: {len(default_edits(version))} edits written")
+    if not build_engine:
+        return 0
+    build()
+    return subprocess.run([sys.executable, __file__, "--after-default", version], cwd=ROOT).returncode
 
 
 if __name__ == "__main__":

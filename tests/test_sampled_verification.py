@@ -1329,3 +1329,21 @@ def test_a_pre_open_pt_v20_snapshot_restores_its_opening_draws():
     assert "opening_z" not in tf.Engine(
         seed=SEED, universe=UNIVERSE, model="pt-v19").state_snapshot()
 
+
+
+def test_the_twin_agrees_on_pt_v22_and_its_contracts():
+    """pt-v22, by name: the economy carries the oil pass-through's part of
+    headline (`fed_core_inflation`) and the put's unmet asks
+    (`treasury_zlb_path`), which the twin hashes in `Engine::state_hash`'s
+    order; and its listed contracts' state, which the hash leaves to their
+    own books. Close-boundary leaves and a mid-session one."""
+    engine = tf.Engine(seed=SEED, universe=UNIVERSE, model="pt-v22")
+    snap = engine.state_snapshot()
+    for _ in range(3):
+        engine.run_days(1, record=False, ticks_per_day=TICKS)
+        snap = engine.state_snapshot()
+        assert engine.state_hash() == state_hash(snap)
+    assert {"oil_inflation_level", "zlb_unmet"} <= set(snap["economy"])
+    engine.open_market()
+    engine.run_session(9, 30, 3, 10)
+    assert engine.state_hash() == state_hash(engine.state_snapshot())

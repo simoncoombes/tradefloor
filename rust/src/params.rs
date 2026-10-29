@@ -5702,7 +5702,7 @@ pub struct ModelParams {
     /// makes the target the read-back exactly, bit for bit; pt-v19 and
     /// pt-v20 ship 0.375.
     ///
-    /// The shipped 0.375 is the calm weight the tape's
+    /// pt-v19 to pt-v21's 0.375 is the calm weight the tape's
     /// VIX-to-realized-volatility elasticity gives through
     /// `theta = (1 - a) k`, which is a different identity from the
     /// slow-pole weight derived below.

@@ -1252,7 +1252,7 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          "cycle_nowcast", "cycle_publication", "anticipation_drift",
          "anticipation_raw", "spread_equity_gap", "spread_priced_gap",
          "treasury_equity_priced_gap", "oil_push_level",
-         "usd_haven_level"}
+         "usd_haven_level", "oil_inflation_level", "zlb_unmet"}
         & set(economy))
     if "fed_put" in economy:
         economy_expected |= {"intermeeting_return", "fed_put", "fed_put_owed",
@@ -1326,6 +1326,13 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # The dollar's safe-haven bid, only while `usd_mean_reversion` is set.
     if "usd_haven_level" in economy:
         _f64(buf, economy["usd_haven_level"])
+    # The oil pass-through's part of headline, only while `fed_core_inflation`
+    # or `treasury_core_inflation` is set, then the put's unmet asks, only
+    # while `treasury_zlb_path` is set: `Engine::state_hash`'s order and rule.
+    if "oil_inflation_level" in economy:
+        _f64(buf, economy["oil_inflation_level"])
+    if "zlb_unmet" in economy:
+        _f64(buf, economy["zlb_unmet"])
     # The published GDP growth figure's state, only while
     # `gdp_publication_lag` is set: `Engine::state_hash`'s order and rule,
     # the pending releases LENGTH-PREFIXED, each its day then its figure.

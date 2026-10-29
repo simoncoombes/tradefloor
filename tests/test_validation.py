@@ -455,8 +455,6 @@ def test_pt_v22_is_the_arm_its_file_names():
     record = json.loads(RECORD22.read_text())
     assert {k: record.get(k) for k in tool.identity(arm)} == tool.identity(arm)
     assert record["arm"]["status"] == arm.status
-    # Not the default: known_answer.py's digest does not move with pt-v22.
-    assert tf.model_preset()["name"] == "pt-v21"
 
 
 def test_the_arm_file_reads_both_forms_the_programme_writes():
@@ -650,3 +648,75 @@ def test_a_record_that_gates_a_failing_row_does_not_load(tmp_path, monkeypatch):
         assert records.refused_rows(json.loads(
             (ROOT / "python" / "tradefloor" / "presets" / f"{name}.json").read_text())) == [], name
     assert records.gated_failures(records.preset_record("pt-v19")) == ["C4a", "C4b"]
+
+
+# ---------------------------------------------------------------------------
+# tools/presets/fill_grade22.py, the release-day fill, on its own mock grade
+# ---------------------------------------------------------------------------
+
+def _fill_tool():
+    sys.path.insert(0, str(ROOT / "tools" / "presets"))
+    import fill_grade22  # noqa: PLC0415
+
+    return fill_grade22
+
+
+def _fill_tree(tmp_path):
+    """A copy of the files the fill writes, with a mock grade beside it."""
+    tool = _fill_tool()
+    tree = tmp_path / "tree"
+    for rel in tool.TOUCHED[:3] + ("rust/src/params.rs",):
+        (tree / rel).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / rel, tree / rel)
+    tool.mock(tmp_path / "mock")
+    shutil.copy2(tmp_path / "mock" / "README.md", tree / "README.md")
+    m = tmp_path / "mock"
+    args = type("A", (), dict(desk=str(m / "desk"), box=[f"ptv22g1={m / 'ptv22g1'}", f"ptv22g2={m / 'ptv22g2'}"],
+                              panel=None, level_rows=None, fill=["README.md"], values=None,
+                              graded_fingerprint=f"custom-{tool.digest_prefix()}"))()
+    return tool, tree, args
+
+
+def test_the_fill_writes_the_verdict_the_named_values_and_the_placeholders(tmp_path, monkeypatch):
+    tool, tree, args = _fill_tree(tmp_path)
+    monkeypatch.setattr(tool, "ROOT", tree)
+    monkeypatch.setattr(rec_tool, "OUT", rec_tool.OUT)
+    monkeypatch.setattr(rec_tool, "PUBLISHED_GRADES", dict(rec_tool.PUBLISHED_GRADES))
+    assert tool.run(tree, args) == 0
+    verdict = json.loads((tree / "validation/pt-v22/verdict-pt-v22.json").read_text())
+    rows = {r["id"]: r for r in verdict["rows"]}
+    assert (verdict["verdict"], verdict["passed"], verdict["of"]) == ("pass", 14, 14)
+    assert verdict["all_rows"] == {"passed": 14, "of": 16}
+    assert rows["OF4"]["gated"] is False and rows["R6"]["gated"] is False
+    assert "exception" in rows["ON1"] and "exception" in rows["E1"]
+    assert rows["B3"]["group"] == "amended (registration 19)" and verdict["replaced_by_amendments"] == ["B3"]
+    assert verdict["measured"]["fingerprint"] == "pt-v22"
+    assert verdict["measured"]["graded_fingerprint"] == f"custom-{tool.digest_prefix()}"
+    block = dict(json.loads((tree / "python/tradefloor/presets/pt-v22.json").read_text())["long_run"])
+    block.pop("coefficients")
+    assert block == rec_tool.public_paths(verdict)
+    assert (tree / "README.md").read_text() == "pt-v22 passes 14 of 14 rows.\n"
+    tests = (tree / "tests/test_validation.py").read_text()
+    assert '"verdict": (\'verdict-pt-v22.json\', \'pass\', 14, 14),' in tests
+    assert '\n    "boxes": None,' not in tests and '"package": \'0.11.0\'' in tests
+    assert 'PT_V22_GRADE_BOXES: tuple[str, ...] = ("ptv22g1", "ptv22g2",)' in (
+        tree / "tools/presets/record.py").read_text()
+
+
+def test_the_fill_refuses_another_arm_and_an_unfilled_placeholder(tmp_path, monkeypatch):
+    tool, tree, args = _fill_tree(tmp_path)
+    monkeypatch.setattr(rec_tool, "OUT", rec_tool.OUT)
+    monkeypatch.setattr(rec_tool, "PUBLISHED_GRADES", dict(rec_tool.PUBLISHED_GRADES))
+    v = pathlib.Path(args.desk) / "verdict-R22-fixd2RWP.json"
+    doc = json.loads(v.read_text())
+    v.write_text(json.dumps(dict(doc, fingerprint="custom-00000000")))
+    with pytest.raises(SystemExit, match="not pt-v22's digest"):
+        tool.run(tree, args)
+    v.write_text(json.dumps(doc))
+    args.graded_fingerprint = None
+    with pytest.raises(SystemExit, match="record no fingerprint"):
+        tool.run(tree, args)
+    args.graded_fingerprint = f"custom-{tool.digest_prefix()}"
+    (tree / "README.md").write_text("{{G19:SS1}} and {{G19:long_run_of}}\n")
+    with pytest.raises(SystemExit, match="no value for .*SS1"):
+        tool.run(tree, args)

@@ -711,3 +711,17 @@ def test_accrue_is_one_days_interest_at_the_policy_rate():
     assert p.accrue(e) == pytest.approx(1000.0 * rate)
     assert p.interest == pytest.approx(1000.0 * rate)
     assert tf.Portfolio(cash=252_000.0).accrue(e) == 0.0
+
+
+def test_a_pt_v22_snapshot_with_the_bonds_restores_and_hashes_like_its_twin():
+    """test_a_snapshot_restores_the_bonds_and_hashes_like_its_twin on pt-v22
+    by name, whose economy carries two fields more."""
+    u = universe()
+    a = _driven(tf.Engine(seed=6, universe=u, model="pt-v22"), days=2)
+    a.open_market()
+    a.run_session(9, 30, 3, 50, fills={"UST10Y": (30_000.0, 0.0)})
+    snap = a.state_snapshot()
+    assert manifest.state_hash(snap) == a.state_hash()
+    b = tf.Engine(seed=6, universe=u, model="pt-v22")
+    b.restore_state(snap)
+    assert b.state_hash() == a.state_hash()
