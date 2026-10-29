@@ -2024,7 +2024,9 @@ def test_preset_of_reads_the_engine_the_observation_carries():
 #: replaying when the default moves. A blanket value across all seven would
 #: write a false provenance into one of them.
 #: The five on the default were re-recorded live on pt-v21 at 0.10.0, when
-#: it took the default; they read pt-v20 until then.
+#: it took the default; they read pt-v20 until then. They were re-recorded
+#: again on pt-v22 for 0.11.0, when it took the default, on the current
+#: models (claude-opus-5-5, claude-sonnet-5-5 for FinRobot; gpt-5.2 kept).
 FIXTURE_PRESETS = {
     "callable/five-days.json": "pt-v22",
     "finrobot/liquidity-crisis.json": "pt-v21",
