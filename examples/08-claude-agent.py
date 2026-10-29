@@ -32,12 +32,13 @@ right for the right reason. A model can score well on the first by accident.
 Nobody can measure the second on real market data, because nobody knows the
 answer there.
 
-The second score has a floor well above zero. On pt-v20, the default,
-`random_noise` moves prices most on almost every day, so an agent that names
-it every day scores 95 to 100 per cent on this market without reading
-anything (seeds 2026 and 1 to 5; `jump` took one day in twenty on three of
-them). The run prints what that constant answer scored on the same days, and
-Claude's figure means something only where it is higher.
+The second score has a floor well above zero. On pt-v22, the default,
+`random_noise` moves prices most on most days, so an agent that names it
+every day scores 75 to 100 per cent on this market without reading anything
+(seeds 2026 and 1 to 5; `overnight` took one to five days in twenty on five
+of them). On pt-v20 the same constant scored 95 to 100 per cent. The run
+prints what that constant answer scored on the same days, and Claude's
+figure means something only where it is higher.
 
 Claude decides once a day, on the day's last step. The harness scores the
 driver against the attribution of the whole day it was named on, open to
@@ -440,7 +441,7 @@ def main(argv: list[str] | None = None) -> None:
         )
 
     # The why-right figure only beside what naming one factor every day
-    # scored and the difference. On pt-v20 a constant answer scores 95 to
+    # scored and the difference. On pt-v22 a constant answer scores 75 to
     # 100 per cent, so only the edge says whether an agent read anything.
     print("%-16s %12s %9s %10s %9s %7s"
           % ("agent", "pnl", "impact", "why-right", "constant", "edge"))
@@ -457,8 +458,9 @@ def main(argv: list[str] | None = None) -> None:
     print("\nP&L over buy-and-hold:")
     for name, excess in tf.versus_buy_and_hold(scores).items():
         print("  %-16s %+12.0f" % (name, excess))
-    # Only where the Oracle is a ceiling: on pt-v20, the default, market
-    # moves mostly stick and no capture ratio is reported.
+    # Only where the Oracle is a ceiling: on pt-v22, the default, as on
+    # pt-v20 and pt-v21, market moves mostly stick and no capture ratio is
+    # reported.
     withheld = tf.capture_withheld(scores)
     if withheld is None:
         print("\nCapture against the Oracle:")
@@ -468,7 +470,7 @@ def main(argv: list[str] | None = None) -> None:
         print("\n" + withheld)
 
     # The floor for the why-right column: the best single factor named on
-    # every scored day. On pt-v20 it is `random_noise` at 95 to 100 per cent
+    # every scored day. On pt-v22 it is `random_noise` at 75 to 100 per cent
     # on this market, so a figure near it says Claude read nothing.
     scored = scores["claude"].explanations
     if scored:
