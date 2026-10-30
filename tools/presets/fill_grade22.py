@@ -2,7 +2,8 @@
 `{{G19:...}}` placeholders.
 
     python tools/presets/fill_grade22.py --desk OUT --box NAME=DIR [--box ...] [--dry] \\
-        [--panel PANEL.json] [--level-rows ROWS.json] [--pooled POOLED.json] [--fill FILE ...] [--values VALUES.json]
+        [--panel PANEL.json] [--level-rows ROWS.json] [--pooled POOLED.json] [--fut PIECES_DIR] [--fill FILE ...] \\
+        [--values VALUES.json]
 
 The release runbook's step 1.7, 1.8 and 1.10 from the grade's outputs. `--desk` is grade19.sh's OUT folder:
 `verdict-ARM.json` (verdict16.py --registration19), `amend19-ARM.json` and `ptv22-ARM.json`. Each `--box` is one
@@ -25,7 +26,12 @@ grading box's output folder, holding `commit.txt`, `scripts-sha256.txt` and `kno
    `validation/pt-v22/level-pool/pt-v22.json` and records it from there after the level rows (`level_pool.py
    record`), as pt-v21's record names its own per-seed file.
 3. **The named values:** `record.py`'s `PT_V22_GRADE_BOXES` and `tests/test_validation.py`'s `GRADE22`.
-4. **The `{{G19:KEY}}` placeholders** in each `--fill` file. The keys are `long_run_passed` and `long_run_of`
+4. **`OF4_bias126`**, the oil forecast's mean error at 126 sessions in dollars a barrel, which no grade output
+   carries: read with `--fut` from the grade's merged `ptv22fut/ARM` pieces, as the registered OF4 reader reads
+   them (each history's mean realised less forecast, `futrows`' `of4`, averaged over the histories; OF4 is that
+   mean over its standard error). The page states the direction, so the value is its size, and the fill prints
+   the sign: the forecast runs high when realised less forecast is negative.
+5. **The `{{G19:KEY}}` placeholders** in each `--fill` file. The keys are `long_run_passed` and `long_run_of`
    (the record's gated counts), `long_run_all_passed` and `long_run_all_of`, and any in `--values` (a JSON
    object, for the docs' row placeholders). A placeholder with no value stops the script.
 
@@ -203,6 +209,11 @@ def run(root: pathlib.Path, a) -> int:
     lr = json.loads((root / "python/tradefloor/presets/pt-v22.json").read_text())["long_run"]
     values = {"long_run_passed": lr["passed"], "long_run_of": lr["of"],
               "long_run_all_passed": lr["all_rows"]["passed"], "long_run_all_of": lr["all_rows"]["of"]}
+    if getattr(a, "fut", None):
+        bias, n = of4_bias126(pathlib.Path(a.fut))
+        values["OF4_bias126"] = f"{abs(bias):.2f}"
+        print(f"OF4_bias126: realised less forecast {bias:+.4f} dollars a barrel over {n} histories, so the "
+              f"oil forecast runs {'high' if bias < 0 else 'low'} at 126 sessions")
     if a.values:
         values.update(json.loads(pathlib.Path(a.values).read_text()))
     fill_placeholders([root / f for f in (a.fill or placeholder_files(root))], values)
@@ -210,6 +221,20 @@ def run(root: pathlib.Path, a) -> int:
           f"({verdict['all_rows']['passed']} of {verdict['all_rows']['of']} rows); "
           f"amend19 replaced {verdict['replaced_by_amendments']}; boxes {'+'.join(boxes)}")
     return 0
+
+
+def of4_bias126(pieces: pathlib.Path) -> tuple[float, int]:
+    """The mean, over the histories, of each history's mean error at 126 sessions (`of4["126"]` in futrows'
+    pieces: realised less forecast), and how many histories carry one."""
+    errs = []
+    for f in sorted(pieces.glob("pieces-*.json")):
+        v = json.loads(f.read_text()).get("of4", {}).get("126")
+        if v is not None and v == v:
+            errs.append(float(v))
+    if len(errs) < 2:
+        raise SystemExit(f"{pieces}: {len(errs)} histories carry OF4's 126-session error; the grade's merged "
+                         "ptv22fut/ARM folder holds one pieces-N.json per history")
+    return sum(errs) / len(errs), len(errs)
 
 
 def placeholder_files(root: pathlib.Path) -> list[str]:
@@ -285,6 +310,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--desk"); ap.add_argument("--box", action="append", default=[])
     ap.add_argument("--panel"); ap.add_argument("--level-rows", dest="level_rows"); ap.add_argument("--pooled")
+    ap.add_argument("--fut", help="the grade's merged ptv22fut/ARM pieces, for OF4_bias126")
     ap.add_argument("--fill", action="append", default=[]); ap.add_argument("--values")
     ap.add_argument("--graded-fingerprint", dest="graded_fingerprint",
                     help="the arm's fingerprint as the grade recorded it, when its files don't carry one")

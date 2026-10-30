@@ -713,7 +713,7 @@ def _fill_tree(tmp_path):
     shutil.copy2(tmp_path / "mock" / "README.md", tree / "README.md")
     m = tmp_path / "mock"
     args = type("A", (), dict(desk=str(m / "desk"), box=[f"ptv22g1={m / 'ptv22g1'}", f"ptv22g2={m / 'ptv22g2'}"],
-                              panel=None, level_rows=None, pooled=None, fill=["README.md"], values=None,
+                              panel=None, level_rows=None, pooled=None, fut=None, fill=["README.md"], values=None,
                               graded_fingerprint=f"custom-{tool.digest_prefix()}"))()
     return tool, tree, args
 
@@ -794,3 +794,42 @@ def test_with_no_fill_named_the_fill_finds_every_page_with_a_placeholder(tmp_pat
     (tmp_path / "docs" / "REALISM.md").write_text("{{G19:one_year_in}} in\n")
     (tmp_path / "docs" / "MODEL.md").write_text("no placeholder\n")
     assert tool.placeholder_files(tmp_path) == ["README.md", "docs/REALISM.md"]
+
+
+def test_of4_bias126_is_the_registered_reader_s_mean_error_at_126_sessions(tmp_path):
+    """The docs' `{{G19:OF4_bias126}}`: each history's mean error at 126
+    sessions (futrows' `of4`, realised less forecast), averaged over the
+    histories, a NaN or a missing horizon skipped. On grade 19's 270 merged
+    histories it reads -0.2643 dollars a barrel, the forecast running high,
+    and the same pieces give back the grade's OF4 of 1.3920 as that mean
+    over its standard error."""
+    tool = _fill_tool()
+    for i, e in enumerate([-0.5, -0.2, None, -0.2], start=1):
+        (tmp_path / f"pieces-{i}.json").write_text(json.dumps({"of4": {"21": 0.0, "126": e}}))
+    bias, n = tool.of4_bias126(tmp_path)
+    assert (round(bias, 4), n) == (-0.3, 3)
+    (tmp_path / "pieces-5.json").write_text("{}")
+    assert tool.of4_bias126(tmp_path)[1] == 3
+    with pytest.raises(SystemExit, match="1 histories"):
+        tool.of4_bias126(_one_piece(tmp_path / "one"))
+
+
+def _one_piece(d):
+    d.mkdir()
+    (d / "pieces-1.json").write_text(json.dumps({"of4": {"126": 1.0}}))
+    return d
+
+
+def test_the_fill_writes_of4_bias126_from_the_pieces(tmp_path, monkeypatch, capsys):
+    tool, tree, args = _fill_tree(tmp_path)
+    monkeypatch.setattr(rec_tool, "OUT", rec_tool.OUT)
+    monkeypatch.setattr(rec_tool, "PUBLISHED_GRADES", dict(rec_tool.PUBLISHED_GRADES))
+    fut = tmp_path / "fut"
+    fut.mkdir()
+    for i, e in enumerate([-0.25, -0.27], start=1):
+        (fut / f"pieces-{i}.json").write_text(json.dumps({"of4": {"126": e}}))
+    (tree / "README.md").write_text("mean error {{G19:OF4_bias126}} dollars a barrel\n")
+    args.fut = str(fut)
+    assert tool.run(tree, args) == 0
+    assert (tree / "README.md").read_text() == "mean error 0.26 dollars a barrel\n"
+    assert "runs high at 126 sessions" in capsys.readouterr().out
