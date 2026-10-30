@@ -16,7 +16,9 @@ SMALL = tf.Universe.random(10, seed=5)
 
 
 def model(**dials):
-    return tf.ModelParams.from_preset("pt-v22", **dials)
+    # pt-v22 with the switch off unless a test turns it on: the graded arm
+    # ships it at 1.0, and these tests compare the two settings.
+    return tf.ModelParams.from_preset("pt-v22", **{"margin_deficit_liquidates": 0.0, **dials})
 
 
 def day(engine):
@@ -72,7 +74,8 @@ def test_a_call_made_above_zero_is_decided_as_before():
 def test_the_switch_is_silent_at_zero_inert_on_prices_and_refused_without_the_margin():
     assert "margin_deficit_liquidates" in set(tf.ModelParams.digest_silent_at_zero())
     for name in tf.preset_names():
-        assert tf.ModelParams.from_preset(name).margin_deficit_liquidates == 0.0
+        if name != "pt-v22":            # pt-v22's value is its graded arm's
+            assert tf.ModelParams.from_preset(name).margin_deficit_liquidates == 0.0
     assert model(margin_deficit_liquidates=0.0).fingerprint == model().fingerprint
     a = tf.Engine(seed=19, universe=SMALL, model=model())
     b = tf.Engine(seed=19, universe=SMALL, model=model(margin_deficit_liquidates=1.0))

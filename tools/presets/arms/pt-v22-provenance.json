@@ -34,5 +34,18 @@
   "date": "2026-10-27",
   "script": "a least-squares fit without intercept, per VIX point, of the tape's same-day ^GSPC log return on the Cboe VIX's change, 1990-2025, by the day's VIX level and pooled; the standard error from 1,000 resamples of years (seed 20261027), in the project's unpublished design notes",
   "inert_through_pt_v21": "inert at 0.0 as shipped through pt-v21: a pinned session's market draws keep a zero mean, as they stood; read only on a session whose VIX a caller pins; at 0.0 it is also left out of the model's digest"
+ },
+ "margin_deficit_liquidates": {
+  "kind": "derived",
+  "presets": {
+   "pt-v22": 1.0
+  },
+  "identity": "a switch whose identity is the value: a margin call a close makes while the account's equity is below zero is unmet whatever the next open shows, so the open liquidates, as a broker liquidates an account in deficit rather than wait for the market to restore it (17 CFR 1.22(c): it covers the deficit from the close)",
+  "terms": {
+   "1.0": "on, as pt-v22 ships it"
+  },
+  "source": "rust/src/params.rs, `ModelParams::margin_deficit_liquidates`",
+  "date": "2026-10-30",
+  "inert_through_pt_v21": "inert at 0.0 as shipped through pt-v21: a margin call is decided on the equity at the open, as it stood; read by `Portfolio`, not the engine; at 0.0 it is also left out of the model's digest"
  }
 }
