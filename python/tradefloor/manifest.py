@@ -567,6 +567,9 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          "pinned_corporate_spread",
          # Today's priced VIX move, only while a pin has made one.
          "pinned_vix_jump",
+         # Today's conditional move and the draws' mean
+         # (`pinned_vix_return`), only while a pin has made them.
+         "pinned_vix_move", "pinned_vix_mean",
          # The day's market t scale, only between an open that drew one
          # and the close (`market_day_tail_df`).
          "market_day_scale",
@@ -966,6 +969,12 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     if snapshot.get("pinned_vix_jump"):
         _f64(buf, 10.0)
         _f64(buf, float(snapshot["pinned_vix_jump"]))
+    if snapshot.get("pinned_vix_move"):
+        _f64(buf, 94.0)
+        _f64(buf, float(snapshot["pinned_vix_move"]))
+    if snapshot.get("pinned_vix_mean"):
+        _f64(buf, 95.0)
+        _f64(buf, float(snapshot["pinned_vix_mean"]))
     if "market_day_scale" in snapshot and float(snapshot["market_day_scale"]) != 1.0:
         _f64(buf, 12.0)
         _f64(buf, float(snapshot["market_day_scale"]))

@@ -458,6 +458,34 @@ OUT_OF_SCOPE = {
         "it: only `expiry_context` in engine/options.rs reads it, and refused "
         "without the index options and the index futures; at 0.0 it is also "
         "left out of the model's digest",
+    # Added beside pt-v22 and inert on every shipped preset, pt-v22 included:
+    # the margin call's worked liquidation, the single-name scan's range, and
+    # two terms of the names' surface.
+    "margin_liquidation_worked":
+        "inert at 0.0: a margin call's liquidation sends each contract's sale "
+        "once, as it stood; read by `Portfolio.settle_open`, not the engine; "
+        "at 0.0 it is also left out of the model's digest",
+    "margin_deficit_liquidates":
+        "inert at 0.0: a margin call is decided on the equity at the open, as it "
+        "stood; read by `Portfolio`, not the engine; at 0.0 it is also left out "
+        "of the model's digest",
+    "margin_option_scan_range":
+        "inert at 0.0: the single-name scan keeps its own size, `z * t` times "
+        "the name's one-session sd at SPAN's seven points (a branch in "
+        "`name_option_margin` and `stock_scan_margin`); read only with "
+        "`margin_scan_coverage` on; at 0.0 it is also left out of the model's "
+        "digest",
+    "surface_name_earnings_premium":
+        "inert at 0.0: `name_events` in engine/name_options.rs prices the "
+        "reports at `surface_earnings_weight` as before and "
+        "`name_events_drawn` is not called; refused without "
+        "`options_names_listed` and `earnings_surprise_sigma`; at 0.0 it is "
+        "also left out of the model's digest",
+    "surface_name_term_slope":
+        "inert at 0.0: `name_surface_at` in engine/name_options.rs leaves "
+        "`TermInputs::name_slope` at 0.0 and `term_shape` adds nothing; "
+        "refused without `options_names_listed`; at 0.0 it is also left out "
+        "of the model's digest",
     # The oil law, inert on every shipped preset: each a
     # branch to the standing arithmetic at 0.0.
     "oil_noise_sd":
@@ -497,6 +525,10 @@ OUT_OF_SCOPE = {
         "refused without `treasury_equity_lag`: the 10-year's anchor is the "
         "expression that stood; no draw; at 0.0 it is also left out of the "
         "model's digest",
+    "treasury_2y_expected_path":
+        "inert at 0.0: `close_yields` takes the 2-year's target as the blend "
+        "that stood (`two_year_target` returns it with no path); at 0.0 it is "
+        "also left out of the model's digest",
     "market_vol_leverage_fast":
         "inert at 0.0: the fast return memory never moves and the variance is "
         "the arithmetic that stood (a branch in the close); its state is carried "
@@ -521,6 +553,12 @@ OUT_OF_SCOPE = {
         "whole reversal moves to the fair-value level, as it stood (a branch in "
         "the tick); no draw and no state; at 0.0 it is also left out of the "
         "model's digest",
+    "pinned_vix_return":
+        "inert at 0.0: a pinned session's market draws keep a zero mean, as "
+        "they stood (a branch at the pin and in the tick); no draw, and its two "
+        "session fields are written only off zero; read only on a session "
+        "whose VIX a caller pins; at 0.0 it is also left out of the model's "
+        "digest",
     "fair_value_aggregate_half_life":
         "inert at 0.0: no reversion of the aggregate earnings level (a branch "
         "on `== 0.0`), the arithmetic that stood. pt-v22 holds the level "

@@ -189,14 +189,16 @@ def test_battery_version_must_be_a_whole_number(bad):
         tf.battery(bad)
 
 
-def test_version_two_is_the_default_and_covers_every_shipped_scenario():
+def test_version_two_is_the_default_and_covers_every_scenario_shipped_when_it_was_fixed():
     """Decision 9 (2026-09-26): battery v2, longer post-shock windows and
-    `curve_shock` included, as a new version rather than an edit to 1."""
+    `curve_shock` included, as a new version rather than an edit to 1.
+    `recession_2008`, packaged later, is in no version: a version never
+    changes."""
     b = tf.battery()
     assert b.version == tf.BATTERY_VERSION == 2
     assert b == tf.battery(2)
     assert sorted(cell.scenario for cell in b.cells) == sorted(
-        tf.Scenario.available())
+        set(tf.Scenario.available()) - {"recession_2008"})
     assert len(b.cells) == 7
     assert {cell.days for cell in b.cells} == {120}
     assert {cell.steps for cell in b.cells} == {6}
@@ -259,7 +261,7 @@ def test_the_battery_docstring_says_what_version_one_pins():
     doc = tf.fingerprint.__doc__
     names = {cell.scenario for cell in tf.battery(1).cells}
     later = set(tf.Scenario.available()) - names
-    assert later == {"curve_shock"}
+    assert later == {"curve_shock", "recession_2008"}
     assert "ships today" not in doc
     assert "``curve_shock``" in doc and "cannot be added" in doc
     for name in names:

@@ -1497,6 +1497,28 @@ pub struct ModelParams {
     /// the zero bound, 1994-2025: 0.046 (se 0.006) on 0.031 of sessions. In
     /// [0, 1].
     pub treasury_2y_meeting_carry: f64,
+    /// The share of the 2-year's daily target that is the expected policy
+    /// path plus a term premium rather than the legacy blend. 0.0, on every
+    /// shipped preset, is the blend as it stood, and a value of 0.0 is left
+    /// out of the model's digest.
+    ///
+    /// The blend, `0.85 (ff + priced) + 0.15 x 10y`, is not the expected
+    /// path plus a premium, so the eight-quarter policy-rate strip less the
+    /// 2-year (RF4) read +18 bp against the tape's -44.8 (-ACM TP02). Off
+    /// zero the 2-year's target is `legacy + d (path + tp - legacy)`:
+    /// `path` is the mean over the next 504 closes of the policy rate the
+    /// standing forecast expects each close to set (past its horizon its
+    /// last rate; without a forecast the policy rate now), the rate the
+    /// strip prices before its premium, so the two read one path; `tp` is
+    /// [`crate::economy::daily::TWO_YEAR_TERM_PREMIUM`] plus
+    /// [`crate::economy::daily::TWO_YEAR_TERM_PREMIUM_BETA`] times the
+    /// 10-year's own term-premium state (`treasury_term_premium_sd`; none
+    /// without it). Both constants are measured on ACM's monthly TP02,
+    /// 1961-2026: its mean, 43.3 bp (se 15.2), and its slope on TP10, 0.452
+    /// (se 0.012). Only the target moves: the 2-year's pull, its noise, the
+    /// meeting and the anticipated meeting's books are as they stand. No
+    /// draw. In [0, 1].
+    pub treasury_2y_expected_path: f64,
     /// The half-life, in sessions, at which the curve's priced change for the
     /// next meeting (`policy_anticipation`) moves toward the shadow meeting's
     /// change between meetings. 0.0, on every shipped preset, is off: the
@@ -2090,6 +2112,23 @@ pub struct ModelParams {
     /// and writes nothing, so no price moves. Requires
     /// `margin_scan_coverage`. In [0, 10].
     pub margin_option_minimum: f64,
+    /// The single-name option scan's price range, a share of the name's
+    /// price. 0.0, on every shipped preset, is the scan's own size (`z * t`
+    /// times the name's one-session sd, at SPAN's seven points), and is left
+    /// out of the model's digest.
+    ///
+    /// Off zero, each name's options are revalued at ten equidistant moves
+    /// of the name from minus to plus this share of its price, ends
+    /// included, at each of the scan's volatility shifts, and the stock an
+    /// exercise or an assignment delivered, held without the name's options,
+    /// is margined at this share of its value. FINRA Rule 4210(g)(2)(F)
+    /// takes a portfolio margin account's theoretical gains and losses "at
+    /// ten equidistant intervals (valuation points)" over "+/- 15%" for any
+    /// product that is, or is based on, an equity security, so the rule's
+    /// value is 0.15. The index options' scan is unchanged. The scan reads
+    /// quotes and writes nothing, so no price moves. Requires
+    /// `margin_scan_coverage`. In [0, 1].
+    pub margin_option_scan_range: f64,
     /// A switch: 1.0 refuses an account's order when its equity after the
     /// order would be under the initial margin the account then asks
     /// (`tradefloor.Portfolio`, `MarginError`). 0.0, on every shipped preset,
@@ -2104,6 +2143,34 @@ pub struct ModelParams {
     /// refused, nor is a margin call's liquidation. Read by the account, not
     /// the engine, so no price moves. Requires `margin_scan_coverage`. 0 or 1.
     pub margin_pretrade_check: f64,
+    /// A switch: 1.0 works a margin call's liquidation as a broker works a
+    /// market order. Each contract's sale is sent again for what is left
+    /// while its book still fills some of it (`tradefloor.Portfolio`,
+    /// `settle_open`). 0.0, on every shipped preset, sends each contract's
+    /// sale once, as it stood, and a value of 0.0 is left out of the model's
+    /// digest.
+    ///
+    /// A dealer shows a few levels a side, and none under a tick, so one
+    /// market order fills only what the ladder holds at that moment; the
+    /// dealer then quotes afresh. A liquidation sent once leaves part of a
+    /// position its book would still take. What no book takes, a long option
+    /// with no bid, stays held. Read by the account, not the engine, so no
+    /// price moves by itself. Requires `margin_scan_coverage`. 0 or 1.
+    pub margin_liquidation_worked: f64,
+    /// A switch: 1.0 liquidates an account in deficit at the next open,
+    /// whatever the night does. When a close leaves an account's equity
+    /// below zero while it holds contracts, the margin call that close makes
+    /// is unmet whatever the next open shows, and the open liquidates as for
+    /// any unmet call (`tradefloor.Portfolio`, `settle_open`). 0.0, on every
+    /// shipped preset, decides that call at the open on the equity then, as
+    /// it stood, and a value of 0.0 is left out of the model's digest.
+    ///
+    /// A broker covers a customer's deficit with its own money from the close
+    /// it is computed at (17 CFR 1.22(c)) and liquidates an account in deficit
+    /// rather than wait for the market to restore it. Read by the account,
+    /// not the engine, so no price moves by itself. Requires
+    /// `margin_scan_coverage`. 0 or 1.
+    pub margin_deficit_liquidates: f64,
     /// Whether the engine lists European options on its price index. 0.0,
     /// on every shipped preset, lists none: no contract, no state, nothing in
     /// the snapshot or the state hash, and a value of 0.0 is left out of the
@@ -2390,6 +2457,32 @@ pub struct ModelParams {
     /// it flat in tenor, and is left out of the model's digest. Read only
     /// with `options_names_listed` set. In [-1, 1].
     pub option_name_spread_tenor_exponent: f64,
+    /// The premium on a report's variance in each single-name surface's
+    /// term structure over the variance the engine draws for it. Off zero a
+    /// report adds this times `earnings_surprise_sigma` squared plus
+    /// `earnings_session_sigma` squared, at its reaction session, and
+    /// `earnings_followthrough_sigma` squared at the session after, each
+    /// times the name's non-market daily variance (the unit the open draws
+    /// the surprise in: its own GARCH variance at its idiosyncratic scale and
+    /// size, and its sector loading on the sector's sigma), carried to the
+    /// report on the forecast's path of the name's variance; and
+    /// `surface_earnings_weight` is not read for the names. 0.0, on every
+    /// shipped preset, prices a name's report at `surface_earnings_weight`
+    /// times `earnings_surprise_sigma` squared times the forecast's whole
+    /// one-session variance of the name, and is left out of the model's
+    /// digest. The index surface's reports are as before either way. Read
+    /// only with `options_names_listed` set. In [0, 5].
+    pub surface_name_earnings_premium: f64,
+    /// The single-name premium's slope in tenor: a log premium on each
+    /// name's implied variance of this times `ln(t / 63)` at `t` sessions
+    /// (held at one session below one), on top of `surface_name_premium`
+    /// and the index's term premia, so a name's 63-session point, where
+    /// `surface_name_premium` holds, is unchanged and its shorter tenors
+    /// fall when the slope is positive. The earnings reports' variance is
+    /// not scaled. 0.0, on every shipped preset, is no slope, and is left out
+    /// of the model's digest. Read only with `options_names_listed` set. In
+    /// [-1, 1].
+    pub surface_name_term_slope: f64,
     /// Switch that makes the fear/greed index read the business cycle and
     /// GDP growth as published instead of as they are. 0.0, on every preset
     /// through pt-v19, is off; pt-v20 sets 1.0.
@@ -3054,6 +3147,39 @@ pub struct ModelParams {
     /// February high read 0.32 (S&P 500 0.34, stepped 0.27) and its
     /// drawdown over the path 0.33 (0.34, stepped 0.38).
     pub pinned_vix_sets_variance: f64,
+    /// The index's same-day return on a PINNED VIX's change, as a share per
+    /// VIX point. 0.0, on every shipped preset, leaves a pinned session's
+    /// market draws at a zero mean; a value of 0.0 is left out of the model's
+    /// digest, and nothing is computed or drawn.
+    ///
+    /// Why. The free model carries the tape's same-day co-movement: the VIX
+    /// answers the day's return (`vix_return_gain` and its exponents), so the
+    /// index's log return on the day's log VIX change reads -0.095, -0.126,
+    /// -0.160 and -0.191 under a VIX of 20, 20-30, 30-40 and above 40
+    /// (R22-fixd2's 270 free histories), against the S&P 500's -0.080,
+    /// -0.130, -0.165 and -0.257 (1990-2025). A pin writes the VIX, so that
+    /// law no longer acts, and nothing in a pinned session makes the return
+    /// answer the VIX instead: on the 2008 and 2020 replays the same slope
+    /// reads -0.047 and -0.050 (R^2 0.02) against -0.217 and -0.146 (R^2 0.61
+    /// and 0.49). The discount `pinned_vix_feedback` prices bridges part of
+    /// it above its knee and none below.
+    ///
+    /// Off zero, a VIX pin sets the session's mean market move to the tape's
+    /// conditional mean, `M = -b (vix - vix_before)` in log return at a beta
+    /// of one. The discount the same pin priced counts toward it, so the
+    /// session's draws carry `M` less that priced move, spread evenly over the
+    /// open session's ticks at each name's beta, after the down-day wiring and
+    /// the crash amplifier so that neither rescales it. Under
+    /// `pinned_vix_variance_share` the variance trim reads `M` in place of the
+    /// discount's move, so the draw keeps the variance the VIX does not
+    /// explain. Free sessions are untouched.
+    ///
+    /// The value is measured: the S&P 500's daily log return on the VIX's
+    /// change in points, 1990-2025, reads -0.5375 per cent a point (se
+    /// 0.0249, years resampled), and it is flat in the level: -0.517, -0.559,
+    /// -0.523 and -0.539 under 20, 20-30, 30-40 and above 40 (R^2 0.52 to
+    /// 0.70), so one number carries it. In [0, 0.05].
+    pub pinned_vix_return: f64,
     /// A ceiling on the annual buyback yield `buyback_payout_share * eps /
     /// price` that the buyback term compounds over the elapsed years. In
     /// [0, 1], and 0.0 means no ceiling.
@@ -9284,6 +9410,7 @@ impl ModelParams {
             corporate_spread_noise_sd: 0.0,
             corporate_spread_noise_half_life: 0.0,
             treasury_2y_meeting_carry: 0.0,
+            treasury_2y_expected_path: 0.0,
             policy_anticipation_half_life: 0.0,
             treasury_path_anticipated: 0.0,
             policy_anticipation_guidance: 0.0,
@@ -9322,7 +9449,10 @@ impl ModelParams {
             margin_scan_tail: 0.0,
             margin_scan_option_tail: 0.0,
             margin_option_minimum: 0.0,
+            margin_option_scan_range: 0.0,
             margin_pretrade_check: 0.0,
+            margin_liquidation_worked: 0.0,
+            margin_deficit_liquidates: 0.0,
             options_index_listed: 0.0,
             surface_ssvi: 0.0,
             surface_skew_physical: 0.0,
@@ -9347,6 +9477,8 @@ impl ModelParams {
             option_name_spread_otm: 0.0,
             option_name_spread_itm: 0.0,
             option_name_spread_tenor_exponent: 0.0,
+            surface_name_earnings_premium: 0.0,
+            surface_name_term_slope: 0.0,
             options_names_listed: 0.0,
             surface_name_premium: 0.0,
             surface_name_skew: 0.0,
@@ -9391,6 +9523,7 @@ impl ModelParams {
             pinned_vix_calm_share: 0.0,
             pinned_vix_priced_cap: 0.0,
             pinned_vix_sets_variance: 0.0,
+            pinned_vix_return: 0.0,
             buyback_yield_cap: 0.0,
             buyback_accrual: 0.0,
             rate_close_remark: 0.0,
@@ -12227,6 +12360,7 @@ impl ModelParams {
             "corporate_spread_noise_sd" => self.corporate_spread_noise_sd,
             "corporate_spread_noise_half_life" => self.corporate_spread_noise_half_life,
             "treasury_2y_meeting_carry" => self.treasury_2y_meeting_carry,
+            "treasury_2y_expected_path" => self.treasury_2y_expected_path,
             "policy_anticipation_half_life" => self.policy_anticipation_half_life,
             "treasury_path_anticipated" => self.treasury_path_anticipated,
             "policy_anticipation_guidance" => self.policy_anticipation_guidance,
@@ -12265,7 +12399,10 @@ impl ModelParams {
             "margin_scan_tail" => self.margin_scan_tail,
             "margin_scan_option_tail" => self.margin_scan_option_tail,
             "margin_option_minimum" => self.margin_option_minimum,
+            "margin_option_scan_range" => self.margin_option_scan_range,
             "margin_pretrade_check" => self.margin_pretrade_check,
+            "margin_liquidation_worked" => self.margin_liquidation_worked,
+            "margin_deficit_liquidates" => self.margin_deficit_liquidates,
             "options_index_listed" => self.options_index_listed,
             "surface_ssvi" => self.surface_ssvi,
             "surface_skew_physical" => self.surface_skew_physical,
@@ -12294,6 +12431,8 @@ impl ModelParams {
             "option_name_spread_otm" => self.option_name_spread_otm,
             "option_name_spread_itm" => self.option_name_spread_itm,
             "option_name_spread_tenor_exponent" => self.option_name_spread_tenor_exponent,
+            "surface_name_earnings_premium" => self.surface_name_earnings_premium,
+            "surface_name_term_slope" => self.surface_name_term_slope,
             "fear_greed_published_inputs" => self.fear_greed_published_inputs,
             "macro_publication_repricing" => self.macro_publication_repricing,
             "treasury_10y_noise" => self.treasury_10y_noise,
@@ -12334,6 +12473,7 @@ impl ModelParams {
             "pinned_vix_calm_share" => self.pinned_vix_calm_share,
             "pinned_vix_priced_cap" => self.pinned_vix_priced_cap,
             "pinned_vix_sets_variance" => self.pinned_vix_sets_variance,
+            "pinned_vix_return" => self.pinned_vix_return,
             "buyback_yield_cap" => self.buyback_yield_cap,
             "buyback_accrual" => self.buyback_accrual,
             "rate_close_remark" => self.rate_close_remark,
@@ -12706,6 +12846,7 @@ impl ModelParams {
             "corporate_spread_noise_sd" => out.corporate_spread_noise_sd = value,
             "corporate_spread_noise_half_life" => out.corporate_spread_noise_half_life = value,
             "treasury_2y_meeting_carry" => out.treasury_2y_meeting_carry = value,
+            "treasury_2y_expected_path" => out.treasury_2y_expected_path = value,
             "policy_anticipation_half_life" => out.policy_anticipation_half_life = value,
             "treasury_path_anticipated" => out.treasury_path_anticipated = value,
             "policy_anticipation_guidance" => out.policy_anticipation_guidance = value,
@@ -12744,7 +12885,10 @@ impl ModelParams {
             "margin_scan_tail" => out.margin_scan_tail = value,
             "margin_scan_option_tail" => out.margin_scan_option_tail = value,
             "margin_option_minimum" => out.margin_option_minimum = value,
+            "margin_option_scan_range" => out.margin_option_scan_range = value,
             "margin_pretrade_check" => out.margin_pretrade_check = value,
+            "margin_liquidation_worked" => out.margin_liquidation_worked = value,
+            "margin_deficit_liquidates" => out.margin_deficit_liquidates = value,
             "options_index_listed" => out.options_index_listed = value,
             "surface_ssvi" => out.surface_ssvi = value,
             "surface_skew_physical" => out.surface_skew_physical = value,
@@ -12773,6 +12917,8 @@ impl ModelParams {
             "option_name_spread_otm" => out.option_name_spread_otm = value,
             "option_name_spread_itm" => out.option_name_spread_itm = value,
             "option_name_spread_tenor_exponent" => out.option_name_spread_tenor_exponent = value,
+            "surface_name_earnings_premium" => out.surface_name_earnings_premium = value,
+            "surface_name_term_slope" => out.surface_name_term_slope = value,
             "fear_greed_published_inputs" => out.fear_greed_published_inputs = value,
             "macro_publication_repricing" => out.macro_publication_repricing = value,
             "treasury_10y_noise" => out.treasury_10y_noise = value,
@@ -12813,6 +12959,7 @@ impl ModelParams {
             "pinned_vix_calm_share" => out.pinned_vix_calm_share = value,
             "pinned_vix_priced_cap" => out.pinned_vix_priced_cap = value,
             "pinned_vix_sets_variance" => out.pinned_vix_sets_variance = value,
+            "pinned_vix_return" => out.pinned_vix_return = value,
             "buyback_yield_cap" => out.buyback_yield_cap = value,
             "buyback_accrual" => out.buyback_accrual = value,
             "rate_close_remark" => out.rate_close_remark = value,
@@ -13591,6 +13738,12 @@ impl ModelParams {
                 "pinned_vix_sets_variance is {}. It is a switch: 0 (a pin reaches the variance one \
                  step a close) or 1 (every pin sets it, as vix_sets_variance does).",
                 self.pinned_vix_sets_variance));
+        }
+        if !(self.pinned_vix_return >= 0.0 && self.pinned_vix_return <= 0.05) {
+            return Err(format!(
+                "pinned_vix_return is {}. It is the index's same-day return on a pinned VIX's change, a \
+                 share per VIX point, in [0, 0.05]; the tape measures 0.005375.",
+                self.pinned_vix_return));
         }
         if !(self.market_vol_slow_gamma >= 0.0 && self.market_vol_slow_gamma <= 1.0) {
             return Err(format!(
@@ -14388,6 +14541,12 @@ impl ModelParams {
                  the meeting's formula a meeting keeps, in [0, 1]; 0 is the reset that stood.",
                 self.treasury_2y_meeting_carry));
         }
+        if !(0.0..=1.0).contains(&self.treasury_2y_expected_path) {
+            return Err(format!(
+                "treasury_2y_expected_path is {}. It is the share of the 2-year's target that is the \
+                 expected policy path plus its term premium, in [0, 1]; 0 is the blend that stood.",
+                self.treasury_2y_expected_path));
+        }
         if !(-2.0..=5.0).contains(&self.fed_neutral_real_rate) {
             return Err(format!(
                 "fed_neutral_real_rate is {}. It is the points added to the Taylor rule's neutral \
@@ -14864,6 +15023,18 @@ impl ModelParams {
                  margin, which only margin_scan_coverage sets: set margin_scan_coverage first.",
                 self.margin_option_minimum));
         }
+        if !(0.0..=1.0).contains(&self.margin_option_scan_range) {
+            return Err(format!(
+                "margin_option_scan_range is {}. It is the single-name option scan's price range, a share of \
+                 the name's price, in [0, 1]; FINRA Rule 4210(g)(2)(F)'s for an equity is 0.15.",
+                self.margin_option_scan_range));
+        }
+        if self.margin_option_scan_range != 0.0 && self.margin_scan_coverage == 0.0 {
+            return Err(format!(
+                "margin_scan_coverage is 0 but margin_option_scan_range is {}. The range sizes the option \
+                 scan's margin, which only margin_scan_coverage sets: set margin_scan_coverage first.",
+                self.margin_option_scan_range));
+        }
         if !(self.margin_pretrade_check == 0.0 || self.margin_pretrade_check == 1.0) {
             return Err(format!(
                 "margin_pretrade_check is {}. It is a switch: 0 (no margin checked before an order) or 1 \
@@ -14875,6 +15046,30 @@ impl ModelParams {
                 "margin_scan_coverage is 0 but margin_pretrade_check is {}. The check reads the margin, which \
                  only margin_scan_coverage sets: set margin_scan_coverage first.",
                 self.margin_pretrade_check));
+        }
+        if !(self.margin_liquidation_worked == 0.0 || self.margin_liquidation_worked == 1.0) {
+            return Err(format!(
+                "margin_liquidation_worked is {}. It is a switch: 0 (a liquidation sent once) or 1 (sent again \
+                 while its book fills).",
+                self.margin_liquidation_worked));
+        }
+        if self.margin_liquidation_worked != 0.0 && self.margin_scan_coverage == 0.0 {
+            return Err(format!(
+                "margin_scan_coverage is 0 but margin_liquidation_worked is {}. It works a margin call's \
+                 liquidation, which only margin_scan_coverage makes: set margin_scan_coverage first.",
+                self.margin_liquidation_worked));
+        }
+        if !(self.margin_deficit_liquidates == 0.0 || self.margin_deficit_liquidates == 1.0) {
+            return Err(format!(
+                "margin_deficit_liquidates is {}. It is a switch: 0 (a call decided on the equity at the open) or \
+                 1 (an account a close leaves below zero is liquidated at the next open).",
+                self.margin_deficit_liquidates));
+        }
+        if self.margin_deficit_liquidates != 0.0 && self.margin_scan_coverage == 0.0 {
+            return Err(format!(
+                "margin_scan_coverage is 0 but margin_deficit_liquidates is {}. It decides a margin call, which \
+                 only margin_scan_coverage makes: set margin_scan_coverage first.",
+                self.margin_deficit_liquidates));
         }
         for (name, v) in [("options_index_listed", self.options_index_listed), ("surface_ssvi", self.surface_ssvi)] {
             if !(v == 0.0 || v == 1.0) {
@@ -15048,6 +15243,37 @@ impl ModelParams {
                  is 0 too. The limit is on listed options, which only those switches list: set one of \
                  them to 1.0 first.",
                 self.option_position_limit));
+        }
+        if !(-1.0..=1.0).contains(&self.surface_name_term_slope) {
+            return Err(format!(
+                "surface_name_term_slope is {}. It is in [-1, 1].",
+                self.surface_name_term_slope));
+        }
+        if self.surface_name_term_slope != 0.0 && self.options_names_listed == 0.0 {
+            return Err(format!(
+                "options_names_listed is 0 but surface_name_term_slope is {}. It shapes the names' \
+                 surfaces in tenor, which only options_names_listed keeps: set options_names_listed \
+                 to 1.0 first.",
+                self.surface_name_term_slope));
+        }
+        if !(0.0..=5.0).contains(&self.surface_name_earnings_premium) {
+            return Err(format!(
+                "surface_name_earnings_premium is {}. It is in [0, 5].",
+                self.surface_name_earnings_premium));
+        }
+        if self.surface_name_earnings_premium != 0.0 && self.options_names_listed == 0.0 {
+            return Err(format!(
+                "options_names_listed is 0 but surface_name_earnings_premium is {}. It prices the \
+                 reports in the names' surfaces, which only options_names_listed keeps: set \
+                 options_names_listed to 1.0 first.",
+                self.surface_name_earnings_premium));
+        }
+        if self.surface_name_earnings_premium != 0.0 && self.earnings_surprise_sigma == 0.0 {
+            return Err(format!(
+                "earnings_surprise_sigma is 0 but surface_name_earnings_premium is {}. It is a \
+                 premium on the variance the reports draw, and without the surprise there are no \
+                 reports: set earnings_surprise_sigma first.",
+                self.surface_name_earnings_premium));
         }
         for (name, v, lo, hi) in [
             ("surface_name_premium", self.surface_name_premium, -0.5, 1.0),
@@ -15533,6 +15759,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "pinned_vix_feedback",
     "pinned_vix_priced_cap",
     "pinned_vix_sets_variance",
+    "pinned_vix_return",
     "pinned_vix_variance_share",
     "policy_anticipation",
     "policy_anticipation_cut_share",
@@ -15596,6 +15823,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "treasury_term_premium_sd",
     "treasury_term_premium_half_life",
     "treasury_2y_meeting_carry",
+    "treasury_2y_expected_path",
     "flight_to_quality_reversal_cut",
     "policy_anticipation_half_life",
     "treasury_path_anticipated",
@@ -15630,7 +15858,10 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "margin_scan_tail",
     "margin_scan_option_tail",
     "margin_option_minimum",
+    "margin_option_scan_range",
     "margin_pretrade_check",
+    "margin_liquidation_worked",
+    "margin_deficit_liquidates",
     "night_session_steps",
     "futures_impact_memory",
     "futures_impact_memory_half_life",
@@ -15662,6 +15893,8 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "option_name_spread_otm",
     "option_name_spread_itm",
     "option_name_spread_tenor_exponent",
+    "surface_name_earnings_premium",
+    "surface_name_term_slope",
 ];
 
 #[cfg(test)]
@@ -15879,6 +16112,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "treasury_term_premium_sd",
         "treasury_term_premium_half_life",
         "treasury_2y_meeting_carry",
+        "treasury_2y_expected_path",
         "flight_to_quality_reversal_cut",
         "policy_anticipation_half_life",
         "treasury_path_anticipated",
@@ -15917,7 +16151,10 @@ pub fn settable_names() -> Vec<&'static str> {
         "margin_scan_tail",
         "margin_scan_option_tail",
         "margin_option_minimum",
+        "margin_option_scan_range",
         "margin_pretrade_check",
+        "margin_liquidation_worked",
+        "margin_deficit_liquidates",
         "options_index_listed",
         "surface_ssvi",
         "surface_skew_physical",
@@ -15946,6 +16183,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "option_name_spread_otm",
         "option_name_spread_itm",
         "option_name_spread_tenor_exponent",
+        "surface_name_earnings_premium",
+        "surface_name_term_slope",
         "fear_greed_published_inputs",
         "macro_publication_repricing",
         "treasury_10y_noise",
@@ -15983,6 +16222,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "pinned_vix_calm_share",
         "pinned_vix_priced_cap",
         "pinned_vix_sets_variance",
+        "pinned_vix_return",
         "buyback_yield_cap",
         "buyback_accrual",
         "rate_close_remark",

@@ -522,6 +522,7 @@ impl Engine {
             premium_long: p.surface_term_premium_long,
             events: &events,
             event_weight: p.surface_earnings_weight,
+            name_slope: 0.0,
         };
         let shape = term_shape(&inputs, n_max);
         let curve = ThetaCurve::new(&shape, clock.elapsed, fit.theta)?;

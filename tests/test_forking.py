@@ -1153,6 +1153,8 @@ def _nothing_dormant():
                    core_trend_persistence=0.993,
                    # Every pinned VIX sets the variance: a switch.
                    pinned_vix_sets_variance=1.0,
+                   # A pinned VIX's same-day return (the tape's per point).
+                   pinned_vix_return=0.005375,
                    # Credit's own state (LQD-IEF residual), on its own keyed draws.
                    corporate_spread_noise_sd=0.025,
                    corporate_spread_noise_half_life=16.0,
@@ -1203,6 +1205,8 @@ def _nothing_dormant():
                    # surprise and the option minimum take the blanket 0.05.
                    rate_premium_per_fixing=1.0,
                    margin_pretrade_check=1.0,
+                   margin_liquidation_worked=1.0,
+                   margin_deficit_liquidates=1.0,
                    # The index options, their surface and their dealer (pt-v22
                    # phase 2): two switches; the surface's companions and the
                    # dealer's spread take the blanket 0.05.

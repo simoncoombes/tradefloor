@@ -117,6 +117,12 @@ def is_name_option(symbol: object) -> bool:
     return is_option_symbol(symbol) and _option_root(symbol) != "IDX"  # type: ignore[arg-type]
 
 
+#: The most orders a worked liquidation (``margin_liquidation_worked``)
+#: sends for one contract after its first: enough to sell a position many
+#: times a dealer's ladder, and a bound if a book refills at every order.
+LIQUIDATION_ORDERS = 100
+
+
 class MarginError(OrderError):
     """An order refused because the account's equity after it would be under
     the initial margin it asks (``margin_pretrade_check``).
@@ -1084,10 +1090,10 @@ class Portfolio:
         margins on its own: the shares held in a name an exercise or an
         assignment delivered (:attr:`deliveries`) and outside ``names``, the
         names whose options are held, which the option scan takes as cover.
-        Once its options settle, an expiry's assignment can leave an account
-        many times its equity in stock that nothing margined (MG2, pt-v22).
-        Stock in a name the account never took delivery in asks nothing, as
-        before."""
+        An expiry's assignment can leave an account many times its equity in
+        stock after its last option settles, and this keeps that stock
+        margined. Stock in a name the account never took delivery in asks
+        nothing."""
         if not self.deliveries:
             return []
         delivered = {d["ticker"] for d in self.deliveries}
@@ -1160,8 +1166,8 @@ class Portfolio:
 
     def margin(self, engine: Engine) -> dict[str, Any]:
         """The account's margin now, a dict: ``initial`` and ``maintenance``,
-        the requirements the futures and options held ask
-        (:meth:`margin_requirement`), dollars; ``equity``, the net worth they
+        the requirements the futures, the options and the delivered stock
+        held ask (:meth:`margin_requirement`), dollars; ``equity``, the net worth they
         are measured against; ``excess``, equity less the initial
         requirement, the room left before a close could call; and ``call``,
         the margin call the last close made and the next open decides
@@ -1376,12 +1382,15 @@ class Portfolio:
     def settle_open(self, engine: Engine) -> None:
         """At an open, after the engine's: settle the contracts that expired
         at it, then decide the last close's margin call. A call is met when
-        the account's equity is back at or above the initial requirement;
-        otherwise every contract held is closed at the market through its
-        book, and so are the shares an exercise or an assignment delivered in
-        a name whose options it trades. A no-op, asking the engine nothing,
-        for a portfolio with
-        no futures and no call open. The harnesses call it after the open."""
+        the account's equity is back at or above the initial requirement, and,
+        under ``margin_deficit_liquidates``, the close that made it did not
+        leave the account below zero; otherwise every contract held is closed
+        at the market through its book (sent again while the book takes some,
+        with ``margin_liquidation_worked``), and so is the stock in each name
+        whose options it held or that an exercise or an assignment delivered
+        shares in. A no-op, asking the engine nothing, for a portfolio with no
+        futures, no options and no call open. The harnesses call it after the
+        open."""
         if not self.futures and not self.options and self._margin_call is None:
             return
         day = int(engine.day_count)
@@ -1391,11 +1400,12 @@ class Portfolio:
         call, self._margin_call = self._margin_call, None
         if call is None:
             return
-        call["met"] = self.net_worth(engine) >= self.margin_requirement(engine)
+        call["met"] = not call.get("deficit") and self.net_worth(engine) >= self.margin_requirement(engine)
         if call["met"]:
             return
         held = [(s, f.quantity) for s, f in self.futures.items()]
         held += [(s, o.quantity) for s, o in self.options.items()]
+        worked = getattr(engine.model, "margin_liquidation_worked", 0.0)
         for symbol, quantity in held:
             filled = 0.0
             try:
@@ -1403,13 +1413,28 @@ class Portfolio:
                                                liquidation=True)["quantity"]
             except OrderError:
                 pass
+            # Worked as a broker works a market order
+            # (``margin_liquidation_worked``): what is left is sent again
+            # while the book, quoting afresh, still takes some of it.
+            for _ in range(LIQUIDATION_ORDERS if worked else 0):
+                left = -quantity - filled
+                if abs(left) <= 1e-9:
+                    break
+                try:
+                    more = self._execute_in_book(engine, symbol, left, None,
+                                                 liquidation=True)["quantity"]
+                except OrderError:
+                    break
+                if not more:
+                    break
+                filled += more
             self.liquidations.append({"day": day, "symbol": symbol, "quantity": -quantity,
                                       "filled": filled})
-        # The shares an exercise or an assignment delivered in a name whose
-        # options the account trades go with them, as a broker's liquidation
-        # takes the whole position: an early assignment can hand an account
-        # several times its equity in stock the option scan no longer
-        # margins once the option is gone. Shares in other names are left.
+        # The stock in each name whose options the account held, or that an
+        # exercise or an assignment delivered shares in, goes with them, as a
+        # broker's liquidation takes the whole position: an assignment can
+        # hand an account several times its equity in stock. Shares in other
+        # names are left.
         names = {_option_root(s) for s, _ in held if is_name_option(s)}
         names |= {d["ticker"] for d in self.deliveries}
         for ticker in sorted(names):
@@ -1462,6 +1487,11 @@ class Portfolio:
         if maintenance > 0 and equity < maintenance:
             self._margin_call = {"day": day, "equity": equity, "maintenance": maintenance,
                                  "initial": self.margin_requirement(engine), "met": None}
+            # ``margin_deficit_liquidates``: a call made on an account in
+            # deficit is one no recovery meets (17 CFR 1.22(c): the broker
+            # carries the deficit from this close).
+            if equity < 0 and getattr(engine.model, "margin_deficit_liquidates", 0.0):
+                self._margin_call["deficit"] = True
             self.margin_calls.append(self._margin_call)
 
     def _holds_delivered(self) -> bool:

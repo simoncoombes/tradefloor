@@ -8,9 +8,15 @@ close with `tf.Exercise`.
 
 Margin is set from a risk scan of each position at every close, with a
 lower maintenance level. A future pays its move to the day's settlement
-mark in cash at each close. If equity falls below maintenance at a close,
-the call is due by the next open: equity must be back at the initial
-margin, and if it isn't, every contract is closed at the market.
+mark in cash at each close. Options are margined with the stock held in the
+same name, and a short option asks at least $.375 a share. Shares an
+exercise or an assignment hands an account are margined from the close
+they arrive, so that close can make a call. An order that would leave
+equity under the initial margin is refused. If equity falls below
+maintenance at a close, the call is due by the next open: equity must be
+back at the initial margin, and if it isn't, every contract is closed at
+the market, and so is the stock in each name whose options the account
+held or took delivery in.
 
 `tradefloor.contracts.explain_move` says why a contract's price moved, cause
 by cause, and a strategy spec can hold the front index future as a hedge.
@@ -39,19 +45,35 @@ symbol in whole contracts, as it trades a ticker:
   surface. A holder exercises at a close with `tf.Exercise`; exercise and
   assignment move the shares and the strike at the close.
 
-Margin works as a clearing house's does. Each contract asks an initial
+Margin works as a clearing house's does. Each future asks an initial
 margin set at each close from its recent volatility, and a maintenance
-margin of the initial over 1.1; a short option asks a scan margin. A
-future pays its move to the day's settlement mark in cash at each close. A
-close that leaves equity under the maintenance margin makes a margin call,
-and if equity is still under the initial margin at the next open, every
-contract held is closed at the market. `Portfolio.margin(engine)` reads the
-account's requirement and any open call.
+margin of the initial over 1.1. Options are margined by a scan of each
+name's options with the stock held in it, so a covered call asks less than
+a naked one, and a short option asks at least $.375 a share, FINRA's
+portfolio-margin minimum. Stock an exercise or an assignment delivered into
+an account that no longer holds the name's options is margined on its own
+scan from the close it arrives. A future pays its move to the day's
+settlement mark in cash at each close. A close that leaves equity under the
+maintenance margin makes a margin call, and if equity is still under the
+initial margin at the next open, every contract held is closed at the
+market, and so is the stock in each name whose options the account held or
+took delivery in. An order that would leave equity under the initial margin
+it then asks is refused with `MarginError`. `Portfolio.margin(engine)` reads
+the account's requirement and any open call.
 
 The MCP server's `list_contracts`, `quote_contracts` and `option_chain`
 read a session's contracts, and `session_step` trades and exercises them.
 The framework payload, the Arrow tables and the WASM build show them too.
 Listing the contracts moves no stock price.
+
+### The 2008 recession scenario
+
+`Scenario.load("recession_2008")` is a new packaged scenario: the 2007-09
+recession on the NBER's months, with every company's earnings cut to 70% by
+the trough, the credit spread over the 10-year widened 150 basis points, and
+the VIX on its real 2008-09 path from Lehman, as a multiple of the model's
+own VIX on that day. pt-v22's recession rows are read on it. The older
+`recession` scenario and the fingerprint batteries are unchanged.
 
 ### The causes of a contract's price change
 
@@ -116,6 +138,32 @@ records are identical (`tests/test_futures_accounts.py`).
   forty's 8-Ks without item 2.02 (2014-2025, 1,372 in-session filings), 0.6%
   land in the first minute and 4.7% in the first half hour; the model's first
   tick prices about 0.6 of the session's news.
+
+### A pinned VIX's same-day return
+
+- `pinned_vix_return` is a new dial, 0.0 on every preset and left out of
+  the digest there: the index's same-day return on a pinned VIX's change, a
+  share per VIX point. A replay that pins the real VIX overwrites the VIX the
+  day's return would have moved, so the index fell with no regard to the
+  VIX's moves (2008: a slope of -0.047 on the log VIX change, R^2 0.02,
+  against the S&P 500's -0.217, R^2 0.61). Off zero, each pin sets the
+  session's mean market move to `-b` times the VIX's change, less what the
+  `pinned_vix_feedback` discount already priced, spread over the session's
+  ticks at each name's beta; the variance trim reads the whole move. The
+  S&P 500 measures -0.5375% a point (se 0.0249, 1990-2025), flat across the
+  VIX's level. No draw; free sessions are untouched.
+
+### The 2-year as the expected path plus a term premium
+
+- `treasury_2y_expected_path` is a new dial, 0.0 on every preset and left
+  out of the digest there: the share of the 2-year's daily target taken
+  from the expected policy path plus a term premium. At 0.0 the target is
+  the blend `0.85 (ff + priced) + 0.15 x 10y`. The path is the mean, over the next 504
+  closes, of the policy rate the standing forecast expects, the rate the
+  term-rate strip prices before its premium. The premium is ACM TP02's
+  mean, 43.3 bp (NY Fed monthly, 1961-2026), plus 0.452 of the 10-year's
+  own term-premium state (TP02's slope on TP10). No draw. The pull, the
+  noise and the meetings are unchanged.
 
 ### The close's growth priced at the open
 
@@ -205,38 +253,59 @@ records are identical (`tests/test_futures_accounts.py`).
   and flat in tenor. At 1.0 a VIX jump compresses the premium, as on CFE,
   with no draw and no state of its own.
 
-### The close an assignment delivers margins the shares
+### Margin on the shares an assignment delivers
 
-An expiry's assignment that settled an account's last option left the shares
-it delivered unmargined: `Portfolio` margined stock only beside the name's
-options, and with none held its close asked nothing. So an account handed
-19 times its equity in stock ended the session below zero with no margin
-call, and no liquidation followed. Stock held in a name an exercise or an
-assignment has delivered shares in, while the account holds none of that
-name's options, is now margined on its own scan, `Engine.stock_margin`: the
-shares times the scan's move of the name. The close they arrive at calls a shortfall, and an
-unmet call's open sells them. Accounts without single-name options, so every
-shipped preset, are as before; known answers are unchanged.
+Stock held in a name an exercise or an assignment delivered shares in,
+while the account holds none of that name's options, is margined on its own
+scan, `Engine.stock_margin`: the shares times the scan's move of the name.
+The close the shares arrive at calls any shortfall, even when the
+assignment settled the account's last option. Stock in a name the account
+took no delivery in asks nothing, and every known answer is where it was.
 
-### A liquidation takes the shares an assignment delivered
+### A liquidation takes the stock with the contracts
 
-On an unmet margin call `Portfolio` closed its futures and options and left
-the stock an exercise or an assignment had delivered, so an early
-assignment that handed an account several times its equity in shares stayed
-held after the liquidation. The shares in a name whose options the account
-trades now go with them. Shares in other names, and every account without
-single-name options, are as before; known answers are unchanged.
+An unmet margin call closes the account's futures and options at the open,
+and the stock in each name whose options it held or that an exercise or an
+assignment delivered shares in. An assignment can hand an account several
+times its equity in shares, and a liquidation takes them. Stock in other
+names is kept. Accounts without single-name options are unaffected; known
+answers are unchanged.
 
-### The single-name options' dealer on the tape
+### A single name's premium shaped in tenor
 
-Five dials, 0.0 on every preset, shape the single-name options' dealer:
-its inventory response per contract (`option_name_inventory_slope`, a
-share of the at-the-money volatility) and the half-life of its pressure in
-sessions (`option_name_inventory_half_life`), both constants before (half a
-half-spread per 20 contracts, 15 open ticks); and its spread as a share of
-the price by delta (`option_name_spread_otm`, `option_name_spread_itm`) and
-in tenor (`option_name_spread_tenor_exponent`). They price options only:
+`surface_name_term_slope` is a new dial, 0.0 on every preset and left out
+of the digest there. Off zero each name's implied variance at `t` sessions
+takes a further log premium of the slope times `ln(t / 63)`, on top of
+`surface_name_premium` and the index's term premia, so a name's 63-session
+point is where it was and, with a positive slope, its shorter tenors fall.
+The earnings reports' variance is not scaled. It prices options only:
 stock prices and every known answer are where they were.
+
+### A name's reports priced on the variance they draw
+
+`surface_name_earnings_premium` is a new dial, 0.0 on every preset and left
+out of the digest there. Off zero a name's surface prices each report at
+that premium on the variance the engine draws for it: the surprise and the
+reaction session's own part at the reaction session, the follow-through at
+the session after, each in the name's non-market daily variance. At 0.0 a
+report is `surface_earnings_weight` times the surprise's sigma squared
+times the name's whole one-session variance, the market's part included,
+as before. It prices options only: stock prices and every known answer are
+where they were.
+
+### The single-name options' trading cost
+
+Five dials, 0.0 on every preset, set what a single-name option costs to
+trade: how far a trade moves the dealer's price and how fast that fades, and
+how its spread changes away from the money and with time to expiry.
+`option_name_inventory_slope` is the price move per contract, a share of
+the at-the-money volatility, and `option_name_inventory_half_life` the
+sessions it takes to halve; at 0.0 the move is half a half-spread per 20
+contracts and halves in 15 open ticks. `option_name_spread_otm` and
+`option_name_spread_itm` quote the spread as a share of the price by delta,
+and `option_name_spread_tenor_exponent` scales it by time to expiry. They
+price options only: stock prices and every known answer are where they
+were.
 
 ### Company news released before the open
 
@@ -318,9 +387,28 @@ stock prices and every known answer are where they were.
   its multiplier: 0.375 a unit.
 - `margin_pretrade_check` is a new switch, 0.0 on every preset and left out
   of the digest there: a `Portfolio` refuses an order that would leave its
-  equity under the initial margin it then asks (`MarginError`; FINRA Rule
-  4210(b), Regulation T 12 CFR 220.4(c)). Margin was checked only at a
-  close, so an account could open what it could not carry.
+  equity under the initial margin it then asks (`MarginError`, a subclass of
+  `OrderError`; FINRA Rule 4210(b), Regulation T 12 CFR 220.4(c)). An order
+  that takes risk off, and a liquidation, always go.
+- `margin_option_scan_range` is a new dial, 0.0 on every preset and left
+  out of the digest there. Off zero a name's options are margined at ten
+  equidistant moves of the name over plus and minus that share of its price,
+  and stock held without the name's options at that share of its value.
+  FINRA Rule 4210(g)(2)(F) sets +/- 15% for an equity, so the rule's value
+  is 0.15; the scan's own size is a few percent. No price moves.
+- `margin_liquidation_worked` is a new switch, 0.0 on every preset and left
+  out of the digest there. With it on, a margin call's liquidation sends
+  each contract's sale again for what is left while its book still takes
+  some, as a broker works a market order. Sent once, a sale fills only the
+  ladder the dealer shows then, and a large position in a cheap option was
+  left partly held.
+- `margin_deficit_liquidates` is a new switch, 0.0 on every preset and left
+  out of the digest there. With it on, a margin call made by a close that
+  leaves the account below zero is unmet whatever the next open shows, and
+  the open liquidates as for any unmet call. A broker carries a customer's
+  deficit with its own money from that close (17 CFR 1.22(c)) and
+  liquidates rather than wait for the market to restore it. No price moves
+  by itself.
 - `margin_scan_option_tail` is new, 0.0 on every preset and left out of the
   digest there. Off zero it is the option scan's own tail allowance, in
   place of `margin_scan_tail` on the scan's price move and volatility
