@@ -79,10 +79,15 @@ valued at the price and traded by the next order; it is not a trade, and
 `obs.portfolio.deliveries` lists what moved. Options are margined by a scan
 with the stock held in the same name, and delivered stock is margined from
 the close it arrives, so that close can make a margin call. On a model with
-`margin_option_minimum`, an option asks at least that many dollars a share
-(FINRA's portfolio-margin minimum is $.375). An unmet call closes the
-contracts and the stock in each name whose options the account held or took
-delivery in. The payload's `options` adds
+`margin_option_scan_range`, a name's options and stock are margined at the
+worst of ten moves of the name over that share of its price either way, and
+delivered stock at that share of its value (FINRA's portfolio-margin range
+for an equity is 15%). On a model with `margin_option_minimum`, an option
+asks at least that many dollars a share (FINRA's portfolio-margin minimum
+is $.375). An unmet call closes the contracts and the stock in each name
+whose options the account held or took delivery in; with
+`margin_liquidation_worked` each sale is sent again while the market still
+buys, and a long option nobody bids stays held. The payload's `options` adds
 `names` (each name's 30-day at-the-money volatility) and an action may name
 a name's option, with the side `EXERCISE` to exercise. The MCP server's
 `option_chain` reads a name's chain with `root` set to its ticker, and

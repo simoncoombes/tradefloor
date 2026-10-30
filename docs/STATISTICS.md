@@ -12,7 +12,14 @@ The model itself is specified in
 
 ## The sets at a glance
 
-| Set | Count | Horizon | pt-v21, the default from 0.10.0 | pt-v20, the default from 0.8.5 to 0.9.1 | pt-v19 |
+pt-v22, the default, has {{G19:one_year_in}} of the 19 one-year statistics
+in band and meets {{G19:long_run_passed}} of the {{G19:long_run_of}}
+long-run criteria that count toward its grade. Its futures and options rows
+are read on their own histories, in
+[MODEL.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/MODEL.md).
+The table gives the earlier presets.
+
+| Set | Count | Horizon | pt-v21, the default from 0.10.0 to 0.10.2 | pt-v20, the default from 0.8.5 to 0.9.1 | pt-v19 |
 |---|---|---|---|---|---|
 | [The one-year table](#the-one-year-table) | 19 statistics | 252 sessions | 19 of 19 in band | 19 of 19 in band | 19 of 19 |
 | [The two-year panel](#the-two-year-panel) | 15 statistics | 504 sessions | 15 of 15 in band | 15 of 15 in band | 15 of 15 |

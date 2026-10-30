@@ -465,11 +465,14 @@ class Engine:
     def surface(self, root: str = ...) -> VolSurface: ...
     # The scan's initial margin on `(symbol, signed contracts)` pairs of
     # options, and `(ticker, signed shares)` of the stock beside a name's
-    # options, dollars, at least `margin_option_minimum` a unit of each
+    # options, dollars: the worst loss over the scan's moves (under
+    # `margin_option_scan_range`, ten moves over plus and minus that share of
+    # a name's price), at least `margin_option_minimum` a unit of each
     # option; None with margin or options off.
     def option_margin(self, positions: list[tuple[str, float]]) -> float | None: ...
     # The scan's margin on `(ticker, signed shares)` of stock held alone in
-    # listed names: the shares times the scan's move of the name; None with
+    # listed names: the shares times the scan's move of the name (under
+    # `margin_option_scan_range`, that share of their value); None with
     # margin or the name options off.
     def stock_margin(self, positions: list[tuple[str, float]]) -> float | None: ...
     # Static-arbitrage violations on every listed chain (row SV2).

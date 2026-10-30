@@ -584,7 +584,8 @@ class Portfolio:
         self.margin_calls: list[dict] = []
         self._margin_call: dict | None = None
         #: One entry per contract liquidated on an unmet call: ``day``,
-        #: ``symbol``, ``quantity`` asked and ``filled``.
+        #: ``symbol``, ``quantity`` asked and ``filled`` (in all, when
+        #: ``margin_liquidation_worked`` sends the sale again).
         self.liquidations: list[dict] = []
         #: One entry per futures or options position settled at expiry:
         #: ``day``, ``symbol``, ``quantity``, ``price`` and ``cash``.
@@ -1382,15 +1383,15 @@ class Portfolio:
     def settle_open(self, engine: Engine) -> None:
         """At an open, after the engine's: settle the contracts that expired
         at it, then decide the last close's margin call. A call is met when
-        the account's equity is back at or above the initial requirement, and,
+        the account's equity is back at or above the initial requirement and,
         under ``margin_deficit_liquidates``, the close that made it did not
         leave the account below zero; otherwise every contract held is closed
-        at the market through its book (sent again while the book takes some,
-        with ``margin_liquidation_worked``), and so is the stock in each name
+        at the market through its book, and so is the stock in each name
         whose options it held or that an exercise or an assignment delivered
-        shares in. A no-op, asking the engine nothing, for a portfolio with no
-        futures, no options and no call open. The harnesses call it after the
-        open."""
+        shares in. With ``margin_liquidation_worked`` each sale is sent again
+        for what is left while the book still takes some. A no-op, asking the
+        engine nothing, for a portfolio with no futures, no options and no
+        call open. The harnesses call it after the open."""
         if not self.futures and not self.options and self._margin_call is None:
             return
         day = int(engine.day_count)
