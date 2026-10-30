@@ -262,6 +262,7 @@ PARAM_SPECS: dict[str, dict] = {
     "margin_option_scan_range": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 1.0), "derived": False},
     "margin_pretrade_check": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0), "derived": False},
     "margin_liquidation_worked": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0), "derived": False},
+    "margin_deficit_liquidates": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0), "derived": False},
     # The index options, their surface and their dealer (pt-v22 phase 2): two
     # switches and the surface's and the dealer's dials; none moves a price.
     "surface_ssvi": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0), "derived": True},

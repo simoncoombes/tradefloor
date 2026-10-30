@@ -402,6 +402,13 @@ were.
   some, as a broker works a market order. Sent once, a sale fills only the
   ladder the dealer shows then, and a large position in a cheap option was
   left partly held.
+- `margin_deficit_liquidates` is a new switch, 0.0 on every preset and left
+  out of the digest there. With it on, a margin call made by a close that
+  leaves the account below zero is unmet whatever the next open shows, and
+  the open liquidates as for any unmet call. A broker carries a customer's
+  deficit with its own money from that close (17 CFR 1.22(c)) and
+  liquidates rather than wait for the market to restore it. No price moves
+  by itself.
 - `margin_scan_option_tail` is new, 0.0 on every preset and left out of the
   digest there. Off zero it is the option scan's own tail allowance, in
   place of `margin_scan_tail` on the scan's price move and volatility

@@ -4698,7 +4698,12 @@ account owes already, and a margin call's liquidation, always go. Under
 worked as a broker works a market order: each contract's sale is sent again
 for what is left while its book, quoting afresh, still takes some. A dealer
 shows ten levels a side and none under a tick, so a sale sent once fills only
-that ladder; what no book takes, a long option with no bid, stays held.
+that ladder; what no book takes, a long option with no bid, stays held. Under
+`margin_deficit_liquidates` (0.0 on every shipped preset) a call made by a
+close that leaves the account below zero is unmet whatever the next open
+shows, and the open liquidates as for any unmet call: a broker carries a
+customer's deficit with its own money from the close it is computed at
+(17 CFR 1.22(c)) and liquidates rather than wait for the market to restore it.
 
 **State.** A snapshot carries `options` (the listing, each expiry's strike
 grid and range, the dealer's pressure and the settled expiries) while

@@ -500,6 +500,7 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "margin_option_scan_range": (0.0, 1.0),
     "margin_pretrade_check": (0.0, 1.0),
     "margin_liquidation_worked": (0.0, 1.0),
+    "margin_deficit_liquidates": (0.0, 1.0),
     # The index options, their surface and their dealer (pt-v22 phase 2):
     # two switches, the surface's skew, curvature, term premia and earnings
     # weight, and the dealer's half-spread. None of them moves a stock price.

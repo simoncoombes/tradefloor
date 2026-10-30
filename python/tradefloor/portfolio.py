@@ -1382,12 +1382,13 @@ class Portfolio:
     def settle_open(self, engine: Engine) -> None:
         """At an open, after the engine's: settle the contracts that expired
         at it, then decide the last close's margin call. A call is met when
-        the account's equity is back at or above the initial requirement;
-        otherwise every contract held is closed at the market through its
-        book (sent again while the book takes some, with
-        ``margin_liquidation_worked``), and so is the stock in each name whose
-        options it held or that an exercise or an assignment delivered shares
-        in. A no-op, asking the engine nothing, for a portfolio with no
+        the account's equity is back at or above the initial requirement, and,
+        under ``margin_deficit_liquidates``, the close that made it did not
+        leave the account below zero; otherwise every contract held is closed
+        at the market through its book (sent again while the book takes some,
+        with ``margin_liquidation_worked``), and so is the stock in each name
+        whose options it held or that an exercise or an assignment delivered
+        shares in. A no-op, asking the engine nothing, for a portfolio with no
         futures, no options and no call open. The harnesses call it after the
         open."""
         if not self.futures and not self.options and self._margin_call is None:
@@ -1399,7 +1400,7 @@ class Portfolio:
         call, self._margin_call = self._margin_call, None
         if call is None:
             return
-        call["met"] = self.net_worth(engine) >= self.margin_requirement(engine)
+        call["met"] = not call.get("deficit") and self.net_worth(engine) >= self.margin_requirement(engine)
         if call["met"]:
             return
         held = [(s, f.quantity) for s, f in self.futures.items()]
@@ -1486,6 +1487,11 @@ class Portfolio:
         if maintenance > 0 and equity < maintenance:
             self._margin_call = {"day": day, "equity": equity, "maintenance": maintenance,
                                  "initial": self.margin_requirement(engine), "met": None}
+            # ``margin_deficit_liquidates``: a call made on an account in
+            # deficit is one no recovery meets (17 CFR 1.22(c): the broker
+            # carries the deficit from this close).
+            if equity < 0 and getattr(engine.model, "margin_deficit_liquidates", 0.0):
+                self._margin_call["deficit"] = True
             self.margin_calls.append(self._margin_call)
 
     def _holds_delivered(self) -> bool:

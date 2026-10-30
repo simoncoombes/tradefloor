@@ -2157,6 +2157,20 @@ pub struct ModelParams {
     /// with no bid, stays held. Read by the account, not the engine, so no
     /// price moves by itself. Requires `margin_scan_coverage`. 0 or 1.
     pub margin_liquidation_worked: f64,
+    /// A switch: 1.0 liquidates an account in deficit at the next open,
+    /// whatever the night does. When a close leaves an account's equity
+    /// below zero while it holds contracts, the margin call that close makes
+    /// is unmet whatever the next open shows, and the open liquidates as for
+    /// any unmet call (`tradefloor.Portfolio`, `settle_open`). 0.0, on every
+    /// shipped preset, decides that call at the open on the equity then, as
+    /// it stood, and a value of 0.0 is left out of the model's digest.
+    ///
+    /// A broker covers a customer's deficit with its own money from the close
+    /// it is computed at (17 CFR 1.22(c)) and liquidates an account in deficit
+    /// rather than wait for the market to restore it. Read by the account,
+    /// not the engine, so no price moves by itself. Requires
+    /// `margin_scan_coverage`. 0 or 1.
+    pub margin_deficit_liquidates: f64,
     /// Whether the engine lists European options on its price index. 0.0,
     /// on every shipped preset, lists none: no contract, no state, nothing in
     /// the snapshot or the state hash, and a value of 0.0 is left out of the
@@ -9438,6 +9452,7 @@ impl ModelParams {
             margin_option_scan_range: 0.0,
             margin_pretrade_check: 0.0,
             margin_liquidation_worked: 0.0,
+            margin_deficit_liquidates: 0.0,
             options_index_listed: 0.0,
             surface_ssvi: 0.0,
             surface_skew_physical: 0.0,
@@ -12387,6 +12402,7 @@ impl ModelParams {
             "margin_option_scan_range" => self.margin_option_scan_range,
             "margin_pretrade_check" => self.margin_pretrade_check,
             "margin_liquidation_worked" => self.margin_liquidation_worked,
+            "margin_deficit_liquidates" => self.margin_deficit_liquidates,
             "options_index_listed" => self.options_index_listed,
             "surface_ssvi" => self.surface_ssvi,
             "surface_skew_physical" => self.surface_skew_physical,
@@ -12872,6 +12888,7 @@ impl ModelParams {
             "margin_option_scan_range" => out.margin_option_scan_range = value,
             "margin_pretrade_check" => out.margin_pretrade_check = value,
             "margin_liquidation_worked" => out.margin_liquidation_worked = value,
+            "margin_deficit_liquidates" => out.margin_deficit_liquidates = value,
             "options_index_listed" => out.options_index_listed = value,
             "surface_ssvi" => out.surface_ssvi = value,
             "surface_skew_physical" => out.surface_skew_physical = value,
@@ -15042,6 +15059,18 @@ impl ModelParams {
                  liquidation, which only margin_scan_coverage makes: set margin_scan_coverage first.",
                 self.margin_liquidation_worked));
         }
+        if !(self.margin_deficit_liquidates == 0.0 || self.margin_deficit_liquidates == 1.0) {
+            return Err(format!(
+                "margin_deficit_liquidates is {}. It is a switch: 0 (a call decided on the equity at the open) or \
+                 1 (an account a close leaves below zero is liquidated at the next open).",
+                self.margin_deficit_liquidates));
+        }
+        if self.margin_deficit_liquidates != 0.0 && self.margin_scan_coverage == 0.0 {
+            return Err(format!(
+                "margin_scan_coverage is 0 but margin_deficit_liquidates is {}. It decides a margin call, which \
+                 only margin_scan_coverage makes: set margin_scan_coverage first.",
+                self.margin_deficit_liquidates));
+        }
         for (name, v) in [("options_index_listed", self.options_index_listed), ("surface_ssvi", self.surface_ssvi)] {
             if !(v == 0.0 || v == 1.0) {
                 return Err(format!("{name} is {v}. It is a switch, 0.0 off or 1.0 on."));
@@ -15832,6 +15861,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "margin_option_scan_range",
     "margin_pretrade_check",
     "margin_liquidation_worked",
+    "margin_deficit_liquidates",
     "night_session_steps",
     "futures_impact_memory",
     "futures_impact_memory_half_life",
@@ -16124,6 +16154,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "margin_option_scan_range",
         "margin_pretrade_check",
         "margin_liquidation_worked",
+        "margin_deficit_liquidates",
         "options_index_listed",
         "surface_ssvi",
         "surface_skew_physical",

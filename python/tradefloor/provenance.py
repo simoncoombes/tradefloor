@@ -465,6 +465,10 @@ OUT_OF_SCOPE = {
         "inert at 0.0: a margin call's liquidation sends each contract's sale "
         "once, as it stood; read by `Portfolio.settle_open`, not the engine; "
         "at 0.0 it is also left out of the model's digest",
+    "margin_deficit_liquidates":
+        "inert at 0.0: a margin call is decided on the equity at the open, as it "
+        "stood; read by `Portfolio`, not the engine; at 0.0 it is also left out "
+        "of the model's digest",
     "margin_option_scan_range":
         "inert at 0.0: the single-name scan keeps its own size, `z * t` times "
         "the name's one-session sd at SPAN's seven points (a branch in "
