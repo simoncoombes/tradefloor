@@ -39,7 +39,8 @@ passing it is weak evidence. Volatility clustering shows the gap. On pt-v22
 `abs_return_acf5` reads 0.028, below the lowest of the ten 2015 to 2025
 windows in `tf.facts.REAL_MARKETS_WINDOWS` (0.034), and passes because its
 range reaches lower than those windows do. `sector_excess_corr`, 0.126, is
-also below every one of those windows (the lowest is 0.133). Changing them
+below the nine of those windows outside the crisis (the lowest is 0.133),
+though above the 2019-07 to 2020-07 crisis window's 0.103. Changing them
 changes the simulation, so it waits for the next preset.
 
 Four of the 19 describe the index as a whole. On pt-v21 an equal-weight index

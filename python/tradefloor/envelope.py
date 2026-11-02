@@ -195,10 +195,11 @@ PRESET = "pt-v22"
 #: The row needs `facts.CRISIS_DISPERSION_MIN_SESSIONS` (30) sessions above
 #: `facts.CRISIS_VIX_THRESHOLD` (30.88) inside the window it is read over,
 #: and most 252-day runs of this preset on the certified roster do not hold
-#: them. On the fifth composition (2026-09-23) 4 of the 30 seeds read the
-#: row and 1.2029 is their median; the record's `dispersion["panel_252"]`
-#: carries that count and why each other seed did not read. Four seeds is
-#: thin, so read the count beside the value. On the vector before it the
+#: them. On pt-v22 (the paired run of 2026-11-01) 3 of the 30 seeds read
+#: the row and 1.3177 is their median; the record's `dispersion["panel_252"]`
+#: carries that count and why each other seed did not read. Three seeds is
+#: thin, so read the count beside the value. On the fifth composition
+#: (2026-09-23) 4 of the 30 read it, at a median of 1.2029. On the vector before it the
 #: entry was `None`: the four seeds measured on 2026-09-22 held 0, 1, 0 and
 #: 10 crisis sessions. A preset with no seed that reads the row has NO
 #: certified reading at 252 and the honest entry is
@@ -233,7 +234,7 @@ CERTIFIED: dict[str, float | None] = {
     "corr_asymmetry_lagged": 0.0734,
     "sector_excess_corr": 0.1264,
     "corr_persistence_acf1": 0.0505,
-    # Read on 4 of the 30 seeds at this preset, with the reason above.
+    # Read on 3 of the 30 seeds at this preset, with the reason above.
     # Written by `envelope_tables.py` from the record's `panel_252`, which
     # carries the row only when a seed read it; `dispersion["panel_252"]` on
     # the record carries how many of the thirty did and why the rest did not.
@@ -326,9 +327,10 @@ CERTIFIED_LEVEL: dict[str, float] = {
     # spread is wide against the band, so a single seed's first year says
     # almost nothing about the row.
     #
-    # pt-v21, over the 360 seeds of `facts.LEVEL_POOL`: a mean of 7.0047 on
-    # an across-seed standard error of 0.6677, inside the ruled band of 1.1
-    # to 10.3 (the thirty certification seeds read 8.8202).
+    # pt-v22, over the 360 seeds of `facts.LEVEL_POOL`: a mean of 7.3319 on
+    # an across-seed standard error of 0.7100, inside the ruled band of 1.1
+    # to 10.3 (the thirty certification seeds read 10.5009). pt-v21 read
+    # 7.0047 on 0.6677 (its thirty seeds 8.8202).
     "index_drift_pct": 7.3319,
 }
 
@@ -687,9 +689,9 @@ MEASURED_504: dict[str, float | None] = {
     "abs_return_acf20": 0.0293,
     "cross_sectional_corr": 0.3210,
     # Re-measured on the fixed bars on 2026-10-01, as in `CERTIFIED`. Before
-    # the fix they read 0.5614 and -0.2415. 0.6266 is 0.0034 under the ruled
-    # ceiling of 0.63 (`facts.REAL_MARKETS_RULED_504`), about 0.4 of a
-    # 504-day seed sd, and 13 of the 30 seeds read above 0.63.
+    # the fix they read 0.5614 and -0.2415. On pt-v22 0.5863 is 0.0437 under
+    # the ruled ceiling of 0.63 (`facts.REAL_MARKETS_RULED_504`), about one
+    # 504-day seed sd (0.0439), and 2 of the 30 seeds read above 0.63.
     "volume_abs_return_corr": 0.5863,
     "leverage_effect": -0.0495,
     "volume_change_acf1": -0.2406,
