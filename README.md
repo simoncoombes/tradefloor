@@ -378,7 +378,7 @@ several presets, and results depend on the preset.
   version = {0.10.2},
   year    = {2026},
   url     = {https://github.com/simoncoombes/tradefloor},
-  note    = {Model preset pt-v21}
+  note    = {Model preset pt-v22}
 }
 ```
 
@@ -387,7 +387,7 @@ carries the same details, and GitHub's "Cite this repository" button reads
 it.
 
 In the text, say which model you used, for example: "tradefloor 0.10.2,
-preset pt-v21, specified in its docs/MODEL.md".
+preset pt-v22, specified in its docs/MODEL.md".
 [docs/REPRODUCIBILITY.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/REPRODUCIBILITY.md)
 says how to publish a result so a reader can rerun it, and how to show a
 score was not tuned to its seeds.
