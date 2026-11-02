@@ -84,12 +84,34 @@ def boxes_of(specs: list[str]) -> dict[str, dict]:
         d = pathlib.Path(d)
         commit = (d / "commit.txt").read_text().strip()
         sha = (d / "scripts-sha256.txt").read_text().split()[0]
-        kat = (d / "known-answer.txt").read_text() if (d / "known-answer.txt").exists() else ""
-        m = re.search(r"package\s+(\S+)", kat)
-        files = d / "scripts-files.txt"
-        out[name] = {"commit": commit, "archive": sha, "package": m.group(1) if m else None,
-                     "files": len([x for x in files.read_text().splitlines() if x.strip()]) if files.exists() else None}
+        out[name] = {"commit": commit, "archive": sha, "package": _package(d), "files": _files(d)}
     return out
+
+
+def _package(d: pathlib.Path) -> str | None:
+    """The package version the box ran: its known-answer report's `package` line, or, for a box that wrote only
+    `kat.txt` (most of the grade's boxes do), the wheel it installed, as `wheel.txt` names it."""
+    for name, pattern in (("known-answer.txt", r"package\s+(\S+)"), ("wheel.txt", r"\btradefloor-(\d[^\s/]*?)(?:-cp|\.whl|\s|$)")):
+        f = d / name
+        m = re.search(pattern, f.read_text(), re.MULTILINE) if f.exists() else None
+        if m:
+            return m.group(1)
+    return None
+
+
+def _files(d: pathlib.Path) -> int | None:
+    """How many files the box unpacked: `scripts-files.txt`, or the files in the archive it kept,
+    `scripts-as-run.tgz`, whose sha256 is the one `scripts-sha256.txt` records."""
+    listed = d / "scripts-files.txt"
+    if listed.exists():
+        return len([x for x in listed.read_text().splitlines() if x.strip()])
+    kept = d / "scripts-as-run.tgz"
+    if kept.exists():
+        import tarfile  # noqa: PLC0415
+
+        with tarfile.open(kept) as t:
+            return sum(1 for m in t.getmembers() if m.isfile())
+    return None
 
 
 def assemble(desk: pathlib.Path, boxes: dict[str, dict], graded_fp: str | None = None) -> dict:
@@ -125,7 +147,7 @@ def assemble(desk: pathlib.Path, boxes: dict[str, dict], graded_fp: str | None =
     want = f"custom-{digest_prefix()}"
     if fp not in (want, NAME):
         raise SystemExit(f"the grade ran {fp}, which is not pt-v22's digest {want}: the swapped preset is not the graded arm")
-    doc = {"grade": "pt-v22, nineteenth registration", "arm": arm, "rows": list(rows.values()),
+    doc = {"grade": "pt-v22, twenty-third registration", "arm": arm, "rows": list(rows.values()),
            "superseded": superseded, "replaced_by_amendments": sorted(replaced),
            "measured": {"fingerprint": NAME, "graded_fingerprint": fp, "box": "+".join(boxes),
                         "engine_commit": commits.pop(), "desk": "validation/pt-v22/"}}

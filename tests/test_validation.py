@@ -787,6 +787,31 @@ def test_the_fill_records_the_pooled_read_with_a_public_source(tmp_path, monkeyp
     assert seen["source"] == "validation/pt-v22/level-pool/pt-v22.json"
 
 
+def test_the_fill_reads_a_box_as_the_grade_s_boxes_wrote_it(tmp_path):
+    """Most of the grade's boxes write `kat.txt` and `wheel.txt` and keep
+    the archive they unpacked, not `known-answer.txt` and `scripts-files.txt`:
+    the package comes from the wheel and the count from the archive."""
+    import tarfile  # noqa: PLC0415
+
+    tool = _fill_tool()
+    box = tmp_path / "g1"
+    (box / "scripts" / "longrun").mkdir(parents=True)
+    for n in ("a.py", "b.json"):
+        (box / "scripts" / "longrun" / n).write_text(n)
+    with tarfile.open(box / "scripts-as-run.tgz", "w:gz") as t:
+        t.add(box / "scripts", arcname="scripts")
+    (box / "commit.txt").write_text("e132a66a\n")
+    (box / "scripts-sha256.txt").write_text(f"{'cd' * 32}  /home/ec2-user/scripts.tgz\n")
+    (box / "kat.txt").write_text("known-answer sim: 3a063f0d\n")
+    (box / "wheel.txt").write_text("wheel key 1e3a (commit e132a66a)\nwheel from cache: tradefloor-0.10.2\n")
+    assert tool.boxes_of([f"g1={box}"]) == {"g1": {"commit": "e132a66a", "archive": "cd" * 32,
+                                                  "package": "0.10.2", "files": 2}}
+    (box / "known-answer.txt").write_text("tradefloor known-answer test v29\n  package  0.10.3\n")
+    (box / "scripts-files.txt").write_text("a\nb\nc\n")
+    assert tool.boxes_of([f"g1={box}"])["g1"] == {"commit": "e132a66a", "archive": "cd" * 32,
+                                                 "package": "0.10.3", "files": 3}
+
+
 def test_with_no_fill_named_the_fill_finds_every_page_with_a_placeholder(tmp_path):
     tool = _fill_tool()
     (tmp_path / "docs").mkdir()
