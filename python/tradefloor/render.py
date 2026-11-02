@@ -340,7 +340,7 @@ def _vol(value: Any) -> str:
     return "-" if value is None else f"{value * 100:.2f}%"
 
 
-#: The index options' expiry table (pt-v22 phase 2), fixed widths as `_ROW`.
+#: The index options' expiry table, fixed widths as `_ROW`.
 _OPTION_ROW = ("{expiry:>8}{sessions:>10}{forward:>12}{strikes:>18}{atm:>10}"
                "{put:>10}{call:>10}{skew:>9}")
 
@@ -640,9 +640,8 @@ class TextRenderer:
         # did.
         if "futures" in payload:
             out += self._futures_block(payload, L)
-        # And the index options' summary on a model that lists them (pt-v22
-        # phase 2), with the index and the margin when no futures block
-        # has shown them.
+        # And the index options' summary on a model that lists them, with
+        # the index and the margin when no futures block has shown them.
         if "options" in payload:
             out += self._options_block(payload, L,
                                        alone="futures" not in payload)

@@ -37,14 +37,14 @@ class Idle:
         return {}
 
 
-def build() -> World:
+def build(model=None) -> World:
     return World(seed=31, universe=list(tf.Universe.random(4, seed=11)),
                  agent=Idle(), steps_per_day=2, ticks_per_step=20,
-                 label="root")
+                 label="root", model=model)
 
 
-def forked():
-    world = build()
+def forked(model=None):
+    world = build(model)
     world.run(days=HISTORY)
     control, stress = world.fork("control", "stress")
     return control, stress
@@ -379,9 +379,9 @@ def test_scenario_show_takes_a_start(capsys):
 #: bundle, commit 7410aec0, `World.manifest(strategy="tests").fingerprints`).
 #: The record of where a scenario's days came from must not change the
 #: identity of a run that applied it with no start given.
-#: On the default model: re-taken at 0.10.0 when it moved to pt-v21. On
-#: pt-v20 `inputs` read 4e7b3124...8e69 and `model` "pt-v20"; the rest did
-#: not move.
+#: On pt-v21 by name: re-taken at 0.10.0 when the default moved to it, and
+#: read on the default until pt-v22 took it. On pt-v20 `inputs` read
+#: 4e7b3124...8e69 and `model` "pt-v20"; the rest did not move.
 FINGERPRINTS_BEFORE_ORIGINS = {
     "inputs": "d0cfcb8d9481599f102bfcd731484e3d47bebad5d60f7dbf125ce8b193a49518",
     "macro": None,
@@ -396,10 +396,10 @@ FINGERPRINTS_BEFORE_ORIGINS = {
 }
 
 
-def applied_run(at=None) -> World:
+def applied_run(at=None, model=None) -> World:
     """Three shared days, a fork, a hand-built window that fires inside the
     run and the packaged file, then five days in one call."""
-    _control, stress = forked()
+    _control, stress = forked(model)
     stress.apply(tf.Scenario(name="thin").shock(
         "market.liquidity", operation="multiply", value=0.4, at=1,
         duration=2))
@@ -409,7 +409,7 @@ def applied_run(at=None) -> World:
 
 
 def test_a_run_applied_with_no_start_keeps_its_manifest_fingerprints():
-    manifest = applied_run().manifest(strategy="tests")
+    manifest = applied_run(model="pt-v21").manifest(strategy="tests")
     assert json.loads(manifest.to_json())["scenario"]["origins"]
     assert manifest.fingerprints == FINGERPRINTS_BEFORE_ORIGINS
 

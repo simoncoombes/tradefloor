@@ -3493,7 +3493,11 @@ impl PyEngine {
             None
         };
         let mut out = Vec::new();
-        for event in self.inner.session_news() {
+        // The session minute each event is released at, while
+        // `news_session_release_share` is set: a reader that shows news to a
+        // trader must hold an event back until `session_tick` reaches it.
+        let release = self.inner.session_news_release();
+        for (k, event) in self.inner.session_news().iter().enumerate() {
             let d = PyDict::new_bound(py);
             d.set_item(
                 "ticker",
@@ -3502,6 +3506,9 @@ impl PyEngine {
             d.set_item("sector", event.sector.clone())?;
             d.set_item("price_impact", event.price_impact)?;
             d.set_item("day", day)?;
+            if let Some(minute) = release.get(k) {
+                d.set_item("release_minute", *minute)?;
+            }
             out.push(d);
         }
         Ok(out)
@@ -4045,7 +4052,11 @@ impl PyEngine {
         // turned ON here: `False`, the default, leaves a mark an earlier
         // call made today in place, so a later pin of another field cannot
         // cancel it. See `MarketVarianceState::close_day_forced`.
-        if vix_sets_variance {
+        // `pinned_vix_sets_variance`: under the switch every VIX pin marks it,
+        // whatever the argument says. Nothing with the switch at 0.0.
+        if vix_sets_variance
+            || (vix.is_some() && self.inner.params().pinned_vix_sets_variance != 0.0)
+        {
             self.inner.set_vix_sets_variance_pending(true);
         }
         // A PINNED VIX CHARGES THE CREDIT SPREAD NOTHING TONIGHT: the close's
@@ -4060,9 +4071,13 @@ impl PyEngine {
             // `pinned_vix_feedback`: the discount lands in this pin's
             // re-mark, and the credit leg, where it applies, in the corporate
             // index's.
+            // `pinned_vix_return` reads the exposure from before this pin, to
+            // net out what the discount prices; nothing with the dial off.
+            let feedback_before = self.inner.economy().vix_feedback;
             if self.inner.price_pinned_vix(vix_before) {
                 self.inner.remark_credit_spread();
             }
+            self.inner.price_pinned_vix_return(vix_before, feedback_before);
         }
         // `macro_pins_hold`: every other field written here holds through
         // tonight's close. The marks are kept only under the dial.
@@ -4295,6 +4310,22 @@ impl PyEngine {
             book_value_per_share,
             revenue_growth,
         });
+        Ok(())
+    }
+
+    /// Record a market-wide earnings write: ``log_factor`` is the log of the
+    /// common factor every company's earnings were scaled by, which the
+    /// ``market.earnings`` scenario target passes after its
+    /// ``set_fundamentals``. With ``earnings_lookthrough_half_life`` set the
+    /// valuation looks through part of it (the model's
+    /// ``earnings_lookthrough_*`` dials); with it 0.0, on every preset, the
+    /// call changes nothing and is not logged. A direct ``set_fundamentals``
+    /// is a name's own news and is valued in full.
+    fn note_market_earnings(&mut self, log_factor: f64) -> PyResult<()> {
+        self.inner.note_market_earnings(log_factor).map_err(ValidationError::new_err)?;
+        if self.inner.carries_earnings_lookthrough() {
+            self.log.push(crate::python_log::LogEntry::NoteMarketEarnings { log_factor });
+        }
         Ok(())
     }
 
@@ -4778,19 +4809,25 @@ impl PyEngine {
         self.inner.live_vix()
     }
 
+    /// The skew premium's noise now (`surface_skew_noise_sd`), in skewness
+    /// units (a SKEW move is `-10` times it), or None with the dial at 0.0.
+    #[getter]
+    fn skew_noise(&self) -> Option<f64> {
+        self.inner.skew_noise_level()
+    }
+
     /// Whether the model lists futures of any family
     /// (`futures_index_listed`, `futures_vix_listed`, `futures_rates_listed`
     /// or `futures_oil_listed`). A property of the model: True on a model
     /// that lists VIX futures before its first close, while `contracts()` is
-    /// still empty. False on every shipped preset.
+    /// still empty.
     #[getter]
     fn lists_futures(&self) -> bool {
         self.inner.lists_futures()
     }
 
     /// Whether the model lists index options (`options_index_listed`): a
-    /// property of the model, as `lists_futures` is. False on every shipped
-    /// preset.
+    /// property of the model, as `lists_futures` is.
     #[getter]
     fn lists_options(&self) -> bool {
         self.inner.lists_options()
@@ -4798,7 +4835,7 @@ impl PyEngine {
 
     /// Whether the model lists American options on its names
     /// (`options_names_listed`): a property of the model, True before the
-    /// first close lists any. False on every shipped preset.
+    /// first close lists any.
     #[getter]
     fn lists_name_options(&self) -> bool {
         self.inner.lists_name_options()
@@ -4809,6 +4846,16 @@ impl PyEngine {
     /// first close. A read.
     fn name_option_roots(&self) -> Vec<String> {
         self.inner.name_option_roots()
+    }
+
+    /// The next scheduled meeting's change, percentage points, as the
+    /// economy as published implies it and as the Fed's own reading (the
+    /// economy the meeting reads) does, on the close the standing forecast
+    /// was taken at: `(published, own)`, the two silent shadows
+    /// `policy_anticipation_guidance` blends. None without a forecast. A
+    /// read: no draw is taken and nothing is written.
+    fn policy_shadows(&self) -> Option<(f64, f64)> {
+        self.inner.policy_shadows()
     }
 
     /// The forecast the last close computed (`forecast_horizon_sessions`), or
@@ -5190,15 +5237,34 @@ impl PyEngine {
         Ok(PySurface { inner: surface, carry })
     }
 
-    /// The scan's initial margin on a portfolio of index options, dollars
+    /// The scan's initial margin on a portfolio of listed options, dollars
     /// (`margin_scan_coverage`): `positions` as `(symbol, signed contracts)`
-    /// pairs, symbols not listed left out. The worst loss over seven index
-    /// moves sized to the coverage's quantile of the index's one-session sd
-    /// at the VIX, each at three implied-volatility shifts; a long option
-    /// asks at most its premium and offsetting positions net. None with
-    /// margin or options off. A read.
+    /// pairs, and `(ticker, signed shares)` for the stock held beside a
+    /// name's options, symbols not listed left out. The worst loss over seven
+    /// moves of the underlying sized to the coverage's quantile of its
+    /// one-session sd, each at three implied-volatility shifts, the index's
+    /// options and each name's apart; a long option asks at most its
+    /// premium, and offsetting positions and the name's stock net. Under
+    /// `margin_option_scan_range` a name's options are revalued at ten
+    /// equidistant moves over plus and minus that share of its price
+    /// instead. Under `margin_option_minimum` it is at least that many
+    /// dollars a unit of each option held, a long's not more than its value.
+    /// None with margin or options off. A read.
     fn option_margin(&self, positions: Vec<(String, f64)>) -> Option<f64> {
         self.inner.option_margin(&positions)
+    }
+
+    /// The scan's margin on stock held alone in listed names, dollars:
+    /// `positions` as `(ticker, signed shares)` pairs, each its shares times
+    /// the scan's move of the name, the one `option_margin` sizes the name's
+    /// options on (under `margin_option_scan_range`, that share of the
+    /// shares' value). The option scan charges stock only as cover for an
+    /// option's risk; `Portfolio` asks this for the shares an exercise or an
+    /// assignment delivered once it holds none of the name's options. Tickers
+    /// without a listed chain are left out. None with margin or the name
+    /// options off. A read.
+    fn stock_margin(&self, positions: Vec<(String, f64)>) -> Option<f64> {
+        self.inner.stock_scan_margin(&positions)
     }
 
     /// Static-arbitrage violations on every listed option chain now (row
@@ -6016,17 +6082,16 @@ impl PyEngine {
         ))
     }
 
-    /// The `futures_bars` table (pt-v22 phase 1): one row per listed
-    /// contract per recorded day, read at `record`. Every day loop in the
-    /// package records after the day's last session and before its close,
-    /// so `price` is the contract's price at the day's last print, `fair`
-    /// its fair value then, `basis_bp` the gap in basis points, `bid` and
-    /// `ask` its book's touch, `mark` the previous close's settlement mark,
-    /// `index` what `fair` reads, `sessions_to_expiry`, and
-    /// `initial_margin`, dollars a contract as the last close set it.
-    /// Nullable where a quote's field is None. `day = N` is that recorded
-    /// day alone. Empty on a model that lists no futures, which is every
-    /// shipped preset. The schema's `schema_version` metadata key is "1".
+    /// The `futures_bars` table: one row per listed contract per recorded
+    /// day, read at `record`. Every day loop in the package records after the
+    /// day's last session and before its close, so `price` is the contract's
+    /// price at the day's last print, `fair` its fair value then, `basis_bp`
+    /// the gap in basis points, `bid` and `ask` its book's touch, `mark` the
+    /// previous close's settlement mark, `index` what `fair` reads,
+    /// `sessions_to_expiry`, and `initial_margin`, dollars a contract as the
+    /// last close set it. Nullable where a quote's field is None. `day = N`
+    /// is that recorded day alone. Empty on a model that lists no futures.
+    /// The schema's `schema_version` metadata key is "1".
     #[pyo3(signature = (day = None))]
     fn futures_bars(&self, day: Option<u32>) -> PyResult<crate::python_arrow::PyArrowStream> {
         let rows: Vec<&crate::python_arrow::FuturesBarRow> =
@@ -6039,7 +6104,7 @@ impl PyEngine {
         ))
     }
 
-    /// The `settlements` table (pt-v22 phase 1): `Engine.settlements(day)`
+    /// The `settlements` table: `Engine.settlements(day)`
     /// as Arrow, one row per final settlement in session order, with
     /// `session`, `symbol`, `root`, `kind`, `value` and `reference`, and a
     /// single-name option's exercises and assignments (`event`, `agent`,
@@ -6058,13 +6123,13 @@ impl PyEngine {
         ))
     }
 
-    /// The `option_quotes` table (pt-v22 phase 2): the index options'
+    /// The `option_quotes` table: the index options'
     /// chains now as Arrow, every listed expiry's in expiry order, or
     /// `expiry`'s alone, each by strike, the call before the put, as
     /// `chain` quotes them. `day` is the engine's day count when read, so
     /// tables read at successive closes stack into a history. Read now, not
     /// recorded: a chain is several hundred contracts. Empty on a model that
-    /// lists no options, which is every shipped preset; an expiry not listed
+    /// lists no index options; an expiry not listed
     /// is refused. The schema's `schema_version` metadata key is "1".
     ///
     /// A listed name's ticker as `root` reads its options
@@ -6379,6 +6444,15 @@ impl PyEngine {
     #[getter]
     fn book_live(&self) -> bool {
         self.inner.book_live()
+    }
+
+    /// Whether the night has walked a step since the last close
+    /// (``run_night``). From then until the next open the index futures
+    /// show where that open will be, and stocks refuse orders, here and in
+    /// ``Portfolio.execute``. A read.
+    #[getter]
+    fn night_walked(&self) -> bool {
+        self.inner.night_walked()
     }
 
     /// The order in which a cohort's orders reach the book on one step.

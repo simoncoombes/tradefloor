@@ -1,11 +1,12 @@
-"""The MCP server's index options (pt-v22 phase 2): option_chain, option
-symbols in quote_contracts and session_step, and the positions and margin
+"""The MCP server's index options: option_chain, option symbols in
+quote_contracts and session_step, and the positions and margin
 session_state reports.
 
-No shipped preset lists options, and a session runs a shipped preset by
-name, so on every preset the tool answers with an empty chain and says why.
-The rest is checked on a session whose engine is built with the phase 2
-switches on, the way a library caller would build one.
+No shipped preset lists index options. On a preset that lists no contract
+(pt-v21) the tool answers with an empty chain, says so and names the
+shipped presets that list contracts. The rest is checked on a session
+whose engine is built with the index options switches on, the way a library
+caller would build one.
 """
 
 import json
@@ -16,6 +17,7 @@ pytest.importorskip("mcp", reason="the MCP server is an opt-in extra")
 
 import tradefloor as tf  # noqa: E402
 from tradefloor import mcp  # noqa: E402
+from test_mcp_futures import PLAIN, says_where  # noqa: E402
 
 #: The surface, the options and their dealer on, with the margin scan, at
 #: the values tests/test_index_options.py uses.
@@ -80,37 +82,42 @@ def atm(sid, expiry, right="C"):
 # -- every shipped preset --------------------------------------------------
 
 
-def test_a_shipped_preset_lists_no_option_and_says_why():
-    sid = opened(universe_size=8)
+def test_a_preset_without_contracts_lists_no_option_and_says_where_they_are():
+    sid = opened(universe_size=8, preset=PLAIN)
     r = mcp.option_chain(sid)
     assert r["ok"] and r["lists_options"] is False
     assert r["expiries"] == [] and r["chain"] == []
-    assert "no shipped preset" in r["note"]
+    says_where(r["note"])
     refused = mcp.option_chain(sid, expiry=14)
-    assert refused["ok"] is False and "no shipped preset" in refused["error"]
+    assert refused["ok"] is False
+    says_where(refused["error"])
     listed = mcp.list_contracts(sid)
     assert "option_expiries" not in listed and "lists_options" not in listed
 
 
-def test_a_shipped_preset_session_view_shows_no_option():
-    sid = opened(universe_size=8)
+def test_a_preset_without_contracts_session_view_shows_no_option():
+    sid = opened(universe_size=8, preset=PLAIN)
     state = mcp.session_state(sid)
     assert "options_listed" not in state["market"]
     assert not {"options", "margin"} & set(state["agents"]["me"])
 
 
-def test_an_option_symbol_on_a_shipped_preset_is_refused_with_the_reason():
-    sid = opened(universe_size=8)
+def test_an_option_symbol_on_a_preset_without_contracts_is_refused_with_the_reason():
+    sid = opened(universe_size=8, preset=PLAIN)
     r = mcp.session_step(sid, orders={"IDX.O0014.C1000.00": 1})
-    assert r["ok"] is False
-    assert "contract symbol" in r["error"] and "no shipped preset" in r["error"]
+    assert r["ok"] is False and "contract symbol" in r["error"]
+    says_where(r["error"])
 
 
 def test_describe_simulator_lists_the_options():
-    options = mcp.describe_simulator()["instruments"]["options"]
+    instruments = mcp.describe_simulator()["instruments"]
+    options = instruments["options"]
     assert options["families"] == [{"root": "IDX", "listed_by": "options_index_listed"}]
     assert options["on_shipped_presets"] == []
-    assert "option_chain" in options["how"]
+    assert "option_chain" in options["how"] and "No shipped preset" in options["how"]
+    names = instruments["name_options"]
+    assert PLAIN not in names["on_shipped_presets"]
+    assert "yet" not in names["how"] and "yet" not in options["how"]
 
 
 def test_strikes_out_of_range_is_refused():

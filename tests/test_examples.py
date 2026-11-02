@@ -560,7 +560,7 @@ def test_the_claude_example_replays_what_it_recorded(monkeypatch, tmp_path):
                         days=4)["claude"]
     assert messages.calls == 4 and len(recorder) == 4
     meta = recorder.meta
-    assert meta["model"] == "claude-opus-5"
+    assert meta["model"] == "claude-opus-5-5"
     assert meta["model_preset"] == tf.ModelParams.from_preset().fingerprint
     assert meta["instructions_digest"] and meta["decision_schema_digest"]
     assert meta["tradefloor_version"] == tf.__version__

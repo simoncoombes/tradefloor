@@ -723,13 +723,12 @@ pub fn distributions_batch(rows: &[&crate::engine::Distribution]) -> Result<Reco
     RecordBatch::try_new(distributions_schema(), columns).map_err(|e| e.to_string())
 }
 
-/// The version the derivatives' tables (`futures_bars`, `settlements`, and
-/// `option_quotes` from pt-v22 phase 2) carry in their schema's
-/// `schema_version` metadata key. The older tables carry no version, and
-/// their columns are frozen by the known-answer gate; these are new in
-/// pt-v22 and may gain columns, so a reader can tell which layout it holds
-/// from the stream alone. One key per schema, for the reason
-/// [`prints_schema`] gives.
+/// The version the derivatives' tables (`futures_bars`, `settlements` and
+/// `option_quotes`) carry in their schema's `schema_version` metadata key.
+/// The older tables carry no version, and their columns are frozen by the
+/// known-answer gate; these are newer and may gain columns, so a reader can
+/// tell which layout it holds from the stream alone. One key per schema,
+/// for the reason [`prints_schema`] gives.
 pub const FUTURES_TABLES_SCHEMA_VERSION: &str = "1";
 
 fn versioned(fields: Vec<Field>) -> SchemaRef {

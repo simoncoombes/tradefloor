@@ -532,10 +532,19 @@ pub fn nominal_scale(p: &ModelParams, economy: &EconomyState, base: f64) -> f64 
     // Under `earnings_anticipation_half_life` the valuation prices the
     // earnings path it expects, not only today's point on it.
     let level = economy.earnings_cycle + economy.earnings_anticipation;
-    if p.earnings_cycle_depth == 0.0 || level == 0.0 {
+    let scale = if p.earnings_cycle_depth == 0.0 || level == 0.0 {
         scale
     } else {
         scale * mathx::exp(level)
+    };
+    // The look-through of the written earnings
+    // (`earnings_lookthrough_half_life`): a branch at exactly zero, which it
+    // is with the dial off and in any run that never wrote `market.earnings`.
+    let look = economy.earnings_lookthrough;
+    if look == 0.0 {
+        scale
+    } else {
+        scale * mathx::exp(look)
     }
 }
 
@@ -773,6 +782,12 @@ pub struct TickInputs<'a> {
     /// is read against the phase's normal volatility. See
     /// `ModelParams::market_vol_cycle_cap_relative`.
     pub market_permanent_ceiling_scale: f64,
+    /// The session's market mean from today's VIX pins
+    /// (`ModelParams::pinned_vix_return`), in log points at a beta of one
+    /// over the whole session: each open tick moves every name by its beta
+    /// times this over 390, outside the intraday curve. 0.0 on every
+    /// unpinned session and with the dial off, where nothing is added.
+    pub pinned_mean: f64,
     /// The VIX at which every variance coupling reads ONE.
     ///
     /// `params.market_vol_vix_anchor` under every preset before pt-v19,
@@ -883,6 +898,7 @@ impl<'a> TickInputs<'a> {
             forced_flow_eff: 1.0,
             market_sigma_daily: MARKET_FACTOR_SIGMA,
             market_permanent_ceiling_scale: 1.0,
+            pinned_mean: 0.0,
             vix_anchor: params.market_vol_vix_anchor,
             universe_stress: 0.0,
             volume_state: 0.0,
@@ -1478,19 +1494,62 @@ pub fn simulate_market_tick(
         // would be a different market.
         let raw = &all_factors[i];
         let scale = 1.0 / 390.0;
+        // The market's next-session reversal (`market_factor_reversal`): on
+        // each open tick the name takes -k * beta * F_{d-1} / 390, where
+        // F_{d-1} is yesterday's whole accumulated market factor. Booked to
+        // the crowd's slot (it is the liquidity the crowd provides against
+        // yesterday's market-wide move) and moved whole into the fair-value
+        // level below, so it does not revert. A branch: 0.0 adds nothing.
+        // Under `market_factor_reversal_vix_power` q the share is
+        // k * (X / 20)^q, X the economy's VIX at the last close (a branch:
+        // q = 0.0 is k as it stands).
+        let reversal = if open && p.market_factor_reversal != 0.0 {
+            let k = if p.market_factor_reversal_vix_power != 0.0 {
+                p.market_factor_reversal
+                    * mathx::pow(mathx::max(economy.vix, 0.0) / 20.0, p.market_factor_reversal_vix_power)
+            } else {
+                p.market_factor_reversal
+            };
+            -k * companies[idx].stock.beta.unwrap_or(1.0) * inputs.prev_day_factor / 390.0
+        } else {
+            0.0
+        };
+        // THE PINNED SESSION'S MEAN (`pinned_vix_return`): this name's beta
+        // times the session's conditional mean over its 390 open ticks,
+        // outside the intraday curve, so the session's sum is the mean the
+        // pins set. Exactly 0.0 off a pinned session, and every use below is
+        // a branch on it, so nothing is added.
+        let pin_mean = if open && inputs.pinned_mean != 0.0 {
+            companies[idx].stock.beta.unwrap_or(1.0) * inputs.pinned_mean / 390.0
+        } else {
+            0.0
+        };
         s_components[i] = if open {
             [
                 s_val * (p.s_phi_tick - 1.0),
                 (p.momentum_theta * momentum) / 390.0,
-                (if p.forced_flow_gain != 0.0 {
-                    crowd_lean_with(p, s_val, momentum) + forced
+                if reversal != 0.0 {
+                    (if p.forced_flow_gain != 0.0 {
+                        crowd_lean_with(p, s_val, momentum) + forced
+                    } else {
+                        crowd_lean_with(p, s_val, momentum)
+                    }) / 390.0
+                        + reversal
                 } else {
-                    crowd_lean_with(p, s_val, momentum)
-                }) / 390.0,
+                    (if p.forced_flow_gain != 0.0 {
+                        crowd_lean_with(p, s_val, momentum) + forced
+                    } else {
+                        crowd_lean_with(p, s_val, momentum)
+                    }) / 390.0
+                },
                 raw.company_news * scale,
                 with_fill_impact(raw.order_flow_impact * scale, inputs.fill_impact.get(idx)),
                 raw.short_squeeze_effect * scale,
-                all_noises[i] * intraday_vol_mult,
+                if pin_mean != 0.0 {
+                    all_noises[i] * intraday_vol_mult + pin_mean
+                } else {
+                    all_noises[i] * intraday_vol_mult
+                },
                 // The breaker's slot, filled below if it binds.
                 0.0,
                 // The fair-value shift's, filled below under the permanent share.
@@ -1522,7 +1581,7 @@ pub fn simulate_market_tick(
         // `garch_innovation_commensurate` is non-zero.
         let noise_scale = if open { intraday_vol_mult } else { 0.15 };
         noise_parts[i] = [
-            raw.noise_market * noise_scale,
+            if pin_mean != 0.0 { raw.noise_market * noise_scale + pin_mean } else { raw.noise_market * noise_scale },
             raw.noise_sector * noise_scale,
             raw.noise_idio * noise_scale,
         ];
@@ -1542,6 +1601,12 @@ pub fn simulate_market_tick(
                 + (if p.forced_flow_gain != 0.0 { lean + forced } else { lean }) / 390.0
                 + all_drifts[i]
                 + all_noises[i] * intraday_vol_mult;
+            if reversal != 0.0 {
+                s_val += reversal;
+            }
+            if pin_mean != 0.0 {
+                s_val += pin_mean;
+            }
         } else {
             s_val = s_val + all_drifts[i] + all_noises[i];
         }
@@ -1553,7 +1618,7 @@ pub fn simulate_market_tick(
         // what later reverts changes. A branch, so 0.0 is the arithmetic
         // that stood, bit for bit.
         let mut fv_moved = fv;
-        if p.fair_value_news_share != 0.0 || p.fair_value_market_share != 0.0 {
+        if p.fair_value_news_share != 0.0 || p.fair_value_market_share != 0.0 || reversal != 0.0 {
             let psi = p.fair_value_news_share;
             let noise_scale = if open { intraday_vol_mult } else { 0.15 };
             let own_noise = psi * ((raw.noise_idio + raw.noise_sector) * noise_scale);
@@ -1574,9 +1639,28 @@ pub fn simulate_market_tick(
                 } else {
                     raw.noise_market_linear
                 };
-                own_noise + own_news
+                let dv = own_noise + own_news
                     + psim * (market_draw * noise_scale)
-                    + psim * (raw.company_news_market * scale)
+                    + psim * (raw.company_news_market * scale);
+                // The pinned mean leaves `s` on the market draw's own share,
+                // as the plain loading does.
+                if pin_mean != 0.0 { dv + psim * pin_mean } else { dv }
+            };
+            // The market's reversal is permanent whole: it leaves `s` for
+            // `v` on the tick it is applied. A branch, so 0.0 is `dv` as it
+            // stood. Under `market_factor_reversal_transient` tau, tau of it
+            // stays in `s` (the transient mispricing) and only the rest moves
+            // to `v`; a branch, so tau 0.0 is the whole reversal as it stood,
+            // and tau 1.0 adds nothing to `dv`.
+            let dv = if reversal != 0.0 {
+                if p.market_factor_reversal_transient != 0.0 {
+                    let moved = (1.0 - p.market_factor_reversal_transient) * reversal;
+                    if moved != 0.0 { dv + moved } else { dv }
+                } else {
+                    dv + reversal
+                }
+            } else {
+                dv
             };
             // The component slots keep the WHOLE shock, deliberately: they
             // report what moved the PRICE (the attribution an agent's

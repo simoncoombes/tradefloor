@@ -43,7 +43,7 @@ import pathlib
 import pytest
 import statistics
 
-from tradefloor import envelope
+from tradefloor import envelope, records
 from tradefloor.facts import (
     REAL_VIX_AR1,
     REAL_VIX_AR1_WINDOWS,
@@ -342,12 +342,15 @@ def test_the_record_tool_treats_a_first_lay_down_as_the_one_exception():
 # THE RECORDS, AND THE SHIP BAR
 # --------------------------------------------------------------------------
 
-@pytest.mark.parametrize("path", sorted(RECORDS.glob("*.json")),
+@pytest.mark.parametrize("path", [p for p in sorted(RECORDS.glob("*.json"))
+                                  if p.stem not in records.pending()],
                          ids=lambda p: p.stem)
 def test_every_committed_record_carries_a_structural_certificate(path):
     """All eighteen, on both panels. A preset with no block is refused by
     the bar, so an unlaid record is not a quiet pass -- but it would be a
-    release nobody could ship, which is worse news arriving later."""
+    release nobody could ship, which is worse news arriving later. A record
+    still waiting for its grade (`records.pending()`) carries the blocks as
+    slots, and `test_validation.py` holds those."""
     rec = json.loads(path.read_text(encoding="utf-8"))
     for field in envelope.STRUCTURE_BAR_PANELS:
         b = rec[field]
@@ -377,7 +380,10 @@ def test_the_shipped_record_reports_its_structural_certificate_beside_the_bar_th
     the line a reader sees; the reading is pinned so it cannot change in
     silence; the published table agrees with it; and beside it sit the two
     things that do gate -- the long-run criteria, which pass, and every
-    ruled band in on all four protocols. The record is pt-v21's since 0.10.0.
+    ruled band in on all four protocols. It reads the shipped default's
+    record: pt-v22's since 0.11.0 (its structure blocks from the record's
+    panel at e96d64d6, its long run from registration 23's grade), pt-v21's
+    before it.
     """
     rec = record(envelope.PRESET)
     for field in envelope.STRUCTURE_BAR_PANELS:
@@ -391,42 +397,51 @@ def test_the_shipped_record_reports_its_structural_certificate_beside_the_bar_th
     assert "structure bar" in line and "PASS" in line
 
     # The reading the release carries, REPORTED, and asserted so it cannot
-    # change in silence. RE-PINNED at 0.10.0 on pt-v21 (box ptv21c1):
-    # REFUSED above on both panels, k 25 at 252 and k 25 held out (cut 21),
-    # median 0.955667 against the tape's 0.929939. The ruling reports it and
-    # does not gate on it. pt-v20's graded arm (box ptv20g6) read PASS on
-    # both at k 15 and k 15, median 0.930223; pt-v19's fifth composition
-    # PASS at k 18 and k 17, median 0.933726.
+    # change in silence. RE-PINNED at 0.11.0 on pt-v22 (the record's panel,
+    # at e96d64d6): REFUSED above on both panels, k 26 at 252 and k 28 held
+    # out (cut 21), median 0.956265 against the tape's 0.929939. The ruling
+    # reports it and does not gate on it. pt-v21 (box ptv21c1) read REFUSED
+    # at k 25 and 25, median 0.955667; pt-v20's graded arm (box ptv20g6) read
+    # PASS on both at k 15 and k 15, median 0.930223; pt-v19's fifth
+    # composition PASS at k 18 and k 17, median 0.933726.
     row = rec["structure_252"]["rows"][VIX_AR1_ROW]
     assert rec["structure_252"]["refused"] == [VIX_AR1_ROW]
-    assert (row["k"], row["cut"], row["side"]) == (25, 21, "above")  # pt-v20: 15
+    assert (row["k"], row["cut"], row["side"]) == (26, 21, "above")  # pt-v21: 25
     assert rec["structure_252"]["at_the_cut"] == []
     row = rec["structure_heldout_seeds"]["rows"][VIX_AR1_ROW]
     assert rec["structure_heldout_seeds"]["refused"] == [VIX_AR1_ROW]
-    assert (row["k"], row["cut"], row["side"]) == (25, 21, "above")  # pt-v20: 15
+    assert (row["k"], row["cut"], row["side"]) == (28, 21, "above")  # pt-v21: 25
     assert rec["structure_heldout_seeds"]["at_the_cut"] == []
 
     # The published table agrees with the record it is written from.
     assert (round(rec["structure_252"]["rows"][VIX_AR1_ROW]["median"], 6)
             == envelope.CERTIFIED_STRUCTURE[VIX_AR1_ROW])
 
-    # WHAT GATES, beside it: the long-run criteria, all passed. pt-v20's
-    # record carries forty: the fifteen pt-v19 was adopted under on
+    # WHAT GATES, beside it: the long-run criteria, all passed. RE-PINNED at
+    # 0.11.0, when pt-v22 became the default: its record (registration 23,
+    # six boxes) carries 231 rows, 190 of them gated and every one of those
+    # passed; the rest are reported beside the grade and do not gate. The
+    # forty pt-v20 was graded on are among them. pt-v20's record carries
+    # exactly those forty: the fifteen pt-v19 was adopted under on
     # 2026-09-23, C4a and C4b (added 2026-09-24,
     # `validation/pt-v20/programme/longrun/CRITERIA.md`, section C4), and the
-    # twenty-three more
-    # graded for pt-v20 (`REGISTERED_PT_V20`). RE-PINNED at 0.8.5, when pt-v20
-    # became the default. pt-v19's record reads 15 of 17 with the verdict
-    # "fail": it passes the fifteen and fails C4a and C4b, the tape's
+    # twenty-three more graded for pt-v20 (`REGISTERED_PT_V20`), 40 of 40 on
+    # its graded arm (box ptv20g6). pt-v19's record reads 15 of 17 with the
+    # verdict "fail": it passes the fifteen and fails C4a and C4b, the tape's
     # 65-minute reversal and two price-only rules on the published suite,
     # which the brief that added them gave to pt-v20 to pass.
     lr = rec["long_run"]
     ids = [r["id"] for r in lr["rows"]]
-    assert sorted(ids) == sorted(ADOPTED + PRICE_ONLY_EDGE + REGISTERED_PT_V20)
-    assert all(r["pass"] for r in lr["rows"]), [
-        r["id"] for r in lr["rows"] if not r["pass"]]
-    # 40 of 40 on the graded arm (box ptv20g6); 29 of 29 before it (ptv20g4b).
-    assert lr["of"] == 40 and lr["passed"] == 40 and lr["verdict"] == "pass"
+    assert set(ADOPTED + PRICE_ONLY_EDGE + REGISTERED_PT_V20) <= set(ids)
+    gated = [r for r in lr["rows"] if r.get("gated", True)]
+    assert len(ids) == 231 and len(gated) == 190
+    assert all(r["pass"] for r in gated), [
+        r["id"] for r in gated if not r["pass"]]
+    assert lr["of"] == 190 and lr["passed"] == 190 and lr["verdict"] == "pass"
+    lr20 = record("pt-v20")["long_run"]
+    assert (sorted(r["id"] for r in lr20["rows"])
+            == sorted(ADOPTED + PRICE_ONLY_EDGE + REGISTERED_PT_V20))
+    assert lr20["of"] == 40 and lr20["passed"] == 40 and lr20["verdict"] == "pass"
     # ... and every ruled band in, on all four protocols.
     assert rec["misses"] == {p: [] for p in rec["misses"]}
     assert set(rec["misses"]) == {"252", "504", "heldout_universe",
@@ -522,8 +537,13 @@ def test_the_record_bar_reads_the_rise_when_the_record_carries_it():
     if rec.get(envelope.STRUCTURE_RISE_FIELD):
         assert verdict["panels"][envelope.STRUCTURE_RISE_FIELD]["passed"] is True
         row = rec[envelope.STRUCTURE_RISE_FIELD]["rows"][VIX_AR1_ROW]
-        # The shipped default's PAIRED rise is the tape's since the
-        # 2026-09-21 composition: +0.0116 [+0.0007, +0.0270] against the
+        # RE-PINNED at 0.11.0 on pt-v22: its paired rise is BELOW the tape's,
+        # +0.0017 [-0.0033, +0.0074] against +0.0120 (the record's panel at
+        # e96d64d6), where pt-v21's +0.0037 [-0.0024, +0.0129] matched it.
+        # Reported and not gated, by the owner's ruling of 2026-09-23; pinned
+        # here so a move either way is seen. Before pt-v22 the shipped
+        # default's paired rise was the tape's from the 2026-09-21
+        # composition: +0.0116 [+0.0007, +0.0270] against the
         # tape's paired +0.0120, on the record box; +0.0071 on the fourth
         # composition and +0.0143 [+0.0064, +0.0280] on the fifth (2026-09-23),
         # reported and not gated by the owner's ruling of that day. pt-v20,
@@ -532,8 +552,8 @@ def test_the_record_bar_reads_the_rise_when_the_record_carries_it():
         # (box ptv20g3). (The
         # 2026-09-20 record read -0.0024 [-0.0058, +0.0065]: one pole. The
         # regime level on the VIX law is what makes calm years and a rise.)
-        assert row["verdict"] == "matches", row
-        assert row["ci90"][0] <= row["tape_rise"] <= row["ci90"][1]
+        assert row["verdict"] == "below" and row["side"] == "below", row
+        assert row["ci90"][1] < row["tape_rise"]
         assert (round(row["median_rise"], 6)
                 == envelope.CERTIFIED_STRUCTURE_RISE[VIX_AR1_ROW])
     else:

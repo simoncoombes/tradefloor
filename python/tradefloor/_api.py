@@ -59,7 +59,7 @@ ADVANCED: tuple[str, ...] = (
     "GameRng", "fair_value", "market_status", "sectors",
     # rate indices
     "RATE_SECTOR", "RATE_TICKERS", "bonds", "rate_specs",
-    # listed derivatives (pt-v22): contract symbols, and the exercise of a
+    # listed derivatives: contract symbols, and the exercise of a
     # single-name option
     "contracts", "Exercise",
     # evaluation detail

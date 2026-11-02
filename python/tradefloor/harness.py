@@ -439,7 +439,7 @@ def _warm_up(engine: Engine, days: int, *, steps_per_day: int,
     """
     hour, minute, day_of_week = start
     for k in range(days):
-        engine.open_market()
+        open_day(engine)
         for step in range(steps_per_day):
             engine.run_session(*session_clock((hour, minute, day_of_week),
                                               step, ticks_per_step),
@@ -534,7 +534,7 @@ class Scorecard:
     mean multiple over the steps with a finite one.
 
     Shares an agent did not order, handed over or taken by a single-name
-    option's exercise or assignment (pt-v22 phase 3), are holdings like any
+    option's exercise or assignment, are holdings like any
     other: valued at the price in the equity curve and counted in the
     exposure. They are not trades, so ``trades``, ``turnover`` and
     ``impact_bps`` leave them out.
@@ -806,6 +806,17 @@ class Scorecard:
         if gross is not None:
             text += f", exposure={gross:.2f}x"
         return text
+
+
+def open_day(engine: Engine) -> None:
+    """The next open, after the night session when the model has one
+    (``night_session_steps``): between a close and the open the index
+    futures walk the night (:meth:`Engine.run_night`), as the graded runs
+    walk it, so an agent trades the futures market that is measured. With
+    no night, or before the first close, the open alone, as before."""
+    if engine.model.night_session_steps > 0:
+        engine.run_night()
+    engine.open_market()
 
 
 def session_clock(start: tuple[int, int, int], step_within_day: int,
@@ -1201,7 +1212,7 @@ def _run_untraded(seed, universe, macro, days, steps_per_day, ticks_per_step,
     for day in range(days):
         if scenario is not None:
             scenario.apply(engine, day)
-        engine.open_market()
+        open_day(engine)
         for step in range(steps_per_day):
             # The same advancing clock as the traded run. If this stepped
             # differently the two worlds would differ for a reason that had
@@ -1290,14 +1301,14 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
             # daily re-read of every ordinary run would be a column copy
             # nobody asked for.
             adv = _f64(engine.column("avg_volume"))
-        engine.open_market()
+        open_day(engine)
         # The dividends this open made payable, before the agent acts: the
         # price already carries the ex-date drop. Reinvested in the paying
         # name under the portfolio's plan, cash otherwise. Nothing on a
         # model without dividends.
         portfolio.collect_dividends(engine)
         # The futures the open settled, and the last close's margin call met
-        # or the account's futures liquidated (pt-v22 phase 1). Nothing for
+        # or the account's futures liquidated. Nothing for
         # a portfolio without futures.
         portfolio.settle_open(engine)
         for _ in range(steps_per_day):
@@ -1427,8 +1438,8 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
         history._close(engine, day)
         engine.close_market()
         # Variation margin to the close's settlement marks, the contracts
-        # settled at it, and a margin call under maintenance (pt-v22 phase
-        # 1). Nothing for a portfolio without futures.
+        # settled at it, and a margin call under maintenance. Nothing for a
+        # portfolio without futures.
         portfolio.settle_close(engine)
         # Marked after the close, which on pt-v20 re-marks every name, so
         # the last value is the final net worth below.
@@ -1527,7 +1538,7 @@ def _impact_bps(portfolio, tickers, baseline, actual) -> float:
     names = set(tickers)
     for fill in portfolio.fills:
         # Impact is on the names' prices. A listed contract holds no slot in
-        # them, and its flow moves none of them (pt-v22 phase 1).
+        # them, and its flow moves none of them.
         if fill["ticker"] not in names:
             continue
         traded[fill["ticker"]] = traded.get(fill["ticker"], 0.0) + abs(fill["notional"])

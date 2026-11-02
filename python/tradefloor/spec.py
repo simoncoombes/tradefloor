@@ -46,6 +46,25 @@ a spec, and the methods section has to cite code at a commit instead.
 Keeping that limit is what stops this grammar from growing into a
 programming language.
 
+## Contracts
+
+On a model that lists index futures, a spec's optional ``contracts``
+section holds the front index future beside the stock book:
+
+```python
+spec = tf.StrategySpec.momentum(top_k=5).with_index_future(hedge_ratio=1.0)
+```
+
+``{"index_future": {"hedge_ratio": h}}`` holds ``-h`` times the stock
+book's net exposure in front index futures, so ``h = 1`` offsets the book's
+dollars; ``{"index_future": {"weight": w}}`` holds ``w`` times net worth in
+them. The position is sized in whole contracts at each decision, after the
+signal's own orders, and moves to the next contract when the front one
+rolls. On a model that lists no index futures the section does nothing. A
+spec without the section is written, hashed and built exactly as before,
+so every existing fingerprint stands; the section is additive grammar
+under ``spec_version`` 1.
+
 ## The decisions the design left open, decided here
 
 **Cadence is in the spec.** Trading frequency moves results more than any
@@ -295,6 +314,31 @@ def _contains_random(signal: Mapping[str, Any]) -> bool:
     )
 
 
+def _canonical_contracts(contracts: Any) -> dict[str, Any]:
+    """The ``contracts`` section, checked: ``{"index_future": {"hedge_ratio":
+    h}}`` or ``{"index_future": {"weight": w}}``, one of the two, finite."""
+    if not isinstance(contracts, Mapping):
+        raise ValidationError(
+            f"contracts is a mapping such as {{\"index_future\": {{\"hedge_ratio\": 1.0}}}}, "
+            f"got {type(contracts).__name__}")
+    _refuse_unknown("contracts", contracts, ("index_future",))
+    leg = contracts.get("index_future")
+    if not isinstance(leg, Mapping):
+        raise ValidationError("contracts.index_future is a mapping with hedge_ratio or weight")
+    _refuse_unknown("contracts.index_future", leg, ("hedge_ratio", "weight"))
+    if len(leg) != 1:
+        raise ValidationError(
+            "contracts.index_future takes hedge_ratio (offset the stock book) or weight "
+            "(a share of net worth), one of the two")
+    (name, value), = leg.items()
+    number = _number(f"contracts.index_future.{name}", value)
+    if name == "hedge_ratio" and number < 0:
+        raise ValidationError(
+            "contracts.index_future.hedge_ratio is 0 or more: a negative hedge adds to the "
+            "book's exposure, which weight says directly")
+    return {"index_future": {name: number}}
+
+
 class StrategySpec:
     """A declarative strategy that can be built, serialised and hashed.
 
@@ -314,7 +358,8 @@ class StrategySpec:
     def __init__(self, signal: Mapping[str, Any], *,
                  portfolio: Mapping[str, Any] | None = None,
                  execution: Mapping[str, Any] | None = None,
-                 seed: int | None = None) -> None:
+                 seed: int | None = None,
+                 contracts: Mapping[str, Any] | None = None) -> None:
         portfolio = dict(portfolio or {})
         execution = dict(execution or {})
         _refuse_unknown("portfolio", portfolio, ("gross", "top_k"))
@@ -376,13 +421,18 @@ class StrategySpec:
                 "identical strategies would fingerprint apart."
             )
 
-        object.__setattr__(self, "_doc", {
+        doc: dict[str, Any] = {
             "spec_version": SPEC_VERSION,
             "signal": canonical_signal,
             "portfolio": canonical_portfolio,
             "execution": canonical_execution,
             "seed": seed,
-        })
+        }
+        if contracts is not None:
+            # Only when given, so every spec written before the section
+            # serialises and fingerprints as it did.
+            doc["contracts"] = _canonical_contracts(contracts)
+        object.__setattr__(self, "_doc", doc)
         object.__setattr__(self, "_fingerprint", None)
 
     def __setattr__(self, name: str, value: Any) -> None:
@@ -512,6 +562,22 @@ class StrategySpec:
                               "cadence": cadence},
                    seed=seed)
 
+    def with_index_future(self, *, hedge_ratio: float | None = None,
+                          weight: float | None = None) -> "StrategySpec":
+        """This spec with a ``contracts`` section holding the front index
+        future: ``hedge_ratio`` times minus the stock book's net exposure, or
+        ``weight`` times net worth (one of the two). See this module's
+        docstring."""
+        leg: dict[str, Any] = {}
+        if hedge_ratio is not None:
+            leg["hedge_ratio"] = hedge_ratio
+        if weight is not None:
+            leg["weight"] = weight
+        doc = self._doc
+        return StrategySpec(doc["signal"], portfolio=doc["portfolio"],
+                            execution=doc["execution"], seed=doc["seed"],
+                            contracts={"index_future": leg})
+
     # -- the three properties --------------------------------------------
 
     def as_dict(self) -> dict[str, Any]:
@@ -545,7 +611,7 @@ class StrategySpec:
             raise ValidationError("not a tradefloor strategy spec document")
         _refuse_unknown("strategy spec", payload,
                         ("spec_version", "signal", "portfolio", "execution",
-                         "seed"))
+                         "seed", "contracts"))
         version = payload.get("spec_version")
         if not isinstance(version, int) or isinstance(version, bool) \
                 or version < 1:
@@ -561,7 +627,8 @@ class StrategySpec:
         return cls(payload["signal"],
                    portfolio=payload.get("portfolio"),
                    execution=payload.get("execution"),
-                   seed=payload.get("seed"))
+                   seed=payload.get("seed"),
+                   contracts=payload.get("contracts"))
 
     @property
     def fingerprint(self) -> str:
@@ -636,6 +703,8 @@ class StrategySpec:
                 max_participation=execution["max_participation"],
                 seed=self._doc["seed"])
 
+        if "contracts" in self._doc:
+            agent = _IndexFutureOverlay(agent, self._doc["contracts"]["index_future"])
         if execution["cadence"] == "daily":
             agent = _DailyCadence(agent)
         agent.spec = self
@@ -662,6 +731,12 @@ class StrategySpec:
     @property
     def seed(self) -> int | None:
         return self._doc["seed"]
+
+    @property
+    def contracts(self) -> dict[str, Any] | None:
+        """The ``contracts`` section, or None for a spec without one."""
+        got = self._doc.get("contracts")
+        return None if got is None else json.loads(json.dumps(got))
 
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, StrategySpec):
@@ -838,3 +913,65 @@ class _DailyCadence:
             obs.day, obs.day, obs.tickers, obs.prices, obs.portfolio,
             obs.engine, obs._adv, 1, hidden=getattr(obs, "hidden", None),
             history=getattr(obs, "history", None)))
+
+
+class _IndexFutureOverlay:
+    """A spec's ``contracts`` section: the front index future beside the
+    stock book (this module's docstring, "Contracts").
+
+    After the signal's own orders, the overlay sizes the front index future
+    in whole contracts: ``-hedge_ratio`` times the book's net exposure after
+    those orders, or ``weight`` times net worth, at the future's price, and
+    sends the difference from what is held. A future of the index held that
+    is no longer the front one is closed. On a model that lists no index
+    futures it adds nothing.
+    """
+
+    def __init__(self, inner: Any, leg: Mapping[str, float]) -> None:
+        self._inner = inner
+        self._hedge = leg.get("hedge_ratio")
+        self._weight = leg.get("weight")
+        self.privileged = bool(getattr(inner, "privileged", False))
+        explain = getattr(inner, "explain", None)
+        if callable(explain):
+            self.explain = explain
+
+    def act(self, obs: Any) -> dict[str, Any]:
+        from .contracts import parse
+        orders = dict(self._inner.act(obs) or {})
+        market = getattr(obs, "engine", None)
+        if market is None or not getattr(market, "lists_futures", False):
+            return orders
+        listed = [c for c in market.contracts() if c["kind"] == "future" and c["root"] == "IDX"]
+        front = next((c for c in listed if c["front"]), None)
+        if front is None:
+            return orders
+        quote = market.quote(front["symbol"])
+        unit = float(quote["price"]) * float(quote["multiplier"])
+        if not unit > 0:
+            return orders
+        pf = obs.portfolio
+        if self._weight is not None:
+            target = self._weight * float(pf.net_worth()) / unit
+        else:
+            net = 0.0
+            for ticker, price in zip(obs.tickers, obs.prices):
+                held = float(pf.quantity_of(ticker))
+                order = orders.get(ticker)
+                if isinstance(order, (int, float)) and not isinstance(order, bool):
+                    held += float(order)
+                net += held * float(price)
+            target = -float(self._hedge) * net / unit
+        target = float(round(target))
+        for c in listed:
+            if c["symbol"] == front["symbol"]:
+                continue
+            held = float(pf.quantity_of(c["symbol"]))
+            if held:
+                orders[c["symbol"]] = -held                 # roll out of the old front
+        delta = target - float(pf.quantity_of(front["symbol"]))
+        if delta:
+            orders[front["symbol"]] = delta
+        # A symbol the engine wrote parses; checked so a bad listing is loud.
+        parse(front["symbol"])
+        return orders

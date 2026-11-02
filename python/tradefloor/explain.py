@@ -238,7 +238,9 @@ MECHANISMS: tuple[Mechanism, ...] = (
                "endogenous_news_sigma"),
         sites=(("news", "news_u", "company"),
                ("news", "news_z", "company")),
-        via=("engine::Engine::open_market",),
+        # The weights are read in `news_terms`, which the tick's
+        # composition and the open's pre-open release both call.
+        via=("engine::Engine::open_market", "market::factors::news_terms"),
     ),
     Mechanism(
         factor="order_flow_impact",
@@ -377,7 +379,10 @@ MECHANISMS: tuple[Mechanism, ...] = (
         state=("price",),
         dials=("macro_publication_repricing", "buyback_payout_share",
                "price_hard_cap"),
+        # The body is `reprice_marks`, which also leaves the growth part
+        # `remark_growth_open_share` holds back to the next opening print.
         via=("engine::Engine::published_macro_marks",
+             "engine::Engine::reprice_marks",
              "market::tick::tick_fair_value"),
     ),
 )
@@ -1481,6 +1486,8 @@ def _replay_inputs(engine: Engine, inputs: Sequence[dict],
         elif op == "set_vix_target_floor":
             floor = entry["floor"]
             engine.set_vix_target_floor(None if floor is None else float(floor))
+        elif op == "note_market_earnings":
+            engine.note_market_earnings(float(entry["log_factor"]))
         elif op == "draw_uniform":
             engine.draw_uniform()
         elif op == "draw_normal":

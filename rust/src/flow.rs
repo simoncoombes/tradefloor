@@ -183,6 +183,8 @@ fn cycle_spec_of(params: &ModelParams) -> CycleSpec {
         equity_hazard: params.cycle_equity_hazard,
         equity_knee: params.cycle_equity_hazard_knee,
         equity_opening: 0.0,
+        inflation_hazard: params.cycle_inflation_hazard,
+        rate_hazard: params.cycle_rate_hazard,
     }
 }
 

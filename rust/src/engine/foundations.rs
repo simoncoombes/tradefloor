@@ -17,6 +17,37 @@ use crate::market::index_var::{
     NameVariance,
 };
 
+/// The policy grid a meeting moves the rate on, percentage points.
+const GUIDANCE_GRID: f64 = 0.25;
+
+/// The prior over a scheduled meeting's decision (`policy_guidance_signal_sd`):
+/// `(steps, weight)`, the decision being the published shadow plus `steps`
+/// times [`GUIDANCE_GRID`]. The model's own: on 64 histories of 21 years of
+/// the pt-v22 futures line (10,040 eves), the share of eves at which the
+/// decision the meeting delivered was the published shadow plus each step,
+/// with a half count on each of -8 to 8 so none has no weight. The decision
+/// is the published shadow at 93.2% of eves (se 0.6%), one step off at 4.9%;
+/// the Fed's own reading at every close sits off it at the same shares.
+const GUIDANCE_PRIOR: [(f64, f64); 17] = [
+    (-8.0, 4.975867e-05),
+    (-7.0, 4.975867e-05),
+    (-6.0, 4.975867e-05),
+    (-5.0, 4.975867e-05),
+    (-4.0, 3.483107e-04),
+    (-3.0, 1.243967e-03),
+    (-2.0, 6.319351e-03),
+    (-1.0, 2.333682e-02),
+    (0.0, 9.315321e-01),
+    (1.0, 2.522765e-02),
+    (2.0, 1.030004e-02),
+    (3.0, 1.144449e-03),
+    (4.0, 1.492760e-04),
+    (5.0, 4.975867e-05),
+    (6.0, 4.975867e-05),
+    (7.0, 4.975867e-05),
+    (8.0, 4.975867e-05),
+];
+
 /// Five-point Gauss-Hermite nodes and weights (physicists' form, the
 /// weights summing to the square root of pi).
 const GAUSS_HERMITE_5: [(f64, f64); 5] = [
@@ -621,19 +652,89 @@ impl Engine {
         Some(self.next_meeting_day(f.day) - 1)
     }
 
-    fn forecast_policy_path(&self, day: i64, horizon: usize) -> Vec<f64> {
-        let p = &self.params;
-        let r0 = self.economy.federal_funds_rate;
-        let request = DayAdvanceRequest {
+    /// The next meeting's change as the economy as published implies it and
+    /// as the Fed's own reading (the economy the meeting reads) does,
+    /// percentage points, on the standing forecast's close: the two silent
+    /// shadows `policy_anticipation_guidance` blends, `(published, own)`.
+    /// `None` without a forecast (`forecast_horizon_sessions`). No stream is
+    /// touched and nothing is written.
+    pub fn policy_shadows(&self) -> Option<(f64, f64)> {
+        let f = self.forecast()?;
+        let request = Self::meeting_request(f.day);
+        let options = self.policy_options(false);
+        Some((self.shadow_published_change(&request, &options), self.shadow_own_change(&request, &options)))
+    }
+
+    /// The request a shadow meeting for the close after `day` reads.
+    fn meeting_request(day: i64) -> DayAdvanceRequest<'static> {
+        DayAdvanceRequest {
             volatility: 1.0,
             active_shocks: &[],
             market_return_pct: 0.0,
             game_day: day + 1,
             timestamp: (day + 1) * 24 * 60,
-        };
+        }
+    }
+
+    /// The next meeting's change as the market sees it through the Fed's
+    /// guidance (`policy_guidance_signal_sd`): the Fed's own reading of the
+    /// meeting held at `meeting`, `reading`, plus the meeting's signal noise,
+    /// and the posterior mean over the decisions it can make, the 25 bp grid
+    /// around the published shadow `published`, weighted by
+    /// [`GUIDANCE_PRIOR`]. Percentage points.
+    fn guidance_posterior(&self, reading: f64, published: f64, meeting: i64) -> f64 {
+        let sd = self.params.policy_guidance_signal_sd / 100.0;
+        let z = crate::rng::GameRng::keyed(
+            crate::rng::guidance_signal_key(self.root_seed),
+            crate::rng::GUIDANCE_SIGNAL_TAG as u64,
+            meeting as u64,
+        )
+        .next_normal();
+        let signal = reading + sd * z;
+        let r0 = self.economy.federal_funds_rate;
+        let mut points = [(0.0, 0.0); GUIDANCE_PRIOR.len()];
+        let mut top = f64::NEG_INFINITY;
+        for (point, (steps, weight)) in points.iter_mut().zip(GUIDANCE_PRIOR.iter()) {
+            let change = crate::mathx::clamp(r0 + published + GUIDANCE_GRID * steps, 0.0, 8.0) - r0;
+            let x = (signal - change) / sd;
+            let log = crate::mathx::log(*weight) - 0.5 * x * x;
+            *point = (change, log);
+            top = crate::mathx::max(top, log);
+        }
+        let (mut sum, mut total) = (0.0, 0.0);
+        for (change, log) in points {
+            let w = crate::mathx::exp(log - top);
+            sum += w * change;
+            total += w;
+        }
+        sum / total
+    }
+
+    fn forecast_policy_path(&self, day: i64, horizon: usize) -> Vec<f64> {
+        let p = &self.params;
+        let r0 = self.economy.federal_funds_rate;
+        let request = Self::meeting_request(day);
         let options = self.policy_options(false);
-        let shadow = self.shadow_meeting_change(&request, &options);
         let first = self.next_meeting_day(day);
+        // THE GUIDANCE'S SIGNAL (`policy_guidance_signal_sd`): the Fed's own
+        // reading reaches the price through a noisy signal, so its share q is
+        // the posterior mean over the grid, not the reading. On a meeting's
+        // eve the reading is the decision the eve holds, and the meeting is
+        // priced at the market's expectation of it whole. A branch: at 0.0
+        // the shadow is the blend as it stood.
+        let (shadow, held) = if p.policy_guidance_signal_sd != 0.0 {
+            let published = self.shadow_published_change(&request, &options);
+            let eve = if first == day + 1 { self.eve_decision } else { None };
+            let reading = match eve {
+                Some(decision) => decision,
+                None => self.shadow_own_change(&request, &options),
+            };
+            let q = p.policy_anticipation_guidance;
+            let seen = (1.0 - q) * published + q * self.guidance_posterior(reading, published, first);
+            (seen, eve.map(|_| seen))
+        } else {
+            (self.shadow_meeting_change(&request, &options), None)
+        };
         // The normal cadence is 42 to 55 calendar days, uniform.
         let cal = self.macro_calendar();
         let mut cadence = 0.0;
@@ -654,6 +755,11 @@ impl Engine {
             let mut change = push;
             if p.forecast_policy_reversion != 0.0 {
                 change += p.forecast_policy_reversion * (p.forecast_policy_neutral - rate);
+            }
+            if j == 0 {
+                if let Some(c) = held {
+                    change = c;
+                }
             }
             rate += change;
             for slot in path.iter_mut().skip((at - day - 1) as usize) {
@@ -741,6 +847,27 @@ impl Engine {
         let mut universe_stress = self.universe_stress;
         let mut down = Some(self.market_vol.prev_day_down());
         let (mut var_oil, mut var_inventory) = (0.0, 0.0);
+        // Oil's long factor (`oil_target_drift_sd`): the mean and variance of
+        // its log level, so the step reads the log of the level's
+        // expectation, `m + v / 2`, which stays where it is with no pull.
+        let (mut drift_mean, mut drift_var) = (self.oil_target_drift, 0.0);
+        // `oil_forecast_clamp`: the level carriers' log variance about the
+        // expected path (the long factor's and the dollar's), and the
+        // dollar's own variance, for the clamped expectation the forecast
+        // publishes; `oil_forecast_opec_spread` reads them too. Nothing is
+        // read with both switches off.
+        let (mut carry_var, mut usd_var) = (0.0f64, 0.0f64);
+        // Under the long factor a bound's truncation moves the factor, so the
+        // expected truncation at one horizon joins the factor's expected path
+        // at the next (`oil_expected_log_truncation`).
+        let (mut absorb_pending, mut absorb_so_far) = (0.0f64, 0.0f64);
+        // `oil_forecast_cycle_growth`: growth's expectation over the cycle's
+        // phases, for oil's block, rather than the believed phase held.
+        let mut cycle = if p.oil_forecast_cycle_growth != 0.0 {
+            Some(CycleGrowth::new(self, &belief, &econ, day))
+        } else {
+            None
+        };
         let policy = self.forecast_policy_path(day, horizon);
         let k_curve = intraday_variance_factor();
         // The spread's shape (`forecast_vix_dispersion_skew`), and the stress
@@ -753,6 +880,9 @@ impl Engine {
         };
         let skewed = p.forecast_vix_dispersion != 0.0 && p.forecast_vix_dispersion_skew != 0.0;
         let mut stress_sd = 0.0;
+        // The VIX's slow level as the published VIX's log average nowcasts
+        // it (`forecast_vix_level_nowcast`); 0.0 with the dial off.
+        let level_now = self.vix_level_nowcast();
 
         let mut out = Forecast {
             day,
@@ -873,9 +1003,18 @@ impl Engine {
             faces_e = next_faces_e;
             down = None;
 
-            // The step's read-back, at the VIX before the step.
+            // The step's read-back, at the VIX before the step. The fast
+            // return memory (`market_vol_leverage_fast`) at its window's mean,
+            // as the close's read-back takes it; the faces themselves with
+            // that dial off.
+            let faces_vix = if p.market_vol_leverage_fast == 0.0 {
+                faces
+            } else {
+                let q = mv.vix_window_ratio(p);
+                (faces.0 * q, faces.1 * q)
+            };
             let (v_next, _) = self.forecast_identity(
-                &names, &garch, &sector_states, &idio, faces, vix, universe_stress, None, &econ);
+                &names, &garch, &sector_states, &idio, faces_vix, vix, universe_stress, None, &econ);
             let mut scale_bar = 0.0;
             for &(w, _, scale) in &regimes {
                 scale_bar += w * scale;
@@ -893,9 +1032,10 @@ impl Engine {
                     let d = crate::mathx::log(implied / anchor);
                     slow = (1.0 - h) * slow + h * d;
                     if p.vix_stress_premium != 0.0 {
-                        stress = (1.0 - h) * stress + h * d;
+                        let hs = p.vix_stress_memory_rate();
+                        stress = (1.0 - hs) * stress + hs * d;
                         let after = self.forecast_vix_log_variance(step + 1);
-                        stress_sd = (1.0 - h) * stress_sd + h * crate::mathx::sqrt(after);
+                        stress_sd = (1.0 - hs) * stress_sd + hs * crate::mathx::sqrt(after);
                     }
                 }
             }
@@ -912,6 +1052,17 @@ impl Engine {
             };
             let mut inputs = self.daily_inputs(&request, 0.0, v_next, slow, scale_bar);
             inputs.vix_anchor_level = self.vix_anchor * scale_bar;
+            // The slow level's nowcast (`forecast_vix_level_nowcast`): the
+            // level's expectation at this close multiplies the anchor, as the
+            // level itself does; the implied VIX below takes it too.
+            let level = if level_now != 0.0 {
+                crate::mathx::exp(level_now * crate::mathx::pow(p.vix_level_persistence, (step + 1) as f64))
+            } else {
+                1.0
+            };
+            if level_now != 0.0 {
+                inputs.vix_anchor_level *= level;
+            }
             inputs.vix_target_premium = premium;
             if premium != 0.0 {
                 premium *= premium_fade;
@@ -920,7 +1071,7 @@ impl Engine {
                 }
             }
             inputs.vix_implied_from_market = if p.vix_level_identity != 0.0 {
-                implied
+                if level_now != 0.0 { implied * level } else { implied }
             } else if p.vix_realised_vol_weight == 0.0 {
                 0.0
             } else {
@@ -948,10 +1099,43 @@ impl Engine {
             // expected safe-haven drift over the VIX's spread.
             let opec_day = econ.oil_last_opec_day;
             let oil_before = econ.oil_price;
-            let mut next = update_economy_daily(&econ, &inputs, &mut crate::economy::daily::MeanDraws);
             let kappa = p.oil_inventory_reversion;
             let sd_before = crate::mathx::sqrt(var_inventory);
-            var_inventory = (1.0 - kappa) * (1.0 - kappa) * var_inventory + 0.25;
+            // Inventory's noise variance a session: the standing 0.25, or
+            // `oil_inventory_noise_sd` squared. A branch, so the shipped
+            // arithmetic is kept to the bit.
+            let inventory_var = if p.oil_inventory_noise_sd == 0.0 {
+                0.25
+            } else {
+                p.oil_inventory_noise_sd * p.oil_inventory_noise_sd
+            };
+            let var_after = (1.0 - kappa) * (1.0 - kappa) * var_inventory + inventory_var;
+            // The convenience premium (`oil_convenience_yield`) is convex in
+            // inventory, so the step reads its expectation over the
+            // inventory's spread, before the step and after it, rather than
+            // its value on the expected path: the expected price is then the
+            // premium-free path times the premium's expectation.
+            if p.oil_convenience_yield != 0.0 {
+                inputs.oil_convenience_inventory_var_before = var_inventory;
+                inputs.oil_convenience_inventory_var = var_after;
+            }
+            if p.oil_target_drift_sd != 0.0 {
+                let sigma = p.oil_target_drift_sd;
+                let pull = 1.0 - p.oil_target_drift_reversion;
+                let before = drift_mean + 0.5 * drift_var;
+                drift_mean = pull * drift_mean - 0.5 * sigma * sigma + absorb_pending;
+                absorb_pending = 0.0;
+                drift_var = pull * pull * drift_var + sigma * sigma;
+                inputs.oil_target_drift = Some((before, drift_mean + 0.5 * drift_var));
+            }
+            if let Some(c) = &cycle {
+                inputs.oil_growth = Some(c.growth());
+            }
+            let mut next = update_economy_daily(&econ, &inputs, &mut crate::economy::daily::MeanDraws);
+            if let Some(c) = cycle.as_mut() {
+                c.step(&inputs, request.volatility, v_session, request.timestamp);
+            }
+            var_inventory = var_after;
             let sd_inv = crate::mathx::sqrt(var_inventory);
             let gap = |level: f64, sd: f64| {
                 crate::economy::daily::inventory_pressure_expected(level, sd)
@@ -961,24 +1145,52 @@ impl Engine {
             // its expectation over inventory's spread is what the price
             // expects. Under `oil_inventory_level_gain` the step read the
             // change in the pressure, so the gap is the change in the gaps.
-            next.oil_price += if p.oil_inventory_level_gain == 0.0 {
+            let mut pushed = if p.oil_inventory_level_gain == 0.0 {
                 gap(next.oil_inventory_level, sd_inv)
             } else {
                 p.oil_inventory_level_gain
                     * (gap(next.oil_inventory_level, sd_inv) - gap(econ.oil_inventory_level, sd_before))
             };
+            next.oil_price += pushed;
             if next.oil_last_opec_day != opec_day {
-                next.oil_price += crate::economy::daily::opec_expected_impact(
-                    oil_before, crate::mathx::sqrt(var_oil), p.oil_opec_symmetry);
+                // `oil_forecast_opec_spread`: the decision over the price's
+                // whole spread at the step's start (the clamp's log variance,
+                // every part as it stood before this step), read lognormal.
+                // A branch, so 0.0 keeps the short factor's normal to the bit.
+                let opec = if p.oil_forecast_opec_spread != 0.0 {
+                    let log_var = if oil_before > 0.0 { var_oil / (oil_before * oil_before) } else { 0.0 }
+                        + carry_var
+                        + p.oil_convenience_yield * p.oil_convenience_yield * (sd_before * sd_before) / (50.0 * 50.0)
+                        + p.oil_dollar_elasticity * p.oil_dollar_elasticity * usd_var / (100.0 * 100.0);
+                    crate::economy::daily::opec_expected_impact_lognormal(oil_before, log_var, p.oil_opec_symmetry)
+                } else {
+                    crate::economy::daily::opec_expected_impact(
+                        oil_before, crate::mathx::sqrt(var_oil), p.oil_opec_symmetry)
+                };
+                next.oil_price += opec;
+                pushed += opec;
+            }
+            // Under `oil_pushes_in_target` the expected pushes join the part
+            // of the price that decays at 0.03, as the step's own do.
+            if p.oil_pushes_in_target != 0.0 {
+                next.oil_push_level += pushed;
             }
             // Oil's own spread about its expectation, for the OPEC rule's
             // expected decision: the law's reversion and noise.
             // A branch, so the standing law keeps its arithmetic to the bit.
-            var_oil = if p.oil_mean_reversion == 0.0 && p.oil_noise_sd == 0.0 {
+            var_oil = if p.oil_mean_reversion == 0.0 && p.oil_noise_sd == 0.0 && p.oil_noise_log_sd == 0.0 {
                 0.97 * 0.97 * var_oil + 4.0
             } else {
                 let keep = if p.oil_mean_reversion == 0.0 { 0.97 } else { 1.0 - p.oil_mean_reversion };
-                let noise = if p.oil_noise_sd == 0.0 { 2.0 } else { p.oil_noise_sd };
+                // Under `oil_noise_log_sd` the noise is a share of the
+                // price, read at the price the step started from.
+                let noise = if p.oil_noise_log_sd != 0.0 {
+                    p.oil_noise_log_sd * oil_before
+                } else if p.oil_noise_sd == 0.0 {
+                    2.0
+                } else {
+                    p.oil_noise_sd
+                };
                 keep * keep * var_oil + noise * noise
             };
             if spread > 0.0 {
@@ -989,14 +1201,69 @@ impl Engine {
                 } else {
                     lognormal_excess(vix, spread, k)
                 };
-                next.usd_index += crate::economy::daily::USD_SAFE_HAVEN_GAIN * (excess - at_mean);
+                let haven = crate::economy::daily::usd_safe_haven_gain(p.usd_safe_haven_gain) * (excess - at_mean);
+                // Under `oil_dollar_elasticity` the law rescales the oil
+                // price's reverting part by the day's whole dollar move, the
+                // bid included, so the expected bid's excess over the bid at
+                // the expected VIX moves oil by the same ratio.
+                if p.oil_dollar_elasticity != 0.0 && next.usd_index > 0.0 {
+                    let push = if p.oil_pushes_in_target != 0.0 { next.oil_push_level } else { 0.0 };
+                    let ratio = crate::mathx::pow((next.usd_index + haven) / next.usd_index, -p.oil_dollar_elasticity);
+                    next.oil_price = (next.oil_price - push) * ratio + push;
+                }
+                next.usd_index += haven;
+                // Under `usd_mean_reversion` the expected bid joins the part of
+                // the dollar that decays at 0.02, as the step's own does.
+                if p.usd_mean_reversion != 0.0 {
+                    next.usd_haven_level += haven;
+                }
             }
             next.vix = vix_next;
             next.federal_funds_rate = rate;
             econ = next;
 
             out.vix.push(self.forecast_published_vix(&shape, econ.vix, stress, stress_sd, step + 1));
-            out.oil.push(econ.oil_price);
+            // `oil_forecast_clamp`: publish the expectation truncated at the
+            // clamps over the price's spread; the recursion keeps stepping
+            // the unclamped expectation, so the clamp is read once.
+            // The carriers' variances step under the clamp and under
+            // `oil_forecast_opec_spread`, which reads them at the next step.
+            if p.oil_forecast_clamp != 0.0 || p.oil_forecast_opec_spread != 0.0 {
+                let sigma = p.oil_target_drift_sd;
+                let pull = 1.0 - p.oil_target_drift_reversion;
+                carry_var = pull * pull * carry_var + sigma * sigma;
+                // The dollar's own spread, on its law: the standing 0.02 and
+                // 0.3, or `usd_mean_reversion` and `usd_noise_sd`.
+                let usd_keep = 1.0 - if p.usd_mean_reversion == 0.0 { 0.02 } else { p.usd_mean_reversion };
+                let usd_noise = if p.usd_noise_sd == 0.0 { 0.3 } else { p.usd_noise_sd };
+                usd_var = usd_keep * usd_keep * usd_var + usd_noise * usd_noise;
+            }
+            if p.oil_forecast_clamp != 0.0 {
+                let s = econ.oil_price;
+                let kappa_c = p.oil_convenience_yield;
+                let inventory_log_var = var_inventory / (50.0 * 50.0);
+                let log_var = carry_var
+                    + kappa_c * kappa_c * inventory_log_var
+                    + p.oil_dollar_elasticity * p.oil_dollar_elasticity * usd_var / (100.0 * 100.0);
+                let bounds = crate::economy::daily::oil_bounds(p.oil_price_floor, p.oil_price_ceiling);
+                // The price at this horizon rests on a bound it reaches; under
+                // the long factor that truncation then moves the factor, which
+                // the next step's expected path carries.
+                // Read as lognormal: the price's spread is right-skewed. Its log
+                // variance is the short factor's (in dollars, over the price)
+                // and the carriers'. The marginal's expected truncation at a
+                // horizon is the whole of it to that horizon, so the factor's
+                // path takes its change.
+                let log_total = if s > 0.0 { var_oil / (s * s) + log_var } else { 0.0 };
+                if p.oil_target_drift_sd != 0.0 {
+                    let to_here = crate::economy::daily::oil_lognormal_log_truncation(s, log_total, bounds);
+                    absorb_pending = to_here - absorb_so_far;
+                    absorb_so_far = to_here;
+                }
+                out.oil.push(crate::economy::daily::oil_lognormal_censored(s, log_total, bounds));
+            } else {
+                out.oil.push(econ.oil_price);
+            }
 
             // The belief, one session on.
             let mut pred = [0.0; 5];
@@ -1062,16 +1329,27 @@ impl Engine {
     /// off.
     fn forecast_leverage_factor(&self, closes: usize) -> f64 {
         let p = &self.params;
-        if p.market_vol_leverage == 0.0 || closes == 0 {
-            return 1.0;
+        let slower = if p.market_vol_leverage == 0.0 || closes == 0 {
+            1.0
+        } else {
+            let k = p.market_vol_leverage;
+            let phi = crate::mathx::pow(0.5, 1.0 / p.market_vol_leverage_half_life);
+            let a = p.market_vol_leverage_down;
+            let var_u = 0.5 * (1.0 + (1.0 - a) * (1.0 - a)) - a * a / (2.0 * std::f64::consts::PI);
+            let s2 = (1.0 - phi) / (1.0 + phi) * var_u;
+            let grown = 1.0 - crate::mathx::pow(phi, 2.0 * closes as f64);
+            crate::mathx::exp(0.5 * k * k * s2 * grown)
+        };
+        // The fast return memory (`market_vol_leverage_fast`) the same way,
+        // at its own half-life; the slower memory's factor alone with it off.
+        if p.market_vol_leverage_fast == 0.0 || closes == 0 {
+            return slower;
         }
-        let k = p.market_vol_leverage;
-        let phi = crate::mathx::pow(0.5, 1.0 / p.market_vol_leverage_half_life);
-        let a = p.market_vol_leverage_down;
-        let var_u = 0.5 * (1.0 + (1.0 - a) * (1.0 - a)) - a * a / (2.0 * std::f64::consts::PI);
-        let s2 = (1.0 - phi) / (1.0 + phi) * var_u;
+        let k = p.market_vol_leverage_fast;
+        let phi = crate::mathx::pow(0.5, 1.0 / p.market_vol_leverage_fast_half_life);
+        let s2 = crate::market::factor_vol::MarketVarianceState::leverage_fast_s2(p);
         let grown = 1.0 - crate::mathx::pow(phi, 2.0 * closes as f64);
-        crate::mathx::exp(0.5 * k * k * s2 * grown)
+        slower * crate::mathx::exp(0.5 * k * k * s2 * grown)
     }
 
     /// One close of the market factor's variance state in expectation: the
@@ -1105,6 +1383,7 @@ impl Engine {
         let c_slow = if p.market_vol_slow_vix_damp == 0.0 { c } else { c * (1.0 - p.market_vol_slow_vix_damp) };
         let w_slow = p.market_vol_slow_weight;
         let (mut variance, mut fast, mut slow_part, mut lev) = (0.0, 0.0, 0.0, 0.0);
+        let mut lev_fast = 0.0;
         let (mut up, mut down) = (0.0, 0.0);
         let mut smoothed_out = -1.0;
         for &(w, level, scale) in regimes {
@@ -1139,11 +1418,14 @@ impl Engine {
                 // The smoothed VIX reads the VIX alone, the same on every node.
                 smoothed_out = snap.5;
                 lev += w / 4.0 * s.leverage_memory();
+                lev_fast += w / 4.0 * s.leverage_fast_memory();
             }
         }
         let mut next = MarketVarianceState::restore_with_components(
             variance, 0.0, fast, slow_part, 0.0, smoothed_out);
         next.set_leverage_memory(lev);
+        // 0.0 with `market_vol_leverage_fast` off, which the field already is.
+        next.set_leverage_fast_memory(lev_fast);
         (next, (up, down))
     }
 
@@ -1197,6 +1479,344 @@ impl Engine {
             inputs.vix_jump_scale
         };
         crate::mathx::min(1.0, rate / 252.0) * size
+    }
+}
+
+
+/// The first day of the economy's long run for the forecast's cycle
+/// (`oil_forecast_cycle_growth`), on the run's own day numbering: far past
+/// any session a run reaches, so the keyed draws the run takes by day are
+/// not the long run's, beside the keys and generators of its own.
+const CYCLE_AGE_LAW_ORIGIN: i64 = 1 << 34;
+
+/// The long run's warm-up and its length, in days. Precision, not a value
+/// of the model: the run starts from the close's state, which the warm-up
+/// forgets, and the age law is its occupancy over the rest.
+const CYCLE_AGE_LAW_WARM_DAYS: i64 = 252 * 50;
+const CYCLE_AGE_LAW_DAYS: i64 = 252 * 10_000;
+
+/// Draws at the middle of their range for a projected meeting: a uniform
+/// of one half and a normal of zero, as the market's shadow meeting reads.
+struct MidDraws;
+
+impl crate::rng::Rng for MidDraws {
+    fn next_f64(&mut self) -> f64 {
+        0.5
+    }
+    fn next_normal(&mut self) -> f64 {
+        0.0
+    }
+}
+
+impl Engine {
+    /// Each phase's stationary age law under the FULL law, for the start of
+    /// the forecast's cycle (`oil_forecast_cycle_growth`): the hazard and the
+    /// ladder on the economy's own state, as the law transitions. There is no
+    /// closed form ([`crate::economy::cycle`], the stationary law), so it is
+    /// read as the occupancy of the economy's own long run: a copy of this
+    /// engine run alone, as before day zero (the cycle reads
+    /// `cycle_equity_hazard_opening` for the index it does not have), with
+    /// every generator and counter key its own (`rng::AGE_LAW_TAG`) and its
+    /// days numbered from [`CYCLE_AGE_LAW_ORIGIN`]. Per phase, `phase_cycle`
+    /// order, in bins of a month: each bin's mass-weighted age in completed
+    /// days and its mass. Bins under a billionth are left out. Worked out
+    /// at the first forecast, from the state it stands on, once per seed and
+    /// model, and kept for the process; nothing the run reads is touched.
+    /// An engine restored from a snapshot works it out from the state it
+    /// restores, so its forecast can differ from the original's in the long
+    /// run's sampling.
+    fn cycle_age_law(&self, day: i64) -> Vec<Vec<(f64, f64)>> {
+        type Key = (u64, String);
+        type Law = Vec<Vec<(f64, f64)>>;
+        static MEMO: std::sync::Mutex<Vec<(Key, Law)>> = std::sync::Mutex::new(Vec::new());
+        let key: Key = (self.root_seed, self.model_fingerprint().to_string());
+        if let Some(v) = MEMO.lock().ok().and_then(|m| m.iter().find(|(k, _)| *k == key).map(|(_, v)| v.clone())) {
+            return v;
+        }
+        let tag = crate::rng::AGE_LAW_TAG;
+        let root = self.root_seed;
+        let mut e = self.clone();
+        e.market_rng = GameRng::surgery(root, stream::MARKET, tag);
+        e.economy_rng = GameRng::surgery(root, stream::ECONOMY, tag);
+        e.external_rng = GameRng::surgery(root, stream::EXTERNAL, tag);
+        e.jump_rng = GameRng::surgery(root, stream::JUMPS, tag);
+        e.volume_rng = GameRng::surgery(root, stream::VOLUME, tag);
+        e.volume_idio_rng = GameRng::surgery(root, stream::VOLUME_IDIO, tag);
+        e.news_rng = GameRng::surgery(root, stream::NEWS, tag);
+        e.overnight_rng = GameRng::surgery(root, stream::OVERNIGHT, tag);
+        e.market_vol_level_rng = GameRng::surgery(root, stream::MARKET_VOL_LEVEL, tag);
+        e.crisis_epicentre_rng = GameRng::surgery(root, stream::CRISIS_EPICENTRE, tag);
+        e.cycle_nowcast_rng = GameRng::surgery(root, stream::CYCLE_NOWCAST, tag);
+        e.earnings_key = crate::rng::age_law_key(self.earnings_key);
+        e.skew_noise_key = crate::rng::age_law_key(self.skew_noise_key);
+        e.oil_drift_key = crate::rng::age_law_key(self.oil_drift_key);
+        e.core_trend_key = crate::rng::age_law_key(self.core_trend_key);
+        e.spread_noise_key = crate::rng::age_law_key(self.spread_noise_key);
+        e.term_premium_key = crate::rng::age_law_key(self.term_premium_key);
+        e.cycle_publication.key = crate::rng::age_law_key(self.cycle_publication.key);
+        e.economy_alone = true;
+        // The absolute clocks move with the days, as the burn-in's do.
+        let shift = CYCLE_AGE_LAW_ORIGIN - day;
+        e.central_bank.next_meeting_date += shift * 24 * 60;
+        e.central_bank.last_meeting_date += shift * 24 * 60;
+        e.economy.oil_last_opec_day += shift;
+        let spec = self.cycle_spec();
+        let phases = crate::economy::cycle::phase_cycle();
+        let mut counts: Vec<Vec<f64>> = vec![Vec::new(); 5];
+        for j in 1..=CYCLE_AGE_LAW_WARM_DAYS + CYCLE_AGE_LAW_DAYS {
+            let d = CYCLE_AGE_LAW_ORIGIN + j;
+            e.advance_day(&DayAdvanceRequest {
+                volatility: 1.0,
+                active_shocks: &[],
+                market_return_pct: 0.0,
+                game_day: d,
+                timestamp: d * 24 * 60,
+            });
+            if j > CYCLE_AGE_LAW_WARM_DAYS {
+                let k = phases.iter().position(|ph| *ph == e.economy.cycle_phase).unwrap_or(0);
+                let a = crate::mathx::max(0.0, (e.economy.months_in_current_phase * spec.month_days).round()) as usize;
+                if counts[k].len() <= a {
+                    counts[k].resize(a + 1, 0.0);
+                }
+                counts[k][a] += 1.0;
+            }
+        }
+        let month = crate::mathx::max(1.0, spec.month_days.round()) as usize;
+        let mut out = Vec::with_capacity(5);
+        for c in &counts {
+            let total: f64 = c.iter().sum();
+            let mut bins: Vec<(f64, f64)> = Vec::new();
+            for chunk in c.chunks(month).enumerate() {
+                let (b, ws) = chunk;
+                let (mut mass, mut age) = (0.0, 0.0);
+                for (i, w) in ws.iter().enumerate() {
+                    mass += w;
+                    age += w * (b * month + i) as f64;
+                }
+                if total > 0.0 && mass / total > 1e-9 {
+                    bins.push((age / mass, mass / total));
+                }
+            }
+            out.push(bins);
+        }
+        if let Ok(mut m) = MEMO.lock() {
+            if m.len() > 8 {
+                m.clear();
+            }
+            m.push((key, out.clone()));
+        }
+        out
+    }
+}
+
+/// One phase's own economy in the forecast's cycle
+/// (`oil_forecast_cycle_growth`): the state the law steps in that phase,
+/// the central bank that meets on it, and the variance of the market's gap
+/// about the state's (`spread_equity_gap`).
+#[derive(Clone)]
+struct CycleTrack {
+    economy: EconomyState,
+    bank: crate::economy::CentralBankState,
+    gap_var: f64,
+}
+
+impl CycleTrack {
+    /// Mass entering the phase joins its state at the mass-weighted mean:
+    /// every continuous field, and the gap's variance as a mixture's. The
+    /// phase, its clock, the OPEC day and the central bank are the
+    /// receiving phase's.
+    fn join(&mut self, w: f64, from: &CycleTrack, wf: f64) {
+        let t = w + wf;
+        if !(t > 0.0) {
+            return;
+        }
+        let (a, b) = (w / t, wf / t);
+        let (g0, g1) = (self.economy.spread_equity_gap, from.economy.spread_equity_gap);
+        let g = a * g0 + b * g1;
+        self.gap_var = a * (self.gap_var + g0 * g0) + b * (from.gap_var + g1 * g1) - g * g;
+        if self.gap_var < 0.0 {
+            self.gap_var = 0.0;
+        }
+        let x = &mut self.economy;
+        let y = &from.economy;
+        macro_rules! mix {
+            ($($f:ident),* $(,)?) => { $( x.$f = a * x.$f + b * y.$f; )* };
+        }
+        mix!(federal_funds_rate, prime_rate, corporate_bond_yield, treasury_yield_10y, treasury_yield_2y,
+             mortgage_rate_30y, cpi, inflation_rate, core_inflation, gdp_growth, gdp, unemployment_rate,
+             jobs_created, labor_force_participation, usd_index, oil_price, gold_price, copper_price,
+             housing_index, home_starts_monthly, housing_transaction_volume, long_term_unemployment_rate,
+             structural_unemployment, consumer_confidence, business_confidence, fear_greed_index, vix,
+             tariff_rate, trade_balance, oil_inventory_level, wage_growth, previous_day_market_return,
+             rolling_market_return_30d, earnings_cycle, vix_feedback, intermeeting_return, fed_put,
+             fed_put_owed, fed_put_mcap_prev, spread_equity_gap, spread_priced_gap, earnings_anticipation,
+             earnings_lookthrough, unemployment_impulse, oil_push_level, usd_haven_level,
+             oil_inflation_level, zlb_unmet, oil_bound_log_ratio, qe_pe_boost, qe_assets_ratio,
+             fiscal_stimulus, government_debt_to_gdp, phase_gdp_target, recession_probability);
+        for (u, v) in x.gdp_trend.iter_mut().zip(y.gdp_trend.iter()) {
+            *u = a * *u + b * *v;
+        }
+        if let (Some(u), Some(v)) = (x.market_pe, y.market_pe) {
+            x.market_pe = Some(a * u + b * v);
+        }
+    }
+}
+
+/// Growth's expectation over the cycle's phases for oil's forecast
+/// (`oil_forecast_cycle_growth`), on the law's own transitions. Each phase
+/// holds cohorts of the belief's mass, each with its own growth and age:
+/// the mass on a phase at the start, spread over the phase's stationary age
+/// law under the full law (the age is not public;
+/// [`Engine::cycle_age_law`], in months), and the mass that enters a phase
+/// over the horizon, a fresh sojourn. Each phase also carries its own
+/// economy ([`CycleTrack`]), from the close's: at each close the law steps
+/// it in that phase, its draws at their means, at its cohorts' mean growth;
+/// its central bank meets on it by the law's rule, the draws at the middle
+/// of their range; and the market's gap steps on it with its variance about
+/// that path, the forecast's own session variance of the index. Each
+/// cohort's growth moves with the step, and each cohort leaves with the
+/// probability the law's transition check compares against on that
+/// phase's stepped economy at the cohort's age: the hazard, the ladder from
+/// the phase's own state (the market's fall over the gap's spread,
+/// inflation, rates, the curve, valuation, unemployment, growth), the clamp
+/// and the per-day conversion
+/// ([`crate::economy::cycle::transition_probability_for`]). Mass entering a
+/// phase takes the step's mean shock on a phase's first session, and its
+/// state joins the phase's at the mass-weighted mean. No value is set
+/// here: every part is the law's.
+struct CycleGrowth {
+    phases: [crate::economy::CyclePhase; 5],
+    spec: crate::economy::CycleSpec,
+    /// Each phase's cohorts: age in completed sessions, mass and growth.
+    cohorts: Vec<Vec<(f64, f64, f64)>>,
+    tracks: Vec<Option<CycleTrack>>,
+    /// The meeting's options as the close stands; the bank's and the
+    /// curve's inflation are each track's own.
+    options: crate::economy::PolicyOptions,
+    core: (bool, bool),
+}
+
+impl CycleGrowth {
+    fn new(engine: &Engine, belief: &[f64; 5], econ: &EconomyState, day: i64) -> Self {
+        let phases = crate::economy::cycle::phase_cycle();
+        let spec = engine.cycle_spec();
+        let ages = engine.cycle_age_law(day);
+        let total: f64 = belief.iter().sum();
+        let mut cohorts = vec![Vec::new(); 5];
+        let mut tracks = vec![None; 5];
+        for k in 0..5 {
+            let b = if total > 0.0 { belief[k] / total } else { 0.0 };
+            if b > 0.0 {
+                for &(age, w) in &ages[k] {
+                    cohorts[k].push((age, b * w, econ.gdp_growth));
+                }
+                let mut economy = econ.clone();
+                economy.cycle_phase = phases[k];
+                tracks[k] = Some(CycleTrack { economy, bank: engine.central_bank, gap_var: 0.0 });
+            }
+        }
+        let options = crate::economy::PolicyOptions {
+            path_before: engine.priced_policy_path(),
+            eve_change: None,
+            ..engine.policy_options(false)
+        };
+        let core = (engine.params.fed_core_inflation != 0.0, engine.params.treasury_core_inflation != 0.0);
+        CycleGrowth { phases, spec, cohorts, tracks, options, core }
+    }
+
+    /// The growth oil's block reads at the next step: the cohorts' mean.
+    fn growth(&self) -> f64 {
+        let (mut m, mut g) = (0.0, 0.0);
+        for c in self.cohorts.iter().flatten() {
+            m += c.1;
+            g += c.1 * c.2;
+        }
+        if m > 0.0 {
+            g / m
+        } else {
+            0.0
+        }
+    }
+
+    /// One close: each phase's economy stepped by the law at its cohorts'
+    /// mean growth and one point above it (the step is affine in growth but
+    /// for its clamp and the pull's doubling against the phase, so each
+    /// cohort moves on the line through the two); each cohort's leavers, at
+    /// the law's transition probability on that stepped economy, enter the
+    /// next phase; then the phase's bank meets. `variance` is the forecast's
+    /// variance of the session's return, the return the gap steps on.
+    fn step(&mut self, inputs: &DailyInputs, volatility: f64, variance: f64, timestamp: i64) {
+        let decay = inputs.yields.spread_equity_decay;
+        let mut own = *inputs;
+        own.oil_growth = None;
+        let mut leaving = [(0.0, 0.0); 5];
+        let mut stepped_tracks: Vec<Option<CycleTrack>> = vec![None; 5];
+        for k in 0..5 {
+            let (mut m, mut g) = (0.0, 0.0);
+            for c in &self.cohorts[k] {
+                m += c.1;
+                g += c.1 * c.2;
+            }
+            let track = match &self.tracks[k] {
+                Some(t) if m > 0.0 => t,
+                _ => continue,
+            };
+            let bar = g / m;
+            let mut at = track.economy.clone();
+            at.cycle_phase = self.phases[k];
+            at.gdp_growth = bar + 1.0;
+            let s1 = update_economy_daily(&at, &own, &mut crate::economy::daily::MeanDraws).gdp_growth;
+            at.gdp_growth = bar;
+            let stepped = update_economy_daily(&at, &own, &mut crate::economy::daily::MeanDraws);
+            let s0 = stepped.gdp_growth;
+            let slope = s1 - s0;
+            let gap_var = if decay != 0.0 { decay * decay * (track.gap_var + variance) } else { 0.0 };
+            for c in self.cohorts[k].iter_mut() {
+                c.0 += 1.0;
+                c.2 = s0 + slope * (c.2 - bar);
+                let q = crate::economy::cycle::transition_probability_for(
+                    &stepped, self.phases[k], c.0, &self.spec, gap_var);
+                let out = c.1 * q;
+                c.1 -= out;
+                leaving[k].0 += out;
+                leaving[k].1 += out * c.2;
+            }
+            self.cohorts[k].retain(|c| c.1 > 1e-12);
+            let mut options = self.options;
+            let core = stepped.inflation_rate - stepped.oil_inflation_level;
+            if self.core.0 {
+                options.policy_inflation = Some(core);
+            }
+            if self.core.1 {
+                options.curve_inflation = Some(core);
+            }
+            let met = crate::economy::update_central_bank_with(&track.bank, &stepped, timestamp, &mut MidDraws, &options);
+            stepped_tracks[k] = Some(CycleTrack { economy: met.economy, bank: met.central_bank, gap_var });
+        }
+        let mut staying = [0.0; 5];
+        for k in 0..5 {
+            staying[k] = self.cohorts[k].iter().map(|c| c.1).sum();
+            if stepped_tracks[k].is_some() {
+                self.tracks[k] = stepped_tracks[k].clone();
+            }
+        }
+        for k in 0..5 {
+            let (m, g) = leaving[k];
+            if m > 0.0 {
+                let next = (k + 1) % 5;
+                let shock = crate::economy::daily::phase_entry_growth_shock(self.phases[next], 0.5, volatility);
+                self.cohorts[next].push((0.0, m, g / m + shock));
+                let from = stepped_tracks[k].as_ref().expect("a phase with leavers was stepped");
+                match self.tracks[next].as_mut() {
+                    Some(t) if staying[next] > 0.0 => t.join(staying[next], from, m),
+                    _ => {
+                        let mut t = from.clone();
+                        t.economy.cycle_phase = self.phases[next];
+                        self.tracks[next] = Some(t);
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -1399,6 +2019,57 @@ mod tests {
         e.advance_day_with(&request, &mut crate::economy::daily::MeanDraws);
         assert_eq!(last.to_bits(), e.published_vix().to_bits());
         assert_eq!(e.live_vix().unwrap().to_bits(), e.published_vix().to_bits());
+    }
+
+    #[test]
+    fn the_guidance_reaches_the_path_through_its_signal_and_rounding_the_eve_recovers_nothing() {
+        let base = [
+            ("forecast_horizon_sessions", 63.0),
+            ("index_level_listed", 1.0),
+            ("fed_eve_decision", 1.0),
+            ("policy_anticipation_guidance", 1.0),
+        ];
+        let mut dials = base.to_vec();
+        dials.push(("policy_guidance_signal_sd", 6.4759));
+        let mut e = engine(with(&dials));
+        let mut off = engine(with(&base));
+        let (mut buffer, mut other) = (SessionBuffer::new(), SessionBuffer::new());
+        let mut eve: Option<(f64, f64)> = None;
+        let mut misses = Vec::new();
+        for day in 0..2000 {
+            e.run_numbered_day(day, 390, &mut buffer);
+            off.run_numbered_day(day, 390, &mut other);
+            // The forecast feeds only the contracts: no stock price moves.
+            for (a, b) in e.companies().iter().zip(off.companies().iter()) {
+                assert_eq!(a.stock.price.to_bits(), b.stock.price.to_bits(), "day {day}");
+            }
+            let rate = e.economy.federal_funds_rate;
+            if let Some((priced, then)) = eve.take() {
+                misses.push((rate - then, priced));
+            }
+            let f = e.forecast().unwrap();
+            if e.next_meeting_day(f.day) == f.day + 1 {
+                // What the signal lets the market expect of the decision.
+                eve = Some((f.policy_rate[0] - rate, rate));
+            }
+        }
+        let n = misses.len() as f64;
+        assert!(n >= 50.0, "{n} eves");
+        let surprise: Vec<f64> = misses.iter().map(|(d, p)| d - p).collect();
+        let mean = surprise.iter().sum::<f64>() / n;
+        let sd = (surprise.iter().map(|x| (x - mean) * (x - mean)).sum::<f64>() / (n - 1.0)).sqrt();
+        assert!(mean.abs() < 0.02 && sd > 0.005 && sd < 0.08, "mean {mean} sd {sd} on {n}");
+        // Rounding the eve's price to the grid and trading toward it.
+        let edge: Vec<f64> = misses
+            .iter()
+            .map(|(d, p)| {
+                let toward = (p / GUIDANCE_GRID).round() * GUIDANCE_GRID - p;
+                if toward == 0.0 { 0.0 } else { toward.signum() * (d - p) }
+            })
+            .collect();
+        let m = edge.iter().sum::<f64>() / n;
+        let s = (edge.iter().map(|x| (x - m) * (x - m)).sum::<f64>() / (n - 1.0)).sqrt();
+        assert!(m < 2.0 * s / n.sqrt(), "the grid rule's edge {m} (se {})", s / n.sqrt());
     }
 
     #[test]

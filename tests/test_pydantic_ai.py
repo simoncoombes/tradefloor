@@ -698,7 +698,7 @@ def test_the_prompt_is_the_payload_and_nothing_else():
     world.run(days=1)
 
     parsed = json.loads(agent.prompts[0])
-    assert set(parsed) == contract.PAYLOAD_KEYS
+    assert set(parsed) == contract.default_payload_keys()
     assert set(parsed["assets"][0]) == contract.DEFAULT_ASSET_KEYS
     assert set(parsed["macro"]) == set(ci.OBSERVABLE_MACRO)
 

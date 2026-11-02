@@ -1,11 +1,10 @@
-"""The MCP server's futures (pt-v22 phase 1): list_contracts,
-quote_contracts, contract symbols in session_step, and the margin
-session_state reports.
+"""The MCP server's futures: list_contracts, quote_contracts, contract
+symbols in session_step, and the margin session_state reports.
 
-No shipped preset lists futures, and a session runs a shipped preset by
-name, so on every preset the tools answer with an empty list and say why.
-The rest is checked on a session whose engine is built with the phase 1
-switches on, the way a library caller would build one.
+On a preset that lists none (pt-v21) the tools answer with an empty list,
+say so and name the shipped presets that list contracts. The rest is
+checked on a session whose engine is built with the futures switches on,
+the way a library caller would build one.
 """
 
 import json
@@ -57,41 +56,65 @@ def opened(**kw):
     return r["session_id"]
 
 
-# -- every shipped preset --------------------------------------------------
+#: A shipped preset that lists no contract.
+PLAIN = "pt-v21"
 
 
-def test_a_shipped_preset_lists_nothing_and_says_why():
-    sid = opened(universe_size=8)
+def says_where(text):
+    """A note on a preset that lists nothing says so and names each shipped
+    preset that lists contracts, or that none does."""
+    assert "lists no futures or options" in text
+    listing = [name for name in tf.preset_names() if mcp._preset_contracts(name)]
+    assert PLAIN not in listing
+    if listing:
+        assert all(f"{name} lists " in text for name in listing), text
+    else:
+        assert "No shipped preset lists any" in text
+
+
+# -- a preset that lists none -------------------------------------------------
+
+
+def test_a_preset_without_contracts_lists_nothing_and_says_where_they_are():
+    sid = opened(universe_size=8, preset=PLAIN)
     listed = mcp.list_contracts(sid)
     assert listed["ok"] and listed["contracts"] == []
     assert listed["lists_futures"] is False and listed["index_level"] is None
-    assert "no shipped preset" in listed["note"]
+    says_where(listed["note"])
     quoted = mcp.quote_contracts(sid)
     assert quoted["ok"] and quoted["quotes"] == {}
     refused = mcp.quote_contracts(sid, symbols=["IDX.F0056"])
-    assert refused["ok"] is False and "no shipped preset" in refused["error"]
+    assert refused["ok"] is False
+    says_where(refused["error"])
 
 
-def test_a_shipped_preset_session_view_is_the_one_it_was():
-    sid = opened(universe_size=8)
+def test_a_preset_without_contracts_session_view_is_the_one_it_was():
+    sid = opened(universe_size=8, preset=PLAIN)
     state = mcp.session_state(sid)
     assert "index_level" not in state["market"]
     assert "contracts_listed" not in state["market"]
     assert not {"futures", "margin"} & set(state["agents"]["me"])
 
 
-def test_a_contract_symbol_on_a_shipped_preset_is_refused_with_the_reason():
-    sid = opened(universe_size=8)
+def test_a_contract_symbol_on_a_preset_without_contracts_is_refused_with_the_reason():
+    sid = opened(universe_size=8, preset=PLAIN)
     r = mcp.session_step(sid, orders={"IDX.F0056": 1})
-    assert r["ok"] is False
-    assert "contract symbol" in r["error"] and "no shipped preset" in r["error"]
+    assert r["ok"] is False and "contract symbol" in r["error"]
+    says_where(r["error"])
 
 
 def test_describe_simulator_lists_the_instrument_kinds():
     d = mcp.describe_simulator()
     futures = d["instruments"]["futures"]
     assert [f["root"] for f in futures["families"]] == ["IDX", "VIX", "FF", "TR3", "OIL"]
-    assert futures["on_shipped_presets"] == []
+    assert futures["on_shipped_presets"] == [
+        name for name in tf.preset_names()
+        if any(getattr(tf.ModelParams.from_preset(name), dial) != 0.0
+               for dial in set(tf.contracts.FUTURE_ROOTS.values()))]
+    assert PLAIN not in futures["on_shipped_presets"]
+    assert ("lists them." if futures["on_shipped_presets"] else "No shipped preset") \
+        in futures["how"]
+    assert "yet" not in futures["how"]
     assert {"equities", "rate_indices"} <= set(d["instruments"])
     assert mcp.describe_simulator() == d
 

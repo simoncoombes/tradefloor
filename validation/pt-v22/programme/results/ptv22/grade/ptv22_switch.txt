@@ -1,0 +1,78 @@
+{
+ "graded": {
+  "ptv22fut": [
+   "IF1",
+   "IF2",
+   "IF3",
+   "NS1",
+   "NS2",
+   "RF1_m1",
+   "RF1_m3",
+   "RF1_m6",
+   "RF2",
+   "RF3",
+   "RF4",
+   "RF5",
+   "OF1",
+   "OF2",
+   "OF3",
+   "OF4",
+   "MG1"
+  ],
+  "ptv22chain": [
+   "SS1",
+   "SS2",
+   "SS3",
+   "SS4",
+   "EV1",
+   "EV2",
+   "EV3"
+  ],
+  "ptv22names": [
+   "MG3",
+   "XD5",
+   "AX1",
+   "AX2"
+  ],
+  "ptv22traded": [
+   "MG2",
+   "XD1",
+   "XD2",
+   "IF4",
+   "XD3"
+  ]
+ },
+ "off": {
+  "ptv22idx": [
+   "SV1",
+   "SV2",
+   "SV3",
+   "SV4",
+   "SV5",
+   "SV6",
+   "SV7",
+   "SV8",
+   "SV9",
+   "OB1",
+   "OB2",
+   "OB3",
+   "OB4",
+   "OB5",
+   "OB6",
+   "XD4"
+  ],
+  "ptv22vix": [
+   "VF1",
+   "VF2",
+   "VF3",
+   "VF4",
+   "VF5",
+   "VF6",
+   "VF7",
+   "VF8",
+   "XD1 VIX rules",
+   "XD3 VIX push"
+  ]
+ },
+ "evidence": {}
+}

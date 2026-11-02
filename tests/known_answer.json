@@ -1,13 +1,13 @@
 {
-  "bondsNote": "Re-based 2026-10-05 with the default trajectory when pt-v21 became the default (see note): bondsSha256 cac3ff44 to aae52e08. Before that, re-based 2026-09-24 on fix/ptv20-core, where on pt-v20 a pinned corporate yield holds through the close, and 2026-09-26 when pt-v20 took its graded arm.",
-  "bondsSha256": "aae52e08c038f68fec696cec15af4ebbda2743edf5dc9b634a3f67f25635c2d1",
-  "bytes": 16920,
-  "days": 250,
-  "katVersion": 29,
-  "kind": "pretium.known-answer",
-  "metadataSha256": "8804ef0e67ecede070a22d7fb56f6980605e78a9e45c71ca10f15862d270b165",
-  "note": "Re-based 2026-10-05 for 0.10.0, where pt-v21 becomes the default: pt-v20 with 104 dials moved, every one inert on every earlier preset (the economy's cycle feeding back from equity stress, the Fed's stress and growth rules, a curve that prices the policy path, payouts as accrued state, a market variance that follows the cycle, a market that opens on its own prehistory, overnight and earnings-day returns, a name's own variance clustering, the traded path's impact memory, unemployment on Okun's law and oil that reverts to its inventory). Every seeded default trajectory changes: simulationSha256 72485a9f to 3a063f0d, sha256 ac004fea to 4ea1d563. metadataSha256 does not move. pt-v20 and every named preset before it replay exactly (tests/known_answer_presets.json, where only pt-v21's row is new). Produced on macOS arm64 (M-series) first; the five-target determinism workflow is the second architecture.",
-  "seed": 20260820,
-  "sha256": "4ea1d56340a3357db730764c3e24c131c5e0883efa4cd6f7f56c83ea9674033c",
-  "simulationSha256": "3a063f0d207bc37b5ade3b23c60f5e358b275507550b7f75f172a8d7cafb075c"
+ "bondsNote": "Re-based for 0.11.0 with the default trajectory when pt-v22 became the default (was aae52e08).",
+ "bondsSha256": "ae3e3c6a154af2444558fda68989d363b51df6e3edda3ec8fbc816526c816b80",
+ "bytes": 16920,
+ "days": 250,
+ "katVersion": 30,
+ "kind": "pretium.known-answer",
+ "metadataSha256": "8804ef0e67ecede070a22d7fb56f6980605e78a9e45c71ca10f15862d270b165",
+ "note": "Re-based for 0.11.0, where pt-v22 becomes the default: pt-v20 with the arm in tools/presets/arms/pt-v22.txt, which lists index, rate and oil futures and options on every name. Every seeded default trajectory changes; pt-v21 and every earlier preset replay exactly (tests/known_answer_presets.json). Was sha256 4ea1d563, simulation 3a063f0d.",
+ "seed": 20260820,
+ "sha256": "f062f8c4fe28ed43b0307ab25fca57334d96c4cfec0dbcabe7492df55fed86f8",
+ "simulationSha256": "100b3f2ea3465727c3e87e085330f30b7f7186ffee9c3b955e5229cd91913574"
 }

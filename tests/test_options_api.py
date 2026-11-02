@@ -227,7 +227,8 @@ def _buy_the_money_put(payload):
 
 def test_a_shipped_preset_payload_gains_no_options_key():
     seen = Capture()
-    tf.evaluate({"a": CallableAgentAdapter(seen, every=6)}, seed=3, universe=SMALL, days=2)
+    tf.evaluate({"a": CallableAgentAdapter(seen, every=6)}, seed=3, universe=SMALL, days=2,
+                model="pt-v21")
     assert seen.payloads
     for payload in seen.payloads:
         assert set(payload) == BASE_KEYS

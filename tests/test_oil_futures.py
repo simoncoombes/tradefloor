@@ -53,6 +53,8 @@ def day(engine):
 
 def test_the_switch_is_off_on_every_shipped_preset_and_silent_in_the_digest():
     for name in tf.preset_names():
+        if name == "pt-v22":
+            continue  # pt-v22 ships its arm's values, which tests/test_validation.py holds
         assert tf.ModelParams.from_preset(name).futures_oil_listed == 0.0, name
     assert "futures_oil_listed" in set(tf.ModelParams.digest_silent_at_zero())
     assert model(futures_oil_listed=0.0).fingerprint == "pt-v21"

@@ -527,6 +527,7 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # constant of the run.
     expected = set(_SNAPSHOT_KEYS) | (
         {"vix_anchor_slow", "vix_anchor", "vix_stress_memory", "market_vol_leverage_memory",
+         "market_vol_leverage_fast_memory",
          "market_vol_cycle_log", "rates", "book", "fair_value_offset", "opening_z",
          "buyback_log_shares", "opening_carry",
          # Carried only while set: a forced close pending tonight, today's
@@ -566,6 +567,9 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          "pinned_corporate_spread",
          # Today's priced VIX move, only while a pin has made one.
          "pinned_vix_jump",
+         # Today's conditional move and the draws' mean
+         # (`pinned_vix_return`), only while a pin has made them.
+         "pinned_vix_move", "pinned_vix_mean",
          # The day's market t scale, only between an open that drew one
          # and the close (`market_day_tail_df`).
          "market_day_scale",
@@ -582,6 +586,9 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          "derivatives_rng", "futures", "futures_book", "night_bridge",
          # The VIX's fear memory, only while `vix_fear_uptake` is set.
          "vix_fear",
+         # The published VIX's log average, only while
+         # `forecast_vix_level_nowcast` is set.
+         "vix_log_average",
          # The VIX futures, only while `futures_vix_listed` is set, and
          # their book once an agent has traded one.
          "vix_futures", "vix_futures_book",
@@ -593,10 +600,36 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          "oil_futures", "oil_futures_book",
          # The contracts' margin, only while `margin_scan_coverage` is set.
          "margin",
+         # Oil's long factor, only while `oil_target_drift_sd` is set.
+         "oil_target_drift",
+         # Core inflation's trend, only while `core_trend_sd` is set; the
+         # eve's decision, only while `fed_eve_decision` is; credit's own
+         # state, only while `corporate_spread_noise_sd` is.
+         "core_trend", "eve_decision", "spread_noise",
+         # The 10-year's own term premium, only while
+         # `treasury_term_premium_sd` is set.
+         "term_premium",
+         # The aggregate earnings level, only while
+         # `fair_value_aggregate_jensen` or `fair_value_aggregate_half_life`
+         # is set.
+         "aggregate_level",
+         # The session's expected variance of the aggregate earnings level,
+         # only while `fair_value_aggregate_expected` and
+         # `fair_value_aggregate_jensen` are set.
+         "aggregate_variance",
+         # The earnings look-through's written level and anchor, only while
+         # `earnings_lookthrough_half_life` is set.
+         "earnings_lookthrough",
+         # The time-held fade's clock and the held VIX, only while
+         # `market_vol_cycle_hold_onset` is set and a close has started it.
+         "cycle_hold",
          # The index options and the surface's clock, only while
          # `surface_ssvi` is set, and the options' book once an agent has
          # traded one.
          "options", "options_book",
+         # The skew premium's noise and its key, only while
+         # `surface_skew_noise_sd` is set.
+         "skew_noise",
          # The single-name options, only while `options_names_listed` is
          # set, their book once an agent has traded one, and their exercise
          # instructions and exercises once there are any.
@@ -775,6 +808,10 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # `market_vol_leverage` set: `Engine::state_hash`'s order and rule.
     if "market_vol_leverage_memory" in snapshot:
         _f64(buf, snapshot["market_vol_leverage_memory"])
+    # The fast return memory, only on a model with `market_vol_leverage_fast`
+    # set: `Engine::state_hash`'s order and rule.
+    if "market_vol_leverage_fast_memory" in snapshot:
+        _f64(buf, snapshot["market_vol_leverage_fast_memory"])
     # The cycle's volatility multiplier, only on a model with
     # `market_vol_cycle_ratio` set: `Engine::state_hash`'s order and rule.
     if "market_vol_cycle_log" in snapshot:
@@ -819,6 +856,12 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # Credit's leverage gap, only on a model with `corporate_spread_equity_gain` set.
     if "spread_equity_gap" in snapshot["economy"]:
         _f64(buf, snapshot["economy"]["spread_equity_gap"])
+    # The gap credit has priced, only with `corporate_spread_equity_lag` set too.
+    if "spread_priced_gap" in snapshot["economy"]:
+        _f64(buf, snapshot["economy"]["spread_priced_gap"])
+    # The gap the 10-year has priced, only with `treasury_equity_lag` and its gain set.
+    if "treasury_equity_priced_gap" in snapshot["economy"]:
+        _f64(buf, snapshot["economy"]["treasury_equity_priced_gap"])
     if "fair_value_offset" in snapshot:
         for name in ("fair_value_offset", "opening_z"):
             if len(snapshot[name]) % 8:
@@ -926,6 +969,12 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     if snapshot.get("pinned_vix_jump"):
         _f64(buf, 10.0)
         _f64(buf, float(snapshot["pinned_vix_jump"]))
+    if snapshot.get("pinned_vix_move"):
+        _f64(buf, 94.0)
+        _f64(buf, float(snapshot["pinned_vix_move"]))
+    if snapshot.get("pinned_vix_mean"):
+        _f64(buf, 95.0)
+        _f64(buf, float(snapshot["pinned_vix_mean"]))
     if "market_day_scale" in snapshot and float(snapshot["market_day_scale"]) != 1.0:
         _f64(buf, 12.0)
         _f64(buf, float(snapshot["market_day_scale"]))
@@ -1001,6 +1050,11 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     if "vix_fear" in snapshot:
         _f64(buf, 47.0)
         _f64(buf, float(snapshot["vix_fear"]))
+    # The published VIX's log average, only while `forecast_vix_level_nowcast`
+    # is set, behind its own tag.
+    if "vix_log_average" in snapshot:
+        _f64(buf, 93.0)
+        _f64(buf, float(snapshot["vix_log_average"]))
     # The VIX futures, only while `futures_vix_listed` is set, behind their
     # own tag, length-prefixed; their book behind another once an agent has
     # traded one. `Engine::state_hash`'s order and rule.
@@ -1065,6 +1119,26 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         _u32(buf, len(values))
         for value in values:
             _f64(buf, value)
+    # Oil's long factor, only while `oil_target_drift_sd` is set, behind its
+    # own tag: its log level and its key's two words.
+    if "oil_target_drift" in snapshot:
+        _f64(buf, 55.0)
+        for value in _column(snapshot["oil_target_drift"], 3, "oil_target_drift"):
+            _f64(buf, value)
+    # Core inflation's trend (57), the eve's decision (58), credit's own
+    # state (59), the 10-year's term premium (60), the aggregate earnings
+    # level (62), the session's expected variance of it (61), the earnings
+    # look-through's state (65) and the time-held fade's clock (84), each
+    # only while its dial is set, behind
+    # its own tag.
+    for name, tag, width in (("core_trend", 57.0, 3), ("eve_decision", 58.0, 2), ("spread_noise", 59.0, 3),
+                              ("term_premium", 60.0, 3), ("aggregate_level", 62.0, 2),
+                              ("aggregate_variance", 61.0, 2), ("earnings_lookthrough", 65.0, 2),
+                              ("cycle_hold", 84.0, 4)):
+        if name in snapshot:
+            _f64(buf, tag)
+            for value in _column(snapshot[name], width, name):
+                _f64(buf, value)
     # The index options and the surface's clock, only while `surface_ssvi` is
     # set, behind their own tag, length-prefixed; their book behind another
     # once an agent has traded an option.
@@ -1082,6 +1156,17 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     if "options_book" in snapshot:
         _f64(buf, 81.0)
         _book(buf, snapshot["options_book"])
+    # The skew premium's noise and its key, only while `surface_skew_noise_sd`
+    # is set, behind their own tag: three numbers.
+    if "skew_noise" in snapshot:
+        raw = snapshot["skew_noise"]
+        if len(raw) != 24:
+            raise ValidationError(
+                f"snapshot field 'skew_noise' carries {len(raw)} bytes, not the "
+                "three f64s it holds.")
+        _f64(buf, 82.0)
+        for value in _column(raw, 3, "skew_noise"):
+            _f64(buf, value)
     # The single-name options, only while `options_names_listed` is set,
     # behind their own tag, length-prefixed; their book behind another once
     # an agent has traded one; their instructions and exercises behind a
@@ -1156,7 +1241,10 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # after `earnings_cycle`. The Fed put's four fields only with
     # `fed_put_gain` set, together; hashed after the night's market draw.
     # `spread_equity_gap` only with `corporate_spread_equity_gain` set;
-    # hashed after the Fed put's fields.
+    # hashed after the Fed put's fields. `spread_priced_gap` only with
+    # `corporate_spread_equity_lag` set as well; hashed after the gap.
+    # `treasury_equity_priced_gap` only with `treasury_equity_lag` and its gain
+    # set; hashed after the priced gap.
     # `cycle_nowcast` only on a model with `cycle_nowcast_accuracy` set,
     # together with the snapshot's `cycle_nowcast_rng`; hashed after the
     # phase, before the history.
@@ -1171,7 +1259,9 @@ def state_hash(snapshot: dict[str, Any]) -> str:
         {"earnings_cycle", "cycle_history", "gdp_publication",
          "unemployment_impulse", "vix_feedback", "qe_assets_ratio",
          "cycle_nowcast", "cycle_publication", "anticipation_drift",
-         "anticipation_raw", "spread_equity_gap"}
+         "anticipation_raw", "spread_equity_gap", "spread_priced_gap",
+         "treasury_equity_priced_gap", "oil_push_level",
+         "usd_haven_level", "oil_inflation_level", "zlb_unmet"}
         & set(economy))
     if "fed_put" in economy:
         economy_expected |= {"intermeeting_return", "fed_put", "fed_put_owed",
@@ -1238,6 +1328,20 @@ def state_hash(snapshot: dict[str, Any]) -> str:
     # is set: `Engine::state_hash`'s order and rule.
     if "unemployment_impulse" in economy:
         _f64(buf, economy["unemployment_impulse"])
+    # The oil pushes' part of the price, only while `oil_pushes_in_target`
+    # is set: `Engine::state_hash`'s order and rule.
+    if "oil_push_level" in economy:
+        _f64(buf, economy["oil_push_level"])
+    # The dollar's safe-haven bid, only while `usd_mean_reversion` is set.
+    if "usd_haven_level" in economy:
+        _f64(buf, economy["usd_haven_level"])
+    # The oil pass-through's part of headline, only while `fed_core_inflation`
+    # or `treasury_core_inflation` is set, then the put's unmet asks, only
+    # while `treasury_zlb_path` is set: `Engine::state_hash`'s order and rule.
+    if "oil_inflation_level" in economy:
+        _f64(buf, economy["oil_inflation_level"])
+    if "zlb_unmet" in economy:
+        _f64(buf, economy["zlb_unmet"])
     # The published GDP growth figure's state, only while
     # `gdp_publication_lag` is set: `Engine::state_hash`'s order and rule,
     # the pending releases LENGTH-PREFIXED, each its day then its figure.
@@ -1613,6 +1717,7 @@ _DEFAULT_SINCE = (
     ("0.1.0", "pt-v3"), ("0.2.0", "pt-v10"), ("0.3.0", "pt-v12"),
     ("0.4.0", "pt-v14"), ("0.6.0", "pt-v16"), ("0.7.0", "pt-v18"),
     ("0.8.0", "pt-v19"), ("0.8.5", "pt-v20"), ("0.10.0", "pt-v21"),
+    ("0.11.0", "pt-v22"),
 )
 
 
@@ -1773,8 +1878,11 @@ _LEDGER_OPTIONAL_BUFFERS = ("fair_value_offset", "opening_z", "pending_fair_valu
                             "pending_dividend", "fed_drawdown_returns",
                             "innovation_day", "forecast", "futures",
                             "night_bridge", "vix_futures", "rate_futures",
-                            "oil_futures", "margin", "options", "name_options",
-                            "shares_outstanding")
+                            "oil_futures", "margin", "shares_outstanding",
+                            "oil_target_drift", "core_trend", "eve_decision",
+                            "spread_noise", "term_premium", "aggregate_level",
+                            "aggregate_variance", "earnings_lookthrough",
+                            "cycle_hold", "options", "skew_noise", "name_options")
 
 #: The ``fundamentals`` block's buffers, one per company each.
 _LEDGER_FUNDAMENTALS = ("eps", "book_value_per_share", "revenue_growth")

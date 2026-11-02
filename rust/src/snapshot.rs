@@ -1601,6 +1601,11 @@ impl Engine {
         if self.carries_market_vol_leverage() {
             out.put("market_vol_leverage_memory", V::Float(self.market_vol_leverage_memory()));
         }
+        // The fast return memory, on the same rule, with
+        // `market_vol_leverage_fast` set.
+        if self.carries_market_vol_leverage_fast() {
+            out.put("market_vol_leverage_fast_memory", V::Float(self.market_vol_leverage_fast_memory()));
+        }
         // The cycle's volatility multiplier, on the same rule: carried, and
         // hashed, only with `market_vol_cycle_ratio` set and once a close
         // has set it.
@@ -1608,6 +1613,12 @@ impl Engine {
             if let Some(l) = self.market_vol_cycle_log() {
                 out.put("market_vol_cycle_log", V::Float(l));
             }
+        }
+        // The time-held fade's clock and the held VIX
+        // (`market_vol_cycle_hold_onset`), on the same rule: only with the
+        // dial set and once a close has started the clock.
+        if let Some(words) = self.cycle_hold_words() {
+            out.put("cycle_hold", V::from_f64s(&words));
         }
         // The published VIX's stress memory, only where the hash covers it:
         // with `vix_stress_premium` non-zero.
@@ -1678,6 +1689,14 @@ impl Engine {
         if self.pinned_vix_jump() != 0.0 {
             out.put("pinned_vix_jump", V::Float(self.pinned_vix_jump()));
         }
+        // Today's conditional move and the draws' mean (`pinned_vix_return`),
+        // keys only while a pin has made them: the session's draws read them.
+        if self.pinned_vix_move() != 0.0 {
+            out.put("pinned_vix_move", V::Float(self.pinned_vix_move()));
+        }
+        if self.pinned_vix_mean() != 0.0 {
+            out.put("pinned_vix_mean", V::Float(self.pinned_vix_mean()));
+        }
         // The day's market t scale (`market_day_tail_df`), a key only between
         // an open that drew one and the close: the session's market draws
         // read it.
@@ -1727,6 +1746,11 @@ impl Engine {
         if self.carries_vix_fear() {
             out.put("vix_fear", V::Float(self.vix_fear()));
         }
+        // The published VIX's log average, a key only while
+        // `forecast_vix_level_nowcast` is set.
+        if self.carries_vix_log_average() {
+            out.put("vix_log_average", V::Float(self.vix_log_average()));
+        }
         // The VIX futures (`futures_vix_listed`): their numbers, and their
         // book once an agent has traded one.
         if let Some(words) = self.vix_futures_words() {
@@ -1754,6 +1778,41 @@ impl Engine {
         if let Some(words) = self.margin_words() {
             out.put("margin", V::from_f64s(&words));
         }
+        // Oil's long factor (`oil_target_drift_sd`).
+        if let Some(words) = self.oil_drift_words() {
+            out.put("oil_target_drift", V::from_f64s(&words));
+        }
+        // Core inflation's trend (`core_trend_sd`).
+        if let Some(words) = self.core_trend_words() {
+            out.put("core_trend", V::from_f64s(&words));
+        }
+        // Credit's own state (`corporate_spread_noise_sd`).
+        if let Some(words) = self.spread_noise_words() {
+            out.put("spread_noise", V::from_f64s(&words));
+        }
+        // The 10-year's own term premium (`treasury_term_premium_sd`).
+        if let Some(words) = self.term_premium_words() {
+            out.put("term_premium", V::from_f64s(&words));
+        }
+        // The aggregate earnings level (`fair_value_aggregate_jensen`,
+        // `fair_value_aggregate_half_life`).
+        if let Some(words) = self.aggregate_level_words() {
+            out.put("aggregate_level", V::from_f64s(&words));
+        }
+        // The session's expected variance of the aggregate earnings level
+        // (`fair_value_aggregate_expected`).
+        if let Some(words) = self.aggregate_variance_words() {
+            out.put("aggregate_variance", V::from_f64s(&words));
+        }
+        // The earnings look-through's written level and anchor
+        // (`earnings_lookthrough_half_life`).
+        if let Some(words) = self.earnings_lookthrough_words() {
+            out.put("earnings_lookthrough", V::from_f64s(&words));
+        }
+        // The eve's decision (`fed_eve_decision`).
+        if let Some(words) = self.eve_decision_words() {
+            out.put("eve_decision", V::from_f64s(&words));
+        }
         // The index options and the surface's clock (`surface_ssvi`), and the
         // options' book once an agent has traded one.
         if let Some(words) = self.options_words() {
@@ -1761,6 +1820,10 @@ impl Engine {
         }
         if let Some(book) = self.options_book_state() {
             out.put("options_book", book_value(book));
+        }
+        // The skew premium's noise and its key (`surface_skew_noise_sd`).
+        if let Some(words) = self.skew_noise_words() {
+            out.put("skew_noise", V::from_f64s(&words));
         }
         // The single-name options (`options_names_listed`), their book once
         // an agent has traded one, and their instructions and exercises
@@ -1853,14 +1916,21 @@ impl Engine {
         }
         // The day's endogenous news, generated once at the open and read by
         // every tick of the day.
+        // Each carries its release minute while `news_session_release_share`
+        // is set, and only then.
+        let release = self.session_news_release();
         let news = self
             .session_news()
             .iter()
-            .map(|event| {
+            .enumerate()
+            .map(|(k, event)| {
                 let mut item = SnapshotMap::new();
                 item.put("ticker", event.company_id.clone().map_or(V::None, V::Str));
                 item.put("sector", event.sector.clone().map_or(V::None, V::Str));
                 item.put("price_impact", event.price_impact.map_or(V::None, V::Float));
+                if let Some(minute) = release.get(k) {
+                    item.put("release_minute", V::Float(*minute));
+                }
                 V::Map(item)
             })
             .collect();
@@ -1895,6 +1965,18 @@ impl Engine {
         }
         if p.unemployment_adjustment_half_life != 0.0 {
             econ.put("unemployment_impulse", V::Float(economy.unemployment_impulse));
+        }
+        if p.oil_pushes_in_target != 0.0 {
+            econ.put("oil_push_level", V::Float(economy.oil_push_level));
+        }
+        if p.usd_mean_reversion != 0.0 {
+            econ.put("usd_haven_level", V::Float(economy.usd_haven_level));
+        }
+        if self.carries_oil_inflation_level() {
+            econ.put("oil_inflation_level", V::Float(economy.oil_inflation_level));
+        }
+        if p.treasury_zlb_path != 0.0 {
+            econ.put("zlb_unmet", V::Float(economy.zlb_unmet));
         }
         if p.gdp_publication_lag != 0.0 {
             let g = self.gdp_publication();
@@ -1952,6 +2034,14 @@ impl Engine {
         // `corporate_spread_equity_gain` set.
         if self.carries_spread_equity_gap() {
             econ.put("spread_equity_gap", V::Float(economy.spread_equity_gap));
+        }
+        // The gap credit has priced (`corporate_spread_equity_lag`).
+        if self.carries_spread_priced_gap() {
+            econ.put("spread_priced_gap", V::Float(economy.spread_priced_gap));
+        }
+        // The gap the 10-year has priced (`treasury_equity_lag`).
+        if self.carries_treasury_equity_lag() {
+            econ.put("treasury_equity_priced_gap", V::Float(economy.treasury_equity_priced_gap));
         }
         out.put("economy", V::Map(econ));
 
@@ -2110,7 +2200,10 @@ impl Engine {
             // The dial-gated state the later mechanisms carry (every dial 0.0
             // on every shipped preset, so no shipped snapshot carries one).
             Gated::dial("market_vol_leverage_memory", "market_vol_leverage", p.market_vol_leverage),
+            Gated::dial("market_vol_leverage_fast_memory", "market_vol_leverage_fast",
+                        p.market_vol_leverage_fast),
             Gated::held("market_vol_cycle_log", "market_vol_cycle_ratio", p.market_vol_cycle_ratio),
+            Gated::held("cycle_hold", "market_vol_cycle_hold_onset", p.market_vol_cycle_hold_onset),
             Gated::dial("vix_stress_memory", "vix_stress_premium", p.vix_stress_premium),
             Gated::dial("cycle_nowcast_rng", "cycle_nowcast_accuracy", p.cycle_nowcast_accuracy),
             Gated::dial("fed_stress_vix_max", "fed_stress_cut", p.fed_stress_cut),
@@ -2121,6 +2214,8 @@ impl Engine {
             Gated::dial("policy_anticipation_priced", "policy_anticipation", p.policy_anticipation),
             Gated::held("rate_live_marks", "rate_intraday_live", p.rate_intraday_live),
             Gated::held("pinned_vix_jump", "pinned_vix_variance_share", p.pinned_vix_variance_share),
+            Gated::held("pinned_vix_move", "pinned_vix_return", p.pinned_vix_return),
+            Gated::held("pinned_vix_mean", "pinned_vix_return", p.pinned_vix_return),
             Gated::held("market_day_scale", "market_day_tail_df", p.market_day_tail_df),
             Gated::dial("index_divisor", "index_level_listed", p.index_level_listed),
             Gated::held("vix_live", "vix_intraday_live", p.vix_intraday_live),
@@ -2130,6 +2225,7 @@ impl Engine {
             Gated::held("futures_book", "futures_index_listed", p.futures_index_listed),
             Gated::held("night_bridge", "night_session_steps", p.night_session_steps),
             Gated::dial("vix_fear", "vix_fear_uptake", p.vix_fear_uptake),
+            Gated::dial("vix_log_average", "forecast_vix_level_nowcast", p.forecast_vix_level_nowcast),
             Gated::dial("vix_futures", "futures_vix_listed", p.futures_vix_listed),
             Gated::held("vix_futures_book", "futures_vix_listed", p.futures_vix_listed),
             Gated::dial("rate_futures", "futures_rates_listed", p.futures_rates_listed),
@@ -2137,8 +2233,25 @@ impl Engine {
             Gated::dial("oil_futures", "futures_oil_listed", p.futures_oil_listed),
             Gated::held("oil_futures_book", "futures_oil_listed", p.futures_oil_listed),
             Gated::dial("margin", "margin_scan_coverage", p.margin_scan_coverage),
+            Gated::dial("oil_target_drift", "oil_target_drift_sd", p.oil_target_drift_sd),
+            Gated::dial("core_trend", "core_trend_sd", p.core_trend_sd),
+            Gated::dial("spread_noise", "corporate_spread_noise_sd", p.corporate_spread_noise_sd),
+            Gated::dial("term_premium", "treasury_term_premium_sd", p.treasury_term_premium_sd),
+            Gated::when(
+                "aggregate_level",
+                self.carries_aggregate_level(),
+                format!("fair_value_aggregate_jensen or fair_value_aggregate_half_life is not 0, and this engine's \
+                         are {} and {}", p.fair_value_aggregate_jensen, p.fair_value_aggregate_half_life)),
+            Gated::when(
+                "aggregate_variance",
+                self.carries_aggregate_variance(),
+                format!("fair_value_aggregate_expected and fair_value_aggregate_jensen are both set, and this \
+                         engine's are {} and {}", p.fair_value_aggregate_expected, p.fair_value_aggregate_jensen)),
+            Gated::dial("earnings_lookthrough", "earnings_lookthrough_half_life", p.earnings_lookthrough_half_life),
+            Gated::dial("eve_decision", "fed_eve_decision", p.fed_eve_decision),
             Gated::dial("options", "surface_ssvi", p.surface_ssvi),
             Gated::held("options_book", "options_index_listed", p.options_index_listed),
+            Gated::dial("skew_noise", "surface_skew_noise_sd", p.surface_skew_noise_sd),
             Gated::dial("name_options", "options_names_listed", p.options_names_listed),
             Gated::held("name_options_book", "options_names_listed", p.options_names_listed),
             Gated::held("name_options_exercise", "options_names_listed", p.options_names_listed),
@@ -2274,12 +2387,42 @@ impl Engine {
                     p.corporate_spread_equity_gain, p.cycle_equity_hazard
                 ),
             ),
+            Gated::when(
+                "spread_priced_gap",
+                self.carries_spread_priced_gap(),
+                format!(
+                    "corporate_spread_equity_lag and corporate_spread_equity_gain are both \
+                     not 0, and this engine's are {} and {}",
+                    p.corporate_spread_equity_lag, p.corporate_spread_equity_gain
+                ),
+            ),
+            Gated::when(
+                "treasury_equity_priced_gap",
+                self.carries_treasury_equity_lag(),
+                format!(
+                    "treasury_equity_lag and treasury_equity_lag_gain are both not 0 with the \
+                     leverage gap carried, and this engine's are {} and {}",
+                    p.treasury_equity_lag, p.treasury_equity_lag_gain
+                ),
+            ),
             Gated::dial(
                 "unemployment_impulse",
                 "unemployment_adjustment_half_life",
                 p.unemployment_adjustment_half_life,
             ),
             Gated::dial("gdp_publication", "gdp_publication_lag", p.gdp_publication_lag),
+            Gated::dial("oil_push_level", "oil_pushes_in_target", p.oil_pushes_in_target),
+            Gated::dial("usd_haven_level", "usd_mean_reversion", p.usd_mean_reversion),
+            Gated::dial("zlb_unmet", "treasury_zlb_path", p.treasury_zlb_path),
+            Gated::when(
+                "oil_inflation_level",
+                self.carries_oil_inflation_level(),
+                format!(
+                    "fed_core_inflation or treasury_core_inflation is not 0, and this \
+                     engine's are {} and {}",
+                    p.fed_core_inflation, p.treasury_core_inflation
+                ),
+            ),
         ];
         if let Some(message) = key_mismatch("this snapshot's economy", economy, &required, &gated, &[]) {
             return Err(refuse(message));
@@ -2572,18 +2715,27 @@ impl Engine {
         let not_news = || core("snapshot field session_news must be a list of dicts".into());
         let items = field(snapshot, "", "session_news")?.items().ok_or_else(not_news)?;
         let mut events = Vec::with_capacity(items.len());
+        let release_share = inner.params().news_session_release_share;
+        let mut release = Vec::new();
         for item in items {
             let SnapshotValue::Map(d) = item else {
                 return Err(not_news());
             };
-            check_keys("snapshot field session_news[]", d, NEWS_KEYS)?;
+            let gated = [Gated::dial("release_minute", "news_session_release_share", release_share)];
+            if let Some(message) = key_mismatch("snapshot field session_news[]", d, NEWS_KEYS, &gated, &[]) {
+                return Err(SnapshotError::new(SnapshotErrorKind::Fields, message));
+            }
             events.push(NewsEvent {
                 company_id: read_opt_str(d, "session_news[].", "ticker")?,
                 sector: read_opt_str(d, "session_news[].", "sector")?,
                 price_impact: read_opt_number(d, "session_news[].", "price_impact")?,
             });
+            if release_share != 0.0 {
+                release.push(read_finite(d, "session_news[].", "release_minute")?);
+            }
         }
         inner.set_session_news(events);
+        inner.set_session_news_release(release);
         inner.set_forced_flow_spent(read_finite(snapshot, "", "forced_flow_spent")?);
         inner.set_market_vol_log_level(read_finite(snapshot, "", "market_vol_log_level")?);
         inner.set_vix_log_level(read_finite(snapshot, "", "vix_log_level")?);
@@ -2610,6 +2762,16 @@ impl Engine {
             None => None,
         };
         inner.set_market_vol_cycle_log(cycle_log);
+        // The time-held fade's clock and the held VIX
+        // (`market_vol_cycle_hold_onset`), unset where the snapshot carries
+        // none: taken before the first close started it.
+        {
+            let words = match snapshot.get("cycle_hold") {
+                Some(_) => Some(read_buffer(snapshot, "", "cycle_hold")?),
+                None => None,
+            };
+            inner.set_cycle_hold_state(words.as_deref()).map_err(core)?;
+        }
         if inner.carries_vix_stress_memory() {
             inner.set_vix_stress_memory(read_finite(snapshot, "", "vix_stress_memory")?);
         }
@@ -2711,6 +2873,16 @@ impl Engine {
             None => 0.0,
         };
         inner.set_pinned_vix_jump(jump);
+        // Absent means no pin had set a conditional move that session.
+        let moved = match snapshot.get("pinned_vix_move") {
+            Some(_) => read_finite(snapshot, "", "pinned_vix_move")?,
+            None => 0.0,
+        };
+        let mean = match snapshot.get("pinned_vix_mean") {
+            Some(_) => read_finite(snapshot, "", "pinned_vix_mean")?,
+            None => 0.0,
+        };
+        inner.set_pinned_vix_return_state(moved, mean);
         // Absent means no open had drawn a day scale (a snapshot at a close).
         let day_scale = match snapshot.get("market_day_scale") {
             Some(_) => read_finite(snapshot, "", "market_day_scale")?,
@@ -2810,6 +2982,10 @@ impl Engine {
         if inner.carries_vix_fear() {
             inner.set_vix_fear(read_finite(snapshot, "", "vix_fear")?);
         }
+        // The published VIX's log average (`forecast_vix_level_nowcast`).
+        if inner.carries_vix_log_average() {
+            inner.set_vix_log_average(read_finite(snapshot, "", "vix_log_average")?);
+        }
         // The VIX futures (`futures_vix_listed`): required while the switch
         // is set, which the key check above has held them to.
         {
@@ -2855,6 +3031,73 @@ impl Engine {
             };
             inner.set_margin_state(words.as_deref()).map_err(core)?;
         }
+        // Oil's long factor (`oil_target_drift_sd`).
+        {
+            let words = match snapshot.get("oil_target_drift") {
+                Some(_) => Some(read_buffer(snapshot, "", "oil_target_drift")?),
+                None => None,
+            };
+            inner.set_oil_drift_state(words.as_deref()).map_err(core)?;
+        }
+        // Core inflation's trend (`core_trend_sd`).
+        {
+            let words = match snapshot.get("core_trend") {
+                Some(_) => Some(read_buffer(snapshot, "", "core_trend")?),
+                None => None,
+            };
+            inner.set_core_trend_state(words.as_deref()).map_err(core)?;
+        }
+        // Credit's own state (`corporate_spread_noise_sd`).
+        {
+            let words = match snapshot.get("spread_noise") {
+                Some(_) => Some(read_buffer(snapshot, "", "spread_noise")?),
+                None => None,
+            };
+            inner.set_spread_noise_state(words.as_deref()).map_err(core)?;
+        }
+        // The 10-year's own term premium (`treasury_term_premium_sd`).
+        {
+            let words = match snapshot.get("term_premium") {
+                Some(_) => Some(read_buffer(snapshot, "", "term_premium")?),
+                None => None,
+            };
+            inner.set_term_premium_state(words.as_deref()).map_err(core)?;
+        }
+        // The aggregate earnings level (`fair_value_aggregate_jensen`,
+        // `fair_value_aggregate_half_life`).
+        {
+            let words = match snapshot.get("aggregate_level") {
+                Some(_) => Some(read_buffer(snapshot, "", "aggregate_level")?),
+                None => None,
+            };
+            inner.set_aggregate_level_state(words.as_deref()).map_err(core)?;
+        }
+        // The session's expected variance of the aggregate earnings level
+        // (`fair_value_aggregate_expected`).
+        {
+            let words = match snapshot.get("aggregate_variance") {
+                Some(_) => Some(read_buffer(snapshot, "", "aggregate_variance")?),
+                None => None,
+            };
+            inner.set_aggregate_variance_state(words.as_deref()).map_err(core)?;
+        }
+        // The earnings look-through's written level and anchor
+        // (`earnings_lookthrough_half_life`).
+        {
+            let words = match snapshot.get("earnings_lookthrough") {
+                Some(_) => Some(read_buffer(snapshot, "", "earnings_lookthrough")?),
+                None => None,
+            };
+            inner.set_earnings_lookthrough_state(words.as_deref()).map_err(core)?;
+        }
+        // The eve's decision (`fed_eve_decision`).
+        {
+            let words = match snapshot.get("eve_decision") {
+                Some(_) => Some(read_buffer(snapshot, "", "eve_decision")?),
+                None => None,
+            };
+            inner.set_eve_decision_state(words.as_deref()).map_err(core)?;
+        }
         // The index options (`surface_ssvi`, `options_index_listed`).
         {
             let words = match snapshot.get("options") {
@@ -2866,6 +3109,14 @@ impl Engine {
                 None => None,
             };
             inner.set_options_state(words.as_deref(), book).map_err(core)?;
+        }
+        // The skew premium's noise (`surface_skew_noise_sd`).
+        {
+            let words = match snapshot.get("skew_noise") {
+                Some(_) => Some(read_buffer(snapshot, "", "skew_noise")?),
+                None => None,
+            };
+            inner.set_skew_noise_words(words.as_deref()).map_err(core)?;
         }
         // The single-name options (`options_names_listed`).
         {
@@ -2899,6 +3150,10 @@ impl Engine {
         if inner.carries_market_vol_leverage() {
             inner.set_market_vol_leverage_memory(
                 read_finite(snapshot, "", "market_vol_leverage_memory")?);
+        }
+        if inner.carries_market_vol_leverage_fast() {
+            inner.set_market_vol_leverage_fast_memory(
+                read_finite(snapshot, "", "market_vol_leverage_fast_memory")?);
         }
 
         // The macro chain's state, every field by name.
@@ -2944,6 +3199,13 @@ impl Engine {
         }
         if inner.carries_spread_equity_gap() {
             inner.economy_mut().spread_equity_gap = read_finite(d, "economy.", "spread_equity_gap")?;
+        }
+        if inner.carries_spread_priced_gap() {
+            inner.economy_mut().spread_priced_gap = read_finite(d, "economy.", "spread_priced_gap")?;
+        }
+        if inner.carries_treasury_equity_lag() {
+            inner.economy_mut().treasury_equity_priced_gap =
+                read_finite(d, "economy.", "treasury_equity_priced_gap")?;
         }
         // The market's cycle nowcast (`cycle_nowcast_accuracy`), before the
         // anticipation that reads it: the belief, and its generator as
@@ -3015,6 +3277,18 @@ impl Engine {
         if params.unemployment_adjustment_half_life != 0.0 {
             inner.economy_mut().unemployment_impulse =
                 read_finite(d, "economy.", "unemployment_impulse")?;
+        }
+        if params.oil_pushes_in_target != 0.0 {
+            inner.economy_mut().oil_push_level = read_finite(d, "economy.", "oil_push_level")?;
+        }
+        if params.treasury_zlb_path != 0.0 {
+            inner.economy_mut().zlb_unmet = read_finite(d, "economy.", "zlb_unmet")?;
+        }
+        if params.fed_core_inflation != 0.0 || params.treasury_core_inflation != 0.0 {
+            inner.economy_mut().oil_inflation_level = read_finite(d, "economy.", "oil_inflation_level")?;
+        }
+        if params.usd_mean_reversion != 0.0 {
+            inner.economy_mut().usd_haven_level = read_finite(d, "economy.", "usd_haven_level")?;
         }
         let gdp_publication = if params.gdp_publication_lag != 0.0 {
             let block = read_map(d, "economy.", "gdp_publication")?;

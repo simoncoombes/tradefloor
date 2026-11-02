@@ -69,7 +69,10 @@ use super::*;
 use crate::agent_book::{AgentFill, AgentOrder, BookState, Liquidity, RestMode, AGENT_BOOK_CAP};
 use crate::derivatives::american::{self, CashDividend, Lattice, OptionSpec, Style};
 use crate::derivatives::calendar;
-use crate::derivatives::dealer::{american_ladder, dealer_thetas, pressure_after, read_smile, walk, ExpirySummary, Ladder, OptionQuote};
+use crate::derivatives::dealer::{
+    american_ladder, dealer_thetas, moneyness_factor, pressure_after, price_ladder, read_smile, walk, ExpirySummary, Ladder,
+    OptionQuote,
+};
 use crate::derivatives::pricing::{black_greeks, intrinsic, Greeks};
 use crate::derivatives::surface::{term_shape, Ssvi, Surface, TermInputs, ThetaCurve};
 use crate::derivatives::{
@@ -78,6 +81,9 @@ use crate::derivatives::{
 };
 use crate::market_maker::MARKET_MAKER_ID;
 use crate::order_book::{OrderBook, Side};
+
+/// Open ticks a session (`option_name_inventory_half_life` counts sessions).
+const SESSION_TICKS: f64 = 390.0;
 
 /// The contract families' roots: a name with one of these tickers lists no
 /// options, so a symbol names one contract.
@@ -396,6 +402,9 @@ impl Engine {
     /// one-session variance of the name at the report.
     fn name_events(&self, clock: &Clock, slot: usize, series: &[f64], day: i64, n_max: usize) -> Vec<(usize, f64)> {
         let p = &self.params;
+        if p.surface_name_earnings_premium != 0.0 {
+            return self.name_events_drawn(clock, slot, series, day, n_max);
+        }
         if p.surface_earnings_weight == 0.0 || !self.carries_earnings() || series.is_empty() {
             return Vec::new();
         }
@@ -428,6 +437,87 @@ impl Engine {
         out
     }
 
+    /// The name in `slot`'s reports as the engine draws them
+    /// (`surface_name_earnings_premium`): `(knot, variance)` at each reaction
+    /// session `d` from the next unprinted one on, `earnings_surprise_sigma`
+    /// squared plus `earnings_session_sigma` squared, and at `d + 1`,
+    /// `earnings_followthrough_sigma` squared, each times the name's
+    /// non-market daily variance now ([`Engine::name_drawn_variance`])
+    /// carried to the session on the forecast's path of the name's variance,
+    /// `series` at the session over `series` at the next. A report printed
+    /// at today's open still has its session after ahead.
+    fn name_events_drawn(&self, clock: &Clock, slot: usize, series: &[f64], day: i64, n_max: usize) -> Vec<(usize, f64)> {
+        let p = &self.params;
+        if !self.carries_earnings() || series.is_empty() || series[0] <= 0.0 {
+            return Vec::new();
+        }
+        let c = &self.companies[slot];
+        if !c.is_public || c.is_bankrupt {
+            return Vec::new();
+        }
+        let unit = self.name_drawn_variance(slot);
+        let h = crate::earnings::id_hash(&c.id);
+        let q = crate::earnings::QUARTER_SESSIONS;
+        let from = clock.unprinted;
+        let last = clock.base + n_max as i64 - 1;
+        let report = p.earnings_surprise_sigma * p.earnings_surprise_sigma
+            + p.earnings_session_sigma * p.earnings_session_sigma;
+        let after = p.earnings_followthrough_sigma * p.earnings_followthrough_sigma;
+        let mut out = Vec::new();
+        if last < from {
+            return out;
+        }
+        let mut push = |d: i64, sigma2: f64| {
+            if sigma2 == 0.0 || d < from || d > last {
+                return;
+            }
+            let n = d - clock.base + 1;
+            if n < 1 || n as usize > n_max {
+                return;
+            }
+            let at = std::cmp::max(1, d - day + 1) as usize;
+            let v = series[std::cmp::min(at, series.len()) - 1];
+            out.push((n as usize, sigma2 * unit * (v / series[0])));
+        };
+        for quarter in std::cmp::max(from - 1, 0).div_euclid(q)..=std::cmp::max(last, 0).div_euclid(q) {
+            let d = crate::earnings::reaction_session(self.earnings_key, h, quarter);
+            push(d, report);
+            push(d + 1, after);
+        }
+        out
+    }
+
+    /// The name in `slot`'s non-market daily variance now, in the unit its
+    /// opening print draws the earnings surprise in
+    /// (`Engine::apply_night_split`): its GARCH variance, floored, at its
+    /// idiosyncratic scale, size and idiosyncratic state, and its sector
+    /// loading on the sector's sigma, in quadrature.
+    pub(crate) fn name_drawn_variance(&self, slot: usize) -> f64 {
+        let p = &self.params;
+        let c = &self.companies[slot];
+        let beta = c.stock.beta.unwrap_or(1.0);
+        let sector_sigma = match self.sector_keys.iter().position(|k| *k == c.sector) {
+            Some(k) => {
+                let shared = crate::market::tick::sector_sigma_at(p, &self.economy, self.vix_anchor);
+                let sigma = if p.sector_vol_alpha != 0.0 || p.sector_vol_beta != 0.0 {
+                    match self.sector_variance.get(k) {
+                        Some(v) if *v > 0.0 => shared * crate::mathx::sqrt(*v),
+                        _ => shared,
+                    }
+                } else {
+                    shared
+                };
+                crate::market::factors::sector_loading_for(p, beta) * sigma
+            }
+            None => 0.0,
+        };
+        let daily_sigma = crate::mathx::sqrt(crate::mathx::max(c.stock.garch_variance, p.idio_sigma_floor));
+        let own_unit = crate::market::factors::idio_scale_for(p, beta)
+            * crate::market::factors::cap_size_multiplier_with(p, c.stock.market_cap);
+        let own_unit = if self.idio_state_on() { own_unit * crate::mathx::sqrt(self.idio_ratio_at(slot)) } else { own_unit };
+        (daily_sigma * own_unit) * (daily_sigma * own_unit) + sector_sigma * sector_sigma
+    }
+
     /// The surface of the name in `slot` now, on the index surface `index`:
     /// `None` without a forecast of the name.
     fn name_surface_at(&self, clock: &Clock, slot: usize, index: &Surface) -> Option<Surface> {
@@ -454,18 +544,24 @@ impl Engine {
             p.surface_term_premium_short,
             p.surface_term_premium_long,
             &events,
-            p.surface_earnings_weight,
+            if p.surface_name_earnings_premium != 0.0 { p.surface_name_earnings_premium } else { p.surface_earnings_weight },
         );
+        let inputs = if p.surface_name_term_slope == 0.0 { inputs } else { inputs.with_name_slope(p.surface_name_term_slope) };
         let shape = term_shape(&inputs, n_max);
         let curve = ThetaCurve::from_shape(&shape, clock.elapsed, 1.0)?;
-        let rho = if p.surface_name_skew == 0.0 { 0.0 } else { p.surface_name_skew * index.ssvi.rho };
+        // The names' curvature and the correlation theirs is a share of: the
+        // index's own, or under `surface_index_curvature` the index's VIX and
+        // skewness fitted at the shared curvature.
+        let (eta, reference) = self.name_reference_fit(index)?;
+        let rho = if p.surface_name_skew == 0.0 { 0.0 } else { p.surface_name_skew * reference.rho };
         Some(Surface {
             root: self.companies[slot].ticker.clone(),
-            ssvi: Ssvi::new(rho, index.ssvi.eta, index.ssvi.gamma),
+            ssvi: Ssvi::new(rho, eta, index.ssvi.gamma),
             curve,
             vix: index.vix,
             skewness_target: None,
-            fit: index.fit,
+            fit: reference,
+            hold: None,
         })
     }
 
@@ -549,8 +645,23 @@ impl Engine {
         let mut shifts = Vec::with_capacity(c.expiries.len());
         for e in &c.expiries {
             let sessions = crate::mathx::max(0.0, (e.expiry + 1) as f64 - clock.now);
-            plain.push((sessions, surface.theta(sessions)));
-            shifts.push(spec.inventory_shift(e.pressure, spec.half_spread(base, surface.vix, 0.0)));
+            let theta = surface.theta(sessions);
+            plain.push((sessions, theta));
+            let half_atm = spec.half_spread(base, surface.vix, 0.0);
+            let slope = self.params.option_name_inventory_slope;
+            shifts.push(if slope != 0.0 {
+                // `option_name_inventory_slope`: a share of the expiry's
+                // at-the-money volatility per contract, under the same cap
+                let vol = if sessions > 0.0 && theta > 0.0 { crate::mathx::sqrt(theta * 252.0 / sessions) } else { 0.0 };
+                if e.pressure == 0.0 || !(half_atm > 0.0) {
+                    0.0
+                } else {
+                    let cap = spec.inventory_cap * half_atm;
+                    crate::mathx::clamp(slope * vol * e.pressure, -cap, cap)
+                }
+            } else {
+                spec.inventory_shift(e.pressure, half_atm)
+            });
         }
         let dealer = dealer_thetas(&plain, &shifts);
         let thetas = plain.iter().zip(dealer).map(|(&(_, theta), d)| (theta, d)).collect();
@@ -638,8 +749,33 @@ impl Engine {
             self.name_tree(right, ctx.spot, strike, x, surface_iv, Style::American)?.value
         };
         let z = if x.theta > 0.0 { k / crate::mathx::sqrt(x.theta) } else { 0.0 };
-        let half = spec.half_spread(self.params.option_dealer_spread, ctx.surface.vix, z);
-        let l = american_ladder(spec, right, x.forward, strike, x.years, x.discount, iv, half, tree.value);
+        let mut half = spec.half_spread(self.params.option_dealer_spread, ctx.surface.vix, z);
+        let exponent = self.params.option_name_spread_tenor_exponent;
+        let tenor = if exponent != 0.0 {
+            crate::mathx::pow(crate::mathx::max(x.sessions, 1.0) / 21.0, exponent)
+        } else {
+            1.0
+        };
+        let (otm, itm) = (self.params.option_name_spread_otm, self.params.option_name_spread_itm);
+        let atm_vol = if x.years > 0.0 && x.dealer_theta > 0.0 {
+            crate::mathx::sqrt(x.dealer_theta / x.years)
+        } else {
+            0.0
+        };
+        let l = if (otm != 0.0 || itm != 0.0) && atm_vol > 0.0 {
+            // `option_name_spread_otm` and `_itm`: the half-spread a share of
+            // the price, the at-the-money share times the moneyness factor
+            let side = |v: f64| if v != 0.0 { v } else { 1.0 };
+            let share = spec.half_spread(self.params.option_dealer_spread, ctx.surface.vix, 0.0) / atm_vol
+                * moneyness_factor(tree.delta.abs(), side(otm), side(itm))
+                * tenor;
+            price_ladder(spec, tree.value, share * tree.value, iv)
+        } else {
+            if exponent != 0.0 {
+                half *= tenor;
+            }
+            american_ladder(spec, right, x.forward, strike, x.years, x.discount, iv, half, tree.value)
+        };
         let (_, euro) = black_greeks(right, x.carry_spot, strike, x.years, iv, x.rate);
         let greeks = Greeks { delta: tree.delta, gamma: tree.gamma, vega: euro.vega, theta: euro.theta };
         let symbol = name_option_symbol(&ctx.ticker, x.expiry, right, strike);
@@ -804,8 +940,11 @@ impl Engine {
     /// `positions` (`(symbol or ticker, signed contracts or shares)`), name
     /// by name: the worst loss over the scan's moves of the name, sized to
     /// the margin's quantile of its one-session sd, at each volatility
-    /// shift, less the stock's own worst loss, floored at 0, so stock that
-    /// covers an option's risk nets it and stock alone asks nothing. Each
+    /// shift, the stock's gain in each move netted against the options' loss
+    /// there (`option_scan_loss_with`), so stock that covers an option's risk
+    /// nets it and stock alone asks nothing. With `margin_option_scan_range`
+    /// set, the moves are instead the portfolio-margin rule's ten points over
+    /// plus and minus that share of the name's price. Each
     /// option is revalued as a European on its escrowed price. 0 where no
     /// name option is held; `None` where a held name does not price.
     pub(super) fn name_option_margin(&self, positions: &[(String, f64)]) -> Option<f64> {
@@ -828,8 +967,8 @@ impl Engine {
         let clock = self.options_clock();
         let index = self.surface_at(&clock)?;
         let p = &self.params;
-        let tail = if p.margin_scan_tail == 0.0 { 1.0 } else { p.margin_scan_tail };
-        let z = super::margin::normal_quantile(0.5 + 0.5 * p.margin_scan_coverage) * tail;
+        let z = super::margin::normal_quantile(0.5 + 0.5 * p.margin_scan_coverage)
+            * super::margin::option_scan_tail(p);
         let mut total = 0.0;
         for (chain, held) in by_chain {
             let ctx = self.name_context(&clock, chain, &index)?;
@@ -848,16 +987,77 @@ impl Engine {
                 });
             }
             let shares: f64 = positions.iter().filter(|(s, _)| *s == ctx.ticker).map(|(_, q)| *q).sum();
-            // The name's one-session sd: the forecast's for the next session.
-            let variance = self
-                .forecast()
-                .and_then(|f| f.name_variance.get(ctx.slot))
-                .and_then(|s| s.first().copied())
-                .unwrap_or(0.0);
-            let spot_move = z * crate::mathx::sqrt(crate::mathx::max(0.0, variance)) * ctx.spot;
-            let with = super::margin::option_scan_loss_with(&scan, shares, spot_move, z * super::margin::SCAN_VOL_SD);
-            let alone = shares.abs() * spot_move;
-            total += crate::mathx::max(0.0, with - alone);
+            let loss = if p.margin_option_scan_range != 0.0 {
+                // The portfolio-margin rule's range (`margin_option_scan_range`):
+                // ten equidistant moves of the name over plus and minus that
+                // share of its price.
+                let size = p.margin_option_scan_range * ctx.spot;
+                let moves = super::margin::RANGE_POINTS.map(|x| x * size);
+                super::margin::option_scan_loss_at(&scan, shares, &moves, z * super::margin::SCAN_VOL_SD)
+            } else {
+                let spot_move = self.name_spot_move(ctx.slot, ctx.spot, z);
+                super::margin::option_scan_loss_with(&scan, shares, spot_move, z * super::margin::SCAN_VOL_SD)
+            };
+            // The portfolio-margin rule's per-contract minimum
+            // (`margin_option_minimum`).
+            total += if p.margin_option_minimum != 0.0 {
+                crate::mathx::max(loss, super::margin::option_contract_minimum(&scan, p.margin_option_minimum))
+            } else {
+                loss
+            };
+        }
+        Some(total)
+    }
+
+    /// The scan's move of the name in company slot `slot` at price `spot`,
+    /// dollars a share: `z` times the name's one-session sd, the forecast's
+    /// for the next session.
+    fn name_spot_move(&self, slot: usize, spot: f64, z: f64) -> f64 {
+        let variance = self
+            .forecast()
+            .and_then(|f| f.name_variance.get(slot))
+            .and_then(|s| s.first().copied())
+            .unwrap_or(0.0);
+        z * crate::mathx::sqrt(crate::mathx::max(0.0, variance)) * spot
+    }
+
+    /// The scan's margin on stock held alone in listed names, dollars:
+    /// `(ticker, signed shares)` pairs, each charged its shares times the
+    /// scan's move of the name (`Engine::name_option_margin`'s), the stock's
+    /// worst loss over the scan's moves. The option scan charges stock only
+    /// as cover for an option's risk; this is the stock's own scan, for the
+    /// shares an exercise or an assignment delivered into an account that no
+    /// longer holds the name's options. With `margin_option_scan_range` set,
+    /// each is charged that share of its value instead. Tickers without a
+    /// listed chain, or without a price, are left out. `None` with margin or
+    /// the name options off. A read.
+    pub fn stock_scan_margin(&self, positions: &[(String, f64)]) -> Option<f64> {
+        if !self.margin_on() || !self.names_on() {
+            return None;
+        }
+        let p = &self.params;
+        let z = super::margin::normal_quantile(0.5 + 0.5 * p.margin_scan_coverage)
+            * super::margin::option_scan_tail(p);
+        let mut total = 0.0;
+        for (ticker, shares) in positions {
+            if *shares == 0.0 {
+                continue;
+            }
+            let Some(chain) = self.name_chain_of(ticker) else {
+                continue;
+            };
+            let slot = self.name_options.chains[chain].slot;
+            let spot = self.companies[slot].stock.price;
+            if !(spot > 0.0 && spot.is_finite()) {
+                continue;
+            }
+            // At the portfolio-margin rule's range the stock alone loses that
+            // share of its value at the range's end.
+            total += if p.margin_option_scan_range != 0.0 {
+                shares.abs() * p.margin_option_scan_range * spot
+            } else {
+                shares.abs() * self.name_spot_move(slot, spot, z)
+            };
         }
         Some(total)
     }
@@ -1435,7 +1635,13 @@ impl Engine {
         if !self.names_on() || self.options.phase != OptionsPhase::Session {
             return;
         }
-        let d = NAME_OPTION_DEALER.decay();
+        let life = self.params.option_name_inventory_half_life;
+        let d = if life != 0.0 {
+            // `option_name_inventory_half_life`, sessions of open ticks
+            crate::mathx::pow(0.5, 1.0 / (life * SESSION_TICKS))
+        } else {
+            NAME_OPTION_DEALER.decay()
+        };
         for chain in self.name_options.chains.iter_mut() {
             for e in chain.expiries.iter_mut() {
                 e.pressure *= d;

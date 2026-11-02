@@ -1,4 +1,122 @@
-## Unreleased
+## 0.11.0
+
+pt-v22 is the default preset. It lists contracts beside the stocks: index
+futures with a night session, policy-rate, term-rate and oil futures, and
+American options on every name. An agent trades them by symbol in whole
+contracts and exercises an option at a close with `tf.Exercise`. pt-v22
+passes all 190 rows that count toward its grade over 21 years, and reports
+41 more, five outside their marks (`validation/pt-v22/`).
+
+Margin is set at every close. A future is margined from a risk scan and pays
+its move to the day's settlement mark in cash. A name's options and stock
+are margined together: the worst loss
+over ten moves of the name up to 15% either way, and at least $.375 a share
+for each option. An order that would leave equity under the initial margin
+is refused with `MarginError`. A close under the maintenance level makes a
+call due by the next open. If equity isn't back at the initial margin then,
+or the close left the account below zero, the account's contracts and its
+options' stock are sold at the market.
+
+`Scenario.load("recession_2008")` adds the 2007-09 recession, with the VIX
+on its 2008-09 path. `tradefloor.contracts.explain_move` says why a
+contract's price moved, and a strategy spec can hedge with the front index
+future.
+
+**What breaks.** A run that leaves `model` out gives pt-v22's market;
+`model="pt-v21"` keeps 0.10.2's, and every preset replays as it did. On the
+default an agent's observation carries the contracts (payload version 3).
+The Rust crate's API only grows.
+
+<!-- release-note-ends -->
+
+### pt-v22 as the default
+
+From 0.11.0 the library's default preset is pt-v22 (`DEFAULT_PRESET_NAME`,
+`Engine::default_model`); pt-v21 stays selectable by name and replays
+exactly. Every seeded default trajectory changes: `KAT_VERSION` goes to 30
+and `tests/known_answer.json` is re-based. The default market lists
+futures, options and margin, so an agent's observation on it carries
+`index`, `futures`, `margin` and `options`: payload version 3, which
+adds those keys only on a model that lists contracts. On pt-v21 the
+payload is version 2's, and a recording made on the old default replays
+with `model="pt-v21"`.
+
+### pt-v22: the contracts
+
+**pt-v22** lists contracts beside the stocks, and an agent trades them by
+symbol in whole contracts, as it trades a ticker:
+
+- **Index futures** on a price index of the roster: the front two
+  quarterly contracts, each named by its expiry session (`IDX.F0056`) and
+  priced at its carry fair value plus a basis, with its own book and a
+  night session from the close to the next open. Each settles in cash on
+  the index of its expiry session's opening prints.
+- **Rate futures**: monthly policy-rate futures (`FF`) and quarterly
+  term-rate futures (`TR3`), priced on the policy rate the market expects
+  plus a premium, settling in cash at 100 less the period's rate.
+- **Oil futures**, monthly, priced on the oil price the market expects and
+  settling in cash on the oil price at expiry.
+- **Single-name options** on every name: American calls and puts, 100
+  shares a contract, quoted by a dealer from each name's volatility
+  surface. A holder exercises at a close with `tf.Exercise`; exercise and
+  assignment move the shares and the strike at the close.
+
+Margin works as a clearing house's does. Each future asks an initial
+margin set at each close from its recent volatility, and a maintenance
+margin of the initial over 1.1. A name's options are margined with the
+stock held in it as FINRA's portfolio margin is: the largest loss over ten
+equidistant moves of the name from 15% down to 15% up, netted within the
+name and summed across names, so a covered call asks less than a naked one,
+and at least $.375 a share for each option. Stock an exercise or an
+assignment delivered into an account that no longer holds the name's
+options asks 15% of its value from the close it arrives. A future pays its
+move to the day's settlement mark in cash at each close. A close that leaves equity under the
+maintenance margin makes a margin call, and if equity is still under the
+initial margin at the next open, every contract held is closed at the
+market, and so is the stock in each name whose options the account held or
+took delivery in. Each sale is sent again for what is left while the market
+still buys, as a broker works the order; a long option nobody bids stays
+held. An order that would leave equity under the initial margin
+it then asks is refused with `MarginError`. `Portfolio.margin(engine)` reads
+the account's requirement and any open call.
+
+The MCP server's `list_contracts`, `quote_contracts` and `option_chain`
+read a session's contracts, and `session_step` trades and exercises them.
+The framework payload, the Arrow tables and the WASM build show them too.
+Listing the contracts moves no stock price.
+
+### The 2008 recession scenario
+
+`Scenario.load("recession_2008")` is a new packaged scenario: the 2007-09
+recession on the NBER's months, with every company's earnings cut to 70% by
+the trough, the credit spread over the 10-year widened 150 basis points, and
+the VIX on its real 2008-09 path from Lehman, as a multiple of the model's
+own VIX on that day. pt-v22's recession rows are read on it. The older
+`recession` scenario and the fingerprint batteries are unchanged.
+
+### The causes of a contract's price change
+
+`tradefloor.contracts.explain_move(before, after, quantity)` says why a
+contract's price moved between two of its quotes: a future's move as the
+index carried to expiry, the rest of its carry and the change in its basis;
+a rate future's as the expected policy rate, its premium and the basis; an
+option's as its delta and gamma on the underlying's move, its vega on the
+change in implied volatility, its theta over the sessions passed, and the
+rest. The parts sum to the move, and in dollars they are a position's P&L
+by cause. It reads the two quotes only.
+
+### Specs that hold the index future
+
+A strategy spec can hold the front index future beside its stock book: a
+`contracts` section, `{"index_future": {"hedge_ratio": 1.0}}` to offset the
+book's dollars or `{"index_future": {"weight": 0.5}}` for a share of net
+worth, sized in whole contracts at each decision and rolled to the next
+contract (`StrategySpec.with_index_future`). A spec without the section
+serializes and fingerprints exactly as before, and on a model that lists no
+index futures the section trades nothing. Neither change moves a price:
+every known-answer digest is where it was.
+
+### Dividends in MCP sessions
 
 An MCP market session now pays dividends. On pt-v21 a holder in a session
 took the ex-date price drop and was never paid, so its net worth and P&L
@@ -8,23 +126,406 @@ are paid. A holder through an ex-date is paid what `evaluate` pays it on
 the same market, and a fork, a rewind or a replay of the session's orders
 pays each ex-date once, with every known-answer digest where it was.
 
-Three switches, off on every preset, build what futures and options will
-read: a price index of the roster with a divisor, a VIX published live
-within the session, and a forecast of the VIX, the index's and each name's
-variance, the policy rate and oil up to 252 sessions ahead, computed at
-each close from public state. None of them moves a price.
+### The index options' forward from the listed future
 
-Two more switches, also off on every preset, list futures on that index and
-let them trade through the night: the front two quarterly contracts, each
-priced at its carry fair value plus a basis, with its own book, and settled
-on the index of its expiry session's opening prints. Stock prices are the
-same with them on as off.
+`options_index_forward_from_future`, 0.0 on every preset: the index
+options' dealer takes an expiry's forward from the book mid of the listed
+index future of the same expiry, so the chain meets put-call parity against
+the future the market trades, not against a carry the future's basis
+departs from. Expiries without a future keep the carry, and every
+known-answer digest is where it was.
 
-Four more list European index options and American options on every name,
-settled in shares, quoted from arbitrage-free surfaces. The MCP server,
-payload, Arrow and WASM show them; agents trade by symbol.
+### A held future settles from its own expiry's rows
 
-<!-- release-note-ends -->
+`Portfolio` settled an expired future by reading every settlement of the
+history at each open and close. With the index options listed every
+expiry adds some 700 rows, so a long traded run slowed in proportion to
+its length at every step. It now reads each held contract's expiry session
+and the sessions after it until the contract's row appears. The rows found
+are the same, and a traded history's net worth, settlements and margin
+records are identical (`tests/test_futures_accounts.py`).
+
+### Company news released through the session
+
+- `news_session_release_share` is a new dial, 0.0 on every preset and left
+  out of the digest there: the share of the session's endogenous company news
+  released during the session on the measured profile, rather than at its
+  first tick. An event's release minute comes from its occurrence uniform, so
+  no draw is added; from its release it is absorbed on the `news_absorption_*`
+  profile over what is left of the session. The sandbox's `news()` holds an
+  event back until `session_tick` reaches its release. On the certified
+  forty's 8-Ks without item 2.02 (2014-2025, 1,372 in-session filings), 0.6%
+  land in the first minute and 4.7% in the first half hour; the model's first
+  tick prices about 0.6 of the session's news.
+
+### A pinned VIX's same-day return
+
+- `pinned_vix_return` is a new dial, 0.0 on every preset and left out of
+  the digest there: the index's same-day return on a pinned VIX's change, a
+  share per VIX point. A replay that pins the real VIX overwrites the VIX the
+  day's return would have moved, so the index fell with no regard to the
+  VIX's moves (2008: a slope of -0.047 on the log VIX change, R^2 0.02,
+  against the S&P 500's -0.217, R^2 0.61). Off zero, each pin sets the
+  session's mean market move to `-b` times the VIX's change, less what the
+  `pinned_vix_feedback` discount already priced, spread over the session's
+  ticks at each name's beta; the variance trim reads the whole move. The
+  S&P 500 measures -0.5375% a point (se 0.0249, 1990-2025), flat across the
+  VIX's level. No draw; free sessions are untouched.
+
+### The 2-year as the expected path plus a term premium
+
+- `treasury_2y_expected_path` is a new dial, 0.0 on every preset and left
+  out of the digest there: the share of the 2-year's daily target taken
+  from the expected policy path plus a term premium. At 0.0 the target is
+  the blend `0.85 (ff + priced) + 0.15 x 10y`. The path is the mean, over the next 504
+  closes, of the policy rate the standing forecast expects, the rate the
+  term-rate strip prices before its premium. The premium is ACM TP02's
+  mean, 43.3 bp (NY Fed monthly, 1961-2026), plus 0.452 of the 10-year's
+  own term-premium state (TP02's slope on TP10). No draw. The pull, the
+  noise and the meetings are unchanged.
+
+### The close's growth priced at the open
+
+- `remark_growth_open_share` is a new dial, 0.0 on every preset and left out
+  of the digest there: the share of the growth in the close's macro re-mark
+  (the change in fair value with only nominal output brought forward, and the
+  aggregate level's close step) that waits for the next opening print
+  instead of entering at the re-mark. The re-mark's news (rates, the VIX, the cycle) stays at
+  the close. The mispricing is unchanged, so the open takes the rest on the
+  night; no draw and no state. Read only with `macro_publication_repricing`;
+  refused without a night split. On the forty names 2015-2025 the night
+  carries 0.707 of the mean daily log return; the model's, with the whole
+  re-mark at the close, about 0.15.
+
+
+### A fast return memory on the market's variance
+
+- `market_vol_leverage_fast` and `market_vol_leverage_fast_half_life` are new,
+  0.0 on every preset and left out of the digest there: a second return memory
+  on the market factor's variance beside `market_vol_leverage`'s, at its own
+  half-life. The VIX's read-back and the forecast take it at its mean over the
+  VIX's 21-session window. Its state is carried by the snapshot and the state
+  hash only while it is set. On the S&P 500, 1990-2025, a day's return moves
+  the next week's realised volatility by its sign: a two-sd fall raises it by
+  0.24 in logs and a two-sd rise lowers it by 0.13, and most of that is gone
+  within twenty sessions.
+- `market_vol_leverage_fast_up` is new, 0.0 on every preset and left out of
+  the digest there: the share of a fall the fast memory ignores, re-centred,
+  so at 1.0 it counts rises only and a rally calms the next sessions. On the
+  S&P 500 a two-sd rise lowers the next week's realised vol by 0.13 in logs.
+
+### The market's next-session reversal
+
+- `market_factor_reversal` is a new dial, 0.0 on every preset and left out of
+  the digest there: the share of yesterday's whole market factor each name
+  gives back over today's session, moved into the fair-value level so it does
+  not revert. No draw and no state of its own. The S&P 500's daily return has
+  a lag-1 autocorrelation of -0.079 over 1990-2025 and its variance ratios
+  fall to 0.76 by 21 sessions; the E-mini future reads the same.
+- `market_factor_reversal_vix_power` is new, 0.0 on every preset and left out
+  of the digest there: the reversal's share follows the VIX as `k (X/20)^q`.
+  The S&P 500's next-day reversal is near zero under a VIX of 30 and -0.17
+  above it; `(X/20)^2` fits best.
+- `market_factor_reversal_transient` is new, 0.0 on every preset and left out
+  of the digest there: the share of the reversal that stays in the name's
+  mispricing instead of moving to the fair-value level. At 1.0 a move is
+  still partly undone the next session, but the level keeps every move whole,
+  so a crash is not taken back. No draw and no state. The S&P 500's variance
+  ratios fall to 0.78 by 10 sessions and stay there out to 252 (0.79), which
+  the model already reads at 252 without the reversal.
+
+### The index smile's term scaling
+
+- `surface_index_tenor_exponent` is new, 0.0 on every preset and left out of
+  the digest there. Off zero the index's SSVI power law is read at the
+  21-session fit's total variance and falls from there as `theta^-x`, in
+  place of `surface_curvature_exponent`: the 21-session smile, its VIX and
+  its SKEW are unchanged, and the at-the-money skew scales with the tenor as
+  `T^-x` (about `T^-0.4` on the S&P). Index only; read only with
+  `surface_ssvi` set.
+- `surface_index_tenor_strip` is new, 0.0 on every preset and left out of
+  the digest there. At 1.0 the term scaling holds each tenor's strip (the
+  VIX formula's variance) where SSVI's own power law puts it, in place of its
+  at-the-money variance: the VIX9D, VIX3M, VIX6M and VIX1Y strips are
+  unchanged and the scaling moves variance between the money and the wings.
+
+### The forecast's nowcast of the VIX's slow level
+
+- `forecast_vix_level_nowcast`, `forecast_vix_level_nowcast_half_life` and
+  `forecast_vix_level_nowcast_centre` are new, 0.0 on every preset and left
+  out of the digest there; the first is refused without
+  `forecast_horizon_sessions` and `vix_level_sigma`. Off zero the engine keeps
+  the published VIX's log average (snapshotted and hashed only then) and the
+  forecast takes the VIX's slow level, which it cannot see, as the gain times
+  the average's gap to the centre, decaying at `vix_level_persistence`. A
+  projection fitted on held-out histories. It changes only what the forecast
+  publishes.
+
+### The VIX futures premium's response
+
+- `futures_vix_premium_response` is a new dial, 0.0 on every preset and left
+  out of the digest there; refused without `futures_vix_listed`. It moves the
+  VIX futures premium's slope on the VIX from the frozen level slope `b(n)`
+  (+0.02 to +0.19 a VIX point) toward its time-series response measured on
+  CFE VX, 2004-2026: a contract's daily change less the tape's own expected
+  change of its settlement, per point of the day's VIX move, -0.072 (se 0.053)
+  and flat in tenor. At 1.0 a VIX jump compresses the premium, as on CFE,
+  with no draw and no state of its own.
+
+### Margin on the shares an assignment delivers
+
+Stock held in a name an exercise or an assignment delivered shares in,
+while the account holds none of that name's options, is margined on its own
+scan, `Engine.stock_margin`: 15% of the shares' value, the loss at the end
+of the portfolio-margin range.
+The close the shares arrive at calls any shortfall, even when the
+assignment settled the account's last option. Stock in a name the account
+took no delivery in asks nothing, and every known answer is where it was.
+
+### A liquidation takes the stock with the contracts
+
+An unmet margin call closes the account's futures and options at the open,
+and the stock in each name whose options it held or that an exercise or an
+assignment delivered shares in. An assignment can hand an account several
+times its equity in shares, and a liquidation takes them. Each sale is sent
+again for what is left while the market still buys: a dealer shows a few
+levels and bids nothing under a cent, so one order could leave much of a
+position unsold. Stock in other names is kept. Accounts without single-name
+options are unaffected; known answers are unchanged.
+
+### A single name's premium shaped in tenor
+
+`surface_name_term_slope` is a new dial, 0.0 on every preset and left out
+of the digest there. Off zero each name's implied variance at `t` sessions
+takes a further log premium of the slope times `ln(t / 63)`, on top of
+`surface_name_premium` and the index's term premia, so a name's 63-session
+point is where it was and, with a positive slope, its shorter tenors fall.
+The earnings reports' variance is not scaled. It prices options only:
+stock prices and every known answer are where they were.
+
+### A name's reports priced on the variance they draw
+
+`surface_name_earnings_premium` is a new dial, 0.0 on every preset and left
+out of the digest there. Off zero a name's surface prices each report at
+that premium on the variance the engine draws for it: the surprise and the
+reaction session's own part at the reaction session, the follow-through at
+the session after, each in the name's non-market daily variance. At 0.0 a
+report is `surface_earnings_weight` times the surprise's sigma squared
+times the name's whole one-session variance, the market's part included,
+as before. It prices options only: stock prices and every known answer are
+where they were.
+
+### The single-name options' trading cost
+
+Five dials, 0.0 on every preset, set what a single-name option costs to
+trade: how far a trade moves the dealer's price and how fast that fades, and
+how its spread changes away from the money and with time to expiry.
+`option_name_inventory_slope` is the price move per contract, a share of
+the at-the-money volatility, and `option_name_inventory_half_life` the
+sessions it takes to halve; at 0.0 the move is half a half-spread per 20
+contracts and halves in 15 open ticks. `option_name_spread_otm` and
+`option_name_spread_itm` quote the spread as a share of the price by delta,
+and `option_name_spread_tenor_exponent` scales it by time to expiry. They
+price options only: stock prices and every known answer are where they
+were.
+
+### Company news released before the open
+
+- `policy_guidance_signal_sd` is a new dial, 0.0 on every preset and left
+  out of the digest there: the forecast's policy path, which the policy-rate
+  and term-rate futures read, sees the Fed's own reading of the next meeting
+  (the share `policy_anticipation_guidance` gives it) through a signal with
+  noise of this sd (bp, one keyed draw a meeting), and prices its posterior
+  mean over the 25 bp grid around the published shadow, under the model's
+  own prior over the gap between the two; on the eve the reading is the
+  decision the eve holds (`fed_eve_decision`) and the meeting is priced at
+  that whole. Before, the path showed the decision itself: a rule trading
+  the front fed funds future on the eve's step won 35 of 36 meetings, and a
+  surprise added to the eve's price was undone by rounding it to the grid.
+  At 6.48 bp the decision less the eve's price has the sd of the
+  Kuttner-scaled ZQ=F surprise on scheduled FOMC days net of an ordinary
+  session, 2015 and 2021-2026, 2.55 bp (se 0.69). No stock price moves.
+- `rate_premium_per_fixing` is a new switch, 0.0 on every preset and left out
+  of the digest there: each close of a rate future's period takes the
+  premium at its own distance, inside the mean (FF) or the compounding
+  (TR3), so a quarter and its three months carry one premium. At its last
+  close a TR3 took the whole quarter's premium, 4.5 bp under its strip at 63
+  sessions and 8.2 at 126. The per-fixing premium is refitted to the same
+  excess returns (k 3.1679, p 1.3235; every point within 0.39 se).
+- `news_preopen_share` is a new dial, 0.0 on every preset and left out of the
+  digest there: the share of the day's endogenous company news released
+  before the open, priced by the opening print on the night rather than
+  through the session. An event is pre-open when its occurrence uniform is
+  below the share times the intensity, so no draw is added. It reaches each
+  name as the session composes news, lands with the night's own draw and
+  moves fair value at `fair_value_news_share`. Refused without a night split.
+  On the forty names 2015-2025 the night carries 0.259 of the idiosyncratic
+  variance on large non-event days; the model's, with every event in the
+  session, 0.167.
+
+### The 10-year's lagged equity term
+
+- `treasury_equity_lag` and `treasury_equity_lag_gain` are new dials, 0.0 on
+  every preset and left out of the digest there. The first is the half-life
+  at which a gap the 10-year prices follows credit's leverage gap; the second
+  is the points that gap takes off the 10-year's anchor, in the daily anchor
+  and in the meeting's target, so the 10-year keeps moving with the index
+  for weeks after a fall instead of giving the move back. The gain is refused
+  without the lag; both are read only with the leverage gap carried. No draw;
+  the priced gap is snapshotted and hashed only with both set. FRED DGS10 on
+  the S&P 500, 1990-2025, moves +0.88 bp per 1% on the day and +2.70 by 62
+  sessions; the flight to quality's increment fades within the month.
+
+### Credit's lagged leverage term
+
+- `corporate_spread_equity_lag_gain` is a new dial, 0.0 on every preset and
+  left out of the digest there: points of the corporate spread's base per
+  unit of the gap credit has priced (`corporate_spread_equity_lag`), beside
+  the leverage term on the gap itself, so the spread widens on the day of an
+  index fall and keeps widening for about two weeks. Refused without the lag;
+  read only with `corporate_spread_equity_gain` set. No draw and no state of
+  its own. The IG closing-price spread (LQD less IEF on SPY, 2015-2025) moves
+  -2.25 bp per 1% on the day and -3.2 by nine sessions; with the gap alone
+  the model's moves -2.46 and then eases.
+
+### The night's first step
+
+- With `night_session_steps` on, the index futures' night starts on the
+  close's marks and takes the close's macro re-mark of the index whole at
+  its first step; an order on an index future before that step walks it
+  first. The after-close quote stood on the close's print while the
+  re-marked level was already public, so buying or selling the front future
+  after the close on the re-mark's sign earned about 21 bp a night. Nothing
+  moves with the switch off, and no stock price.
+
+### The option scan's tail
+
+- `margin_option_minimum` is a new dial, 0.0 on every preset and left out of
+  the digest there: an option book's margin is at least that many dollars a
+  unit of every option it holds, long or short, a long's not more than its
+  value. The scan is a risk-based theoretical loss, so the account it
+  margins is a portfolio-margin account, and FINRA Rule 4210(g)(7) asks the
+  greater of the scan's largest loss and (B) $.375 a listed option times
+  its multiplier: 0.375 a unit.
+- `margin_pretrade_check` is a new switch, 0.0 on every preset and left out
+  of the digest there: a `Portfolio` refuses an order that would leave its
+  equity under the initial margin it then asks (`MarginError`, a subclass of
+  `OrderError`; FINRA Rule 4210(b), Regulation T 12 CFR 220.4(c)). An order
+  that takes risk off, and a liquidation, always go.
+- `margin_option_scan_range` is a new dial, 0.0 on every preset and left
+  out of the digest there. Off zero a name's options are margined at ten
+  equidistant moves of the name over plus and minus that share of its price,
+  and stock held without the name's options at that share of its value.
+  FINRA Rule 4210(g)(2)(F) sets plus or minus 15% for an equity, so the
+  rule's value is 0.15. No price moves.
+- `margin_liquidation_worked` is a new switch, 0.0 on every preset and left
+  out of the digest there. With it on, a margin call's liquidation sends
+  each contract's sale again for what is left while its book still takes
+  some, as a broker works a market order. Sent once, a sale fills only the
+  ladder the dealer shows then; a long option no book bids stays held.
+- `margin_deficit_liquidates` is a new switch, 0.0 on every preset and left
+  out of the digest there. With it on, a margin call made by a close that
+  leaves the account below zero is unmet whatever the next open shows, and
+  the open liquidates as for any unmet call. A broker carries a customer's
+  deficit with its own money from that close (17 CFR 1.22(c)) and
+  liquidates rather than wait for the market to restore it. No price moves
+  by itself.
+- `margin_scan_option_tail` is new, 0.0 on every preset and left out of the
+  digest there. Off zero it is the option scan's own tail allowance, in
+  place of `margin_scan_tail` on the scan's price move and volatility
+  shift. The futures' margin is unchanged, and no price moves.
+
+### The earnings look-through
+
+- `earnings_lookthrough_half_life`, `earnings_lookthrough_gain` and
+  `earnings_lookthrough_discount_half_life` are new, all 0.0 on every preset
+  and left out of the digest there. A `market.earnings` write was valued at
+  once and in full. Off zero, the scenario target passes the write's common
+  factor to the engine (`Engine.note_market_earnings`), which holds its log
+  `m` and an anchor `a`, and the valuation reads `a + c (m - a)` of it:
+  `c = rho / (rho + kappa)`, the deviation's expected path discounted, as
+  the cycle's anticipation is derived. The anchor takes the gain's share of
+  each write at once and of the reversion the valuation expected and did not
+  see at each close, so a permanent write is valued in full in the end. A
+  direct `set_fundamentals` is a name's own news and is valued in full. A
+  run that never writes `market.earnings` is the same with the dials on as
+  off. It draws nothing; `m` and `a` are snapshotted and hashed (tag 65)
+  only while the half-life is set.
+
+### The aggregate earnings level
+
+- `fair_value_aggregate_jensen` is a new switch and
+  `fair_value_aggregate_half_life` a new half-life in sessions, both 0.0 on
+  every preset and left out of the digest there. A name's fair-value level
+  is a level martingale, so the roster's total earnings over the nominal
+  scale are one too and their log falls by half their variance a year, a
+  profit share that drifts down for ever where the tape's ln(CP/GDP) does
+  not. At 1.0 the switch adds half the square of that aggregate's change
+  since the last close to every name's level at each close, so its log
+  innovations have mean zero; the half-life pulls it back toward the
+  roster's base earnings. Each is one shift to every name's level after the
+  relative knee, it draws nothing, and the aggregate after the step is
+  snapshotted and hashed (tag 62) only while either is set.
+- `fair_value_aggregate_expected` is a new switch, 0.0 on every preset and
+  left out of the digest there. At 1.0 the aggregate's step is half the
+  session's expected variance of its move, computed at the open from the
+  coefficients the session's draws are made at, in place of half its
+  realised square. Both remove the log drift in expectation; the realised
+  square is the noisier of the two and also counts the aggregate's
+  predictable moves. It draws nothing, and the variance is snapshotted and
+  hashed (tag 61) only while it and `fair_value_aggregate_jensen` are set.
+
+### Oil's forecast
+
+- `oil_forecast_opec_spread` is a new switch, 0.0 on every preset and left
+  out of the digest there. At 1.0 the forecast's expected OPEC decision reads
+  the oil price's whole spread (the short factor's and the level carriers',
+  as the clamp does), lognormal, in place of the short factor's alone. With
+  the long factor carrying most of the spread, the short factor's undercounts
+  the rule's cuts, which are worth more than its raises, and the forecast
+  sits low. It changes what the forecast publishes and nothing in the law.
+- `oil_forecast_cycle_growth` is a new switch, 0.0 on every preset and left
+  out of the digest there. At 0.0 the forecast steps the economy in the
+  believed phase, held for the whole horizon, so oil's target follows that
+  phase's growth; the law changes phase, with shocks on a phase's first
+  session that sum to -2 points a cycle, and the forecast runs high
+  at long horizons. At 1.0 oil's block reads growth's expectation over the
+  cycle's phases on the law's own transitions: each cohort of the belief's
+  mass (the start's at the phase's stationary age under the full law, read
+  from the economy's own long run; the entrants fresh) leaves at the
+  probability the law's transition check reads at its age. Each phase
+  carries its own economy, stepped by the law in that phase with its own
+  central bank's meetings and the market's gap over its spread, so the
+  ladder's state-dependent hazards read that phase's state; each cohort's
+  growth steps by the law in its phase with the law's mean shock on entry.
+  No free parameter. It changes what the forecast publishes and nothing in
+  the law.
+### The skew noise
+
+- `surface_skew_noise_sd` and `surface_skew_noise_half_life` are new dials,
+  0.0 on every preset and left out of the digest there. Off zero the
+  skewness the index surface's 21-session strip is fitted to carries an
+  AR(1) of its own: it opens at a draw from its stationary distribution and
+  steps at each close, with the sd and half-life asked. The Cboe SKEW the
+  strip prices then moves apart from the VIX, as it does on the tape, and
+  the names' skew, a share of the index's, moves with it. Its draws are
+  keyed on the root seed and take nothing from any stream; stock prices are
+  the same with it on as off.
+- `Engine.skew_noise` reads the noise (None off). A snapshot carries
+  `skew_noise` (the level and its key) while the dial is set, hashed behind
+  tag 82, as `manifest.state_hash` does. Every known-answer digest is where
+  it was.
+### The index surface's own curvature
+
+- `surface_index_curvature` is a new dial, 0.0 on every preset (the shared
+  `surface_curvature`) and left out of the digest there. Off zero the index
+  surface is fitted at its own curvature and the names keep theirs: a
+  name's correlation is its share of the one the index's VIX and skewness
+  give at the shared curvature, so the names' smiles are the ones they have
+  without it. A lower index curvature puts less of the strip's variance in
+  the wings, so at-the-money volatility sits nearer the VIX, and reaches
+  less skew. No state, nothing in the snapshot; stock prices are the same
+  with it set, and every known-answer digest is where it was.
 
 ### Single-name options
 
@@ -118,7 +619,7 @@ payload, Arrow and WASM show them; agents trade by symbol.
   quote.
 - WASM: `Sim.nameOptionRoots` lists the names with options and
   `Sim.nameOptionExpiries(ticker)` reads each of a name's expiries as an
-  `OptionExpiry`, both empty on every shipped preset.
+  `OptionExpiry`, both empty on a model that lists no name options.
 
 ### The options' public API
 
@@ -234,7 +735,7 @@ payload, Arrow and WASM show them; agents trade by symbol.
   `surface_skew_premium`, `surface_skew_premium_slope`, `surface_curvature`, `surface_curvature_exponent`,
   `surface_term_premium_short`, `surface_term_premium_long` and
   `surface_earnings_weight` beside them, all 0.0 on every preset and left out
-  of the digest there. None is fitted yet.
+  of the digest there.
 - The surface is SSVI (Gatheral and Jacquier 2014) with the paper's
   no-arbitrage conditions checked at every knot. Its 21-session strip,
   priced by the Cboe VIX formula, returns the VIX (row SV1, by
@@ -311,7 +812,7 @@ payload, Arrow and WASM show them; agents trade by symbol.
   `initial_margin` carries it, and the new `maintenance_margin` its
   maintenance level.
 - `tools/calibration/margin_dials.py derive` fits the tail allowance on
-  held-out histories (1.762 with every phase 1 contract listed), and
+  held-out histories (1.762 with every futures family listed), and
   `measure` reads row MG1: 1.05 per cent on 16 fresh histories.
 - A snapshot carries `margin` only under the coverage, hashed behind tag 54
   only then. Every known-answer digest is where it was.
@@ -340,6 +841,159 @@ payload, Arrow and WASM show them; agents trade by symbol.
   on its level (the gain times the pressure's change) in place of a daily
   push. The forecast steps the same law. Every known-answer digest is where
   it was.
+- `oil_convenience_yield` is a new dial, 0.0 on every preset and left out of
+  the digest there. Off zero the oil price carries a premium of
+  `(I/50)^-k` on its level, inventory read at no lower than 25, so low
+  stocks raise the price at once, the premium unwinds as inventory refills
+  and the curve is in backwardation. It needs `oil_inventory_reversion`.
+  The forecast takes the premium's expectation over inventory's spread.
+- `oil_target_drift_sd` and `oil_target_drift_reversion` are new dials, 0.0
+  on every preset and left out of the digest there. Off zero the oil price
+  carries a long factor, a random walk on the log of its level drawn on a
+  key of its own (Schwartz and Smith 2000), which moves spot and the whole
+  curve alike; the pull returns it toward 0. A snapshot carries
+  `oil_target_drift` only under the dial, hashed behind tag 55 only then.
+- `oil_pushes_in_target` and `oil_noise_log_sd` are new dials, 0.0 on every
+  preset and left out of the digest there. The switch splits the oil price
+  into a part that reverts at `oil_mean_reversion` and a part the daily
+  pushes make, which decays at the shipped 0.03, so a slower reversion no
+  longer multiplies each push's long-run effect; the economy carries
+  `oil_push_level` only under it. `oil_noise_log_sd` draws the noise as a
+  share of the price.
+- `oil_dollar_elasticity` is a new dial, 0.0 on every preset and left out of
+  the digest there. Off zero the dollar's daily drag on oil is dropped and
+  the oil price carries `(usd/100)^-e` on its level, so a stronger dollar
+  lowers spot and every contract at once, as EIA's contracts do against
+  FRED's trade-weighted dollar.
+- `oil_inventory_noise_sd` and `oil_forecast_clamp` are new dials, 0.0 on
+  every preset and left out of the digest there: the sd of oil inventory's
+  daily noise (0.0 the standing 0.5), and a switch that has the forecast
+  publish oil's expectation truncated at its clamps.
+- `usd_mean_reversion` and `usd_noise_sd` are new dials, 0.0 on every
+  preset and left out of the digest there: the dollar index's daily
+  reversion share (0.0 the standing 0.02) and its daily noise sd (0.0 the
+  standing 0.3), measured on FRED's trade-weighted dollar. Under the
+  reversion the dollar's safe-haven bid decays at the shipped 0.02 on its
+  own; the economy carries `usd_haven_level` only then.
+- `usd_safe_haven_gain` is a new dial, 0.0 on every preset and left out of
+  the digest there: the dollar's daily drift per VIX point above
+  `usd_crisis_vix_threshold` (0.0 the standing 0.05), read by the dollar's
+  step and by the forecast's expected bid. FRED DTWEXM against CBOE's VIX
+  measures 0.001.
+- `pinned_vix_sets_variance` is a new switch, 0.0 on every preset and left
+  out of the digest there: under it every VIX a caller pins sets the market
+  factor's variance to the law's level at that VIX, as a scenario's
+  `vix_sets_variance` already could, instead of stepping one session toward
+  it. Free sessions are unchanged. Stepped, a pinned path's variance lagged
+  the VIX it stated by weeks: replaying the real 2020-21 VIX, realized
+  volatility ran about twice the S&P 500's once the VIX was back at 20-40,
+  and short of it at the March peak.
+- `market_vol_cycle_hold_onset`, `market_vol_cycle_hold_fade`,
+  `market_vol_cycle_hold_half_life` and `market_vol_vix_hold_half_life` are
+  new dials, 0.0 on every preset and left out of the digest there: off zero
+  a contraction or trough held past its onset (a quantile of the phase's own
+  sojourn) fades. The cycle multiplier's excess gives up a share at a
+  half-life, and the VIX coupling's denominator follows a slow average of
+  the held VIX, so a long-held regime reads as normal rather than as fresh
+  panic. The phase's age is counted at each close from the phase the
+  session closes in, so a host that writes the phase through
+  `economy_mut()` is counted too. A host that held a trough for 454
+  sessions saw realised index volatility at 1.15 to 1.32 times the VIX
+  after 126 to 252 sessions, against about 0.9 on the tape's long stressed
+  stretches (issue #303).
+- `treasury_term_premium_sd` and `treasury_term_premium_half_life` are new
+  dials, 0.0 on every preset and left out of the digest there: off zero the
+  10-year carries its own term premium, an AR(1) stepped every session on its
+  own keyed draws (no stream moves) and opened from its stationary
+  distribution, added to the 10-year's daily anchor and to the meeting's
+  10-year target. Without it the 10-year's only noise is iid against a 5 per
+  cent pull, so it mean-reverts within the month: its variance ratio over 21
+  and 63 sessions is about 0.70 and 0.55 where DGS10's (1990-2025) is 0.974
+  and 0.950.
+- `corporate_spread_noise_sd` and `corporate_spread_noise_half_life` are new
+  dials, 0.0 on every preset and left out of the digest there: off zero
+  credit carries its own state, an AR(1) stepped every session on its own
+  keyed draws (no stream moves) and opened from its stationary distribution,
+  added to the spread formula's base beside the leverage term in the close's
+  corporate move, the meeting's re-anchor and the prehistory carry. Without
+  it the spread is nearly an equity echo: the part of its change the index
+  does not explain is half the IG closing-price spread's (LQD less IEF on
+  SPY, 2015-2025) from a session to a quarter.
+- `corporate_spread_equity_lag` is a new dial, 0.0 on every preset and left
+  out of the digest there: a half-life in sessions at which the gap the
+  corporate spread prices follows credit's leverage gap, so the spread
+  reprices an equity move over weeks rather than on the day. Read only with
+  `corporate_spread_equity_gain` set; the cycle's equity hazard keeps the
+  gap itself. The tape's spread beta on the index builds from -0.47 bp per 1%
+  over a session to -2.3 over a month (FRED BAA10Y, 1990-2025); with the gap
+  read whole the model's is -2.2 at every horizon.
+- `fed_eve_decision` is a new switch, 0.0 on every preset and left out of the
+  digest there: at 1 a scheduled meeting delivers the decision the Fed's own
+  reading implied at the eve's close (the decision the market priced), after
+  the ladder's and the put's draws; emergency meetings are untouched. The
+  model's scheduled-decision surprise falls from 9-12 bp to about 5 (tape
+  4.8, Bauer and Swanson 2022).
+- `treasury_path_owed_excluded` is a new switch, 0.0 on every preset and
+  left out of the digest there: under `treasury_path_anticipated` the
+  meeting's path step leaves out the put's owed step, which in the legacy
+  `dff + owed` offsets the put's extra cut and under the anticipated path
+  priced the give-back on the day of the cut.
+- `cycle_inflation_hazard` and `cycle_rate_hazard` are new dials, 0.0 on
+  every preset and left out of the digest there: the monthly peak hazard an
+  expansion adds with inflation above 4 and with the funds rate above 5
+  (0.0 the legacy 0.1 each). NBER peaks 1962-2025 on the two conditions and
+  the ladder's inversion term measure +0.022 and +0.001.
+- `core_trend_sd` and `core_trend_persistence` are new dials, 0.0 on every
+  preset and left out of the digest there: off zero headline inflation's
+  month-start step reverts to 2.0 plus a slow AR(1) trend (monthly
+  persistence and innovation sd, stepped at the month start on its own keyed
+  draws so no stream moves, opened from its stationary distribution), so
+  core carries the tape's persistent regimes. Fitted to FRED CPILFESL
+  year-on-year 1990-2025 about 2.0: 0.993 and 0.170.
+- `policy_anticipation_guidance` is a new dial, 0.0 on every preset and left
+  out of the digest there: the share of the anticipated meeting's priced
+  change taken from the decision the Fed's own reading implies; the rest
+  comes from the published economy's. The tape's policy surprise at scheduled FOMC
+  announcements has an sd of 4.8 bp (Bauer and Swanson 2022).
+- `treasury_path_anticipated` is a new switch, 0.0 on every preset and left
+  out of the digest there: at 1 a meeting moves the priced policy path by
+  the further move the anticipated meeting priced, not by the rate's change,
+  so a rate surprise reaches the curve once.
+- `policy_anticipation_half_life` is a new dial, 0.0 on every preset and left
+  out of the digest there: between meetings the anticipated meeting's priced
+  change moves toward the shadow meeting's at this half-life, in sessions,
+  rather than jumping to it each close. DGS2 off the zero bound: FOMC days
+  carry 0.046 of the variance, the other days' sd is 6.16 bp.
+- `treasury_2y_meeting_carry` is a new dial, 0.0 on every preset and left
+  out of the digest there: the share of the 2-year's standing gap to the
+  meeting's formula (`0.85 (ff + path) + 0.15 x 10y`) that a meeting keeps.
+  At 1.0 the meeting moves the 2-year by 0.85 of the decision's news and
+  0.15 of the 10-year's move instead of resetting it. FOMC days carry 0.046
+  of DGS2's daily variance off the zero bound (1994-2025).
+- `fed_neutral_real_rate` is a new dial, 0.0 on every preset and left out of
+  the digest there: points added to the neutral rate of the central bank's
+  Taylor rule, whose neutral at target is a nominal 2.0 (a real rate of 0).
+  The Holston-Laubach-Williams US natural rate averaged 2.0 over 1990-2025.
+- `treasury_zlb_path` and `treasury_zlb_haven_gain` are new dials, 0.0 on
+  every preset and left out of the digest there. At the zero bound the curve
+  prices the part of the Fed put's ask the rate cannot deliver (tonight's and
+  each meeting's, decaying at the priced path's half-life, carried as
+  `zlb_unmet` only with the dial on), and the term premium falls a further
+  amount per VIX point above 20. Kim and Wright's decomposition of the
+  10-year in the 2008-2015 falls that began at the zero bound: expected path
+  -0.35, term premium -0.36, with the funds rate unchanged.
+- `fed_core_inflation` and `treasury_core_inflation` are new switches, 0.0
+  on every preset and left out of the digest there: the central bank, and the
+  Treasury curve (the 10-year's term premium, the haven's gate, the flight to
+  quality's sign), read core inflation in place of headline. Core is headline
+  less the oil pass-through's accumulated part, which the economy carries as
+  `oil_inflation_level` only with either switch on. FRED CPILFESL against
+  CPIAUCSL, 1990 to 2025: the funds rate loads on core and not on the gap,
+  and in index falls with headline at 3 or more and core under 3 the Fed cut
+  and the 10-year rallied as below 3.
+- `oil_price_floor` and `oil_price_ceiling` are new dials, 0.0 on every
+  preset and left out of the digest there: oil's bounds, the standing 35
+  and 150 at 0.0, read by the step and by the forecast's clamp.
 
 ### Oil futures
 
@@ -409,6 +1063,21 @@ payload, Arrow and WASM show them; agents trade by symbol.
 - A snapshot carries `vix_futures` and `vix_futures_book` only under the
   switch, and the state hash and `manifest.state_hash` cover them behind tags
   48 and 49 only then. Every known-answer digest is where it was.
+
+### The published VIX's stress memory at its own rate
+
+- `vix_stress_premium_memory` is a new dial, 0.0 on every preset and left
+  out of the digest there. At 0.0 the published VIX's stress memory steps at
+  `vix_anchor_memory`'s rate, as it always has. Off zero it steps at this
+  rate at the close, in the projection of tonight's close and in the
+  forecast; the anchor's memory, the VIX state and every price are
+  untouched, so only the published quote moves. Every known-answer digest is
+  where it was.
+- `vix_stress_premium_undo` is a new switch, 0.0 on every preset and left
+  out of the digest there. On, the published VIX's premium is the anchor's
+  pull undone above the knee, `vix_anchor_weight * max(0, m - knee)`, in
+  place of the capped hinge; the gain and the cap are then unread, and only
+  the quote moves.
 
 ### The VIX's fear memory
 
@@ -495,10 +1164,9 @@ payload, Arrow and WASM show them; agents trade by symbol.
 
 ### An American options pricer
 
-- New module `derivatives::american`, the pricer pt-v22's single-stock
-  options will quote from. It is library code that the engine does not
-  call yet: no dial reads it, it takes no draw, and every known-answer
-  digest is where it was. It provides a Leisen-Reimer binomial tree
+- New module `derivatives::american`, the pricer the single-name options
+  quote from. It takes no draw, and every known-answer digest is where it
+  was. It provides a Leisen-Reimer binomial tree
   (`price`, `steps_for`, `OptionSpec`, `Style`, `Lattice`, `TreeValue`),
   with cash dividends on the escrowed price (`CashDividend`,
   `CashDividend::from_ex_day`), the early-exercise boundary at each step

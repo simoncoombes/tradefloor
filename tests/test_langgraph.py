@@ -353,7 +353,7 @@ def test_the_input_builder_never_receives_the_observation():
         input_builder=lambda payload: got.append(payload) or {
             "observation": payload})
     contract.make_world(agent).run(days=1)
-    assert set(got[0]) == contract.PAYLOAD_KEYS
+    assert set(got[0]) == contract.default_payload_keys()
     assert not hasattr(got[0], "engine")
 
 

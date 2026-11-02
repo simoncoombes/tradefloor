@@ -22,21 +22,26 @@ hidden state all raise `tf.SandboxError`. The hidden state includes the true
 business-cycle phase; the macro fields carry the phase as published. The gym
 environment's `env.engine` and `env.portfolio` are the same views.
 
-On a model that lists futures (the pt-v22 switches, off on every shipped
-preset), `obs.engine.contracts()`, `obs.engine.quote(symbol)` and
+On a model that lists futures (pt-v22, the default from 0.11.0, lists index,
+rate and oil futures),
+`obs.engine.contracts()`, `obs.engine.quote(symbol)` and
 `obs.engine.settlements()` read them, and `act` trades one by its symbol,
 `IDX.F0056` for instance, as it trades a ticker. The portfolio holds a
 future at its last settlement mark and pays the mark's move in cash at each
 close; a close that leaves equity under the contracts' maintenance margin
 makes a margin call, and if equity is not back at the initial margin by the
-next open, the futures are closed at the market. MODEL.md's Margin section
-has the rules. `obs.portfolio.margin()` reads the account's initial and
+next open, every contract is closed at the market. On a model with
+`margin_pretrade_check`, an order that would leave equity under the initial
+margin it then asks raises `tf.portfolio.MarginError`. MODEL.md's Margin
+section has the rules. `obs.portfolio.margin()` reads the account's initial and
 maintenance requirement, its excess over the initial and any open call, and
 `obs.portfolio.futures` the positions. `tf.contracts.parse` and
 `tf.contracts.format` read and write a symbol. A framework adapter shows its
 model the same: the payload (version 3) gains `index`, `futures` and
 `margin` on such a model, and an action may name a listed future, counted
-in contracts. The MCP server's `list_contracts` and `quote_contracts` read a
+in contracts. The default's payload carries them from 0.11.0, with
+`options`; a recording made on the default before then replays on
+`pt-v21` by name. The MCP server's `list_contracts` and `quote_contracts` read a
 session's futures, and `session_step` trades one by its symbol.
 `Engine.futures_bars()` and `Engine.settlements_table()` give them as Arrow
 tables.
@@ -58,8 +63,8 @@ expiry's chain, `quote_contracts` quotes an option, and `session_step`
 trades one by its symbol. `Engine.chain_table()` gives the chains now as an
 Arrow table.
 
-On a model that lists single-name options (`options_names_listed`, off on
-every shipped preset), every name lists American calls and puts from the
+On a model that lists single-name options (`options_names_listed`; pt-v22,
+the default from 0.11.0, lists them), every name lists American calls and puts from the
 first close, 100 shares a contract, each settling at its expiry session's
 close: `obs.engine.name_option_roots()` names them, and
 `obs.engine.option_expiries("ACME")`, `obs.engine.chain("ACME", expiry)` and
@@ -74,7 +79,18 @@ puts), and at expiry everything a cent in the money is exercised; both are
 assigned to short positions pro rata. So an account can be handed stock,
 or go short, without an order. That stock is a holding like any other,
 valued at the price and traded by the next order; it is not a trade, and
-`obs.portfolio.deliveries` lists what moved. The payload's `options` adds
+`obs.portfolio.deliveries` lists what moved. Options are margined by a scan
+with the stock held in the same name, and delivered stock is margined from
+the close it arrives, so that close can make a margin call. On a model with
+`margin_option_scan_range`, a name's options and stock are margined at the
+worst of ten moves of the name over that share of its price either way, and
+delivered stock at that share of its value (FINRA's portfolio-margin range
+for an equity is 15%). On a model with `margin_option_minimum`, an option
+asks at least that many dollars a share (FINRA's portfolio-margin minimum
+is $.375). An unmet call closes the contracts and the stock in each name
+whose options the account held or took delivery in; with
+`margin_liquidation_worked` each sale is sent again while the market still
+buys, and a long option nobody bids stays held. The payload's `options` adds
 `names` (each name's 30-day at-the-money volatility) and an action may name
 a name's option, with the side `EXERCISE` to exercise. The MCP server's
 `option_chain` reads a name's chain with `root` set to its ticker, and
@@ -146,10 +162,10 @@ Add `tf.baselines.reference_agents()` to the entrants to read a score against
 buy-and-hold on the same market: `tf.versus_buy_and_hold(scores)` gives each
 agent's P&L less buy-and-hold's. The reference set includes an Oracle that
 reads the model's fair value. On pt-v19 and earlier `tf.capture_ratio(scores)`
-gives each P&L as a fraction of the Oracle's. On pt-v20 and on pt-v21, the
-default, it returns `{}` and warns why: market moves there mostly stick, so even perfect
-knowledge of fair value leaves little edge, and buy-and-hold is the
-comparison to quote.
+gives each P&L as a fraction of the Oracle's. On pt-v20, on pt-v21 and on
+pt-v22, the default, it returns `{}` and warns why: market moves there
+mostly stick, so even perfect knowledge of fair value leaves little edge,
+and buy-and-hold is the comparison to quote.
 
 ### Explanation scores
 

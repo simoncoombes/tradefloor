@@ -40,9 +40,9 @@ name was earlier in the roster, and the cap refused it.
 ## A target is the whole holding
 
 A weight is the target for everything the account holds in a name,
-whatever put it there. On a model that lists single-name options (pt-v22
-phase 3) an option's exercise or assignment can hand an account shares it
-did not order, or leave it short; the env's actions name stocks only, so
+whatever put it there. On a model that lists single-name options an
+option's exercise or assignment can hand an account shares it did not
+order, or leave it short; the env's actions name stocks only, so
 its own account is never assigned, but the rule is the same for any
 holding: the next step trades the difference between the target and the
 position as it stands.
@@ -98,7 +98,7 @@ from typing import Any, Sequence
 from ._core import check_seed
 from ._core import (Engine, Instrument, Macro, ModelParams, OrderError,
                     ValidationError)
-from .harness import session_clock
+from .harness import open_day, session_clock
 from .portfolio import Portfolio
 from .sandbox import MarketView, PortfolioView
 from .universe_util import as_universe
@@ -291,7 +291,7 @@ class TradingEnv(_Base):
         # episode and a new one after the next reset, as it always was.
         self._shown = (MarketView(engine), PortfolioView(portfolio, engine))
         self._step = 0
-        engine.open_market()
+        open_day(engine)
         # The cash dividends the open made payable (none at an episode's
         # first open, and none on a model without dividends).
         portfolio.collect_dividends(engine)
@@ -340,11 +340,10 @@ class TradingEnv(_Base):
         self._step += 1
         if self._step % self.steps_per_day == 0:
             engine.close_market()
-            # Variation margin and a margin call at the close (pt-v22 phase
-            # 1); nothing without futures.
+            # Variation margin and a margin call at the close; nothing without futures.
             portfolio.settle_close(engine)
             if self._step < self.max_steps:
-                engine.open_market()
+                open_day(engine)
                 # Collected at the open, before the reward is marked, so the
                 # ex-date drop and what the holder is paid net in one step.
                 portfolio.collect_dividends(engine)
