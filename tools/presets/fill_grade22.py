@@ -163,6 +163,8 @@ def registered_numbers(desk: pathlib.Path, arm: str, rows: dict[str, dict]) -> N
             r["rule_applied"] = applied
         if rid == "C5":
             c5_words_applied(desk, arm, r, existing[rid])
+        if rid in FILE_NAMED_ROWS and FILE_NAME.search(r["words"]):
+            r["words_applied"] = FILE_NAME.sub("", r.get("words_applied", r["words"]))
         # C2's words count its histories as the rule was written ("of 30"); the grade read 270, so the words as
         # applied sit beside the verbatim ones, as the mark does.
         if rid == "C2" and existing[rid].get("histories") and int(existing[rid]["histories"]) != 30 \
@@ -196,6 +198,12 @@ def amended_reals(desk: pathlib.Path, arm: str, a19: dict, rows: dict[str, dict]
             real = (merged.get(rid) or {}).get("real")
         if real is not None:
             r["real"] = real if isinstance(real, list) else [real]
+
+
+#: A script named in a row's words, " (driven2022.py)": user text names no file, so the words as applied drop it.
+FILE_NAME = re.compile(r" \([A-Za-z0-9_]+\.py\)")
+#: The rows whose words as applied leave the file name out (the release's ruling, 2026-11-02).
+FILE_NAMED_ROWS = frozenset({"C9", "C10", "D2", "F1", "L1", "R5", "R6", "R7a", "R7b", "S1a", "S1b", "S2", "V1"})
 
 
 def c5_words_applied(desk: pathlib.Path, arm: str, r: dict, c: dict) -> None:

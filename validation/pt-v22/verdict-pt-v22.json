@@ -391,6 +391,7 @@
    ],
    "words": "the driven 2020-21 market: the index's maximum drawdown and the sessions from the pre-crash high back to it, medians over histories (driven2020.py)",
    "rule": "drawdown in 0.237 to 0.441 and sessions in 63 to 252",
+   "words_applied": "the driven 2020-21 market: the index's maximum drawdown and the sessions from the pre-crash high back to it, medians over histories",
    "gated": true
   },
   {
@@ -420,6 +421,7 @@
    ],
    "words": "the driven 2020 path's fast crash: the high to the lowest close within 60 sessions, and the sessions it took (driven2020.py)",
    "rule": "drop in 0.237 to 0.441 within 12 to 46 sessions",
+   "words_applied": "the driven 2020 path's fast crash: the high to the lowest close within 60 sessions, and the sessions it took",
    "gated": true
   },
   {
@@ -443,6 +445,7 @@
    ],
    "words": "look-through: sessions from the index's trough to the aggregate earnings level's trough on the driven 2020 path (driven2020.py)",
    "rule": "lead in 1 to 136 sessions",
+   "words_applied": "look-through: sessions from the index's trough to the aggregate earnings level's trough on the driven 2020 path",
    "gated": true
   },
   {
@@ -467,6 +470,7 @@
    ],
    "words": "timing rules on published macro data against buy-and-hold, and the drift after a published turn (c10.py)",
    "rule": "every rule at most +1.0 point a year and ahead in at most 2/3; drifts no larger than the S&P's after NBER turns",
+   "words_applied": "timing rules on published macro data against buy-and-hold, and the drift after a published turn",
    "gated": true
   },
   {
@@ -490,6 +494,7 @@
    ],
    "words": "the driven 2022 market: the index's maximum drawdown (driven2022.py)",
    "rule": "drawdown in 0.178 to 0.330",
+   "words_applied": "the driven 2022 market: the index's maximum drawdown",
    "gated": true
   },
   {
@@ -510,6 +515,7 @@
    ],
    "words": "the equal-weight index's mean log move from the first price readable after a changed policy rate to the end of the first 65-minute bar, less the mean first bar of all days, bp: after a hike, after a cut (r7_event.py)",
    "rule": "each within 5 bp, or 2 se where wider",
+   "words_applied": "the equal-weight index's mean log move from the first price readable after a changed policy rate to the end of the first 65-minute bar, less the mean first bar of all days, bp: after a hike, after a cut",
    "gated": true
   },
   {
@@ -530,6 +536,7 @@
    ],
    "words": "the audit's rate-news agent through tf.evaluate: mean annual excess over holding in points, histories ahead (r7_eval.py)",
    "rule": "at most 0 points a year, ahead in at most 20 of 30",
+   "words_applied": "the audit's rate-news agent through tf.evaluate: mean annual excess over holding in points, histories ahead",
    "gated": true
   },
   {
@@ -553,6 +560,7 @@
    ],
    "words": "the packaged recession: share of the index's paired log fall, at its lowest, won back 252 sessions later, mean over seeds (recession_rows.py)",
    "rule": "in 45% to 100%",
+   "words_applied": "the packaged recession: share of the index's paired log fall, at its lowest, won back 252 sessions later, mean over seeds",
    "gated": true
   },
   {
@@ -576,6 +584,7 @@
    ],
    "words": "the packaged recession: the index's own rise in the 252 sessions after its low, per cent, mean over seeds (recession_rows.py)",
    "rule": "in +25% to +80%",
+   "words_applied": "the packaged recession: the index's own rise in the 252 sessions after its low, per cent, mean over seeds",
    "gated": true
   },
   {
@@ -594,6 +603,7 @@
    ],
    "words": "the packaged recession: seeds whose cycle has left contraction and trough within 24 months of the onset (recession_rows.py)",
    "rule": "every seed",
+   "words_applied": "the packaged recession: seeds whose cycle has left contraction and trough within 24 months of the onset",
    "gated": true
   },
   {
@@ -623,6 +633,7 @@
    ],
    "words": "the index's variance ratio at two and five years relative to one, years 2-21 of the pooled free histories (v1.py)",
    "rule": "2y/1y in 0.75 to 1.15 and 5y/1y in 0.55 to 1.20",
+   "words_applied": "the index's variance ratio at two and five years relative to one, years 2-21 of the pooled free histories",
    "gated": true
   },
   {
@@ -643,6 +654,7 @@
    ],
    "words": "the cost of size in the agent-facing book: exponent and coefficient of the average cost against Q/V, in sigma units (impact_curve.py)",
    "rule": "exponent in 0.4 to 0.7 and coefficient in 0.33 to 0.67",
+   "words_applied": "the cost of size in the agent-facing book: exponent and coefficient of the average cost against Q/V, in sigma units",
    "gated": true
   },
   {
@@ -2231,6 +2243,7 @@
    "words": "the driven 2022 market: the market P/E's log change per 100 bp of the corporate yield, monthly averages (driven2022.py)",
    "rule": "-10.4 to -2.6 per cent",
    "rule_applied": "-10.86 to -2.72 per cent",
+   "words_applied": "the driven 2022 market: the market P/E's log change per 100 bp of the corporate yield, monthly averages",
    "gated": false,
    "reported_because": "reported, not gated (draft item 25(i))"
   },
