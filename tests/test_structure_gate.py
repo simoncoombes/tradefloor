@@ -537,8 +537,13 @@ def test_the_record_bar_reads_the_rise_when_the_record_carries_it():
     if rec.get(envelope.STRUCTURE_RISE_FIELD):
         assert verdict["panels"][envelope.STRUCTURE_RISE_FIELD]["passed"] is True
         row = rec[envelope.STRUCTURE_RISE_FIELD]["rows"][VIX_AR1_ROW]
-        # The shipped default's PAIRED rise is the tape's since the
-        # 2026-09-21 composition: +0.0116 [+0.0007, +0.0270] against the
+        # RE-PINNED at 0.11.0 on pt-v22: its paired rise is BELOW the tape's,
+        # +0.0017 [-0.0033, +0.0074] against +0.0120 (the record's panel at
+        # e96d64d6), where pt-v21's +0.0037 [-0.0024, +0.0129] matched it.
+        # Reported and not gated, by the owner's ruling of 2026-09-23; pinned
+        # here so a move either way is seen. Before pt-v22 the shipped
+        # default's paired rise was the tape's from the 2026-09-21
+        # composition: +0.0116 [+0.0007, +0.0270] against the
         # tape's paired +0.0120, on the record box; +0.0071 on the fourth
         # composition and +0.0143 [+0.0064, +0.0280] on the fifth (2026-09-23),
         # reported and not gated by the owner's ruling of that day. pt-v20,
@@ -547,8 +552,8 @@ def test_the_record_bar_reads_the_rise_when_the_record_carries_it():
         # (box ptv20g3). (The
         # 2026-09-20 record read -0.0024 [-0.0058, +0.0065]: one pole. The
         # regime level on the VIX law is what makes calm years and a rise.)
-        assert row["verdict"] == "matches", row
-        assert row["ci90"][0] <= row["tape_rise"] <= row["ci90"][1]
+        assert row["verdict"] == "below" and row["side"] == "below", row
+        assert row["ci90"][1] < row["tape_rise"]
         assert (round(row["median_rise"], 6)
                 == envelope.CERTIFIED_STRUCTURE_RISE[VIX_AR1_ROW])
     else:

@@ -481,13 +481,16 @@ CERTIFIED_STRUCTURE: dict[str, float] = {
 #: The default preset's RISE in each structural row from 252 to 504 days,
 #: the second gate's one verdict since 2026-09-21 (`facts.REAL_VIX_AR1_RISE`,
 #: `facts.structure_rise_verdict`). None until the record carries the block;
-#: `test_structure_gate` binds it to the record once it does. pt-v21 reads
-#: +0.003709, 90% interval -0.0024 to +0.0129, which matches the tape's
-#: +0.0120 (box ptv21c1): its 252-day reading is high and rises less. pt-v20's
+#: `test_structure_gate` binds it to the record once it does. pt-v22 reads
+#: +0.001691, 90% interval -0.0033 to +0.0074, BELOW the tape's +0.0120 (the
+#: record's panel at e96d64d6): about a seventh of the tape's rise, from a
+#: 252-day reading that is already high. Reported and not gated, by the
+#: owner's ruling of 2026-09-23. pt-v21 read +0.003709, 90% interval -0.0024
+#: to +0.0129, which matched the tape's (box ptv21c1). pt-v20's
 #: graded arm reads +0.014582, 90% interval +0.0032 to +0.0241, against the
 #: tape's +0.0120 (box ptv20g6); before the arm, +0.015596 [+0.0041, +0.0270].
 CERTIFIED_STRUCTURE_RISE: dict[str, float | None] = {
-    "vix_ar1_debiased": 0.003709,  # pt-v20: 0.014582; pt-v19: 0.014322
+    "vix_ar1_debiased": 0.001691,  # pt-v21: 0.003709; pt-v20: 0.014582; pt-v19: 0.014322
 }
 
 #: Bands re-derived at a 504-day window, from the same reference roster and
