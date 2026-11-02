@@ -812,6 +812,26 @@ def test_the_fill_reads_a_box_as_the_grade_s_boxes_wrote_it(tmp_path):
                                                  "package": "0.10.3", "files": 3}
 
 
+def test_a_row_the_grade_reports_without_gating_stays_ungated_and_unread_stays_unread():
+    """ptv22grade reports some rows without gating them (`gated: false`,
+    "reported, not graded"), some of them unread. The record takes the
+    grade's own gating: those rows don't count toward `passed`/`of`, an
+    unread one keeps `pass` null, and the verdict is the gated rows'."""
+    rows = [{"id": "G1", "pass": True}, {"id": "ON1", "pass": True}, {"id": "E1", "pass": True},
+            {"id": "OF4", "pass": False},
+            {"id": "R6", "pass": True},
+            {"id": "SV4", "pass": False, "gated": False},
+            {"id": "VF1", "pass": None, "gated": False}]
+    block, problems = rec_tool.mark_rows("pt-v22", {"rows": rows})
+    assert problems == []
+    marked = {r["id"]: r for r in block["rows"]}
+    assert [r["id"] for r in block["rows"] if r["gated"]] == ["G1", "ON1", "E1"]
+    assert marked["SV4"]["reported_because"] == rec_tool.GRADE_REPORTED
+    assert marked["VF1"]["pass"] is None
+    assert (block["verdict"], block["passed"], block["of"]) == ("pass", 3, 3)
+    assert block["all_rows"] == {"passed": 4, "of": 7}
+
+
 def test_with_no_fill_named_the_fill_finds_every_page_with_a_placeholder(tmp_path):
     tool = _fill_tool()
     (tmp_path / "docs").mkdir()

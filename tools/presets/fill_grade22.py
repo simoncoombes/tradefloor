@@ -135,8 +135,12 @@ def assemble(desk: pathlib.Path, boxes: dict[str, dict], graded_fp: str | None =
     for rid, r in (p22.get("rows") or {}).items():
         if rid in rows:
             raise SystemExit(f"row {rid} is in ptv22-{arm}.json and in verdict16 or amend19: say which is the grade's")
-        rows[rid] = {"group": "pt-v22", "id": rid, "value": r.get("value"), "band": [r.get("low"), r.get("high")],
-                     "rule": r.get("rule"), "pass": bool(r.get("pass"))}
+        row = {"group": "pt-v22", "id": rid, "value": r.get("value"), "band": [r.get("low"), r.get("high")],
+               "rule": r.get("rule"), "pass": bool(r.get("pass"))}
+        if r.get("gated") is False:
+            # ptv22grade's "reported, not graded" rows: the grade's own gating, and an unread one stays unread.
+            row.update(gated=False, **({"pass": r.get("pass")} if r.get("pass") is None else {}))
+        rows[rid] = row
     commits = {b["commit"] for b in boxes.values()}
     if len(commits) != 1:
         raise SystemExit(f"the boxes ran different engine commits: {sorted(commits)}")
@@ -151,7 +155,8 @@ def assemble(desk: pathlib.Path, boxes: dict[str, dict], graded_fp: str | None =
            "superseded": superseded, "replaced_by_amendments": sorted(replaced),
            "measured": {"fingerprint": NAME, "graded_fingerprint": fp, "box": "+".join(boxes),
                         "engine_commit": commits.pop(), "desk": "validation/pt-v22/"}}
-    gated = [r for r in doc["rows"] if r["id"] not in rec.REPORTED_ROWS.get(NAME, {})]
+    reported = rec.reported_rows(NAME, doc["rows"])
+    gated = [r for r in doc["rows"] if r["id"] not in reported]
     doc["passed"] = sum(1 for r in gated if r["pass"])
     doc["of"] = len(gated)
     doc["verdict"] = "pass" if doc["passed"] == doc["of"] else "fail"

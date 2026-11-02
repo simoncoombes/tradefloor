@@ -104,6 +104,20 @@ REPORTED_ROWS = {
     },
 }
 
+#: The reason a row carries when the grade itself reports it without gating
+#: it (`gated: false` in its own output, as ptv22grade's "reported, not
+#: graded" rows are) and `REPORTED_ROWS` does not name it.
+GRADE_REPORTED = "reported, not gated: the grade reads it and reports it without gating it"
+
+
+def reported_rows(name: str, rows: list[dict]) -> dict[str, str]:
+    """The rows `name`'s record reports without gating, with the reason:
+    `REPORTED_ROWS`, and every row the grade itself marks `gated: false`."""
+    out = {str(r.get("id")): r.get("reported_because") or GRADE_REPORTED
+           for r in rows if r.get("gated") is False}
+    out.update(REPORTED_ROWS.get(name, {}))
+    return out
+
 #: Rows a registration GATES but records an accepted exception for, by
 #: preset: a rule the row breaks that the owner accepted for it alone. The
 #: row stays gated (it must still pass its mark) and carries `exception`.
@@ -128,12 +142,12 @@ def mark_rows(name: str, doc: dict) -> tuple[dict, list[str]]:
     block's verdict "fail", and `tradefloor.records` refuses to load a record
     that carries one; a reported row outside its mark is written, and says so.
     """
-    reported = REPORTED_ROWS.get(name, {})
     excepted = ROW_EXCEPTIONS.get(name, {})
     rows = [dict(r) for r in doc.get("rows") or []]
+    reported = reported_rows(name, rows)
     ids = {r.get("id") for r in rows}
     problems = [f"{name}'s registration names row {rid} ({what}), and the verdict has no such row"
-                for what, table in (("reported", reported), ("exception", excepted))
+                for what, table in (("reported", REPORTED_ROWS.get(name, {})), ("exception", excepted))
                 for rid in sorted(set(table) - ids)]
     for r in rows:
         rid = r.get("id")
@@ -1507,14 +1521,15 @@ def write_long_run(verdict_path: str) -> int:
     # criteria.py counts every row it grades. A registration that reports some
     # rows without gating them (`REPORTED_ROWS`) gates the rest, so its
     # verdict may count either way; `mark_rows` redoes the counts below.
-    gated_n = sum(1 for r in rows if r.get("id") not in REPORTED_ROWS.get(name, {}))
-    gated_p = sum(1 for r in rows if r.get("pass") is True
-                  and r.get("id") not in REPORTED_ROWS.get(name, {}))
+    reported = reported_rows(name, rows)
+    gated_n = sum(1 for r in rows if r.get("id") not in reported)
+    gated_p = sum(1 for r in rows if r.get("pass") is True and r.get("id") not in reported)
     if not rows or (doc.get("of"), doc.get("passed")) not in ((len(rows), passed), (gated_n, gated_p)):
         problems.append(f"the counts do not add up: of {doc.get('of')!r} and "
                         f"passed {doc.get('passed')!r} against {len(rows)} rows "
                         f"of which {passed} pass")
-    if any(r.get("pass") not in (True, False) for r in rows):
+    # A reported row the grade did not read keeps `pass` null; a gated row must have one.
+    if any(r.get("pass") not in (True, False) for r in rows if r.get("id") not in reported):
         problems.append("a row carries no verdict")
     marked, refused = mark_rows(name or "", doc)
     problems += refused
