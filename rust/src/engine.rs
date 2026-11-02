@@ -2140,7 +2140,11 @@ impl Engine {
     /// default written as a bare `PT_V1` at two call sites, where moving an
     /// era means finding both.
     ///
-    /// Since 0.10.0 this is [`PT_V21`]: pt-v20 with 104 dials moved, each
+    /// Since 0.11.0 this is [`PT_V22`]: the preset that lists the contracts
+    /// (index, rate and oil futures, and options on every name), graded as
+    /// its record says (`tf.preset_record("pt-v22")`, `validation/pt-v22/`).
+    ///
+    /// From 0.10.0 until 0.11.0 it was [`PT_V21`]: pt-v20 with 104 dials moved, each
     /// inert on every earlier preset (see [`crate::params::ModelParams::pt_v21`]).
     /// It holds all fifteen rows of the fixed-roster panel at 252 days,
     /// fifteen of fifteen at 504, fifteen on both held-out axes, and all
@@ -2194,8 +2198,9 @@ impl Engine {
     /// [`PT_V19`]: crate::params::PT_V19
     /// [`PT_V20`]: crate::params::PT_V20
     /// [`PT_V21`]: crate::params::PT_V21
+    /// [`PT_V22`]: crate::params::PT_V22
     pub const fn default_model() -> crate::params::ModelParams {
-        crate::params::PT_V21
+        crate::params::PT_V22
     }
 
     /// [`Engine::new`] under an explicit model preset (the runtime seam).
@@ -18698,8 +18703,8 @@ mod tests {
         assert_eq!(crate::params::digests_taken(), taken, "the fingerprint was worked out again");
         assert_eq!(e.model_fingerprint(), e.params().fingerprint());
         assert_eq!(e.model_fingerprint(), "pt-v20");
-        // And the default engine, which is pt-v21 from 0.10.0.
-        assert_eq!(engine(8).model_fingerprint(), "pt-v21");
+        // And the default engine, which is pt-v22 from 0.11.0 (pt-v21 from 0.10.0).
+        assert_eq!(engine(8).model_fingerprint(), "pt-v22");
         assert_eq!(engine_v19(7).model_fingerprint(), "pt-v19");
     }
 

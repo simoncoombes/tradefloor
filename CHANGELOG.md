@@ -28,6 +28,18 @@ price.
 
 <!-- release-note-ends -->
 
+### pt-v22 as the default
+
+From 0.11.0 the library's default preset is pt-v22 (`DEFAULT_PRESET_NAME`,
+`Engine::default_model`); pt-v21 stays selectable by name and replays
+exactly. Every seeded default trajectory changes: `KAT_VERSION` goes to 30
+and `tests/known_answer.json` is re-based. The default market lists
+futures, options and margin, so an agent's observation on it carries
+`index`, `futures`, `margin` and `options`: payload version 3, which
+adds those keys only on a model that lists contracts. On pt-v21 the
+payload is version 2's, and a recording made on the old default replays
+with `model="pt-v21"`.
+
 ### pt-v22: the contracts
 
 **pt-v22** lists contracts beside the stocks, and an agent trades them by

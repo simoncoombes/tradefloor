@@ -9063,12 +9063,12 @@ pub const PT_V20: ModelParams = ModelParams::pt_v20();
 /// pt-v20 with the economy's cycle, the Fed's stress rules, the curve, the
 /// market's variance, the opening, overnight returns, a name's own variance
 /// and the traded path's impact memory moved; see
-/// [`ModelParams::pt_v21`]. THE DEFAULT since 0.10.0:
-/// `DEFAULT_PRESET_NAME` names it and `Engine::default_model` returns it,
-/// and the test at the bottom of this file asserts the two agree.
+/// [`ModelParams::pt_v21`]. The default from 0.10.0 until 0.11.0.
 pub const PT_V21: ModelParams = ModelParams::pt_v21();
 /// pt-v21's successor, which lists the contracts; see
-/// [`ModelParams::pt_v22`]. Not the default.
+/// [`ModelParams::pt_v22`]. THE DEFAULT since 0.11.0:
+/// `DEFAULT_PRESET_NAME` names it and `Engine::default_model` returns it,
+/// and the test at the bottom of this file asserts the two agree.
 pub const PT_V22: ModelParams = ModelParams::pt_v22();
 
 /// pt-v21's `cycle_equity_hazard_opening`, held apart because it is the one
@@ -9105,7 +9105,7 @@ const PT_V22_DIGEST_PREFIX: &str = "9ac114fd";
 /// bottom of this file asserts it resolves to the engine's default
 /// bit-for-bit. A future era that moves the default and forgets this
 /// constant fails the suite instead of mislabelling every manifest.
-pub const DEFAULT_PRESET_NAME: &str = "pt-v21";
+pub const DEFAULT_PRESET_NAME: &str = "pt-v22";
 
 /// Every coefficient `pt-v3` moved, with the exact bits the converged
 /// certificate recorded. Read only by the tests.
@@ -11681,7 +11681,7 @@ impl ModelParams {
     /// a market that opens on two years of prehistory, a name's own variance
     /// clustering, overnight and earnings-day returns, a traded path whose
     /// impact remembers recent volume, unemployment on Okun's law and oil
-    /// that reverts to its inventory level. THE DEFAULT since 0.10.0.
+    /// that reverts to its inventory level. The default from 0.10.0 until 0.11.0.
     ///
     /// Every dial it moves is a switch or a dial that is inert at 0.0 on
     /// every earlier preset (or at its default, where that is not zero), so
@@ -11841,8 +11841,8 @@ impl ModelParams {
     /// futures with their night session and margin, and options on every
     /// name with their dealer, beside the economy, curve and variance terms
     /// pt-v21 moved. Index options (`options_index_listed`) and VIX futures
-    /// (`futures_vix_listed`) stay off. NOT the default: `DEFAULT_PRESET_NAME`
-    /// is pt-v21's.
+    /// (`futures_vix_listed`) stay off. THE DEFAULT since 0.11.0
+    /// (`DEFAULT_PRESET_NAME`); pt-v21 stays selectable by name.
     ///
     /// The values are an arm, written between the two marker lines by
     /// `tools/presets/arm_preset.py` from `tools/presets/arms/pt-v22.txt`:
@@ -16765,11 +16765,13 @@ mod tests {
         // pt-v21 took it at 0.10.0. Before it did, the line below asserted
         // `DEFAULT_PRESET_NAME == "pt-v20"`.
         assert_eq!(crate::params::PT_V21.fingerprint(), "pt-v21");
-        assert_eq!(DEFAULT_PRESET_NAME, "pt-v21");
+        // pt-v22 took it at 0.11.0. Before it did, the line below asserted
+        // `DEFAULT_PRESET_NAME == "pt-v21"`.
+        assert_eq!(DEFAULT_PRESET_NAME, "pt-v22");
         // pt-v21 is the graded vector: its digest is the one the vector had
         // as overrides on pt-v20 while it was graded.
         assert_eq!(&crate::params::PT_V21.digest()[..8], PT_V21_DIGEST_PREFIX);
-        // pt-v22 is not the default. Its digest is the one its arm has as
+        // pt-v22, the default from 0.11.0: its digest is the one its arm has as
         // overrides on the arm's base.
         assert_eq!(crate::params::PT_V22.fingerprint(), "pt-v22");
         assert_eq!(&crate::params::PT_V22.digest()[..8], PT_V22_DIGEST_PREFIX);
