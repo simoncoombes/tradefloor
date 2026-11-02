@@ -99,7 +99,8 @@ GRADE_SLOTS = {
 REPORTED_ROWS = {
     "pt-v22": {
         "OF4": "reported, not gated (draft item 21): six attempts to remove the oil "
-               "forecast's 126-session bias failed; the bias is about 0.3% of the price",
+               "forecast's 126-session bias failed; on the grade it is $0.36 a barrel, "
+               "about 0.5% of the price",
         "R6": "reported, not gated (draft item 25(i))",
     },
 }
