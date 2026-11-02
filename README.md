@@ -215,18 +215,19 @@ statistics, listed in
 On pt-v22, the default, 19 of the 19 statistics of the
 one-year table (volatility, fat tails, how much stocks move together, how far
 the VIX jumps after a fall) are inside the range real markets show over a
-year. pt-v22 meets 190 of the 190
-long-run criteria that count toward its grade, and its futures and options
-rows are read on their own histories ([docs/MODEL.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/MODEL.md)).
+year. pt-v22's long-run criteria are 190 rows over 21 years, covering crash
+depth, how long fear lasts, bear markets per decade, the 2008 and 2020
+replays, the rate indices, the cost of size in the book, strategies built
+to find an edge, and the futures, options and margin
+([docs/MODEL.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/MODEL.md)).
+pt-v22 meets all 190, read on 270 histories. Two more rows are shown for
+comparison and not counted.
 On pt-v21, the default from 0.10.0 to 0.10.2, all 19 one-year statistics are
 inside their ranges, on the ruled bands. The index's return and the share of
 days it falls 3% or more are read over 360 seeds, as the long-run criteria
 read them: the index falls 3% or more on 0.98% of days, against a range of 0.64 to 2.34. All 15
-statistics of the two-year panel are inside their two-year ranges. The
-long-run criteria are 40 rows over 21 years, covering crash depth, how long
-fear lasts, bear markets per decade, the 2008 and 2020 replays, the rate
-indices and the cost of size in the book. pt-v21 meets all 40, read on 270
-histories.
+statistics of the two-year panel are inside their two-year ranges. pt-v21
+meets all 40 of the long-run rows it was graded on, read on 270 histories.
 
 Read those claims narrowly:
 

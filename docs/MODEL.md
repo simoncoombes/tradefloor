@@ -3648,7 +3648,7 @@ against -0.0), R7b (-1.00 against -0.98), AO2 to AO4 (22.9 bp, 18 of 30,
 
 | Symbol | Dial | pt-v20 (pt-v19) | pt-v21 | pt-v22 | Kind | Source |
 |---|---|---|---|---|---|---|
-| $Y$ | `book_depth_coefficient` | 0.75 (0, off) | same | same | measured | the cost of size fitted as 0.469 $\sigma (Q/V)^{0.495}$ (tools/calibration/impact_curve.py) inside the 0.33 to 0.67 band of Tóth et al. (2011); row C9 reads exponent 0.484 and coefficient 0.424 on pt-v20, and on pt-v21 row C9 reads exponent 0.515 and coefficient 0.438, for one immediate order of 1% to 100% of a day's volume |
+| $Y$ | `book_depth_coefficient` | 0.75 (0, off) | same | same | measured | the cost of size fitted as 0.469 $\sigma (Q/V)^{0.495}$ (tools/calibration/impact_curve.py) inside the 0.33 to 0.67 band of Tóth et al. (2011); row C9 reads exponent 0.484 and coefficient 0.424 on pt-v20 and exponent 0.515 and coefficient 0.438 on pt-v21, and on pt-v22 row C9 reads exponent 0.459 and coefficient 0.474, for one immediate order of 1% to 100% of a day's volume |
 | $\delta$ | `book_depth_exponent` | 0.5 | same | same | derived | the square-root law (Tóth et al. 2011) |
 | $R$ | `book_depth_reach` | 1.0 | same | same | derived | the latent book reaches one day's volume |
 | $k$ | `book_depth_nesting` | 0 (beside) | 1 | same | for a new registration | the share of the maker's ladder the latent curve counts as its own front; 1 makes the depth the larger of ladder and law (Tóth et al. 2011) |

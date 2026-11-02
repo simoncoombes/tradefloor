@@ -2,7 +2,7 @@
 
 tradefloor checks its market against real markets with several sets of
 statistics. The sets overlap, have different counts, and are measured over
-different horizons, so "19 of 19", "15 of 15", "14 of 14" and "40 of 40" can
+different horizons, so "19 of 19", "15 of 15", "14 of 14" and "190 of 190" can
 all be true of the same preset at once. This page names each set, lists what is in it,
 and says where it is used. The README and the documentation site use these
 names.
@@ -17,14 +17,14 @@ in band and meets 190 of the 190
 long-run criteria that count toward its grade. Its futures and options rows
 are read on their own histories, in
 [MODEL.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/MODEL.md).
-The table gives the earlier presets.
+The table gives pt-v22 and the earlier presets.
 
-| Set | Count | Horizon | pt-v21, the default from 0.10.0 to 0.10.2 | pt-v20, the default from 0.8.5 to 0.9.1 | pt-v19 |
-|---|---|---|---|---|---|
-| [The one-year table](#the-one-year-table) | 19 statistics | 252 sessions | 19 of 19 in band | 19 of 19 in band | 19 of 19 |
-| [The two-year panel](#the-two-year-panel) | 15 statistics | 504 sessions | 15 of 15 in band | 15 of 15 in band | 15 of 15 |
-| [The long-run criteria](#the-long-run-criteria) | 40 registered rows; 17 in pt-v19's record, 15 in records up to 0.8.1 | 21 years | 40 of 40 met, on 270 histories | 40 of 40 met | fails 16 of the 40, C9 and D1 not scored; its own record reads 15 of 17 |
-| [The hosted report](#the-hosted-report) | no statistics of its own | | quotes the long-run criteria | | |
+| Set | Count | Horizon | pt-v22, the default | pt-v21, the default from 0.10.0 to 0.10.2 | pt-v20, the default from 0.8.5 to 0.9.1 | pt-v19 |
+|---|---|---|---|---|---|---|
+| [The one-year table](#the-one-year-table) | 19 statistics | 252 sessions | 19 of 19 in band | 19 of 19 in band | 19 of 19 in band | 19 of 19 |
+| [The two-year panel](#the-two-year-panel) | 15 statistics | 504 sessions | 15 of 15 in band | 15 of 15 in band | 15 of 15 in band | 15 of 15 |
+| [The long-run criteria](#the-long-run-criteria) | 190 registered rows for pt-v22; 40 for pt-v20 and pt-v21; 17 in pt-v19's record, 15 in records up to 0.8.1 | 21 years | 190 of 190 met, on 270 histories | 40 of 40 met, on 270 histories | 40 of 40 met | fails 16 of the 40, C9 and D1 not scored; its own record reads 15 of 17 |
+| [The hosted report](#the-hosted-report) | no statistics of its own | | quotes the long-run criteria | | | |
 
 Three parts of the one-year table have counts of their own, and appear on
 some pages: [the 14 shape statistics](#the-shape-statistics), [the
@@ -192,13 +192,29 @@ preset list.
 
 ## The long-run criteria
 
-**40 registered rows over 21 years.** The set grew as the model
-did: 15 criteria when pt-v19 was adopted, 17 when C4a and C4b were added,
-28 on pt-v20's first grades, and 40 on its final one, which adds the
-driven 2020 and 2022 markets, the packaged recession and the audit's
-findings. Each row is something a user
-would notice, with a tolerance that is easy to read. The result is in
-`tf.preset_record()["long_run"]`.
+**190 registered rows over 21 years for pt-v22, and 40 for pt-v20 and
+pt-v21.** The set grew as the model did: 15 criteria when pt-v19 was
+adopted, 17 when C4a and C4b were added, 28 on pt-v20's first grades, 40 on
+its final one, which adds the driven 2020 and 2022 markets, the packaged
+recession and the audit's findings, and 190 for pt-v22. Each row is
+something a user would notice, with a tolerance that is easy to read. The
+result is in `tf.preset_record()["long_run"]`.
+
+pt-v22 meets all 190. Its grade read the 40 rows below on 270 histories of
+21 years, on the engine at commit e132a66a. R6 isn't counted: on the driven
+2022 market the P/E falls 2.08% for each 100 bp of the corporate yield,
+less than the tolerance asks, and the row is shown for comparison. The
+other 151 rows are pt-v22's own: 59 more criteria, 44 leak checks and one
+exploit check (strategies built to find an edge, which must earn about
+nothing), 11 of pt-v21's rows, 4 read on corrected definitions, and 32 for
+the futures, options and margin
+([MODEL.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/MODEL.md)).
+One more, OF4, the oil forecast's largest mean error in standard errors,
+reads 2.003 against a limit of 2 and is shown for comparison. pt-v22's R3
+is read at the held close and its E1 on the index's trailing reported
+earnings, the definitions registered for its grade. Of the rows below, the
+nearest their edges are C3 (90% of its tolerance), C10 and C4a (75%) and A2
+(73%). The grade, its scripts and the verdict are in `validation/pt-v22/`.
 
 pt-v21 meets all 40. Its certification, boxes `ptv21c1` and `ptv21c1s` on
 the 0.10.0 engine, grades the same 40 rows with pt-v21 and pt-v20 both named,
@@ -231,48 +247,48 @@ says how to check the grade or run it again. pt-v19's own record, from an
 earlier box of 30 histories, carries 17 rows and reads 15 of 17. Records up
 to 0.8.1 carry the first 15, and pt-v18 met 8 of those.
 
-| Id | Criterion | Tolerance | pt-v21 | pt-v20 | Real |
-|---|---|---|---|---|---|
-| A1 | worst month's volatility in the 2008 and 2020 replays, % | within 30% | 93.0, 74.4 | 88.5, 76.5 | 84.3, 94.5 |
-| A2 | maximum drawdown in the 2008 and 2020 replays | within 30% | 0.473, 0.352 | 0.450, 0.368 | 0.568, 0.339 |
-| A3 | peak stock correlation in the 2008 and 2020 replays | within 0.15 | 0.825, 0.803 | 0.784, 0.784 | 0.748, 0.872 |
-| B1 | share of sessions with the VIX above 30 | half to twice | 0.052 | 0.059 | 0.082 |
-| B2 | mean length of a spell with the VIX above 30, sessions | half to twice | 19 | 27 | 22 |
-| B3 | 20% bear markets a decade | half to twice | 1.51 | 1.96 | 1.12 |
-| B4 | 10% corrections a decade | half to twice | 4.24 | 4.52 | 3.65 |
-| B5 | sessions down more than 5% a decade | half to twice | 6.9 | 9.6 | 6.2 |
-| B6 | share of sessions with the VIX under 15 | half to twice | 0.372 | 0.400 | 0.326 |
-| B7 | the index's annual volatility, % | within 20% | 18.0 | 19.1 | 18.1 |
-| B8 | the index's long-run return, % a year | within 2 points of the target | 6.4 | 6.4 | 6.25 |
-| B9 | sd of annual index returns, %; start-up volatility ratio | within 20%; two thirds to 1.5 | 16.5; 1.05 | 16.3; 0.80 | 17.4; 1 |
-| C1 | crash rate in years 3 to 21 against years 1 to 2 | two thirds to 1.5 | 1.11 | 0.92 | 1.0 |
-| C2 | histories that touch the VIX ceiling | at most 1 in 30 | 1 of 270 | 0 | 0 |
-| C3 | the edge from reading a headline 5 ticks late, bp | under 20 | 15.3 | 15.8 | 0 |
-| C4a | lag-1 autocorrelation of 65-minute returns; Roll spread over quoted | at or above -0.05, or Roll at most twice quoted | -0.020; 1.29 | -0.016; 1.21 | 0; 1 |
-| C4b | the best price-only rule on the suite: points over buy-and-hold; markets beaten of 20 | at most +5 and 14 | -2.0; 7 | +0.2; 11 | 0; 10 |
-| C5 | a company's variance ratio at 60 sessions | 0.80 to 1.05 | 0.954 | 0.950 | 0.924 |
-| C6 | value signal's rank IC over 20 sessions, whole run and first 60 sessions | -0.03 to +0.05 | 0.003; 0.000 | 0.000; 0.005 | 0.009 |
-| C7 | momentum's rank IC, 12-1 and 6-1 | -0.04 to +0.095; -0.02 to +0.10 | -0.003; -0.002 | -0.003; -0.001 | 0.027; 0.041 |
-| C8 | one-day Lo-MacKinlay contrarian profit, bp a day | -6.4 to +2.9 | -0.89 | -0.06 | -1.74 |
-| C9 | cost of size of one immediate order: exponent; coefficient | 0.4 to 0.7; 0.33 to 0.67 | 0.515; 0.438 | 0.484; 0.424 | 0.5; 0.5 |
-| C10 | timing rules on published macro data: the best rule's points a year over holding | at most +1.0, ahead in at most two thirds | +0.07 | +0.12 | -2.0 |
-| R1 | daily sd of the 2-year yield, bp | 3.65 to 6.80 | 5.55 | 3.87 | 5.23 |
-| R2 | daily sd of the 10-year yield, bp | 4.54 to 6.27 | 5.20 | 4.96 | 5.41 |
-| R3 | correlation of index and Treasury returns | -0.36 to +0.03 | -0.319 | -0.136 | -0.161 |
-| R4 | correlation of index and investment-grade bond returns | +0.15 to +0.39 | +0.328 at the held close (+0.112 at the last print) | +0.200 | +0.272 |
-| R5 | the driven 2022 market: the index's maximum drawdown | 0.178 to 0.330 | 0.238 | 0.265 | 0.254 |
-| R6 | the driven 2022 market: P/E change per 100 bp of the corporate yield, % | -10.4 to -2.6 | -6.97 | -4.26 | -5.2 |
-| R7a | the first bar after a changed policy rate, less all days' first bars, bp: hike; cut | within 5 bp | -0.9; -0.3 | -0.1; -1.7 | 0; 0 |
-| R7b | a rate-news agent against holding: points a year; histories ahead of 30 | at most 0; at most 20 | -0.79; 2 | -0.32; 2 | 0; 15 |
-| E1 | median fall in earnings through a contraction | -0.40 to -0.046 | -0.110 | -0.172 | -0.17 |
-| D2 | the driven 2020-21 market: maximum drawdown; sessions back to the pre-crash high | 0.237 to 0.441; 63 to 252 | 0.358; 136 | 0.374; 120.5 | 0.339; 126 |
-| F1 | the driven 2020 market's fast crash: the fall; sessions it took | 0.237 to 0.441; 12 to 46 | 0.285; 38.5 | 0.307; 40 | 0.339; 23 |
-| L1 | sessions by which the index's trough leads the earnings trough, driven 2020 | 1 to 136 | 19 | 10.5 | 68 |
-| S1a | the packaged recession: share of the fall won back in 252 sessions | 45% to 100% | 0.52 | 0.49 | 0.62 |
-| S1b | the packaged recession: seeds out of contraction within 24 months | every seed | 90 of 90 | 30 of 30 | all |
-| S2 | the packaged recession: the index's rise in the 252 sessions after its low, % | +25 to +80 | +65.3 | +54.6 | +69 |
-| V1 | the index's variance ratio, two and five years against one | 0.75 to 1.15; 0.55 to 1.20 | 0.93; 0.85 | 0.82; 0.62 | 0.93; 0.87 |
-| D1 | the one-year table, in band on all four cells | every band in | all | all | all |
+| Id | Criterion | Tolerance | pt-v22 | pt-v21 | pt-v20 | Real |
+|---|---|---|---|---|---|---|
+| A1 | worst month's volatility in the 2008 and 2020 replays, % | within 30% | 100, 98 | 93.0, 74.4 | 88.5, 76.5 | 84.3, 94.5 |
+| A2 | maximum drawdown in the 2008 and 2020 replays | within 30% | 0.44, 0.34 | 0.473, 0.352 | 0.450, 0.368 | 0.568, 0.339 |
+| A3 | peak stock correlation in the 2008 and 2020 replays | within 0.15 | 0.81, 0.86 | 0.825, 0.803 | 0.784, 0.784 | 0.748, 0.872 |
+| B1 | share of sessions with the VIX above 30 | half to twice | 0.068 | 0.052 | 0.059 | 0.082 |
+| B2 | mean length of a spell with the VIX above 30, sessions | half to twice | 24 | 19 | 27 | 22 |
+| B3 | 20% bear markets a decade | half to twice | 1.69 | 1.51 | 1.96 | 1.12 |
+| B4 | 10% corrections a decade | half to twice | 4.62 | 4.24 | 4.52 | 3.65 |
+| B5 | sessions down more than 5% a decade | half to twice | 7.2 | 6.9 | 9.6 | 6.2 |
+| B6 | share of sessions with the VIX under 15 | half to twice | 0.308 | 0.372 | 0.400 | 0.326 |
+| B7 | the index's annual volatility, % | within 20% | 18.4 | 18.0 | 19.1 | 18.1 |
+| B8 | the index's long-run return, % a year | within 2 points of the target | 7.0 | 6.4 | 6.4 | 6.25 |
+| B9 | sd of annual index returns, %; start-up volatility ratio | within 20%; two thirds to 1.5 | 16.8; 1.14 | 16.5; 1.05 | 16.3; 0.80 | 17.4; 1 |
+| C1 | crash rate in years 3 to 21 against years 1 to 2 | two thirds to 1.5 | 1.12 | 1.11 | 0.92 | 1.0 |
+| C2 | histories that touch the VIX ceiling | at most 1 in 30 | 5 of 270 | 1 of 270 | 0 | 0 |
+| C3 | the edge from reading a headline 5 ticks late, bp | under 20 | 17.9 | 15.3 | 15.8 | 0 |
+| C4a | lag-1 autocorrelation of 65-minute returns; Roll spread over quoted | at or above -0.05, or Roll at most twice quoted | -0.044; 1.50 | -0.020; 1.29 | -0.016; 1.21 | 0; 1 |
+| C4b | the best price-only rule on the suite: points over buy-and-hold; markets beaten of 20 | at most +5 and 14 | -3.0; 8 | -2.0; 7 | +0.2; 11 | 0; 10 |
+| C5 | a company's variance ratio at 60 sessions | 0.80 to 1.05 | 0.952 | 0.954 | 0.950 | 0.924 |
+| C6 | value signal's rank IC over 20 sessions, whole run and first 60 sessions | -0.03 to +0.05 | 0.002; 0.002 | 0.003; 0.000 | 0.000; 0.005 | 0.009 |
+| C7 | momentum's rank IC, 12-1 and 6-1 | -0.04 to +0.095; -0.02 to +0.10 | 0.005; 0.001 | -0.003; -0.002 | -0.003; -0.001 | 0.027; 0.041 |
+| C8 | one-day Lo-MacKinlay contrarian profit, bp a day | -6.4 to +2.9 | -1.1 | -0.89 | -0.06 | -1.74 |
+| C9 | cost of size of one immediate order: exponent; coefficient | 0.4 to 0.7; 0.33 to 0.67 | 0.459; 0.474 | 0.515; 0.438 | 0.484; 0.424 | 0.5; 0.5 |
+| C10 | timing rules on published macro data: the best rule's points a year over holding | at most +1.0, ahead in at most two thirds | +0.01 | +0.07 | +0.12 | -2.0 |
+| R1 | daily sd of the 2-year yield, bp | 3.65 to 6.80 | 5.30 | 5.55 | 3.87 | 5.23 |
+| R2 | daily sd of the 10-year yield, bp | 4.54 to 6.27 | 5.89 | 5.20 | 4.96 | 5.41 |
+| R3 | correlation of index and Treasury returns | -0.36 to +0.03 | -0.138 | -0.319 | -0.136 | -0.161 |
+| R4 | correlation of index and investment-grade bond returns | +0.15 to +0.39 | +0.293 | +0.328 at the held close (+0.112 at the last print) | +0.200 | +0.272 |
+| R5 | the driven 2022 market: the index's maximum drawdown | 0.178 to 0.330 | 0.221 | 0.238 | 0.265 | 0.254 |
+| R6 | the driven 2022 market: P/E change per 100 bp of the corporate yield, % | -10.4 to -2.6 | -2.08, not counted | -6.97 | -4.26 | -5.2 |
+| R7a | the first bar after a changed policy rate, less all days' first bars, bp: hike; cut | within 5 bp | +1.8; -0.7 | -0.9; -0.3 | -0.1; -1.7 | 0; 0 |
+| R7b | a rate-news agent against holding: points a year; histories ahead of 30 | at most 0; at most 20 | -1.22; 2 | -0.79; 2 | -0.32; 2 | 0; 15 |
+| E1 | median fall in earnings through a contraction | -0.40 to -0.046 | -0.091 | -0.110 | -0.172 | -0.17 |
+| D2 | the driven 2020-21 market: maximum drawdown; sessions back to the pre-crash high | 0.237 to 0.441; 63 to 252 | 0.382; 167.5 | 0.358; 136 | 0.374; 120.5 | 0.339; 126 |
+| F1 | the driven 2020 market's fast crash: the fall; sessions it took | 0.237 to 0.441; 12 to 46 | 0.382; 31.5 | 0.285; 38.5 | 0.307; 40 | 0.339; 23 |
+| L1 | sessions by which the index's trough leads the earnings trough, driven 2020 | 1 to 136 | 71 | 19 | 10.5 | 68 |
+| S1a | the packaged recession: share of the fall won back in 252 sessions | 45% to 100% | 0.88 | 0.52 | 0.49 | 0.62 |
+| S1b | the packaged recession: seeds out of contraction within 24 months | every seed | 180 of 180 | 90 of 90 | 30 of 30 | all |
+| S2 | the packaged recession: the index's rise in the 252 sessions after its low, % | +25 to +80 | +60.6 | +65.3 | +54.6 | +69 |
+| V1 | the index's variance ratio, two and five years against one | 0.75 to 1.15; 0.55 to 1.20 | 0.91; 0.82 | 0.93; 0.85 | 0.82; 0.62 | 0.93; 0.87 |
+| D1 | the one-year table, in band on all four cells | every band in | all | all | all | all |
 
 The real figures come from the S&P 500 and the VIX (A, B, C1 to C4), the
 40-company reference roster (C5 to C8), published impact studies (C9,
