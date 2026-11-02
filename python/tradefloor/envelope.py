@@ -448,12 +448,14 @@ CERTIFIED_CRISIS: dict[str, float] = {
 #: is new is that a verdict is now taken on it and refused on.
 #:
 #: THE VALUE IS THE DEFAULT PRESET'S READING, like the three tables above.
-#: pt-v21, the default from 0.10.0, reads 0.955667 as the median of thirty
-#: seeds at 252 days (box ptv21c1, `presets/pt-v21.json`), 0.0257 above the
-#: tape's centre, and is REFUSED on both panels: k = 25 of 30 at 252 and 25
-#: held out against a cut of 21. The VIX is more persistent day to day than
-#: the tape's. The row is reported and does not gate a preset (the ruling
-#: below), and pt-v21 passes the long-run criteria.
+#: pt-v22, the default from 0.11.0, reads 0.956265 as the median of thirty
+#: seeds at 252 days (the record's panel at e96d64d6, `presets/pt-v22.json`),
+#: 0.0263 above the tape's centre, and is REFUSED on both panels: k = 26 of
+#: 30 at 252 and 28 held out against a cut of 21. The VIX is more persistent
+#: day to day than the tape's. The row is reported and does not gate a preset
+#: (the ruling below), and pt-v22 passes the long-run criteria.
+#: pt-v21, the default from 0.10.0 to 0.10.2, read 0.955667 (box ptv21c1,
+#: `presets/pt-v21.json`), REFUSED at k = 25 and 25.
 #: pt-v20, the default from 0.8.5 to 0.9.1, reads 0.930223 on its graded arm as the
 #: median of thirty seeds at 252 days (box ptv20g6, `presets/pt-v20.json`)
 #: and PASSES on both panels, k = 15 of 30 at 252 and 15 held out against a
@@ -473,7 +475,7 @@ CERTIFIED_CRISIS: dict[str, float] = {
 #: does not gate a preset; the pass bar is the long-run criteria and every
 #: ruled band.
 CERTIFIED_STRUCTURE: dict[str, float] = {
-    "vix_ar1_debiased": 0.955667,  # pt-v20: 0.930223; pt-v19: 0.933726
+    "vix_ar1_debiased": 0.956265,  # pt-v21: 0.955667; pt-v20: 0.930223; pt-v19: 0.933726
 }
 
 #: The default preset's RISE in each structural row from 252 to 504 days,

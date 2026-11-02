@@ -1152,8 +1152,10 @@ def test_the_shipped_record_reports_its_mechanism_certificate_beside_the_bar_tha
     both panels' certificates, readable by the bar and rendered in the line
     a reader sees; the reading is pinned so it cannot change in silence; and
     beside it sit the two things that do gate -- the long-run criteria,
-    which pass, and every ruled band in on all four protocols. The record
-    is pt-v20's since 0.8.5.
+    which pass, and every ruled band in on all four protocols. It reads the
+    shipped default's record, pt-v22's since 0.11.0 (the certificate from
+    the record's panel at e96d64d6, the long run from registration 23's
+    grade), and was pt-v20's from 0.8.5 and pt-v21's from 0.10.0.
     """
     rec = record(envelope.PRESET)
     for panel in envelope.MECHANISM_BAR_PANELS:
@@ -1166,9 +1168,9 @@ def test_the_shipped_record_reports_its_mechanism_certificate_beside_the_bar_tha
     line = envelope.mechanism_bar_line(verdict)
     assert "mechanism bar" in line and "PASS" in line
 
-    # The reading the release carries, REPORTED: on pt-v21 (box ptv21c1),
-    # 10 of 10 at 252 and 9 of 10 held out, the held-out miss being
-    # `corr_asymmetry`. pt-v20 and pt-v19's fifth composition read the same
+    # The reading the release carries, REPORTED: on pt-v22 (the record's
+    # panel at e96d64d6), 10 of 10 at 252 and 9 of 10 held out, the held-out
+    # miss being `corr_asymmetry`, as on pt-v21 (box ptv21c1). pt-v20 and pt-v19's fifth composition read the same
     # counts with `corr_asymmetry_lagged` the held-out miss, at 20 of 30
     # against a cut of 21. pt-v19's fourth composition read 9 and 9 with
     # `corr_asymmetry` the miss on both; the test below reads those two
@@ -1180,23 +1182,31 @@ def test_the_shipped_record_reports_its_mechanism_certificate_beside_the_bar_tha
     assert rec["mechanism_252"]["reversed"] == []
     assert rec["mechanism_heldout_seeds"]["reversed"] == []
 
-    # WHAT GATES, beside it: the long-run criteria, all passed. pt-v20's
-    # record carries forty: the fifteen pt-v19 was adopted under on
+    # WHAT GATES, beside it: the long-run criteria, all passed. RE-PINNED at
+    # 0.11.0, when pt-v22 became the default: its record (registration 23,
+    # six boxes) carries 231 rows, 190 of them gated and every one of those
+    # passed; the rest are reported beside the grade and do not gate. The
+    # forty pt-v20 was graded on are among them. pt-v20's record carries
+    # exactly those forty: the fifteen pt-v19 was adopted under on
     # 2026-09-23, C4a and C4b (added 2026-09-24,
     # `validation/pt-v20/programme/longrun/CRITERIA.md`, section C4), and the
-    # twenty-three more
-    # graded for pt-v20 (`REGISTERED_PT_V20`). RE-PINNED at 0.8.5, when pt-v20
-    # became the default. pt-v19's record reads 15 of 17 with the verdict
-    # "fail": it passes the fifteen and fails C4a and C4b, the tape's
+    # twenty-three more graded for pt-v20 (`REGISTERED_PT_V20`), 40 of 40 on
+    # its graded arm (box ptv20g6). pt-v19's record reads 15 of 17 with the
+    # verdict "fail": it passes the fifteen and fails C4a and C4b, the tape's
     # 65-minute reversal and two price-only rules on the published suite,
     # which the brief that added them gave to pt-v20 to pass.
     lr = rec["long_run"]
     ids = [r["id"] for r in lr["rows"]]
-    assert sorted(ids) == sorted(ADOPTED + PRICE_ONLY_EDGE + REGISTERED_PT_V20)
-    assert all(r["pass"] for r in lr["rows"]), [
-        r["id"] for r in lr["rows"] if not r["pass"]]
-    # 40 of 40 on the graded arm (box ptv20g6); 29 of 29 before it (ptv20g4b).
-    assert lr["of"] == 40 and lr["passed"] == 40 and lr["verdict"] == "pass"
+    assert set(ADOPTED + PRICE_ONLY_EDGE + REGISTERED_PT_V20) <= set(ids)
+    gated = [r for r in lr["rows"] if r.get("gated", True)]
+    assert len(ids) == 231 and len(gated) == 190
+    assert all(r["pass"] for r in gated), [
+        r["id"] for r in gated if not r["pass"]]
+    assert lr["of"] == 190 and lr["passed"] == 190 and lr["verdict"] == "pass"
+    lr20 = record("pt-v20")["long_run"]
+    assert (sorted(r["id"] for r in lr20["rows"])
+            == sorted(ADOPTED + PRICE_ONLY_EDGE + REGISTERED_PT_V20))
+    assert lr20["of"] == 40 and lr20["passed"] == 40 and lr20["verdict"] == "pass"
     assert lr["measured"]["fingerprint"] == envelope.PRESET
     # ... and every ruled band in, on all four protocols.
     assert rec["misses"] == {p: [] for p in rec["misses"]}

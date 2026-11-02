@@ -55,7 +55,7 @@ across seeds, and the rate is the falls on every seed over the sessions of
 every seed. The two VIX rows are read over 30.
 
 The VIX's own day-to-day persistence (`vix_ar1_debiased`) has no band and is
-graded by a sign test against the real tape's centre. pt-v21 reads 0.956
+graded by a sign test against the real tape's centre. pt-v22 reads 0.956
 against the tape's 0.930 and the test refuses it, at one year and on held-out
 seeds. That is a gap: the VIX is stickier from day to day than the real
 one.
