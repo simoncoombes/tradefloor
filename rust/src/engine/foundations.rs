@@ -1527,7 +1527,8 @@ impl Engine {
     /// run's sampling.
     fn cycle_age_law(&self, day: i64) -> Vec<Vec<(f64, f64)>> {
         type Key = (u64, String);
-        static MEMO: std::sync::Mutex<Vec<(Key, Vec<Vec<(f64, f64)>>)>> = std::sync::Mutex::new(Vec::new());
+        type Law = Vec<Vec<(f64, f64)>>;
+        static MEMO: std::sync::Mutex<Vec<(Key, Law)>> = std::sync::Mutex::new(Vec::new());
         let key: Key = (self.root_seed, self.model_fingerprint().to_string());
         if let Some(v) = MEMO.lock().ok().and_then(|m| m.iter().find(|(k, _)| *k == key).map(|(_, v)| v.clone())) {
             return v;

@@ -14817,15 +14817,15 @@ impl ModelParams {
                     "{name} is {value}. It is {unit}, in [0, {hi}]; 0 is off."));
             }
         }
-        if self.forecast_vix_level_nowcast != 0.0 {
-            if self.forecast_horizon_sessions == 0.0 || self.vix_level_sigma == 0.0 {
-                return Err(format!(
-                    "forecast_horizon_sessions is {}, and vix_level_sigma is {}, but \
-                     forecast_vix_level_nowcast is {}. It nowcasts the VIX's slow level for the \
-                     forecast: set both first.",
-                    self.forecast_horizon_sessions, self.vix_level_sigma,
-                    self.forecast_vix_level_nowcast));
-            }
+        if self.forecast_vix_level_nowcast != 0.0
+            && (self.forecast_horizon_sessions == 0.0 || self.vix_level_sigma == 0.0)
+        {
+            return Err(format!(
+                "forecast_horizon_sessions is {}, and vix_level_sigma is {}, but \
+                 forecast_vix_level_nowcast is {}. It nowcasts the VIX's slow level for the \
+                 forecast: set both first.",
+                self.forecast_horizon_sessions, self.vix_level_sigma,
+                self.forecast_vix_level_nowcast));
         }
         if !(self.forecast_policy_persistence >= 0.0 && self.forecast_policy_persistence < 1.0) {
             return Err(format!(

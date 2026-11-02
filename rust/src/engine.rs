@@ -9132,7 +9132,7 @@ impl Engine {
         let ratio = self.economy.vix / self.vix_anchor;
         let rate_scale = if p.jump_vix_coupling == 0.0 { 1.0 } else { (1.0 - p.jump_vix_coupling) + ((p.jump_vix_coupling * ratio) * ratio) };
         let intensity_market = if p.jump_vix_coupling == 0.0 { p.jump_intensity_market } else { p.jump_intensity_market * rate_scale };
-        let intensity_idio = if p.jump_vix_coupling == 0.0 { p.jump_intensity_idio } else if p.jump_idio_vix_decoupled != 0.0 { p.jump_intensity_idio } else { p.jump_intensity_idio * rate_scale };
+        let intensity_idio = if p.jump_vix_coupling == 0.0 || p.jump_idio_vix_decoupled != 0.0 { p.jump_intensity_idio } else { p.jump_intensity_idio * rate_scale };
         let earnings = self.carries_earnings();
         let key = self.earnings_key;
         let day = self.elapsed_days;
@@ -9718,7 +9718,7 @@ impl Engine {
             let p = &self.params;
             let ratio = self.economy.vix / self.vix_anchor;
             let rate_scale = if p.jump_vix_coupling == 0.0 { 1.0 } else { (1.0 - p.jump_vix_coupling) + ((p.jump_vix_coupling * ratio) * ratio) };
-            let intensity_idio = if p.jump_vix_coupling == 0.0 { p.jump_intensity_idio } else if p.jump_idio_vix_decoupled != 0.0 { p.jump_intensity_idio } else { p.jump_intensity_idio * rate_scale };
+            let intensity_idio = if p.jump_vix_coupling == 0.0 || p.jump_idio_vix_decoupled != 0.0 { p.jump_intensity_idio } else { p.jump_intensity_idio * rate_scale };
             let var1 = p.jump_sigma_idio * p.jump_sigma_idio;
             for i in 0..self.companies.len() {
                 let ex = excitation_drawn.get(i).copied().unwrap_or(0.0);
