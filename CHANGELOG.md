@@ -4,12 +4,12 @@ pt-v22 is the default preset. It lists contracts beside the stocks: index
 futures with a night session, policy-rate, term-rate and oil futures, and
 American options on every name. An agent trades them by symbol in whole
 contracts and exercises an option at a close with `tf.Exercise`. pt-v22
-passes all 190 graded rows registered for it, over 21 years
-(`validation/pt-v22/`).
+passes all 190 rows that count toward its grade over 21 years, and reports
+41 more, five outside their marks (`validation/pt-v22/`).
 
 Margin is set at every close. A future is margined from a risk scan and pays
 its move to the day's settlement mark in cash. A name's options and stock
-are margined together, as a broker's portfolio margin is: the worst loss
+are margined together: the worst loss
 over ten moves of the name up to 15% either way, and at least $.375 a share
 for each option. An order that would leave equity under the initial margin
 is refused with `MarginError`. A close under the maintenance level makes a
@@ -19,8 +19,8 @@ options' stock are sold at the market.
 
 `Scenario.load("recession_2008")` adds the 2007-09 recession, with the VIX
 on its 2008-09 path. `tradefloor.contracts.explain_move` says why a
-contract's price moved, and a strategy spec can hold the front index future
-as a hedge.
+contract's price moved, and a strategy spec can hedge with the front index
+future.
 
 **What breaks.** A run that leaves `model` out gives pt-v22's market;
 `model="pt-v21"` keeps 0.10.2's, and every preset replays as it did. On the
