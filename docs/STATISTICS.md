@@ -59,9 +59,9 @@ of 19 in band. The table above gives the count for each preset.
 | `fear_gauge_dn3` | the VIX's rise on a day the index falls 3% or more | index |
 | `index_tail_dn3_pct` | the share of days the index falls 3% or more | index |
 
-Volatility clustering fades faster than real after the first day. pt-v21's
-certified median is 0.0948 for `abs_return_acf1`, against a median real year
-of 0.1025 in `tf.facts.REAL_MARKETS_WINDOWS`. At lag 5 it reads 0.0204 and at lag 20 0.0012,
+Volatility clustering fades faster than real after the first day. pt-v22's
+certified median is 0.1052 for `abs_return_acf1`, against a median real year
+of 0.1025 in `tf.facts.REAL_MARKETS_WINDOWS`. At lag 5 it reads 0.0281 and at lag 20 0.0044,
 where the lowest real years read 0.034 and -0.015, so `abs_return_acf5`
 sits below every one of those windows. The ruled floor, -0.03, is lower
 still, which is why the row counts as in band. The `decay-shape` gap in
