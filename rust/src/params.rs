@@ -9089,7 +9089,7 @@ const PT_V21_DIGEST_PREFIX: &str = "2dc32068";
 /// has as overrides on the arm's base. `tools/presets/arm_preset.py` writes
 /// it with the arm, and a test pins it.
 #[cfg(test)]
-const PT_V22_DIGEST_PREFIX: &str = "8f77ba8f";
+const PT_V22_DIGEST_PREFIX: &str = "9ac114fd";
 
 /// The name of the preset an engine runs when none is named.
 ///
@@ -11855,7 +11855,7 @@ impl ModelParams {
     pub const fn pt_v22() -> ModelParams {
         let mut p = ModelParams::pt_v20();
         // ARM BEGIN: written by tools/presets/arm_preset.py from tools/presets/arms/pt-v22.txt.
-        // Arm R22-fixd2 on pt-v20, a STAND-IN until the graded arm replaces it.
+        // Arm R22-fixd2RWPD on pt-v20, the graded arm.
         p.cycle_equity_hazard_opening = 0.011;
         p.cycle_equity_hazard = 5.0;
         p.cycle_equity_hazard_knee = 0.1;
@@ -12061,6 +12061,10 @@ impl ModelParams {
         p.option_name_spread_otm = 1.431;
         p.option_name_spread_itm = 0.724;
         p.option_name_spread_tenor_exponent = -0.167;
+        p.margin_option_scan_range = 0.15;
+        p.margin_liquidation_worked = 1.0;
+        p.pinned_vix_return = 0.005375;
+        p.margin_deficit_liquidates = 1.0;
         // ARM END
         p
     }

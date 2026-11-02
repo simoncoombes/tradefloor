@@ -5,8 +5,8 @@
 # the values pt-v22 will ship.
 
 @base pt-v20
-@arm R22-fixd2
-@status stand-in
+@arm R22-fixd2RWPD
+@status graded
 cycle_equity_hazard_opening 0.011
 cycle_equity_hazard 5.0
 cycle_equity_hazard_knee 0.1
@@ -212,3 +212,7 @@ option_name_inventory_half_life 11.4
 option_name_spread_otm 1.431
 option_name_spread_itm 0.724
 option_name_spread_tenor_exponent -0.167
+margin_option_scan_range 0.15
+margin_liquidation_worked 1.0
+pinned_vix_return 0.005375
+margin_deficit_liquidates 1.0
