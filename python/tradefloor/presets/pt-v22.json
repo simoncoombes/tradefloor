@@ -2831,6 +2831,7 @@
         "words": "histories touching the VIX ceiling, of 30",
         "rule": "at most 1",
         "rule_applied": "at most 9 of 270 (1 per 30)",
+        "words_applied": "histories touching the VIX ceiling, of 270",
         "gated": true
       },
       {
@@ -2908,6 +2909,7 @@
         ],
         "words": "stock-level (idiosyncratic) variance ratio at 60 sessions, median name, 30 histories of 2,660 sessions",
         "rule": "in 0.80 to 1.05",
+        "words_applied": "stock-level (idiosyncratic) variance ratio at 60 sessions, median name, 90 histories of 2,660 sessions (three seed sets of 30; the median over the histories)",
         "gated": true
       },
       {
@@ -4805,6 +4807,7 @@
         "note": "pooled median over the gen histories' contractions of the TTM reported EPS's fall (item 25, amendments A and E)",
         "words": "the aggregate earnings fall around a contraction, median over the 30 histories' contractions (Shiller 1953-2020)",
         "rule": "in -0.40 to -0.046",
+        "words_applied": "the aggregate earnings fall around a contraction, pooled median over the 270 histories' 809 contractions (Shiller 1953-2020)",
         "real": [
           -0.17
         ],

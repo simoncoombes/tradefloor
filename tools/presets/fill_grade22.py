@@ -161,6 +161,13 @@ def registered_numbers(desk: pathlib.Path, arm: str, rows: dict[str, dict]) -> N
         applied = rule_applied(rid, existing[rid])
         if applied:
             r["rule_applied"] = applied
+        if rid == "C5":
+            c5_words_applied(desk, arm, r, existing[rid])
+        # C2's words count its histories as the rule was written ("of 30"); the grade read 270, so the words as
+        # applied sit beside the verbatim ones, as the mark does.
+        if rid == "C2" and existing[rid].get("histories") and int(existing[rid]["histories"]) != 30 \
+                and r["words"].endswith("of 30"):
+            r["words_applied"] = r["words"][: -len("of 30")] + f"of {int(existing[rid]['histories'])}"
 
 
 def amended_reals(desk: pathlib.Path, arm: str, a19: dict, rows: dict[str, dict]) -> None:
@@ -175,6 +182,13 @@ def amended_reals(desk: pathlib.Path, arm: str, a19: dict, rows: dict[str, dict]
         # The criterion's words and rule, verbatim, as for the registered rows; the amendment's own reading is in `note`.
         if rid in criteria.WORDS:
             r["words"], r["rule"] = criteria.WORDS[rid], criteria.RULE[rid]
+        # E1's words count its contractions over 30 histories; the amendment reads a pooled median over its own
+        # count of them, so the words as applied sit beside the verbatim ones.
+        a = (a19.get("rows") or {}).get(rid, {})
+        if rid == "E1" and a.get("n") and a.get("histories") and "the 30 histories' contractions" in r.get("words", ""):
+            r["words_applied"] = r["words"].replace(
+                "median over the 30 histories' contractions",
+                f"pooled median over the {int(a['histories'])} histories' {int(a['n'])} contractions")
         if "real" in r:
             continue
         real = (a19.get("rows") or {}).get(rid, {}).get("real")
@@ -182,6 +196,21 @@ def amended_reals(desk: pathlib.Path, arm: str, a19: dict, rows: dict[str, dict]
             real = (merged.get(rid) or {}).get("real")
         if real is not None:
             r["real"] = real if isinstance(real, list) else [real]
+
+
+def c5_words_applied(desk: pathlib.Path, arm: str, r: dict, c: dict) -> None:
+    """C5's words say 30 histories; the grade read the cross-section file beside the long-run report it names
+    (`xsec.json`: its seed sets, histories and days), and its reading is that file's median."""
+    line = next(l for l in (desk / "grade_all.txt").read_text().splitlines() if l.startswith("long run"))
+    xsec = json.loads((pathlib.Path(line.split(None, 2)[2].strip()).parent / "xsec.json").read_text())
+    if abs(xsec["arms"][arm]["C5_vr60"] - c["values"][0]) > 1e-12:
+        raise SystemExit("C5: xsec.json beside the long-run report is not the file grade_all read")
+    n, days, sets = len(xsec["histories"]), int(xsec["days"]), len(str(xsec["seeds"]).split(","))
+    old = "30 histories of 2,660 sessions"
+    if n != 30 and r.get("words", "").endswith(old):
+        count = {2: "two", 3: "three", 4: "four", 5: "five"}.get(sets, str(sets))
+        r["words_applied"] = (r["words"][: -len(old)] + f"{n} histories of {days:,} sessions "
+                              f"({count} seed sets of 30; the median over the histories)")
 
 
 def rule_applied(rid: str, c: dict) -> str | None:
