@@ -5288,7 +5288,7 @@ changes, so it waits for a new preset.
 
 - In the 2022 replay (the real 2022 path of the VIX, the policy rate, the corporate yield and the 2- and 10-year Treasury yields, pinned each morning), pt-v22's market P/E falls 2.1% for each 100 bp rise in the corporate yield, against 5.4% in real markets, so the 2022 valuation squeeze comes out under half its real size. It is outside its band of -10.9% to -2.7%, and it is reported beside the grade and does not gate it (row R6). *Next preset.*
 - The forecast's VIX (`Engine.forecast()`) runs low at long horizons. Over 270 histories of 21 years the VIX ends 0.11 points above the forecast at 21 sessions, 0.26 at 63 and 0.55 at 126, 6.9 standard errors at 126. It is reported beside the grade and does not gate it (row VF8). No shipped preset lists VIX futures, so it reaches only an agent that reads the forecast. *Next preset.*
-- Oil's forecast runs high at long horizons: the oil price ends 0.36 dollars under the forecast at 126 sessions, 2.0 standard errors and about 0.3% of the price, and the oil futures, priced on the forecast, carry the same bias. It is reported beside the grade and does not gate it (row OF4). *Next preset.*
+- Oil's forecast runs high at long horizons: the oil price ends 0.36 dollars under the forecast at 126 sessions, 2.0 standard errors and about 0.5% of the price, and the oil futures, priced on the forecast, carry the same bias. It is reported beside the grade and does not gate it (row OF4). *Next preset.*
 
 **Records.** The provenance ledger labels `crisis_epicentre_end_sessions` as
 out of scope, but it is read; and it labels `market_beta_down_asym_lag`
