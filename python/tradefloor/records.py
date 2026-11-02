@@ -7,7 +7,7 @@ wheel, so a reader can cite a preset's figures without a clone and without
 re-running a 96-core measurement.
 
     >>> import tradefloor as tf
-    >>> rec = tf.preset_record()            # pt-v21, the shipped default
+    >>> rec = tf.preset_record()            # pt-v22, the shipped default
     >>> rec["in_band"]["252"]
     15
 
