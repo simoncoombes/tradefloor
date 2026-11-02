@@ -58,6 +58,8 @@ NAME = "pt-v22"
 VERDICT_FILE = "verdict-pt-v22.json"
 TOUCHED = ("python/tradefloor/presets/pt-v22.json", "tools/presets/record.py", "tests/test_validation.py",
            f"validation/pt-v22/{VERDICT_FILE}")
+#: Where runbook step 1.9 publishes the desk's grade outputs; the verdict names the three files it was assembled from.
+GRADE_DIR = "validation/pt-v22/programme/results/ptv22/grade"
 PLACEHOLDER = re.compile(r"\{\{G19:([A-Za-z0-9_\-]+)\}\}")
 
 
@@ -117,6 +119,8 @@ def _files(d: pathlib.Path) -> int | None:
 def assemble(desk: pathlib.Path, boxes: dict[str, dict], graded_fp: str | None = None) -> dict:
     """The verdict the record carries: see the module note, step 1."""
     arm, v16 = _one(desk, "verdict")
+    published = {key: f"{GRADE_DIR}/{stem}-{arm}.json" for key, stem in
+                 (("verdict16", "verdict"), ("amend19", "amend19"), ("ptv22grade", "ptv22"))}
     _, a19 = _one(desk, "amend19")
     _, p22 = _one(desk, "ptv22")
     rows = {r["id"]: dict(r) for r in v16["rows"]}
@@ -154,7 +158,8 @@ def assemble(desk: pathlib.Path, boxes: dict[str, dict], graded_fp: str | None =
     doc = {"grade": "pt-v22, twenty-third registration", "arm": arm, "rows": list(rows.values()),
            "superseded": superseded, "replaced_by_amendments": sorted(replaced),
            "measured": {"fingerprint": NAME, "graded_fingerprint": fp, "box": "+".join(boxes),
-                        "engine_commit": commits.pop(), "desk": "validation/pt-v22/"}}
+                        "engine_commit": commits.pop(), "desk": "validation/pt-v22/",
+                        **{k: v for k, v in published.items() if (ROOT / v).is_file()}}}
     reported = rec.reported_rows(NAME, doc["rows"])
     gated = [r for r in doc["rows"] if r["id"] not in reported]
     doc["passed"] = sum(1 for r in gated if r["pass"])
