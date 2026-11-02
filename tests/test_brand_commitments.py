@@ -506,12 +506,13 @@ class TreeScan(typing.NamedTuple):
 
 
 #: Tracked files kept gzipped, which the walk reads through gzip so the text
-#: inside is checked like any other. Two today: the S&P 500 and VIX tape that
-#: grade box ptv20g6 and certification box ptv21c1 unpacked, each kept as the
-#: bytes it ran on so its sha256 still matches its folder's
-#: `scripts-as-run.txt`.
+#: inside is checked like any other. Three today: the S&P 500 and VIX tape that
+#: grade box ptv20g6, certification box ptv21c1 and pt-v22's grading boxes
+#: unpacked, each kept as the bytes it ran on so its sha256 still matches its
+#: folder's `scripts-as-run.txt`.
 GZIPPED_TEXT = ("validation/pt-v20/programme/longrun/data/tape.json.gz",
-                "validation/pt-v21/programme/longrun/data/tape.json.gz")
+                "validation/pt-v21/programme/longrun/data/tape.json.gz",
+                "validation/pt-v22/programme/longrun/data/tape.json.gz")
 
 
 def scan_tree(paths: list[str] | None = None) -> TreeScan:
