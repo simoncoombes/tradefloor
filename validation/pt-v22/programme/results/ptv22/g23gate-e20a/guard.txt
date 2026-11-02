@@ -1,0 +1,32 @@
+a3af7107650b1909  b9pp.py
+c52118653dde592b  bands.json
+d0c465e7a1e822be  data/covid-2020-2021.json
+a931411ba16ded6b  data/driven-2022.json
+54c7c991620a6f97  desk.py
+aa98fdb08ec6dda8  desk_sf.py
+ae1aee40cb39ec36  driven2020.py
+df0381b91649941d  driven2022.py
+9b87fa8e05801060  earnings-2020.json
+1f8a27eb098fa25d  edgar/DBAA.csv
+1959f640da1116ce  grade-seeds.json
+834b1ab4e66df1f2  grade_xsec.py
+6541c79889117868  graded-scenarios/SOURCE.json
+22552c19176a4ae8  graded-scenarios/curve_shock.yml
+cdad6e309eb95988  graded-scenarios/geopolitical_conflict.yml
+3d6eaa44c41e97f2  graded-scenarios/liquidity_crisis.yml
+9451659e24808f76  graded-scenarios/oil_price_spike.yml
+479b200a7fcdbe4f  graded-scenarios/policy_regime_shift.yml
+10e435213b0065e0  graded-scenarios/rate_shock.yml
+ad3c51d5c949bba3  graded-scenarios/recession.yml
+c2bf308937d903ee  graded_scenarios.py
+d6c04a155dca0474  guard.py
+fb47ea7e80313c08  jobs.sh
+b7b104c5e2b43c02  openings.py
+01772404e9b79d19  os2.py
+b8160e535e5d95a6  r14gen_zlb.py
+22109cfbb8db5a75  recession_rows.py
+84c66dd779dee9a1  seedplan.py
+1f25324f6b220d66  shim/sitecustomize.py
+a0cb893fda0165cf  xsec.py
+56ef4093b1620d5a  arm.txt (supplied)
+guard: OK (30 inputs)

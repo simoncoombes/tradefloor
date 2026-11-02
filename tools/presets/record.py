@@ -134,6 +134,12 @@ ROW_EXCEPTIONS = {
 }
 
 
+def _shown(path: pathlib.Path) -> pathlib.Path:
+    """A written file as the messages show it: from the repository's root,
+    or whole when it is outside it (`fill_grade22.py --dry` writes a copy)."""
+    return path.relative_to(ROOT) if path.is_relative_to(ROOT) else path
+
+
 def mark_rows(name: str, doc: dict) -> tuple[dict, list[str]]:
     """A verdict's rows marked for `name`'s record, and its counts redone.
 
@@ -1140,7 +1146,7 @@ def main() -> int:
                 continue
             text = json.dumps(record, indent=2, ensure_ascii=False) + "\n"
             path.write_text(text, encoding="utf-8", newline="\n")
-            print(f"  wrote {path.relative_to(ROOT)}"
+            print(f"  wrote {_shown(path)}"
                   + (f"  ({note})" if note else ""))
 
     if args.check:
@@ -1203,7 +1209,7 @@ def write_coefficients() -> int:
         text = json.dumps(record, indent=2, ensure_ascii=False) + chr(10)
         path.write_text(text, encoding="utf-8", newline=chr(10))
         added = sorted(set(values) - set(before))
-        print(f"  wrote {path.relative_to(ROOT)}"
+        print(f"  wrote {_shown(path)}"
               + (f"  (+{', '.join(added)})" if added else ""))
     if refused:
         print(f"{len(refused)} record(s) not written: {', '.join(refused)}")
@@ -1265,7 +1271,7 @@ def write_mechanism_gate(panel_path: str) -> int:
         path.write_text(json.dumps(ordered, indent=2, ensure_ascii=False) + "\n",
                         encoding="utf-8", newline="\n")
         counts = record["mechanism_252"]["counts"]
-        print(f"  wrote {path.relative_to(ROOT)}  mechanism shown "
+        print(f"  wrote {_shown(path)}  mechanism shown "
               f"{counts['mechanism_shown']} of {counts['mechanism_of']}"
               + (f", REVERSED {record['mechanism_252']['reversed']}"
                  if record["mechanism_252"]["reversed"] else ""))
@@ -1353,7 +1359,7 @@ def write_structure_rows(panel_path: str) -> int:
         for field in envelope.STRUCTURE_BAR_PANELS:
             b = record[field]
             for row, v in b["rows"].items():
-                print(f"  wrote {path.relative_to(ROOT)}  {field}  {row}  "
+                print(f"  wrote {_shown(path)}  {field}  {row}  "
                       f"{v['verdict'].upper()}"
                       + (f" ({v['side']} the tape centre)" if v["side"] else "")
                       + f"  k {v['k']} of {v['n']}, cut {v['cut']}, median "
@@ -1481,7 +1487,7 @@ def write_level_protocol(rows_path: str) -> int:
         print(f"  {pooled_note}")
     rows = dict(doc["certified_level"])
     rows.update(doc["certified_crisis"])
-    print(f"  wrote {path.relative_to(ROOT)}  level_protocol: "
+    print(f"  wrote {_shown(path)}  level_protocol: "
           + ", ".join(f"{k}={v:.4f}" for k, v in rows.items()))
     return 0
 

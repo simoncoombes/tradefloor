@@ -1,4 +1,4 @@
-pt-v22 rows of R22-fixd2RWPD on /Users/simoncoombes/Dev/runs/reg23/MERGED (histories: {'ptv22fut': 270, 'ptv22traded': 270, 'ptv22mp metaorder': 30, 'ptv22mp push': 30, 'ptv22chain': 270, 'ptv22names': 270}); RF5 at 63,126; switched on: ['ptv22chain', 'ptv22fut', 'ptv22names', 'ptv22traded']
+pt-v22 rows of R22-fixd2RWPD on <merged> (histories: {'ptv22fut': 270, 'ptv22traded': 270, 'ptv22mp metaorder': 30, 'ptv22mp push': 30, 'ptv22chain': 270, 'ptv22names': 270}); RF5 at 63,126; switched on: ['ptv22chain', 'ptv22fut', 'ptv22names', 'ptv22traded']
   IF1             3.718  [1.209256369040696, 6.267280393713019]  pass
   IF2            0.4154  [0.12666979481012236, 0.7158637407060751]  pass
   IF3                 0  [0.0, 1e-12]  pass

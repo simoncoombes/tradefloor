@@ -7,10 +7,14 @@ custom model `custom-9ac114fd`, and pt-v22 is that arm value for value
 (`tools/presets/arms/pt-v22.txt`, `@status graded`). The layout follows
 `../pt-v21/`:
 
-- `scripts-as-run.txt` lists every file the five grading boxes unpacked
-  before they ran (g23gen-e1a, g23b1-e1a, g23b2-e1a, g23traded-e7a and
-  g23reads-e1a): its sha256, the box and its path in that box's archive, and
-  its path here.
+- `scripts-as-run.txt` lists every file the grade's six boxes ran: its
+  sha256, the box and its path there, and its path here. The five grading
+  boxes (g23gen-e1a, g23b1-e1a, g23b2-e1a, g23traded-e7a and g23reads-e1a)
+  unpacked theirs from an archive each kept. The gate box, g23gate-e20a, ran
+  the gatebox's scripts, each checked against
+  `programme/ptv22/gatebox/scripts/MANIFEST.sha256`.
+- `programme/r13reg/box/regr.tgz` is kept as the boxes ran it, and its files
+  are unpacked beside it in `programme/r13reg/box/regr/`.
 - `programme/` holds those files at their paths in the design repository at
   the registration's commit.
   - `programme/results/ptv22/BOX/` holds each box's engine commit, archive
@@ -22,3 +26,7 @@ custom model `custom-9ac114fd`, and pt-v22 is that arm value for value
 - `verdict-pt-v22.json` is the verdict the preset record carries
   (`python/tradefloor/presets/pt-v22.json`, `long_run`).
 - `level-pool/pt-v22.json` is the record's pooled level read, 360 seeds.
+
+## Known gaps
+
+- There is no `run-box.sh` for this grade yet, so it cannot be re-run here without AWS.

@@ -1,10 +1,10 @@
 {
  "kind": "longrun.criteria",
  "inputs": {
-  "longrun": "/Users/simoncoombes/Dev/runs/reg23/MERGED/lr270/longrun-report.json",
-  "certgrade": "/Users/simoncoombes/Dev/runs/reg23/grade/certgrade-MERGED.json",
+  "longrun": "<merged>/lr270/longrun-report.json",
+  "certgrade": "<desk>/certgrade-MERGED.json",
   "edge": {
-   "R22-fixd2RWPD": "/Users/simoncoombes/Dev/runs/reg23/MERGED/edge.json"
+   "R22-fixd2RWPD": "<merged>/edge.json"
   }
  },
  "honest_return": 6.25,

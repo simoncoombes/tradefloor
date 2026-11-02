@@ -1,9 +1,9 @@
 PASS CRITERIA (programme/longrun/CRITERIA.md, adopted 2026-09-23, C4 added 2026-09-24, C5-C8 registered 2026-09-24), computed by criteria.py
-long run  /Users/simoncoombes/Dev/runs/reg23/MERGED/lr270/longrun-report.json
+long run  <merged>/lr270/longrun-report.json
   R22-fixd2RWPD: base pt-v20, 209 dials, 270 seeds x 21 years, engine e132a66acbde, fingerprint custom-9ac114fd
-cert      /Users/simoncoombes/Dev/runs/reg23/grade/certgrade-MERGED.json  (arms R22-fixd2RWPD=R22-fixd2RWPD)
-edge      R22-fixd2RWPD=R22-fixd2RWPD from /Users/simoncoombes/Dev/runs/reg23/MERGED/edge.json: base pt-v20, 10 seeds from 9420201 x 300 days, 4418 events
-c4        R22-fixd2RWPD=R22-fixd2RWPD from /Users/simoncoombes/Dev/runs/reg23/MERGED/c4a.json, /Users/simoncoombes/Dev/runs/reg23/MERGED/c4b.json (tradefloor 0.10.2 at e132a66acbde): c4a, c4b
+cert      <desk>/certgrade-MERGED.json  (arms R22-fixd2RWPD=R22-fixd2RWPD)
+edge      R22-fixd2RWPD=R22-fixd2RWPD from <merged>/edge.json: base pt-v20, 10 seeds from 9420201 x 300 days, 4418 events
+c4        R22-fixd2RWPD=R22-fixd2RWPD from <merged>/c4a.json, <merged>/c4b.json (tradefloor 0.10.2 at e132a66acbde): c4a, c4b
 
     criterion                                      real/target   R22-fixd2RWPD             
     A1 worst month's volatility within 30%         84 / 95       100 / 98  pass            
