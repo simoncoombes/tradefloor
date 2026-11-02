@@ -1023,7 +1023,7 @@ impl Engine {
 
     /// The scan's margin on stock held alone in listed names, dollars:
     /// `(ticker, signed shares)` pairs, each charged its shares times the
-    /// scan's move of the name ([`Engine::name_option_margin`]'s), the stock's
+    /// scan's move of the name (`Engine::name_option_margin`'s), the stock's
     /// worst loss over the scan's moves. The option scan charges stock only
     /// as cover for an option's risk; this is the stock's own scan, for the
     /// shares an exercise or an assignment delivered into an account that no
