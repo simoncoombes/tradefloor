@@ -1226,20 +1226,23 @@ def test_a_run_that_lists_and_delists_still_verifies():
     assert report.day_runs == 6
 
 
-def test_a_world_ledgers_every_day_it_runs():
+@pytest.mark.parametrize("model", ["pt-v21", "pt-v22"])
+def test_a_world_ledgers_every_day_it_runs(model):
     """The counterfactual loop, including the entries before the open.
 
     A world with pins writes `pin_macro` before the market opens, so a day's
     replay segment starts at the previous close rather than at `open_market`.
     Verified with every day sampled, which is what would fail if the segment
     were cut at the open: day 1 onward would replay under day 0's macro path.
+    On pt-v22 the index futures' night session runs between the two.
     """
     class Flat:
         def act(self, observation):
             return {}
 
     world = tf.World(seed=3, universe=UNIVERSE, agent=Flat(),
-                     pins={"vix": 34.0}, steps_per_day=2, ticks_per_step=10)
+                     pins={"vix": 34.0}, steps_per_day=2, ticks_per_step=10,
+                     model=model)
     ledger = tf.DayLedger()
     world.run(days=3, ledger=ledger)
     world.intervene(federal_funds_rate=0.06)
@@ -1248,9 +1251,9 @@ def test_a_world_ledgers_every_day_it_runs():
     assert len(ledger.leaves) == 6
     assert ledger.leaves[-1] == world.engine.state_hash()
 
-    log = world.engine.order_log
-    assert [entry["op"] for entry in log[:2]] == ["pin_macro",
-                                                  "open_market"], (
+    ops = [entry["op"] for entry in world.engine.order_log]
+    night = ["run_night"] if model == "pt-v22" else []
+    assert ops[:2 + len(night)] == ["pin_macro", *night, "open_market"], (
         "the world writes its macro path before the open, which is the case "
         "the day segment has to cover"
     )
@@ -1329,3 +1332,21 @@ def test_a_pre_open_pt_v20_snapshot_restores_its_opening_draws():
     assert "opening_z" not in tf.Engine(
         seed=SEED, universe=UNIVERSE, model="pt-v19").state_snapshot()
 
+
+
+def test_the_twin_agrees_on_pt_v22_and_its_contracts():
+    """pt-v22, by name: the economy carries the oil pass-through's part of
+    headline (`fed_core_inflation`) and the put's unmet asks
+    (`treasury_zlb_path`), which the twin hashes in `Engine::state_hash`'s
+    order; and its listed contracts' state, which the hash leaves to their
+    own books. Close-boundary leaves and a mid-session one."""
+    engine = tf.Engine(seed=SEED, universe=UNIVERSE, model="pt-v22")
+    snap = engine.state_snapshot()
+    for _ in range(3):
+        engine.run_days(1, record=False, ticks_per_day=TICKS)
+        snap = engine.state_snapshot()
+        assert engine.state_hash() == state_hash(snap)
+    assert {"oil_inflation_level", "zlb_unmet"} <= set(snap["economy"])
+    engine.open_market()
+    engine.run_session(9, 30, 3, 10)
+    assert engine.state_hash() == state_hash(engine.state_snapshot())

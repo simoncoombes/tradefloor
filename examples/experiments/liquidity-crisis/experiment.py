@@ -5,10 +5,11 @@ Tradefloor scenario read off disk; the other does not, and nothing else
 differs.
 
     control   nothing
-    crisis    `scenarios/liquidity_crisis_at_fork.yml` -- the scenario that
-              shipped with Tradefloor before 0.8.5, rebased to fire at the
-              fork. Quoted depth to 40%, volatility doubled, and one stated
-              assumption that credit widens 50 basis points alongside them.
+    crisis    `scenarios/liquidity_crisis_at_fork.yml` -- the
+              `liquidity_crisis` scenario as Tradefloor shipped it through
+              0.8.1, rebased to fire at the fork. Quoted depth to 40%,
+              volatility doubled, and one stated assumption that credit
+              widens 50 basis points alongside them.
 
 The scenario is the experiment. Anyone can read the file and see exactly
 what changed, which is the thing a hand-written mutation inside experiment
@@ -24,12 +25,10 @@ returns, so a one-off repricing is visible in a return window for exactly
 one window. After that the only trace of it is two decimal places. A
 crisis, by contrast, changes a WORD.
 
-The second finding is the reason `resample` is part of this experiment
-rather than an appendix to it. A single decision pair cannot tell a
-response from sampling noise: on the first post-fork decision of a pilot,
-the agent bought a dip in control and de-risked under the shock, which read
-as a clean result and turned out to sit inside the control arm's own
-variance over eight identical calls.
+The second is the reason `resample` is part of this experiment rather
+than an appendix to it. A single decision pair cannot tell a response from
+sampling noise, so each arm's first post-fork question is asked eight more
+times and the spread of the answers is the yardstick.
 
 ## What this measures
 
@@ -39,9 +38,11 @@ immediately after, at the same arrival prices, so the market is held still.
 Reporting only the first would let a difference in prices read as a
 difference in behaviour.
 
-In the recorded run the control arm averaged 0.859 gross exposure and added
-0.122 through its own trades; the crisis arm averaged 0.636 and removed
-0.128. Across four live replications the crisis arm was lower in three.
+In the recorded run on pt-v21 the control arm averaged 0.615 gross
+exposure and added 0.149 through its own trades, most of it in one decision;
+the crisis arm averaged 0.486 and removed 0.056. Across four live
+replications the crisis arm was lower in all four, by a gap about half the
+size of the spread between runs.
 
 Three separate bodies of evidence, and they answer different questions. One
 canonical trajectory per arm carries the path. Eight identical fork-step
@@ -80,11 +81,11 @@ SNAPSHOT = HERE / "data" / "edgar-2026-08-31.json"
 #: of one drift apart.
 FIXTURE = ROOT / "tests" / "fixtures" / "finrobot" / "liquidity-crisis.json"
 
-#: The earlier three-arm rate ladder, for the supporting story about a
-#: result that looked convincing once and did not reproduce.
+#: An older recording of this agent on a three-arm rate ladder. The
+#: notebook only parses it, to show an answer the market cannot execute.
 LEGACY_FIXTURE = ROOT / "tests" / "fixtures" / "finrobot" / "rate-ladder.json"
 
-PRESET = "pt-v16"
+PRESET = "pt-v21"
 SEED = 4242
 UNIVERSE_SEED = 4242
 CASH = 50_000_000.0
@@ -116,16 +117,13 @@ SCENARIO_NAME = "liquidity_crisis_at_fork"
 #: the notebook checks that rather than asking a reader to trust it.
 PACKAGED_SCENARIO = "liquidity_crisis"
 
-#: The quiet intervention, kept for the supporting story. The canonical
-#: +200bps pair, and the one experiment 001 ran. It changes two numbers and
-#: no word. It is not part of the public comparison any more: a rate shock
-#: is a LEVEL shift, visible in a return window for exactly one window,
-#: which is what 001 measured and what four replications failed to
-#: reproduce.
+#: The quiet intervention: the +200bps pair experiment 001 ran. It changes
+#: two numbers and no word. A rate shock is a LEVEL shift, visible in a
+#: return window for exactly one window. It is the decomposition's quiet
+#: arm.
 QUIET = {"federal_funds_rate": 0.06, "corporate_bond_yield": 0.075}
 
-#: The loud rate-and-regime arm the earlier framing compared against. Kept
-#: because the notebook tells the supporting story from its recording.
+#: The loud rate-and-regime arm, which the decomposition splits.
 LOUD = {**QUIET, "vix": 45.0, "cycle": "contraction"}
 
 #: The public experiment. Ordered: `dict` preserves insertion order, the
@@ -140,31 +138,30 @@ CONTROL_ARM = "control"
 CRISIS_ARM = "crisis"
 TREATMENTS = [name for name, treatment in ARMS.items() if treatment]
 
-#: The three-arm rate ladder the earlier framing ran, kept so the
-#: supporting story and the decomposition still have their arms. Nothing in
-#: the public experiment reads this.
+#: The three-arm rate ladder: control, the quiet rate move and the loud
+#: rate-and-regime move. Nothing in the two-arm experiment reads this.
 LEGACY_ARMS: dict[str, str | dict | None] = {"control": None,
                                              "+200bps": QUIET,
                                              "crisis": LOUD}
 
-#: The crisis moves four fields at once, so the headline result cannot say
-#: which of them carried it. These two arms split the regime half of it:
+#: The rate-and-regime arm moves four macro fields at once, so it cannot say
+#: which of them carried a response. These two arms split the regime half:
 #: VIX alone, and the cycle phase alone. Both are in
 #: `finrobot.OBSERVABLE_MACRO`, and `cycle` is the one that reaches the
 #: agent as a word.
 #:
-#: Every arm of a fork is bit-identical at the fork whatever the arm count.
-#: So a five-arm fork reproduces the three-arm arms exactly, and the
-#: recorded replications cover three of the five without a further call.
+#: Every arm of a fork is bit-identical at the fork whatever the arm count,
+#: so `record.py` forks these and the study's two arms from one shared
+#: history per replication, and `control` serves both comparisons.
 VIX_ONLY = {"vix": LOUD["vix"]}
 CYCLE_ONLY = {"cycle": LOUD["cycle"]}
-#: Legacy, like `LEGACY_ARMS`: these split the rate-and-regime arm.
+#: The five-arm decomposition of the rate-and-regime arm.
 ARMS_DECOMPOSED: dict[str, dict | None] = {
     "control": None,
     "+200bps": QUIET,
     "vix": VIX_ONLY,
     "cycle": CYCLE_ONLY,
-    "crisis": LOUD,
+    "rate+regime": LOUD,
 }
 
 OBJECTIVE = ("Manage the portfolio for attractive risk-adjusted returns "
@@ -196,9 +193,9 @@ def load_scenario(name: str = SCENARIO_NAME) -> tf.Scenario:
     `Scenario.from_yaml` rather than `Scenario.load`, because this file
     lives with the experiment rather than in the wheel. The packaged one it
     was rebased from is reachable as `tf.Scenario.load(PACKAGED_SCENARIO)`.
-    Against the package before 0.8.5 the only field that differs is `at`;
-    0.8.5 recalibrated the packaged file (VIX x3.5 rather than x2, and an
-    earnings path), and this study keeps the one it was recorded under.
+    The file here is the package as 0.8.1 shipped it, with `at` moved to
+    0; the package has since been recalibrated (VIX x3.5 rather than x2,
+    and an earnings path), and this study runs the 0.8.1 shocks.
     """
     path = SCENARIO_DIR / f"{name}.yml"
     if not path.is_file():
@@ -279,11 +276,10 @@ def subset(snapshot: Snapshot) -> Snapshot:
 def universe(small: Snapshot) -> list:
     """The instruments, priced at fair value under `PRESET`.
 
-    `model=PRESET` is load-bearing. Since 0.7.0 `to_instruments` prices each
-    company under the model it names and defaults to the shipped one, and
-    pt-v18 onward move `neutral_discount_rate` (0.0482 against pt-v16's
-    0.04). Left to the default, the day-zero prices come out one to two
-    per cent higher than the ones pt-v16 sets, every prompt the agent is
+    `model=PRESET` is load-bearing. `to_instruments` prices each company
+    under the model it names and defaults to the shipped one. Presets
+    differ in `neutral_discount_rate`, so when the default moves away from
+    `PRESET` the day-zero prices move with it, every prompt the agent is
     sent differs from the recording, and every replayed decision is
     refused: the agent never trades and the notebook finds no decision at
     the fork.
@@ -515,11 +511,11 @@ def depth_reading(world, day: int | None = None) -> dict[str, Any]:
     out of quoted book, and `liquidity_share` says how far the depth bound
     moved the print as a multiple of the move the print made.
 
-    The share is NEGATIVE on most rows that carry one. The bound truncates a
-    walk: an order that exhausts a shallow book stops there, while against
-    every resting level it keeps filling and prints further from where it
-    started. The unbounded book's move is `1 - share` times the printed
-    move.
+    The share is NEGATIVE wherever the bound truncated a walk: an order
+    that exhausts a shallow book stops there, while against every resting
+    level it keeps filling and prints further from where it started. It is
+    positive where the deeper book would have absorbed part of the move.
+    The unbounded book's move is `1 - share` times the printed move.
 
     This is the reading the crisis arm exists to move. `market.liquidity`
     scales the volume column the maker quotes off, so the crisis book is
@@ -567,8 +563,8 @@ def depth_reading(world, day: int | None = None) -> dict[str, Any]:
     )
     # ABSOLUTE, and labelled so everywhere it is reported. Absorption is
     # signed with the move, so up ticks and down ticks cancel and the signed
-    # mean over a session is small: +4.2 basis points against 22.9 for the
-    # absolute mean on the control arm of the 0.8.5 recording. The question
+    # mean over a session is small: +1.3 basis points against 3.0 for the
+    # absolute mean on the control arm of the recorded run. The question
     # is how far a print sits from the model price, which is a distance.
     absorbed = [abs(v) for v in table["absorbed"]]
     return {

@@ -120,6 +120,14 @@ def state(engine):
     out.update({f"attribution:{f}": engine.attribution(f)
                 for f in tf.Engine.FACTORS})
     out["prices"] = engine.prices()
+    # What derivatives read (`index_level_listed`, `vix_intraday_live`,
+    # `forecast_horizon_sessions`): None on a model without them.
+    out["index_level"] = engine.index_level
+    out["live_vix"] = engine.live_vix
+    out["forecast"] = engine.forecast()
+    # The index futures (`futures_index_listed`): empty on a model without.
+    out["futures"] = [engine.quote(c["symbol"]) for c in engine.contracts()]
+    out["settlements"] = engine.settlements()
     out["draws"] = engine.draws_consumed
     out["draws_by_stream"] = engine.draws_by_stream()
     out["digest"] = market_digest(engine)
@@ -1016,7 +1024,10 @@ def test_a_snapshot_carries_the_dormant_engine_dials():
 #:   measured from the raw open, nothing writes the carried jump, and
 #:   `jump_move` is a snapshot field no market here could reach.
 def _nothing_dormant():
-    shipped = tf.ModelParams.from_preset().to_dict()
+    # pt-v21 by name, the default the notes below were written against. On
+    # pt-v22 its contracts read `skew_noise` and `vix_stress_memory`, which
+    # the notes record as out of this scenario's reach.
+    shipped = tf.ModelParams.from_preset("pt-v21").to_dict()
     dormant = {name: 0.05 for name in tf.ModelParams.settable()
                if float(shipped[name]) == 0.0}
     assert dormant, "no dial ships at zero; this model is not testing anything"
@@ -1098,6 +1109,120 @@ def _nothing_dormant():
                    # timing); the stress cut takes the blanket 0.05.
                    rate_close_remark=1.0,
                    rate_intraday_live=1.0,
+                   # What derivatives read (pt-v22 phase 1): two switches and
+                   # a whole number of sessions, as long as the VIX futures'
+                   # sixth contract reads.
+                   index_level_listed=1.0,
+                   vix_intraday_live=1.0,
+                   forecast_horizon_sessions=126.0,
+                   # The index futures (pt-v22 phase 1): a switch, a basis
+                   # persistent enough that a restore which lost the basis
+                   # is still apart a month on, and a whole number of night
+                   # steps.
+                   futures_index_listed=1.0,
+                   basis_sd=3.7,
+                   basis_persistence=0.9,
+                   night_session_steps=4.0,
+                   # The VIX futures (pt-v22 phase 1), on a forecast long
+                   # enough to price them, with their intraday loading.
+                   futures_vix_listed=1.0,
+                   futures_vix_live_fast_share=0.27,
+                   futures_vix_live_fast_half_life=1.3,
+                   futures_vix_live_slow_half_life=28.6,
+                   # The rate futures (pt-v22 phase 1): a switch.
+                   futures_rates_listed=1.0,
+                   # The oil futures (pt-v22 phase 1): a switch.
+                   futures_oil_listed=1.0,
+                   # The oil storage law's two switches, and oil's bounds
+                   # at WTI's real-terms range (each only widens).
+                   oil_pushes_in_target=1.0,
+                   oil_forecast_clamp=1.0,
+                   oil_forecast_opec_spread=1.0,
+                   oil_forecast_cycle_growth=1.0,
+                   # The bank's and the curve's core inflation: switches,
+                   # and both on so the oil part of headline is carried.
+                   fed_core_inflation=1.0,
+                   treasury_core_inflation=1.0,
+                   # The zero bound's pieces (the put and path are on above).
+                   treasury_zlb_path=0.5,
+                   treasury_zlb_haven_gain=0.05,
+                   # The Taylor rule's neutral real rate (HLW, 1990-2025).
+                   fed_neutral_real_rate=2.0,
+                   # Core inflation's trend (CPILFESL fit), on its own keyed draws.
+                   core_trend_sd=0.17,
+                   core_trend_persistence=0.993,
+                   # Every pinned VIX sets the variance: a switch.
+                   pinned_vix_sets_variance=1.0,
+                   # A pinned VIX's same-day return (the tape's per point).
+                   pinned_vix_return=0.005375,
+                   # Credit's own state (LQD-IEF residual), on its own keyed draws.
+                   corporate_spread_noise_sd=0.025,
+                   corporate_spread_noise_half_life=16.0,
+                   # The 10-year's own term premium (DGS10's variance
+                   # ratios), on its own keyed draws.
+                   treasury_term_premium_sd=0.06,
+                   # The aggregate earnings level's step at the close.
+                   fair_value_aggregate_jensen=1.0,
+                   fair_value_aggregate_half_life=1959.0,
+                   fair_value_aggregate_remark=1.0,
+                   fair_value_aggregate_expected=1.0,
+                   # The earnings look-through's written level and anchor.
+                   earnings_lookthrough_half_life=598.0,
+                   earnings_lookthrough_gain=0.1605,
+                   earnings_lookthrough_discount_half_life=5267.0,
+                   treasury_term_premium_half_life=49.0,
+                   # The time-held fade (issue #303): the onset, the
+                   # multiplier's fade and the held VIX's half-life.
+                   market_vol_cycle_hold_onset=0.9,
+                   market_vol_cycle_hold_fade=0.335,
+                   market_vol_cycle_hold_half_life=295.0,
+                   market_vol_vix_hold_half_life=198.0,
+                   # The expansion's inflation and rate hazards (NBER fit).
+                   cycle_inflation_hazard=0.0219,
+                   cycle_rate_hazard=0.0013,
+                   # The eve's decision and the anticipated path without the
+                   # owed step (both switches).
+                   fed_eve_decision=1.0,
+                   treasury_path_owed_excluded=1.0,
+                   # The 2-year's carry through a meeting (a share).
+                   treasury_2y_meeting_carry=1.0,
+                   # The reversed flight to quality's cut over 4 (a share).
+                   flight_to_quality_reversal_cut=0.5,
+                   # The priced meeting's half-life (policy_anticipation is
+                   # on above), in sessions.
+                   policy_anticipation_half_life=10.0,
+                   # The anticipated path (a switch; the path is on above).
+                   treasury_path_anticipated=1.0,
+                   # The Fed's guidance (a share; the anticipation is on).
+                   policy_anticipation_guidance=0.5,
+                   oil_price_floor=16.4,
+                   oil_price_ceiling=279.0,
+                   # The contracts' margin (pt-v22 phase 1).
+                   margin_scan_coverage=0.99,
+                   margin_scan_tail=1.3,
+                   # The rate futures' premium per fixing and the pre-trade
+                   # margin check (fix round): two switches; the eve's
+                   # surprise and the option minimum take the blanket 0.05.
+                   rate_premium_per_fixing=1.0,
+                   margin_pretrade_check=1.0,
+                   margin_liquidation_worked=1.0,
+                   margin_deficit_liquidates=1.0,
+                   # The index options, their surface and their dealer (pt-v22
+                   # phase 2): two switches; the surface's companions and the
+                   # dealer's spread take the blanket 0.05.
+                   surface_ssvi=1.0,
+                   options_index_listed=1.0,
+                   # The index surface's strip-held term scaling: a switch.
+                   surface_index_tenor_strip=1.0,
+                   # The index options' forward from the listed future: a
+                   # switch.
+                   options_index_forward_from_future=1.0,
+                   # The single-name options (pt-v22 phase 3): a switch; the
+                   # names' premium and skew take the blanket 0.05.
+                   options_names_listed=1.0,
+                   # The name dealer's response per contract lives in
+                   # [0, 0.01], so it takes the table's value, not 0.05.
+                   option_name_inventory_slope=0.0002,
                    # Two switches read only under a macro pin (r13).
                    macro_pins_hold=1.0,
                    pinned_vix_feedback=1.0,
@@ -1144,7 +1269,7 @@ def _nothing_dormant():
                    # sessions keep the build short and still hand on state.
                    market_prehistory_sessions=5.0,
                    market_prehistory_valuation=1.0)
-    return tf.ModelParams.from_preset(**dormant)
+    return tf.ModelParams.from_preset("pt-v21", **dormant)
 
 
 #: A crisis, so the stress term has something to remember.
@@ -1308,6 +1433,23 @@ REQUIRED_SNAPSHOT_KEYS = ("columns", "rng", "tickers", "tick_components")
 #: dials put the scenario in reach of them: `fed_drawdown_mcap_prev`,
 #: `night_market_factor` and `market_vol_cycle_log`.
 UNREACHED_SNAPSHOT_FIELDS = {
+    "earnings_lookthrough":
+        "the earnings look-through's written level and anchor "
+        "(`earnings_lookthrough_half_life`). Only a `market.earnings` write "
+        "moves them off zero, and this scenario's market writes none, so "
+        "dropping the key restores the zeros the run holds. What it takes to "
+        "see it is a scenario that writes `market.earnings` before the fork. "
+        "rust's `earnings_lookthrough` tests hold the state across a restore "
+        "and in the state hash.",
+    "cycle_hold":
+        "the time-held fade's clock and held VIX "
+        "(`market_vol_cycle_hold_onset`). Both fades act only past a "
+        "contraction's or trough's onset, 111 sessions of a trough at the "
+        "earliest, and this scenario's market is days long, so dropping the "
+        "clock restarts a count no price reads yet. What it takes to see it "
+        "is a phase held past its onset. The engine's own tests "
+        "(`cycle_hold`) hold the clock, the fades and the state hash across "
+        "a restore.",
     "vix_anchor":
         "the VIX anchor `vix_level_identity` derives from the roster the "
         "engine was built on. Every copy here is built on the original's "
@@ -1315,6 +1457,56 @@ UNREACHED_SNAPSHOT_FIELDS = {
         "changes nothing. What it takes to see it is a copy built on a later "
         "day's roster, as a host that saves and resumes builds one. "
         "rust/tests/host_day_restore.rs holds it across that restore (#268).",
+    "vix_live":
+        "the live VIX's projection (`vix_intraday_live`). It moves no price, "
+        "and a restore without it projects again on the next tick from the "
+        "same state, so the continuation reads the same live VIX from the "
+        "next refresh on and the published one after the close. What it "
+        "takes to see it is a read between the restore and the next "
+        "five-minute refresh. tests/test_derivative_foundations.py holds it "
+        "in the state hash and across a mid-session restore.",
+    "vix_futures":
+        "the VIX futures (`futures_vix_listed`). They move no price, and every "
+        "close marks them afresh from the forecast and the published VIX, so "
+        "an untraded continuation's marks are the copy's from its first close "
+        "on. What the key alone carries is agents' flow's mark and the "
+        "consumed depth, which wait on a trade, the settlements made, which "
+        "wait on an expiry inside the window, and the listing within a "
+        "session, which waits on a read before the close. "
+        "tests/test_vix_futures.py holds each in the state hash and across a "
+        "restore.",
+    "rate_futures":
+        "the policy-rate and term-rate futures (`futures_rates_listed`). They "
+        "move no price, and every close marks them afresh from the rate it "
+        "sets and the forecast. What the key alone carries is the closing "
+        "rates a period in progress has realised, which reach a mark only "
+        "where a restore lost one inside the period, agents' flow's mark, "
+        "which waits on a trade, and the settlements made. "
+        "tests/test_rate_futures.py holds each in the state hash and across a "
+        "restore.",
+    "options":
+        "the index options and the surface's clock (`surface_ssvi`, "
+        "`options_index_listed`). They move no price: a quote is computed from "
+        "public state when asked. What the key alone carries is the listing "
+        "(each expiry's strike grid and range), the dealer's pressure, which "
+        "waits on a trade, and the settled expiries, which wait on an expiry "
+        "inside the window. tests/test_index_options.py holds each in the "
+        "state hash and across a restore.",
+    "skew_noise":
+        "the skew premium's noise and its key (`surface_skew_noise_sd`). It "
+        "moves no price: only the index surface's skewness reads it, and a "
+        "quote is computed from public state when asked. What the key alone "
+        "carries is the noise's level, which a read of the surface would see. "
+        "tests/test_skew_noise.py holds it in the state hash and across a "
+        "restore, a fork and a replay.",
+    "oil_futures":
+        "the oil futures (`futures_oil_listed`). They move no price, and every "
+        "close marks them afresh from the forecast. What the key alone "
+        "carries is agents' flow's mark, which waits on a trade, the "
+        "settlements made, which wait on an expiry inside the window, and the "
+        "listing within a session, which waits on a read before the close. "
+        "tests/test_oil_futures.py holds each in the state hash and across a "
+        "restore.",
     "attribution":
         "the day's decomposition of the change in `s`. This model splits the "
         "day (`overnight_market_share`), and under a split the close's GJR "
@@ -1350,16 +1542,20 @@ UNREACHED_SNAPSHOT_FIELDS = {
         "tests/test_postcut.py::test_the_hashes_agree_and_a_restore_"
         "reproduces_the_run cuts, carries a non-zero path across a restore "
         "and asserts the state hash reads it.",
-    "fed_stress_vix_max":
-        "the central bank's stress level, the highest VIX published since "
-        "the last meeting (`fed_stress_cut`). `CRISIS` holds the VIX at 45 "
-        "every session, so each close writes 45 whatever the level was, and "
-        "an engine restored without it (0.0) is back at 45 at its first "
-        "close, before any meeting reads it. What it takes to see it is a "
-        "VIX that spikes and falls back before a meeting. tests/"
-        "test_bond_timing.py::test_a_restore_without_the_stress_level_loses_"
-        "the_cut is that scenario: without the key the meeting holds where "
-        "the parent cut.",
+    "core_trend":
+        "core inflation's trend (`core_trend_sd`): its level and its key. A "
+        "fresh engine on the same seed opens at the same trend (the opening "
+        "is a draw on the same key), and the trend moves only on a month's "
+        "first step, so until the split's parent has passed one the blank "
+        "value is the parent's own. tests/test_core_trend_process.py holds "
+        "the process to its own draws and its state in the hash.",
+    "eve_decision":
+        "the decision the Fed's own reading implied at the last close "
+        "(`fed_eve_decision`), which the next scheduled meeting delivers. "
+        "`CRISIS` starts the policy rate at 0.05 in a contraction, where the "
+        "ladder has no cut left and no reason to hike, so the eve's decision "
+        "and the day's agree and a restore that loses it (and re-reads the "
+        "day) reaches the same decision.",
     "earnings_key":
         "the earnings calendar's key. It is derived from the seed the engine "
         "was built with, and this guard restores into an engine built from "

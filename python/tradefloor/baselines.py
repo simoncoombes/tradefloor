@@ -15,16 +15,17 @@ These are the reference points that make a score readable, from the bottom up:
   anyone would try first?
 - **Oracle**: how much was available?
 
-## On pt-v20 and pt-v21 the headline is buy-and-hold
+## On pt-v20, pt-v21 and pt-v22 the headline is buy-and-hold
 
 The Oracle answers that last question only where hidden state predicts
 returns, which is every preset through pt-v19. On pt-v20 market moves
 mostly stick. Each shock moves fair value for good, so even perfect
 knowledge of the model's fair value leaves little edge. The Oracle made
 money in 10 of 14 test markets there, and its P&L follows the
-market's month. pt-v21, the default from 0.10.0, keeps that. The Oracle
-stays in the reference set, but :func:`capture_ratio` reports nothing on
-either (:data:`ORACLE_NOT_A_CEILING` names them, with the reason), and a
+market's month. pt-v21, the default from 0.10.0, and pt-v22 keep that.
+The Oracle stays in the reference set, but :func:`capture_ratio` reports
+nothing on any of them (:data:`ORACLE_NOT_A_CEILING` names them, with the
+reason), and a
 score is read against buy-and-hold with
 :func:`versus_buy_and_hold`. The rest of this docstring describes the
 Oracle where it is a ceiling.
@@ -850,6 +851,16 @@ ORACLE_NOT_A_CEILING: dict[str, str] = {
         "all 8, so a fraction of its P&L would measure the month, not the "
         "agent. Compare against buy-and-hold instead."
     ),
+    # Measured 2026-10-28 on the same markets: 6 and 8, pt-v21's counts
+    # (pt-v21 re-measured beside it: 6, and 8, the figures above).
+    "pt-v22": (
+        "No capture ratio on pt-v22. As on pt-v20 and pt-v21, market moves "
+        "there mostly stick: each shock moves fair value for good, so even "
+        "perfect knowledge of the model's fair value leaves little edge. The "
+        "Oracle made money in 6 of 8 test markets and took buy-and-hold's "
+        "sign in all 8, so a fraction of its P&L would measure the month, "
+        "not the agent. Compare against buy-and-hold instead."
+    ),
 }
 
 
@@ -967,7 +978,8 @@ def capture_ratio(scores: dict[str, Any], *, oracle: str = "oracle") -> dict[str
     worst agent first. An empty result means "not measurable here".
 
     Returns an empty mapping, too, on a preset where the Oracle is not a
-    ceiling (:data:`ORACLE_NOT_A_CEILING`, which names pt-v20 and pt-v21), whatever
+    ceiling (:data:`ORACLE_NOT_A_CEILING`, which names pt-v20, pt-v21 and
+    pt-v22), whatever
     the Oracle earned. :func:`capture_withheld` gives the reason, and
     :func:`versus_buy_and_hold` the comparison to quote there.
 

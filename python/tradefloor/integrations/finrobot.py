@@ -181,7 +181,7 @@ from ..render import Renderer, TextRenderer, _sector_rows, check_renderer
 from .common import (OBSERVATION_SCHEMA_VERSION, AdapterInfo,
                      FrameworkError, IntegrationError, MissingDependencyError)
 from .common import SIDES as _COMMON_SIDES
-from .common import _dividends_paid, _next_reports
+from .common import _dividends_paid, _next_reports, derivatives_payload
 from .common import Action as _CommonAction
 from .common import Decision as _CommonDecision
 from .common import DecisionError as _CommonDecisionError
@@ -207,11 +207,12 @@ from .common import jsonable as _as_jsonable
 #: itself, so the two cannot drift apart over what a macro experiment covers.
 OBSERVABLE_MACRO = MACRO_FIELDS
 
-#: The sides a decision may name: the shared contract's, so the two parsers
-#: cannot disagree. HOLD carries no quantity and produces no order, so the
-#: agent can decline a decision period. CANCEL withdraws the limit orders
-#: waiting on a symbol.
-SIDES = _COMMON_SIDES
+#: The sides a decision may name: the shared contract's but EXERCISE, which
+#: the mandate (frozen at version 2) does not offer, so a FinRobot agent
+#: never exercises a single-name option and its parser refuses the side.
+#: HOLD carries no quantity and produces no order, so the agent can decline
+#: a decision period. CANCEL withdraws the limit orders waiting on a symbol.
+SIDES = tuple(s for s in _COMMON_SIDES if s != "EXERCISE")
 
 #: The only keys a decision object may carry, and the only keys an action may
 #: carry. Anything else is refused rather than dropped.
@@ -360,6 +361,9 @@ class Action(_CommonAction):
 
     __slots__ = ()
     _error = DecisionError
+    #: The sides the mandate offers (``SIDES``), which the shared parser
+    #: reads in place of its own.
+    _sides = SIDES
 
 
 class Decision(_CommonDecision):
@@ -481,6 +485,10 @@ def observe(obs: Any, *, history: Sequence[Sequence[float]] = (),
             # The agent's limit orders still waiting in the book.
             "open_orders": open_orders_of(obs),
         },
+        # The listed futures, the price index and the margin, on a model
+        # that lists futures (observation schema 3), read as the shared
+        # serializer reads them; nothing on any other model.
+        **derivatives_payload(obs, max_participation=max_participation),
     }
     if detail is not None:
         listed = {asset["symbol"] for asset in assets}

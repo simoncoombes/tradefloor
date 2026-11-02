@@ -5,6 +5,7 @@
 //!
 //! - each market cap follows at once, and every tick after prices it off
 //!   the new count;
+//! - the listed index keeps its level across the write;
 //! - a bad write is refused and changes nothing;
 //! - a snapshot carries the counts, and the state hash covers them, only
 //!   once they have moved, so a restore continues bit for bit and an engine
@@ -36,6 +37,12 @@ fn engine_with(params: ModelParams) -> Engine {
 
 fn engine() -> Engine {
     engine_with(ModelParams::preset("pt-v21").unwrap())
+}
+
+fn listed() -> Engine {
+    let mut p = ModelParams::preset("pt-v21").unwrap();
+    p.index_level_listed = 1.0;
+    engine_with(p)
 }
 
 fn session(e: &mut Engine, dow: i64, hour: i64, minute: i64, ticks: usize) {
@@ -104,6 +111,25 @@ fn the_counts_move_the_market_and_consume_no_draws() {
 }
 
 #[test]
+fn the_listed_index_keeps_its_level_across_the_write() {
+    let mut e = listed();
+    run(&mut e, 0..2);
+    e.open_market();
+    session(&mut e, 2, 9, 30, 10);
+    let before = e.index_level().unwrap();
+    let shares = moved(&e);
+    e.set_shares_outstanding(&shares).unwrap();
+    let after = e.index_level().unwrap();
+    assert!(
+        (after.level - before.level).abs() <= 1e-9 * before.level,
+        "the level moved from {} to {}",
+        before.level,
+        after.level
+    );
+    assert_ne!(after.divisor, before.divisor, "the divisor was not reset");
+}
+
+#[test]
 fn a_bad_write_is_refused_and_changes_nothing() {
     let mut e = engine();
     run(&mut e, 0..2);
@@ -144,21 +170,22 @@ fn an_engine_never_told_carries_no_counts_and_hashes_as_before() {
 
 #[test]
 fn a_restore_carries_the_counts_and_continues_bit_for_bit() {
-    let make = engine;
-    let mut original = make();
-    run(&mut original, 0..2);
-    let shares = moved(&original);
-    original.set_shares_outstanding(&shares).unwrap();
-    run(&mut original, 2..3);
-    let bytes = original.snapshot().to_bytes();
-    let mut resumed = make();
-    resumed.restore(&EngineSnapshot::from_bytes(&bytes).unwrap()).unwrap();
-    assert_eq!(bits(&resumed.shares_outstanding()), bits(&shares));
-    assert_eq!(resumed.snapshot().to_bytes(), bytes);
-    run(&mut original, 3..6);
-    run(&mut resumed, 3..6);
-    assert_eq!(bits(&resumed.column(PriceField::Price)), bits(&original.column(PriceField::Price)));
-    assert_eq!(resumed.state_hash(6, false), original.state_hash(6, false));
+    for make in [engine as fn() -> Engine, listed] {
+        let mut original = make();
+        run(&mut original, 0..2);
+        let shares = moved(&original);
+        original.set_shares_outstanding(&shares).unwrap();
+        run(&mut original, 2..3);
+        let bytes = original.snapshot().to_bytes();
+        let mut resumed = make();
+        resumed.restore(&EngineSnapshot::from_bytes(&bytes).unwrap()).unwrap();
+        assert_eq!(bits(&resumed.shares_outstanding()), bits(&shares));
+        assert_eq!(resumed.snapshot().to_bytes(), bytes);
+        run(&mut original, 3..6);
+        run(&mut resumed, 3..6);
+        assert_eq!(bits(&resumed.column(PriceField::Price)), bits(&original.column(PriceField::Price)));
+        assert_eq!(resumed.state_hash(6, false), original.state_hash(6, false));
+    }
 }
 
 #[test]

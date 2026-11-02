@@ -9,9 +9,9 @@
 #
 # 0.8.5 recalibrated the packaged file against March 2020 (VIX x3.5 rather
 # than x2.0, and an earnings fall of 15 per cent over two months), so it is
-# now sha256:7d8c8cc8... and this study no longer rebases the packaged file.
-# The study's recordings were made under 0.8.x on this file, and it stays as
-# it was until the study is re-recorded.
+# now sha256:7d8c8cc8... This study keeps the 0.8.1 shocks: depth,
+# volatility and the credit assumption, with no earnings path. Its
+# recordings, made on pt-v21, were made on this file.
 #
 # ONE FIELD DIFFERS. The packaged file fires `at: 50`, and every packaged
 # scenario does, because they are written for a single market with fifty

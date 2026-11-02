@@ -364,7 +364,15 @@ import tradefloor
 # (tests/known_answer_presets.py); pt-v21's own row there is e3cf4410...
 # and does not move with this bump. `metadataSha256` does NOT move: pt-v21
 # carries pt-v20's mispricing and crowd coefficients.
-KAT_VERSION = 29
+#
+# v30: pt-v22 IS THE DEFAULT (0.11.0). pt-v20 with the arm in
+# tools/presets/arms/pt-v22.txt: index, rate and oil futures with their
+# night session and margin, options on every name with their dealer, and
+# the economy, curve and variance terms pt-v21 moved. Every seeded default
+# trajectory changes. pt-v21 and every preset before it replay exactly
+# (tests/known_answer_presets.py), and pt-v22's own row there does not move
+# with this bump.
+KAT_VERSION = 30
 
 SEED = 20260820
 DAYS = 250

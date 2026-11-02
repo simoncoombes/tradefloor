@@ -200,7 +200,7 @@ def _repo_root() -> Path:
 #: recording are two recordings that can drift apart.
 FIXTURE = _repo_root() / "tests" / "fixtures" / "langgraph" / "rate-shock.json"
 
-LIVE_MODEL = os.environ.get("TRADEFLOOR_LANGGRAPH_MODEL", "claude-opus-5")
+LIVE_MODEL = os.environ.get("TRADEFLOOR_LANGGRAPH_MODEL", "claude-opus-5-5")
 LIVE_KEY_VAR = "ANTHROPIC_API_KEY"
 LIVE_MAX_TOKENS = 2000
 

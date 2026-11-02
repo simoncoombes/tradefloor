@@ -67,13 +67,14 @@ HERE = Path(__file__).resolve().parent
 #: own values, an agent or the scoring re-bases the baseline without bumping
 #: it (see the module text). 2 at 0.10.0, when the run moved from pt-v20 to
 #: pt-v21 with the default, so the traded path the default ships (its
-#: impact memory and order-flow laws) is in the cross-target comparison.
-TRADED_KAT_VERSION = 2
+#: impact memory and order-flow laws) is in the cross-target comparison. 3
+#: at 0.11.0, when it moved to pt-v22 with the default.
+TRADED_KAT_VERSION = 3
 
 SEED = 20260930
 #: Seeds the random baseline only (see `reference_agents`).
 AGENT_SEED = 5
-PRESET = "pt-v21"
+PRESET = "pt-v22"
 DAYS = 10
 STEPS_PER_DAY = 6
 TICKS_PER_STEP = 65
@@ -97,8 +98,9 @@ SCORECARD_FIELDS = (
 
 #: The scorecard fields hashed by value after the others, and only where
 #: they are not zero: the dividends a card received are 0.0 on every model
-#: without dividends (`dividend_payout_share`), which is every preset, so
-#: the digest of a run on one is the one it was before the field existed.
+#: without dividends (`dividend_payout_share`), which is every preset before
+#: pt-v21, so the digest of a run on one is the one it was before the field
+#: existed.
 #: `population_fingerprint` likewise: "" on every isolated run, which is
 #: every run this script makes.
 SCORECARD_NONZERO = ("dividends", "population_fingerprint")

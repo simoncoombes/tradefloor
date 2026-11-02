@@ -128,12 +128,12 @@ print(agree(control, shock).render())
 
 ```
   market columns         identical  18 columns x 4
-  prices                 identical  114.63  87.74  68.82  52.54
-  order book             identical  212 levels
+  prices                 identical  114.35  87.74  68.73  52.51
+  order book             identical  211 levels
   generator state        identical  30 words
   macro chain            identical  federal_funds_rate=0.04  corporate_bond_yield=0.055
-  whole engine state     identical  63 fields, day 20
-  portfolio              identical  $3,558,782 cash, 4 positions
+  whole engine state     identical  83 fields, day 20
+  portfolio              identical  $3,131,867 cash, 4 positions
   agent state            identical  3 fields
   shared history         identical  120 steps
 ```
@@ -191,19 +191,19 @@ not cut evenly:
 
 ```
             growth   control    shock      cut
-    NOVA      0.35    0.2375   0.0551   -76.8%
-    HELX      0.18    0.2375   0.0609   -74.3%
-    BRDG      0.06    0.2375   0.0658   -72.3%
-    STAP      0.01    0.2375   0.0681   -71.3%
+    NOVA      0.35    0.2375   0.0556   -76.6%
+    HELX      0.18    0.2375   0.0615   -74.1%
+    BRDG      0.06    0.2375   0.0664   -72.0%
+    STAP      0.01    0.2375   0.0687   -71.1%
 ```
 
 Twenty days later the two markets are apart, in the same order:
 
 ```
                                NOVA       HELX       BRDG       STAP
-  control        40 days     117.90      85.84      72.15      52.31
-  +200bps        40 days     105.45      78.68      67.16      49.04
-  difference                -10.56%     -8.35%     -6.92%     -6.26%
+  control        40 days     117.36      85.88      72.11      52.20
+  +200bps        40 days     104.97      78.71      67.13      48.93
+  difference                -10.56%     -8.35%     -6.91%     -6.26%
 ```
 
 And the two books:
@@ -211,11 +211,11 @@ And the two books:
 ```
                                     control          +200bps
   final gross exposure                0.89x            0.35x
-  turnover                       $4,226,207      $39,778,770
-  cost against arrival               $1,454          $34,185
-  cash                           $5,592,938      $30,721,513
-  P&L since the fork              $+816,937      $-3,423,208
-  max drawdown since                  2.55%            8.08%
+  turnover                       $4,016,059      $40,016,591
+  cost against arrival               $1,445          $36,410
+  cash                           $5,573,225      $30,658,061
+  P&L since the fork              $+781,699      $-3,467,394
+  max drawdown since                  2.63%            8.17%
 ```
 
 The behaviour comes first here deliberately. The P&L difference is one draw of

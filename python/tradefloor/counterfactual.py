@@ -195,9 +195,9 @@ from ._arith import ordered_sum
 from ._core import (Engine, Instrument, Macro, ModelParams, OrderError,
                     ValidationError, check_seed)
 from .checkpoint import Checkpoint, branch
-from .harness import History, Observation, _warm_up, session_clock
+from .harness import History, Observation, _warm_up, open_day, session_clock
 from .manifest import RunManifest, market_digest
-from .portfolio import Cancel, Limit, Portfolio, check_order, order_items
+from .portfolio import Cancel, Exercise, Limit, Portfolio, check_order, order_items
 from .sandbox import (HiddenState, MarketView, PortfolioView, TamperGuard,
                       declares_hidden_state)
 from .interventions import Intervention
@@ -742,12 +742,16 @@ class World:
             # at which today's value is known.
             self._adv = _f64(self.engine.column("avg_volume"))
             macro = _macro(self.engine)
-            self.engine.open_market()
+            open_day(self.engine)
             # The cash dividends this open made payable, into each
             # portfolio in label order before any agent is asked, as
             # `evaluate` collects them. Nothing on a model without dividends.
             paid = {label: self._portfolios[label].collect_dividends(self.engine)
                     for label in self._agents}
+            # The futures the open settled, and each margin call decided,
+            # in label order. Nothing without futures.
+            for label in self._agents:
+                self._portfolios[label].settle_open(self.engine)
             self._dividends_today = paid if any(paid.values()) else None
 
             for _ in range(self.steps_per_day):
@@ -827,6 +831,10 @@ class World:
             if record:
                 self.engine.record(day)
             self.engine.close_market()
+            # Variation margin and margin calls at the close, in label
+            # order. Nothing without futures.
+            for label in self._agents:
+                self._portfolios[label].settle_close(self.engine)
             self._verify_surgery(day)
             if ledger is not None:
                 ledger.close(self.engine)
@@ -1111,6 +1119,11 @@ class World:
                     continue
                 if isinstance(quantity, Cancel):
                     portfolio.cancel(self.engine, ticker=ticker)
+                    continue
+                if isinstance(quantity, Exercise):
+                    # An instruction for the close: the shares move at
+                    # settle_close, and nothing trades now.
+                    portfolio.exercise(self.engine, ticker, quantity.quantity)
                     continue
                 # The step's arrival mid: the book's before ANY agent's order
                 # this step, read once per name. Off a live book every agent
@@ -2637,6 +2650,37 @@ def _entry_at(world: World, at: int) -> dict[str, Any]:
         "step a reader is about to draw a conclusion from.")
 
 
+#: The payload's sections for the listed contracts. Each prices off the market
+#: an intervention moves -- a future off the policy rate, the index and its
+#: dividends, an option off the surface, the margin off both -- so on the day
+#: an intervention lands they reprice with it, and a line inside one is the
+#: intervention's own consequence, not a second difference. Lines anywhere
+#: else stay held to the intervened fields.
+CONTRACT_SECTIONS = ("futures", "options", "margin")
+
+_TOP_KEY = re.compile(r'^  "([A-Za-z_]+)":')
+
+
+def _sections(lines: Sequence[str]) -> list[str | None]:
+    """Each line's top-level payload section in an indented-JSON prompt.
+
+    A key at two spaces of indent opens a section and every deeper line
+    belongs to it; a line at no indent closes it. Text that is not the
+    payload as JSON belongs to none, so it is held to the intervened fields
+    as before.
+    """
+    out: list[str | None] = []
+    current = None
+    for line in lines:
+        m = _TOP_KEY.match(line)
+        if m:
+            current = m.group(1)
+        elif not line.startswith("  "):
+            current = None
+        out.append(current)
+    return out
+
+
 def _diff(control_entry: dict, treatment_entry: dict,
           touched: Sequence[str]) -> list[dict[str, str]]:
     """The differing prompt lines, refusing any the intervention cannot own.
@@ -2647,6 +2691,8 @@ def _diff(control_entry: dict, treatment_entry: dict,
     """
     left = _lines(control_entry.get("prompt"))
     right = _lines(treatment_entry.get("prompt"))
+    owned = {i for i, sec in enumerate(_sections(left)) if sec in CONTRACT_SECTIONS}
+    owned_r = {j for j, sec in enumerate(_sections(right)) if sec in CONTRACT_SECTIONS}
     rows: list[dict[str, str]] = []
     stray: list[str] = []
     for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(
@@ -2660,7 +2706,12 @@ def _diff(control_entry: dict, treatment_entry: dict,
         # whether the BLOCK mentions an intervened field lets the price
         # ride in on the rate's ticket -- which is the single thing this
         # check exists to catch.
-        for line in left[i1:i2] + right[j1:j2]:
+        lines = [(line, i in owned) for i, line in zip(range(i1, i2), left[i1:i2])]
+        lines += [(line, j in owned_r) for j, line in zip(range(j1, j2), right[j1:j2])]
+        for line, in_contract in lines:
+            # A listed contract reprices with whatever the intervention moved.
+            if in_contract and touched:
+                continue
             if not any(field in line for field in touched):
                 stray.append(_field_of(line))
     if stray:

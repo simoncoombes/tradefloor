@@ -134,6 +134,16 @@ def test_portfolio_weights_are_warned_about_and_still_executed():
     assert card.trades == 10
 
 
+def test_the_weights_warning_sizes_the_order_not_the_holding():
+    # The fix it suggests subtracts what is already held, so following it
+    # on a second step does not buy the whole position again.
+    with pytest.warns(UserWarning, match=r"close the gap: int\(0\.2 \* "
+                                         r"obs\.portfolio\.net_worth\(\) / "
+                                         r"obs\.price\('AAA'\)\) - "
+                                         r"obs\.position\('AAA'\)"):
+        _evaluate({"w": Weights()})
+
+
 def test_whole_share_orders_are_not_warned_about():
     with warnings.catch_warnings():
         warnings.simplefilter("error")
@@ -394,9 +404,9 @@ def test_empty_comparisons_come_with_a_reason():
     with pytest.warns(UserWarning, match=r"Did you mean "
                                          r"reference='buy_and_hold'\?"):
         assert tf.versus_buy_and_hold(scores, reference="buy-and-hold") == {}
-    # pt-v21, the default from 0.10.0, withholds the capture ratio (as
-    # pt-v20, the default before it, did; this matched "on pt-v20").
-    scores = _evaluate({"a": Idle()}, model=None)
+    # pt-v21 withholds the capture ratio (as pt-v20 did). It read the
+    # default, model=None, while each was it; this matched "on pt-v20".
+    scores = _evaluate({"a": Idle()}, model="pt-v21")
     with pytest.warns(UserWarning, match=r"No capture ratio on pt-v21.*"
                                          r"tf\.versus_buy_and_hold"):
         assert tf.capture_ratio(scores) == {}

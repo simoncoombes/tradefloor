@@ -8,6 +8,7 @@
 //!   lets it go when cleared.
 //! - A snapshot taken mid-fade, with a floor set, restores bit for bit, and
 //!   a malformed one is refused.
+//! - The forecast reads the premium fading and the floor held.
 
 use tradefloor::economy::{create_initial_central_bank_state, create_initial_economy_state};
 use tradefloor::engine::{Engine, PriceField, SessionBuffer, SessionRequest};
@@ -237,4 +238,37 @@ fn a_restore_without_the_input_clears_it_and_a_malformed_one_is_refused() {
         block.remove("half_life");
     }
     refused(&s, "half_life", SnapshotErrorKind::Fields);
+}
+
+#[test]
+fn the_forecast_reads_the_premium_fading_and_the_floor_held() {
+    let p = ModelParams::preset("pt-v21")
+        .unwrap()
+        .with_override("index_level_listed", 1.0)
+        .unwrap()
+        .with_override("forecast_horizon_sessions", 63.0)
+        .unwrap();
+    let mut base = engine_with(p.clone());
+    let mut premium = engine_with(p.clone());
+    let mut floored = engine_with(p);
+    for e in [&mut base, &mut premium, &mut floored] {
+        run(e, 0..3);
+    }
+    let b = base.forecast().unwrap().vix.clone();
+    premium.set_vix_target_premium(6.0, 5.0).unwrap();
+    floored.set_vix_target_floor(Some(30.0)).unwrap();
+    // A write re-reads the forecast at once, as a pin does.
+    let p = premium.forecast().unwrap().vix.clone();
+    let f = floored.forecast().unwrap().vix.clone();
+    let lift: Vec<f64> = p.iter().zip(&b).map(|(x, y)| x - y).collect();
+    assert!(lift[3] > 0.5, "{lift:?}");
+    // Fading at five sessions, the lift is all but gone by the horizon.
+    assert!(lift[62].abs() < 0.25 * lift[3], "{} {}", lift[62], lift[3]);
+    assert!(f[62] > 27.0 && f[62] > b[62] + 5.0, "{} {}", f[62], b[62]);
+    // And it is the forecast the next close would compute: a copy that
+    // refreshes reads the same.
+    let mut copy = premium.clone();
+    run(&mut copy, 3..4);
+    run(&mut premium, 3..4);
+    assert_eq!(bits(&copy.forecast().unwrap().vix), bits(&premium.forecast().unwrap().vix));
 }

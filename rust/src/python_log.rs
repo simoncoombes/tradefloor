@@ -123,6 +123,14 @@ pub enum LogEntry {
     SetVixTargetFloor {
         floor: Option<f64>,
     },
+    /// A `market.earnings` write's common factor, in logs, as
+    /// `Engine.note_market_earnings` took it. An input for the reason
+    /// `SetFundamentals` is: the look-through's written level is held from
+    /// it. Logged only while `earnings_lookthrough_half_life` is set, so every
+    /// log of a run with the dial off is the one it was.
+    NoteMarketEarnings {
+        log_factor: f64,
+    },
     ListInstrument {
         ticker: String,
         sector: String,
@@ -175,6 +183,26 @@ pub enum LogEntry {
     },
     TakeImpacts {
         agent: Option<String>,
+    },
+    /// Steps of the night session for index futures (`run_night`), between
+    /// a close and the next open. Logged because each step draws on the
+    /// derivatives' stream and moves the futures' books; `u32::MAX` is
+    /// "the rest of the night".
+    RunNight {
+        steps: u32,
+    },
+    /// An agent's instruction to exercise a single-name option at the next
+    /// close (`options_names_listed`). Logged because it moves the close's
+    /// deliveries and positions.
+    Exercise {
+        agent: String,
+        symbol: String,
+        quantity: f64,
+    },
+    /// An agent's exercise instructions on a symbol withdrawn.
+    CancelExercise {
+        agent: String,
+        symbol: String,
     },
 }
 
@@ -332,6 +360,10 @@ impl LogEntry {
                 d.set_item("op", "set_vix_target_floor")?;
                 d.set_item("floor", floor)?;
             }
+            LogEntry::NoteMarketEarnings { log_factor } => {
+                d.set_item("op", "note_market_earnings")?;
+                d.set_item("log_factor", log_factor)?;
+            }
             LogEntry::Delist { index } => {
                 d.set_item("op", "delist")?;
                 d.set_item("index", index)?;
@@ -363,6 +395,22 @@ impl LogEntry {
             LogEntry::TakeImpacts { agent } => {
                 d.set_item("op", "take_impacts")?;
                 d.set_item("agent", agent)?;
+            }
+            LogEntry::RunNight { steps } => {
+                d.set_item("op", "run_night")?;
+                // The rest of the night is None, which JSON can carry.
+                d.set_item("steps", if *steps == u32::MAX { None } else { Some(*steps) })?;
+            }
+            LogEntry::Exercise { agent, symbol, quantity } => {
+                d.set_item("op", "exercise")?;
+                d.set_item("agent", agent)?;
+                d.set_item("symbol", symbol)?;
+                d.set_item("quantity", quantity)?;
+            }
+            LogEntry::CancelExercise { agent, symbol } => {
+                d.set_item("op", "cancel_exercise")?;
+                d.set_item("agent", agent)?;
+                d.set_item("symbol", symbol)?;
             }
         }
         Ok(d.into())

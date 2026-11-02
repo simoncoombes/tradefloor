@@ -56,7 +56,7 @@ same experiment two ways, and writes its output to its own git-ignored
 | [`rate-shock/`](rate-shock/) | Does the agent actually react to macro conditions? Checkpoint, fork, +200bps in one arm, compare. Under five seconds of CPU, no keys |
 | [`integrations/finrobot/`](integrations/finrobot/) | The same experiment with a real [FinRobot](https://github.com/AI4Finance-Foundation/FinRobot) agent in place of the native one. Replays a recorded run by default, so it needs no API key |
 | [`integrations/`](integrations/) | The same decision loop under a plain function, the OpenAI Agents SDK, PydanticAI and LangGraph. Offline, no keys |
-| [`experiments/liquidity-crisis/`](experiments/liquidity-crisis/) | Will a financial AI agent reduce risk in a market crisis? A checkpoint, a two-way fork, and the packaged `liquidity_crisis` scenario on one arm. An executed notebook, replayed from a recording |
+| [`experiments/liquidity-crisis/`](experiments/liquidity-crisis/) | Will a financial AI agent reduce risk in a market crisis? A checkpoint, a two-way fork, and the `liquidity_crisis` scenario on one arm. An executed notebook, replayed from a recording |
 
 ## Running them
 
@@ -118,9 +118,9 @@ The rest is opt-in, because executing every notebook takes several minutes:
 TRADEFLOOR_SLOW_TESTS=1 pytest tests/test_examples.py
 ```
 
-That executes every notebook except the liquidity-crisis study's, whose
-recordings no longer replay (its README says why), confirms the committed
-copies carry output, and runs `07-research-workflow.py` end to end.
+That executes every notebook, the liquidity-crisis study's included,
+confirms the committed copies carry output, and runs
+`07-research-workflow.py` end to end.
 `08-claude-agent.py` is checked on every run without a key or a bill: it must
 refuse readably when no model answers, offer Claude every factor the harness
 scores, and ask on the day's last step, the one its answer is scored against.
@@ -137,4 +137,4 @@ python examples/experiments/liquidity-crisis/build_notebook.py
 
 The second line re-runs the integration notebooks, which replay recorded
 model calls. The third rebuilds the liquidity-crisis study from its module,
-and fails until that study's recordings are re-recorded.
+replaying its recording.

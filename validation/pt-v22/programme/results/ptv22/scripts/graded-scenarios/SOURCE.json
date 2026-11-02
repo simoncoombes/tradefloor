@@ -1,0 +1,15 @@
+{
+ "engine_ref": "caaa4c6e36e49791ad230379bafad4c1dbbeddb4",
+ "files": {
+  "curve_shock.yml": "22552c19176a4ae86d59c977d3d7268234e74db70cc53a47b0ec252c54b4eecd",
+  "geopolitical_conflict.yml": "cdad6e309eb9598852ad62d3364cd1b64c351caa27d0a3875b878802e462f561",
+  "liquidity_crisis.yml": "3d6eaa44c41e97f2dd537aafdf7f40c24fba768af62feac92d608e4d0c41ff22",
+  "oil_price_spike.yml": "9451659e24808f76c4097384c88ad1245f04a4402ea4b1c0f670059888e6e4fc",
+  "policy_regime_shift.yml": "479b200a7fcdbe4ffcb6fb87ee4db3b7aee80a74e4c4722247d57babff3c056c",
+  "rate_shock.yml": "10e435213b0065e0961c6ca44edfb2b91b8fdb51b228736f4294b118ec5ac76c",
+  "recession.yml": "ad3c51d5c949bba3c49f181e8a6f4ef23cd120bd900abdfc8a22c2f844e710be"
+ },
+ "design": {
+  "recession.yml": "d8bf1ad16d82ec13b2d53d89cc537ff1765d9bc1:programme/ptv22/s2fix/vix/graded-vix/recession.yml"
+ }
+}

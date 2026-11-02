@@ -187,6 +187,8 @@ HIDDEN_STATE = {
     "model_params": "the model's dials, the cycle's hazards among them",
     "macro_table": "the full macro path, the true phase included",
     "fork": "a copy of the market that can be run ahead: look-ahead",
+    "policy_shadows": "the next meeting's change on the Fed's own reading "
+                      "of the economy, which the meeting delivers",
     "earnings_surprises": "each report's surprise as the opening print "
                           "realised it, split from the night's own move: "
                           "the price shows the gap, not what caused it",
@@ -262,6 +264,19 @@ class PublishedMacro:
 _WRAPPED: "weakref.WeakKeyDictionary[Any, Any]" = weakref.WeakKeyDictionary()
 
 
+def _released(engine: Any) -> list[dict[str, Any]]:
+    """The day's news a trader can have seen by now. Under
+    ``news_session_release_share`` an event carries ``release_minute`` and
+    is held back until ``session_tick`` reaches it; without the dial every
+    event is out from the open, as it always was."""
+    news = engine.session_news()
+    if not any("release_minute" in e for e in news):
+        return news
+    tick = engine.session_tick
+    tick = 0 if tick is None else tick
+    return [e for e in news if e.get("release_minute", 0.0) <= tick]
+
+
 def _no_copy(what: str, holds: str) -> SandboxError:
     return SandboxError(
         f"the {what} cannot be copied or pickled, because the copy would "
@@ -333,6 +348,91 @@ class MarketView:
         nothing, because orders go through the ``act`` mapping."""
         return _WRAPPED[self].book(ticker)
 
+    # The derivatives' public reads. Each reads public state only and writes
+    # nothing; a contract trades through the ``act`` mapping by its symbol,
+    # as a ticker does.
+
+    @property
+    def lists_futures(self) -> bool:
+        """Whether the model lists futures of any family, as
+        ``Engine.lists_futures``: a property of the model, True even before a
+        contract is listed."""
+        return _WRAPPED[self].lists_futures
+
+    def contracts(self) -> list[dict[str, Any]]:
+        """The listed contracts, as ``Engine.contracts`` lists them. Empty on
+        a model that lists none."""
+        return _WRAPPED[self].contracts()
+
+    def quote(self, symbol: str) -> dict[str, Any]:
+        """A listed contract's quote, as ``Engine.quote`` gives it."""
+        return _WRAPPED[self].quote(symbol)
+
+    def settlements(self, day: int | None = None) -> list[dict[str, Any]]:
+        """The contracts' final settlements, as ``Engine.settlements``."""
+        return _WRAPPED[self].settlements(day)
+
+    @property
+    def index_level(self) -> Any:
+        """The price index (``index_level_listed``), as
+        ``Engine.index_level``."""
+        return _WRAPPED[self].index_level
+
+    @property
+    def live_vix(self) -> Any:
+        """The live VIX (``vix_intraday_live``), as ``Engine.live_vix``."""
+        return _WRAPPED[self].live_vix
+
+    def forecast(self) -> Any:
+        """The last close's forecast (``forecast_horizon_sessions``), which
+        reads public state only, as ``Engine.forecast``."""
+        return _WRAPPED[self].forecast()
+
+    # The index options' public reads: the dealer's quotes and the surface
+    # they come from, which reads public state only.
+
+    @property
+    def lists_options(self) -> bool:
+        """Whether the model lists index options, as ``Engine.lists_options``:
+        a property of the model."""
+        return _WRAPPED[self].lists_options
+
+    @property
+    def lists_name_options(self) -> bool:
+        """Whether the model lists American options on its names, as
+        ``Engine.lists_name_options``: a property of the model."""
+        return _WRAPPED[self].lists_name_options
+
+    def name_option_roots(self) -> list[str]:
+        """The tickers whose options are listed now, as
+        ``Engine.name_option_roots``."""
+        return _WRAPPED[self].name_option_roots()
+
+    def option_expiries(self, root: str = "IDX") -> list[dict[str, Any]]:
+        """Every listed expiry with its strike grid, at-the-money volatility
+        and 25-delta skew, as ``Engine.option_expiries`` reads them; a
+        listed name's ticker reads its options. Empty on a model that lists
+        no options."""
+        return _WRAPPED[self].option_expiries(root)
+
+    def chain(self, root: str, expiry: int) -> list[dict[str, Any]]:
+        """One expiry's options, the index's or a listed name's, as
+        ``Engine.chain`` quotes them."""
+        return _WRAPPED[self].chain(root, expiry)
+
+    def surface(self, root: str = "IDX") -> Any:
+        """The implied-volatility surface (``surface_ssvi``), as
+        ``Engine.surface``."""
+        return _WRAPPED[self].surface(root)
+
+    def option_margin(self, positions: list[tuple[str, float]]) -> Any:
+        """The scan margin on option positions, as ``Engine.option_margin``."""
+        return _WRAPPED[self].option_margin(positions)
+
+    def stock_margin(self, positions: list[tuple[str, float]]) -> Any:
+        """The scan margin on stock held alone, as ``Engine.stock_margin``."""
+        return _WRAPPED[self].stock_margin(positions)
+
     @property
     def recorded_days(self) -> int:
         """How many days the engine has recorded, which is what
@@ -394,7 +494,7 @@ class MarketView:
         """
         return [{"ticker": e.get("ticker"), "sector": e.get("sector"),
                  "day": e.get("day")}
-                for e in _WRAPPED[self].session_news()]
+                for e in _released(_WRAPPED[self])]
 
     # -- dividends --------------------------------------------------------
 
@@ -645,6 +745,62 @@ class PortfolioView:
     def open_orders(self, engine: Any = None) -> list[dict]:
         portfolio, live = _WRAPPED[self]
         return [dict(o) for o in portfolio.open_orders(live)]
+
+    # The futures and the options, as copies: the view's holder cannot move
+    # a mark, a cost or a quantity.
+
+    @property
+    def futures(self) -> dict[str, Any]:
+        """The futures held, by symbol, as copies of the portfolio's
+        :class:`~tradefloor.portfolio.FuturesPosition`. Empty without
+        futures."""
+        from .portfolio import FuturesPosition
+
+        out: dict[str, FuturesPosition] = {}
+        for symbol, held in _WRAPPED[self][0].futures.items():
+            twin = FuturesPosition(symbol, held.multiplier, held.mark)
+            twin.quantity = held.quantity
+            twin.variation = held.variation
+            out[symbol] = twin
+        return out
+
+    @property
+    def options(self) -> dict[str, Any]:
+        """The options held, by symbol, as copies of
+        the portfolio's :class:`~tradefloor.portfolio.OptionPosition`. Empty
+        without options."""
+        from .portfolio import OptionPosition
+
+        out: dict[str, OptionPosition] = {}
+        for symbol, held in _WRAPPED[self][0].options.items():
+            twin = OptionPosition(symbol, held.multiplier)
+            twin.quantity = held.quantity
+            twin.cost = held.cost
+            twin.realised = held.realised
+            out[symbol] = twin
+        return out
+
+    def margin(self, engine: Any = None) -> dict[str, Any]:
+        """The account's margin now, as :meth:`Portfolio.margin
+        <tradefloor.Portfolio.margin>` gives it."""
+        portfolio, live = _WRAPPED[self]
+        return portfolio.margin(live)
+
+    def margin_requirement(self, engine: Any = None, *,
+                           maintenance: bool = False) -> float:
+        portfolio, live = _WRAPPED[self]
+        return portfolio.margin_requirement(live, maintenance=maintenance)
+
+    @property
+    def margin_calls(self) -> list[dict]:
+        return [dict(c) for c in _WRAPPED[self][0].margin_calls]
+
+    @property
+    def deliveries(self) -> list[dict]:
+        """The single-name options exercised and assigned so far, as copies
+        of :attr:`Portfolio.deliveries <tradefloor.Portfolio.deliveries>`:
+        the shares and cash each moved."""
+        return [dict(d) for d in _WRAPPED[self][0].deliveries]
 
     def __getattr__(self, name: str) -> Any:
         raise SandboxError(

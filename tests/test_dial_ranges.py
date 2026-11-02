@@ -14,7 +14,9 @@ the reading to what the validator does: at the ladder's values and at the
 edges of the range the message states, just inside and just outside each.
 A refusal that names another dial first (`OTHER is v but NAME ...`, or
 `OTHER is v, and ...`) belongs to that dial's rule, as the reference
-records it, and is not held against this one.
+records it, and is not held against this one. So does a switch's refusal to
+turn off beside a dial it carries (`NAME is 0 but OTHER is v`), which pt-v22,
+with those dials set, gives.
 """
 
 from __future__ import annotations
@@ -31,7 +33,10 @@ LADDER = (-1e12, -1.0, -0.5, -1e-9, 0.0, 1e-9, 0.5, 1.0, 2.0, 1e12)
 
 _NUM = r"-?[0-9]+(?:\.[0-9]+)?(?:e[-+]?[0-9]+)?"
 _INTERVAL = rf"[\[(]\s*{_NUM}\s*,\s*{_NUM}\s*[\])]"
-_JOINT = re.compile(r"REFUSED:\s*([a-z0-9_]+) is \S+(?: but|, and)\b")
+_JOINT = re.compile(r"REFUSED:\s*([a-z0-9_]+) is \S+(?: but| with|, and)\b")
+#: A dial named first and refused for another dial's value: a switch turned
+#: off while a dial it carries is set (pt-v22 sets them).
+_REFUSED_BESIDE = re.compile(r"REFUSED:\s*([a-z0-9_]+) is \S+ but ([a-z0-9_]+) is\b")
 
 DEFAULT = tf.model_preset()["name"]
 SETTABLE = tuple(tf.ModelParams.settable())
@@ -154,7 +159,11 @@ def edges(rule: str) -> list[float]:
 
 def joint(name: str, message: str) -> bool:
     m = _JOINT.match(message)
-    return bool(m) and m.group(1) != name
+    if m and m.group(1) != name:
+        return True
+    m = _REFUSED_BESIDE.match(message)
+    return bool(m) and m.group(1) == name and m.group(2) != name and (
+        m.group(2) in SETTABLE)
 
 
 def stated_rule(preset: str, name: str, probes: list[tuple[bool, str]]) -> str:
@@ -198,8 +207,10 @@ def disagreements(preset: str, names=SETTABLE) -> list[str]:
     return out
 
 
-def test_every_dial_states_what_it_accepts_on_the_default_preset():
-    assert disagreements(DEFAULT) == []
+@pytest.mark.parametrize("preset", sorted({DEFAULT, "pt-v21", "pt-v22"}))
+def test_every_dial_states_what_it_accepts_on_the_default_preset(preset):
+    # The default, and both presets that have been it or will be, by name.
+    assert disagreements(preset) == []
 
 
 #: The four #248 named, on every shipped preset: their ranges and their
@@ -233,6 +244,5 @@ def test_the_four_named_dials_state_what_they_accept_on_every_preset(preset):
     ("crisis_epicentre_extra", 1.0, True),
 ])
 def test_the_edges_issue_248_named(name, value, accepted):
-    assert tf.model_preset()["name"] == "pt-v21"
     ok, msg = attempt("pt-v21", name, value)
     assert ok == accepted, msg

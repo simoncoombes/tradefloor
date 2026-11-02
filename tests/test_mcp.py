@@ -58,8 +58,8 @@ def test_the_readme_counts_the_tools_the_server_registers():
     import re
     readme = (pathlib.Path(__file__).resolve().parent.parent
               / "README.md").read_text(encoding="utf-8")
-    row = re.search(r"^\| MCP server \| (\w+) tools for a coding agent, "
-                    r"(\w+) of them read-only", readme, re.M)
+    row = re.search(r"^\| MCP server \| ([\w-]+) tools for a coding agent, "
+                    r"([\w-]+) of them read-only", readme, re.M)
     assert row, "README.md's Contents table has no MCP server row"
     words = ["zero", "one", "two", "three", "four", "five", "six", "seven",
              "eight", "nine", "ten", "eleven", "twelve", "thirteen",
@@ -445,9 +445,10 @@ def test_on_pt_v20_the_ranking_quotes_buy_and_hold_and_no_capture():
     table is ordered on it, and the reason is sent."""
     r = mcp.rank_strategies({"mine": MOMENTUM}, seeds=[1, 2, 3], days=1)
     assert r["ok"]
-    # The default, pt-v21 from 0.10.0 (these read "pt-v20" until then).
-    assert r["provenance"]["model_preset"] == "pt-v21"
-    assert r["capture_withheld"] == pt.baselines.ORACLE_NOT_A_CEILING["pt-v21"]
+    # The default, pt-v22 from 0.11.0 (these read "pt-v21" from 0.10.0 and
+    # "pt-v20" before that).
+    assert r["provenance"]["model_preset"] == "pt-v22"
+    assert r["capture_withheld"] == pt.baselines.ORACLE_NOT_A_CEILING["pt-v22"]
     assert "unmeasurable" not in r
     for record in r["records"]:
         assert not {"pooled_capture", "median_capture",
@@ -463,7 +464,7 @@ def test_on_pt_v20_an_evaluation_quotes_buy_and_hold_and_no_capture():
     assert r["ok"]
     assert "capture_ratio" not in r and "capture_note" not in r
     assert r["capture_ratio_withheld"] == (
-        pt.baselines.ORACLE_NOT_A_CEILING["pt-v21"])  # the default; was pt-v20
+        pt.baselines.ORACLE_NOT_A_CEILING["pt-v22"])  # the default; was pt-v21, and pt-v20 before
     pnl = {row["name"]: row["pnl"] for row in r["scores"]}
     assert set(r["versus_buy_and_hold"]) == set(pnl) - {"buy_and_hold"}
     for name, value in r["versus_buy_and_hold"].items():
@@ -1406,7 +1407,7 @@ def test_every_tool_says_what_it_does_to_the_world():
     tool. Every other tool builds its own engine and only reads, or reads a
     session without changing it."""
     tools = asyncio.run(mcp.server.list_tools())
-    assert len(tools) == 19
+    assert len(tools) == 22
     assert set(NOT_READ_ONLY) <= {t.name for t in tools}
     for t in tools:
         a = t.annotations
@@ -1659,6 +1660,10 @@ def test_describe_simulator_lists_every_preset_and_which_is_certified():
     assert [n for n, p in shipped.items() if p["certified"]] == [
         envelope.PRESET]
     for name, entry in shipped.items():
+        if name in pt.records.pending():
+            # Committed before its grade: no measurement to quote yet.
+            assert entry["record"] is None, name
+            continue
         record = pt.preset_record(name)
         assert entry["record"]["252"]["in_band"] == record["in_band"]["252"]
         assert entry["record"]["252"]["misses"] == record["misses"]["252"]

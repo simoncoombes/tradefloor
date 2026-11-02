@@ -396,7 +396,7 @@ def test_a_schema_violation_is_a_decision_error_carrying_its_cause():
     assert isinstance(excinfo.value.__cause__, UnexpectedModelBehavior)
     assert isinstance(excinfo.value.__cause__.__cause__,
                       PydanticValidationError)
-    assert "'BUY', 'SELL', 'HOLD' or 'CANCEL'" in str(
+    assert "'BUY', 'SELL', 'HOLD', 'CANCEL' or 'EXERCISE'" in str(
         excinfo.value.__cause__.__cause__)
 
 
@@ -698,7 +698,7 @@ def test_the_prompt_is_the_payload_and_nothing_else():
     world.run(days=1)
 
     parsed = json.loads(agent.prompts[0])
-    assert set(parsed) == contract.PAYLOAD_KEYS
+    assert set(parsed) == contract.default_payload_keys()
     assert set(parsed["assets"][0]) == contract.DEFAULT_ASSET_KEYS
     assert set(parsed["macro"]) == set(ci.OBSERVABLE_MACRO)
 

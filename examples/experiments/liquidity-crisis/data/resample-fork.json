@@ -5,195 +5,188 @@
     "control": {
       "calls": 8,
       "refusals": 0,
-      "distinct": 4,
-      "mean_net": 0.625,
-      "stdev_net": 0.6959705453537527,
-      "mean_gross": 69000.0,
-      "stdev_gross": 5590.169943749474,
-      "prompt_lines": 372,
+      "distinct": 2,
+      "mean_net": 2,
+      "stdev_net": 0.0,
+      "mean_gross": 20625.0,
+      "stdev_gross": 1767.7669529663688,
+      "prompt_lines": 378,
       "differing_lines": 0
     },
     "crisis": {
       "calls": 8,
       "refusals": 0,
-      "distinct": 5,
-      "mean_net": -0.125,
-      "stdev_net": 0.5994789404140899,
-      "mean_gross": 38125.0,
-      "stdev_gross": 15909.411522743385,
-      "prompt_lines": 372,
-      "differing_lines": 72
+      "distinct": 6,
+      "mean_net": 2,
+      "stdev_net": 1.4142135623730951,
+      "mean_gross": 18000.0,
+      "stdev_gross": 13298.764711699461,
+      "prompt_lines": 378,
+      "differing_lines": 188
     }
   },
   "runs": {
     "control": [
       {
         "orders": {
-          "IBM": -19000.0,
-          "FANG": -10000.0,
-          "AMD": 20000.0,
-          "INCY": 5000.0,
-          "TMUS": 10000.0
+          "IBM": -4000.0,
+          "FANG": 15000.0,
+          "EXR": 3000.0,
+          "INCY": 3000.0
         },
-        "net": 1,
-        "gross": 64000.0
+        "net": 2,
+        "gross": 25000.0
       },
       {
         "orders": {
-          "IBM": -19000.0,
-          "FANG": -10000.0,
-          "AMD": 20000.0,
-          "INCY": 10000.0,
-          "TMUS": 15000.0
+          "IBM": -4000.0,
+          "FANG": 10000.0,
+          "INCY": 3000.0,
+          "EXR": 3000.0
         },
-        "net": 1,
-        "gross": 74000.0
+        "net": 2,
+        "gross": 20000.0
       },
       {
         "orders": {
-          "IBM": -19000.0,
-          "FANG": -10000.0,
-          "AMD": 20000.0,
-          "INCY": 5000.0,
-          "TMUS": 10000.0
+          "IBM": -4000.0,
+          "FANG": 10000.0,
+          "EXR": 3000.0,
+          "INCY": 3000.0
         },
-        "net": 1,
-        "gross": 64000.0
+        "net": 2,
+        "gross": 20000.0
       },
       {
         "orders": {
-          "IBM": -19000.0,
-          "FANG": -10000.0,
-          "AMD": 20000.0,
-          "INCY": 10000.0,
-          "TMUS": 15000.0
+          "IBM": -4000.0,
+          "FANG": 10000.0,
+          "EXR": 3000.0,
+          "INCY": 3000.0
         },
-        "net": 1,
-        "gross": 74000.0
+        "net": 2,
+        "gross": 20000.0
       },
       {
         "orders": {
-          "IBM": -19000.0,
-          "FANG": -10000.0,
-          "AMD": 20000.0,
-          "INCY": 5000.0,
-          "TMUS": 10000.0
+          "IBM": -4000.0,
+          "FANG": 10000.0,
+          "EXR": 3000.0,
+          "INCY": 3000.0
         },
-        "net": 1,
-        "gross": 64000.0
+        "net": 2,
+        "gross": 20000.0
       },
       {
         "orders": {
-          "IBM": -19000.0,
-          "FANG": -10000.0,
-          "AMD": 30000.0,
-          "INCY": 10000.0
+          "IBM": -4000.0,
+          "FANG": 10000.0,
+          "EXR": 3000.0,
+          "INCY": 3000.0
         },
-        "net": 0,
-        "gross": 69000.0
+        "net": 2,
+        "gross": 20000.0
       },
       {
         "orders": {
-          "IBM": -19000.0,
-          "FANG": -10000.0,
-          "AMD": 20000.0,
-          "INCY": 5000.0,
-          "TMUS": 10000.0
+          "IBM": -4000.0,
+          "FANG": 10000.0,
+          "EXR": 3000.0,
+          "INCY": 3000.0
         },
-        "net": 1,
-        "gross": 64000.0
+        "net": 2,
+        "gross": 20000.0
       },
       {
         "orders": {
-          "IBM": -19000.0,
-          "FANG": -10000.0,
-          "AMD": -20000.0,
-          "INCY": 10000.0,
-          "TMUS": 20000.0
+          "IBM": -4000.0,
+          "FANG": 10000.0,
+          "INCY": 3000.0,
+          "EXR": 3000.0
         },
-        "net": -1,
-        "gross": 79000.0
+        "net": 2,
+        "gross": 20000.0
       }
     ],
     "crisis": [
       {
         "orders": {
-          "IBM": -10000.0,
-          "AKAM": -7000.0,
-          "AMD": -20000.0,
-          "TMUS": 10000.0,
-          "INCY": 5000.0
+          "EXR": 3000.0,
+          "FANG": 5000.0,
+          "AMD": 5000.0
         },
-        "net": -1,
-        "gross": 52000.0
+        "net": 3,
+        "gross": 13000.0
       },
       {
         "orders": {
-          "IBM": -10000.0,
-          "INCY": -10000.0,
-          "AMD": 15000.0,
-          "TMUS": 10000.0
+          "FANG": 5000.0,
+          "EXR": 3000.0,
+          "IBM": 1000.0
         },
-        "net": 0,
-        "gross": 45000.0
+        "net": 3,
+        "gross": 9000.0
       },
       {
         "orders": {
-          "IBM": -5000.0,
-          "SLB": 40000.0,
+          "IBM": 2000.0,
+          "EXR": 3000.0,
           "FANG": 5000.0
         },
+        "net": 3,
+        "gross": 10000.0
+      },
+      {
+        "orders": {
+          "IBM": -4000.0,
+          "FANG": 11000.0
+        },
+        "net": 0,
+        "gross": 15000.0
+      },
+      {
+        "orders": {
+          "IBM": -4000.0,
+          "AMD": -15000.0,
+          "PCAR": -8000.0,
+          "EXR": 3000.0,
+          "VZ": 5000.0,
+          "FANG": 8000.0
+        },
+        "net": 0,
+        "gross": 43000.0
+      },
+      {
+        "orders": {
+          "IBM": -4000.0,
+          "AMD": -15000.0,
+          "FANG": 8000.0,
+          "EXR": 3000.0,
+          "VZ": 5000.0
+        },
         "net": 1,
-        "gross": 50000.0
+        "gross": 35000.0
       },
       {
         "orders": {
-          "IBM": -10000.0,
-          "INCY": -10000.0,
-          "AMD": 15000.0,
-          "TMUS": 10000.0
+          "FANG": 5000.0,
+          "IBM": 2000.0,
+          "EXR": 3000.0
         },
-        "net": 0,
-        "gross": 45000.0
+        "net": 3,
+        "gross": 10000.0
       },
       {
         "orders": {
-          "IBM": -3000.0,
-          "SLB": 15000.0
+          "FANG": 5000.0,
+          "EXR": 3000.0,
+          "IBM": 1000.0
         },
-        "net": 0,
-        "gross": 18000.0
-      },
-      {
-        "orders": {
-          "IBM": -10000.0,
-          "INCY": -10000.0,
-          "AMD": 15000.0,
-          "TMUS": 10000.0
-        },
-        "net": 0,
-        "gross": 45000.0
-      },
-      {
-        "orders": {
-          "IBM": -10000.0,
-          "INCY": -10000.0,
-          "AMD": 15000.0,
-          "TMUS": 10000.0
-        },
-        "net": 0,
-        "gross": 45000.0
-      },
-      {
-        "orders": {
-          "IBM": -5000.0
-        },
-        "net": -1,
-        "gross": 5000.0
+        "net": 3,
+        "gross": 9000.0
       }
     ]
   },
-  "recorded_by": "run.py --live --record",
   "model": "claude-sonnet-4-5-20250929",
   "temperature": 0.0
 }

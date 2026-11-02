@@ -69,11 +69,11 @@ def universe() -> list:
     ]))
 
 
-def make_world(agent) -> World:
+def make_world(agent, model=None) -> World:
     return World(seed=7, universe=universe(), agent=agent,
                  cash=1_000_000.0,
                  pins={"federal_funds_rate": 0.04,
-                       "corporate_bond_yield": 0.055})
+                       "corporate_bond_yield": 0.055}, model=model)
 
 
 def _observation(world: World, engine=None) -> Observation:
@@ -168,6 +168,28 @@ PORTFOLIO_KEYS = {"cash", "net_worth", "leverage", "max_leverage",
                   "buying_power", "open_orders"}
 OPEN_ORDER_KEYS = {"symbol", "side", "limit_price", "remaining"}
 
+#: pt-v22's payload, version 3: the keys above and the four its market
+#: adds (docs/SUPPORT.md), each frozen at every level as the keys above are.
+CONTRACT_KEYS = {"index", "futures", "margin", "options"}
+INDEX_KEYS = {"level", "close"}
+FUTURE_KEYS = {"symbol", "root", "expiry", "sessions_to_expiry", "front",
+               "settlement", "price", "fair", "basis_bp", "mark", "best_bid",
+               "best_ask", "underlying", "rate", "dividends", "expected",
+               "premium", "multiplier", "tick", "daily_volume",
+               "max_order_contracts", "initial_margin", "maintenance_margin",
+               "position"}
+MARGIN_KEYS = {"initial", "maintenance", "excess", "call"}
+OPTIONS_KEYS = {"expiries", "names", "positions"}
+
+#: Each shipped default's top-level payload, by name.
+PRESET_PAYLOAD_KEYS = {"pt-v21": PAYLOAD_KEYS,
+                       "pt-v22": PAYLOAD_KEYS | CONTRACT_KEYS}
+
+
+def default_payload_keys() -> set[str]:
+    """The top-level keys the default's payload carries."""
+    return PRESET_PAYLOAD_KEYS[tf.model_preset()["name"]]
+
 
 def check_the_payload_reaches_the_framework(make_agent):
     """The adapter serializes the Observation it was handed, allowlist keys
@@ -182,7 +204,7 @@ def check_the_payload_reaches_the_framework(make_agent):
     world.run(days=1)
     assert seen, "the framework was never consulted"
     payload = seen[0]
-    assert set(payload) == PAYLOAD_KEYS
+    assert set(payload) == default_payload_keys()
     assert set(payload["assets"][0]) == DEFAULT_ASSET_KEYS
     assert set(payload["macro"]) == set(ci.OBSERVABLE_MACRO)
     assert [a["symbol"] for a in payload["assets"]] == [r[0] for r in ROSTER]
@@ -911,7 +933,7 @@ def test_the_error_family_distinguishes_the_four_failures():
 
 def test_the_serializer_emits_exactly_the_allowlisted_keys():
     agent = callable_agent(hold)
-    world = make_world(agent)
+    world = make_world(agent, model="pt-v21")
     world.run(days=2)
     payload = ci.serialize_observation(_observation(world),
                                        history=agent.history)
@@ -926,13 +948,18 @@ def test_the_payload_is_frozen_for_the_lts_line():
     removes or renames one fails here and has to bump
     OBSERVATION_SCHEMA_VERSION, update SUPPORT.md and re-record every
     fixture, on purpose."""
-    # 2 from 0.10.0, when the default's payload gained the two conditional
-    # asset keys (docs/SUPPORT.md); "1" through 0.9.x.
-    assert ci.OBSERVATION_SCHEMA_VERSION == "2"
-    assert ci.REPLAYABLE_SCHEMA_VERSIONS == ("1", "2")
-    assert ci.DECISION_SCHEMA_VERSION == "2"
+    # 3 from pt-v22 phase 1, when a model that lists futures gained the
+    # three conditional derivative keys (tests/test_futures_api.py pins
+    # them); 2 from 0.10.0, when the default's payload gained the two
+    # conditional asset keys (docs/SUPPORT.md); "1" through 0.9.x. Every
+    # key below is the payload on a model without futures: pt-v21's, by
+    # name, and every earlier preset's. pt-v22's is frozen in the test
+    # after this one.
+    assert ci.OBSERVATION_SCHEMA_VERSION == "3"
+    assert ci.REPLAYABLE_SCHEMA_VERSIONS == ("1", "2", "3")
+    assert ci.DECISION_SCHEMA_VERSION == "3"
     world = World(seed=7, universe=universe(), agent=callable_agent(rest),
-                  cash=1_000_000.0, max_leverage=2.0)
+                  cash=1_000_000.0, max_leverage=2.0, model="pt-v21")
     world.run(days=1)
     payload = ci.serialize_observation(_observation(world))
     assert set(payload) == PAYLOAD_KEYS
@@ -944,6 +971,33 @@ def test_the_payload_is_frozen_for_the_lts_line():
     support = (ROOT / "docs" / "SUPPORT.md").read_text(encoding="utf-8")
     for key in sorted(PAYLOAD_KEYS | DEFAULT_ASSET_KEYS | PORTFOLIO_KEYS
                       | OPEN_ORDER_KEYS):
+        assert f"`{key}`" in support, (
+            f"docs/SUPPORT.md does not list the frozen payload key {key!r}")
+
+
+def test_the_pt_v22_payload_is_frozen_with_its_contracts():
+    """pt-v22 lists the index and rate futures, margin and the names'
+    options, and its payload shows them: version 3, pt-v21's keys at every
+    level and the four the contracts add, each frozen at every level. A
+    change to any fails here, as for pt-v21, and has to bump the version
+    and SUPPORT.md on purpose."""
+    world = World(seed=7, universe=universe(), agent=callable_agent(rest),
+                  cash=1_000_000.0, max_leverage=2.0, model="pt-v22")
+    world.run(days=1)
+    payload = ci.serialize_observation(_observation(world))
+    assert set(payload) == PAYLOAD_KEYS | CONTRACT_KEYS
+    assert set(payload["macro"]) == set(ci.OBSERVABLE_MACRO)
+    assert set(payload["assets"][0]) == DEFAULT_ASSET_KEYS
+    assert set(payload["portfolio"]) == PORTFOLIO_KEYS
+    assert set(payload["index"]) == INDEX_KEYS
+    assert payload["futures"], "no future listed"
+    for future in payload["futures"]:
+        assert set(future) == FUTURE_KEYS, future["symbol"]
+    assert set(payload["margin"]) == MARGIN_KEYS
+    assert set(payload["options"]) == OPTIONS_KEYS
+    support = (ROOT / "docs" / "SUPPORT.md").read_text(encoding="utf-8")
+    for key in sorted(CONTRACT_KEYS | INDEX_KEYS | FUTURE_KEYS | MARGIN_KEYS
+                      | OPTIONS_KEYS):
         assert f"`{key}`" in support, (
             f"docs/SUPPORT.md does not list the frozen payload key {key!r}")
 
@@ -1953,32 +2007,34 @@ def test_preset_of_reads_the_engine_the_observation_carries():
 #: rather than assumed. The day-zero macro block a recording carries is a
 #: function of the preset and of nothing else on this path -- day-zero
 #: PRICES are identical across every shipped preset, so they say nothing.
-#: The five integration recordings open at a derived VIX where the two
-#: pt-v16 ones open at the declared 15.0000 with inflation 0.0200; one of
-#: the five, `openai_agents/five-days.json`, prints no macro block at all
-#: and is dated by its replay instead.
+#: The six recordings on pt-v21 open at a derived VIX where the pt-v16 one
+#: opens at the declared 15.0000 with inflation 0.0200; one of the six,
+#: `openai_agents/five-days.json`, prints no macro block at all and is
+#: dated by its replay instead.
 #:
 #: The set is NOT uniform, so this table is written out per file. Five
 #: of the seven belong to the integration examples and were re-recorded
 #: live against pt-v19 at 0.8.0, on the shipped default rather than on a
 #: pin; each replays green under it, which a recording made in another
 #: market could not do. The other two belong to
-#: `examples/experiments/liquidity-crisis/`, which pins `PRESET = "pt-v16"`
-#: deliberately and is a pinned historical study rather than notebook
-#: material. Three readings agree on that pair: the pin, the macro opening
-#: below, and `DEFAULT_PRESET_NAME` at the commit that recorded them, which
-#: was pt-v16. A blanket value across all seven would write a false
-#: provenance into two of them.
+#: `examples/experiments/liquidity-crisis/`. `rate-ladder.json` is an older
+#: recording of that study made on pt-v16, which the notebook only parses
+#: and never replays. `liquidity-crisis.json` was recorded again live on
+#: pt-v21 at 0.10.1, and the study pins `PRESET = "pt-v21"` so it keeps
+#: replaying when the default moves. A blanket value across all seven would
+#: write a false provenance into one of them.
 #: The five on the default were re-recorded live on pt-v21 at 0.10.0, when
-#: it took the default; they read pt-v20 until then.
+#: it took the default; they read pt-v20 until then. They were re-recorded
+#: again on pt-v22 for 0.11.0, when it took the default, on the current
+#: models (claude-opus-5-5, claude-sonnet-5-5 for FinRobot; gpt-5.2 kept).
 FIXTURE_PRESETS = {
-    "callable/five-days.json": "pt-v21",
-    "finrobot/liquidity-crisis.json": "pt-v16",
+    "callable/five-days.json": "pt-v22",
+    "finrobot/liquidity-crisis.json": "pt-v21",
     "finrobot/rate-ladder.json": "pt-v16",
-    "finrobot/rate-shock.json": "pt-v21",
-    "langgraph/rate-shock.json": "pt-v21",
-    "openai_agents/five-days.json": "pt-v21",
-    "pydantic_ai/rate-shock.json": "pt-v21",
+    "finrobot/rate-shock.json": "pt-v22",
+    "langgraph/rate-shock.json": "pt-v22",
+    "openai_agents/five-days.json": "pt-v22",
+    "pydantic_ai/rate-shock.json": "pt-v22",
 }
 
 
@@ -2126,7 +2182,8 @@ def test_a_recording_is_stamped_with_both_schema_versions():
     assert len(recorder) == 1
     assert (recorder.meta["observation_schema_version"]
             == ci.OBSERVATION_SCHEMA_VERSION)
-    assert recorder.meta["decision_schema_version"] == "2"
+    assert (recorder.meta["decision_schema_version"]
+            == ci.DECISION_SCHEMA_VERSION)
 
 
 def test_a_replay_under_another_payload_version_is_refused_by_name():

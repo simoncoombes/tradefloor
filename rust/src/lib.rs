@@ -16,6 +16,8 @@
 //! - [`fair_value`] and [`mispricing`]: what a stock is worth and how far
 //!   its price has strayed from it.
 //! - [`rates`]: bond indices priced off the engine's yield curve.
+//! - [`derivatives`]: what futures and options read: the engine's forecast
+//!   of its own state. The price index is [`market::IndexLevel`].
 //! - [`flow`]: the shock flow each preset was fitted at, and a tally a host
 //!   keeps of the news, shocks and revisions it adds.
 //! - [`rng`] and [`mathx`]: the random streams and the transcendental
@@ -52,6 +54,7 @@
 #![allow(clippy::neg_cmp_op_on_partial_ord)]
 
 pub mod agent_book;
+pub mod derivatives;
 pub mod earnings;
 pub mod economy;
 pub mod engine;

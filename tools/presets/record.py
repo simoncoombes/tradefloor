@@ -45,7 +45,7 @@ SCHEMA = 1
 DEFAULT_SINCE = {
     "pt-v3": "0.1.0", "pt-v10": "0.2.0", "pt-v12": "0.3.0",
     "pt-v14": "0.4.0", "pt-v16": "0.6.0", "pt-v18": "0.7.0", "pt-v19": "0.8.0",
-    "pt-v20": "0.8.5", "pt-v21": "0.10.0",
+    "pt-v20": "0.8.5", "pt-v21": "0.10.0", "pt-v22": "0.11.0",
 }
 
 #: Grades published in this repository, by the box that ran them, and the
@@ -61,6 +61,160 @@ PUBLISHED_GRADES = {"ptv20g6": "validation/pt-v20",
                     "ptv21c1s": "validation/pt-v21"}
 
 _DESIGN_PATH = re.compile(r"(?<![\w./-])programme/")
+
+#: The boxes that ran pt-v22's grade, for `PUBLISHED_GRADES`. A SLOT: empty
+#: until the grade has run and its files are published under
+#: `validation/pt-v22/`.
+PT_V22_GRADE_BOXES: tuple[str, ...] = ("g23gen-e1a", "g23b1-e1a", "g23b2-e1a", "g23traded-e7a", "g23reads-e1a", "g23gate-e20a",)
+PUBLISHED_GRADES.update({box: "validation/pt-v22" for box in PT_V22_GRADE_BOXES})
+
+#: The blocks a grade measures, in a record's order, and the writer that
+#: fills each. A record committed before its grade has run carries each one
+#: as a slot, `{"slot": NAME, "filled_by": HOW}`, and
+#: `tradefloor.preset_record` refuses it until every slot is filled
+#: (`tradefloor.records`). `default_since` is not here: it is the release's
+#: decision, not a measurement, and `--default-since` writes it.
+GRADE_SLOTS = {
+    **{field: "record.py --panel <the grade's preset_panel.py artefact>"
+       for field in ("measured", "panel_252", "panel_504", "mechanism_252",
+                     "mechanism_heldout_seeds")},
+    **{field: "record.py --panel <the grade's preset_panel.py artefact>, or "
+              "--structure-rows when the artefact keeps no per-seed rows"
+       for field in ("structure_252", "structure_heldout_seeds",
+                     "structure_rise")},
+    **{field: "record.py --panel <the grade's preset_panel.py artefact>"
+       for field in ("in_band", "misses", "unreadable", "absent", "dispersion",
+                     "crisis_lever")},
+    "level_protocol": "record.py --level-rows <the grade's level_rows.py artefact>",
+    "long_run": "record.py --long-run <the grade's criteria.py verdict>",
+}
+
+
+#: Rows a registration READS AND REPORTS but does not gate, by preset: a row
+#: here is written onto the record's `long_run` block with `gated: false` and
+#: the reason, its `pass` still the plain fact of whether it sits inside its
+#: mark. The block's `passed` and `of` count gated rows only, and `all_rows`
+#: counts every row; the verdict is "pass" when every gated row passes. A row
+#: not named here is gated, as every row of pt-v20's and pt-v21's grades was.
+REPORTED_ROWS = {
+    "pt-v22": {
+        "OF4": "reported, not gated (draft item 21): six attempts to remove the oil "
+               "forecast's 126-session bias failed; on the grade it is $0.36 a barrel, "
+               "about 0.5% of the price",
+        "R6": "reported, not gated (draft item 25(i))",
+    },
+}
+
+#: The reason a row carries when the grade itself reports it without gating
+#: it (`gated: false` in its own output, as ptv22grade's "reported, not
+#: graded" rows are) and `REPORTED_ROWS` does not name it.
+GRADE_REPORTED = "reported, not gated: the grade reads it and reports it without gating it"
+
+
+def reported_rows(name: str, rows: list[dict]) -> dict[str, str]:
+    """The rows `name`'s record reports without gating, with the reason:
+    `REPORTED_ROWS`, and every row the grade itself marks `gated: false`."""
+    out = {str(r.get("id")): r.get("reported_because") or GRADE_REPORTED
+           for r in rows if r.get("gated") is False}
+    out.update(REPORTED_ROWS.get(name, {}))
+    return out
+
+#: Rows a registration GATES but records an accepted exception for, by
+#: preset: a rule the row breaks that the owner accepted for it alone. The
+#: row stays gated (it must still pass its mark) and carries `exception`.
+ROW_EXCEPTIONS = {
+    "pt-v22": {
+        "ON1": "worse than v21 on its corrected reader (0.345 against 0.325, real 0.330, both "
+               "in band), an exception the owner accepts to the rule that no row is worse "
+               "than v21 (draft item 25(h)): the measured pre-open news share",
+        "E1": "worse than v21 on its corrected reader (-0.086 against -0.117, real -0.17), an "
+              "exception the owner accepts to the rule that no row is worse than v21 (draft item "
+              "25(j)): v21's earnings level drifts down by half its variance a year, which pt-v22's "
+              "aggregate earnings-level fix removes; the tape has no such drift",
+    },
+}
+
+
+def _shown(path: pathlib.Path) -> pathlib.Path:
+    """A written file as the messages show it: from the repository's root,
+    or whole when it is outside it (`fill_grade22.py --dry` writes a copy)."""
+    return path.relative_to(ROOT) if path.is_relative_to(ROOT) else path
+
+
+def mark_rows(name: str, doc: dict) -> tuple[dict, list[str]]:
+    """A verdict's rows marked for `name`'s record, and its counts redone.
+
+    Returns the block and the problems that refuse it: a reported or excepted
+    row the verdict does not hold. A GATED row outside its mark makes the
+    block's verdict "fail", and `tradefloor.records` refuses to load a record
+    that carries one; a reported row outside its mark is written, and says so.
+    """
+    excepted = ROW_EXCEPTIONS.get(name, {})
+    rows = [dict(r) for r in doc.get("rows") or []]
+    reported = reported_rows(name, rows)
+    ids = {r.get("id") for r in rows}
+    problems = [f"{name}'s registration names row {rid} ({what}), and the verdict has no such row"
+                for what, table in (("reported", REPORTED_ROWS.get(name, {})), ("exception", excepted))
+                for rid in sorted(set(table) - ids)]
+    for r in rows:
+        rid = r.get("id")
+        r["gated"] = rid not in reported
+        if rid in reported:
+            r["reported_because"] = reported[rid]
+        if rid in excepted:
+            r["exception"] = excepted[rid]
+    gated = [r for r in rows if r["gated"]]
+    failing = [r.get("id") for r in gated if r.get("pass") is not True]
+    block = dict(doc)
+    block["rows"] = rows
+    block["passed"] = sum(1 for r in gated if r.get("pass") is True)
+    block["of"] = len(gated)
+    block["all_rows"] = {"passed": sum(1 for r in rows if r.get("pass") is True), "of": len(rows)}
+    block["verdict"] = "pass" if gated and not failing else "fail"
+    return block, problems
+
+
+def scaffold(name: str, identity: dict) -> dict:
+    """A record before its grade: `identity` (the preset, its arm and its
+    coefficients) and every `GRADE_SLOTS` block as an empty slot."""
+    record = {"schema": SCHEMA, **identity, "default_since": DEFAULT_SINCE.get(name)}
+    record.update({field: {"slot": field, "filled_by": how}
+                   for field, how in GRADE_SLOTS.items()})
+    return record
+
+
+def _committed(path: pathlib.Path) -> dict:
+    """A committed record with its empty slots left out, so a block carried
+    forward is a measurement and never a slot."""
+    from tradefloor.records import is_slot  # noqa: PLC0415
+
+    record = json.loads(path.read_text(encoding="utf-8"))
+    return {k: v for k, v in record.items() if not is_slot(v)}
+
+
+def carry_slots(record: dict, path: pathlib.Path) -> str:
+    """Keep what a panel cannot rebuild on a record still waiting for its
+    grade: the `arm` block `tools/presets/arm_preset.py` wrote, and each slot
+    this write does not fill, so the record still refuses to load until the
+    last one is."""
+    from tradefloor.records import is_slot  # noqa: PLC0415
+
+    if not path.exists():
+        return ""
+    was = json.loads(path.read_text(encoding="utf-8"))
+    kept = []
+    out = {}
+    for key, value in record.items():
+        out[key] = value
+        if key == "fingerprint" and "arm" in was:
+            out["arm"] = was["arm"]
+    for key, value in was.items():
+        if is_slot(value) and not out.get(key):
+            out[key] = value
+            kept.append(key)
+    record.clear()
+    record.update(out)
+    return f"kept {len(kept)} empty slot(s): {', '.join(kept)}" if kept else ""
 
 
 def _panel_version(panel: dict) -> str:
@@ -252,7 +406,7 @@ def carry_structure(record: dict, path: pathlib.Path) -> str:
         return ""
     if not path.exists():
         return ""
-    was = json.loads(path.read_text(encoding="utf-8"))
+    was = _committed(path)
     carried = [f for f in fields if was.get(f) and not record.get(f)]
     if not carried:
         return ""
@@ -439,7 +593,7 @@ def carry_level_protocol(record: dict, path: pathlib.Path) -> str:
     """
     if not path.exists():
         return ""
-    was = json.loads(path.read_text(encoding="utf-8")).get("level_protocol")
+    was = _committed(path).get("level_protocol")
     if not was:
         return ""
     stamped = was.get("coefficients")
@@ -475,7 +629,7 @@ def carry_long_run(record: dict, path: pathlib.Path) -> str:
     """
     if not path.exists():
         return ""
-    was = json.loads(path.read_text(encoding="utf-8")).get("long_run")
+    was = _committed(path).get("long_run")
     if not was:
         return ""
     changed = moved_values(was.get("coefficients") or {}, record["coefficients"])
@@ -500,7 +654,10 @@ def mechanism_bar(fresh: dict, committed: dict | None) -> dict:
     """
     from tradefloor import envelope
 
-    if committed is None:
+    # A record committed before its grade carries no certificate either: its
+    # blocks are slots, which `_committed` leaves out.
+    if committed is None or not any(
+            committed.get(f) for f in ("mechanism_252", "mechanism_heldout_seeds")):
         return {"passed": True, "first": True, "lost": [], "absent": [],
                 "reason": "no committed record: this run LAYS ONE DOWN, and "
                           "a first measurement cannot regress against itself"}
@@ -887,6 +1044,7 @@ def main() -> int:
         note = carry_level_protocol(record, path)
         note += carry_structure(record, path)
         note += carry_long_run(record, path)
+        note += carry_slots(record, path)
         # After the carry, whichever way the carry went: a block carried
         # UNCHECKED needs the ruler named just as much as a checked one, and
         # more, since nothing else about it has been verified.
@@ -896,7 +1054,7 @@ def main() -> int:
             if not path.exists():
                 drift.append(f"{path.name} is missing")
             else:
-                have = json.loads(path.read_text(encoding="utf-8"))
+                have = _committed(path)
                 # THE SUBSET BAR, BEFORE THE FIELD DIFF AND NOT INSTEAD OF
                 # IT. A `differs` line says the block moved and says nothing
                 # about WHICH WAY: a preset that gained a mechanism and one
@@ -961,8 +1119,7 @@ def main() -> int:
             # trace destroys the evidence that it did. Since the owner's
             # ruling of 2026-09-23 the loss is REPORTED rather than refused
             # (see `PASS_BAR_RULING`): the record is written and carries it.
-            have = (json.loads(path.read_text(encoding="utf-8"))
-                    if path.exists() else None)
+            have = _committed(path) if path.exists() else None
             # THE SECOND GATE beside it. `--panel` rebuilds both blocks from
             # the artefact's per-seed rows, so this path is the one that can
             # overwrite a PASS with a REFUSED.
@@ -990,7 +1147,7 @@ def main() -> int:
                 continue
             text = json.dumps(record, indent=2, ensure_ascii=False) + "\n"
             path.write_text(text, encoding="utf-8", newline="\n")
-            print(f"  wrote {path.relative_to(ROOT)}"
+            print(f"  wrote {_shown(path)}"
                   + (f"  ({note})" if note else ""))
 
     if args.check:
@@ -1053,7 +1210,7 @@ def write_coefficients() -> int:
         text = json.dumps(record, indent=2, ensure_ascii=False) + chr(10)
         path.write_text(text, encoding="utf-8", newline=chr(10))
         added = sorted(set(values) - set(before))
-        print(f"  wrote {path.relative_to(ROOT)}"
+        print(f"  wrote {_shown(path)}"
               + (f"  (+{', '.join(added)})" if added else ""))
     if refused:
         print(f"{len(refused)} record(s) not written: {', '.join(refused)}")
@@ -1094,8 +1251,8 @@ def write_mechanism_gate(panel_path: str) -> int:
         # says the mechanism was never there. Refused per preset until the
         # owner's ruling of 2026-09-23; REPORTED since (`PASS_BAR_RULING`):
         # the certificate is written and the record carries the loss.
-        bar = mechanism_bar(p, record)
-        for line in note_regression(record, dict(record), mechanism=bar):
+        bar = mechanism_bar(p, _committed(path))
+        for line in note_regression(record, _committed(path), mechanism=bar):
             print(f"  {name}: {line}", file=sys.stderr)
             regressed += 1
         for field in ("mechanism_252", "mechanism_heldout_seeds"):
@@ -1115,7 +1272,7 @@ def write_mechanism_gate(panel_path: str) -> int:
         path.write_text(json.dumps(ordered, indent=2, ensure_ascii=False) + "\n",
                         encoding="utf-8", newline="\n")
         counts = record["mechanism_252"]["counts"]
-        print(f"  wrote {path.relative_to(ROOT)}  mechanism shown "
+        print(f"  wrote {_shown(path)}  mechanism shown "
               f"{counts['mechanism_shown']} of {counts['mechanism_of']}"
               + (f", REVERSED {record['mechanism_252']['reversed']}"
                  if record["mechanism_252"]["reversed"] else ""))
@@ -1203,7 +1360,7 @@ def write_structure_rows(panel_path: str) -> int:
         for field in envelope.STRUCTURE_BAR_PANELS:
             b = record[field]
             for row, v in b["rows"].items():
-                print(f"  wrote {path.relative_to(ROOT)}  {field}  {row}  "
+                print(f"  wrote {_shown(path)}  {field}  {row}  "
                       f"{v['verdict'].upper()}"
                       + (f" ({v['side']} the tape centre)" if v["side"] else "")
                       + f"  k {v['k']} of {v['n']}, cut {v['cut']}, median "
@@ -1331,7 +1488,7 @@ def write_level_protocol(rows_path: str) -> int:
         print(f"  {pooled_note}")
     rows = dict(doc["certified_level"])
     rows.update(doc["certified_crisis"])
-    print(f"  wrote {path.relative_to(ROOT)}  level_protocol: "
+    print(f"  wrote {_shown(path)}  level_protocol: "
           + ", ".join(f"{k}={v:.4f}" for k, v in rows.items()))
     return 0
 
@@ -1368,15 +1525,25 @@ def write_long_run(verdict_path: str) -> int:
     if not name or name.startswith("custom-"):
         problems.append(f"the long run ran fingerprint {name!r}, not a named "
                         "preset, so there is no record it describes")
-    if not rows or doc.get("of") != len(rows) or doc.get("passed") != passed:
+    # criteria.py counts every row it grades. A registration that reports some
+    # rows without gating them (`REPORTED_ROWS`) gates the rest, so its
+    # verdict may count either way; `mark_rows` redoes the counts below.
+    reported = reported_rows(name, rows)
+    gated_n = sum(1 for r in rows if r.get("id") not in reported)
+    gated_p = sum(1 for r in rows if r.get("pass") is True and r.get("id") not in reported)
+    if not rows or (doc.get("of"), doc.get("passed")) not in ((len(rows), passed), (gated_n, gated_p)):
         problems.append(f"the counts do not add up: of {doc.get('of')!r} and "
                         f"passed {doc.get('passed')!r} against {len(rows)} rows "
                         f"of which {passed} pass")
-    if any(r.get("pass") not in (True, False) for r in rows):
+    # A reported row the grade did not read keeps `pass` null; a gated row must have one.
+    if any(r.get("pass") not in (True, False) for r in rows if r.get("id") not in reported):
         problems.append("a row carries no verdict")
-    want = "pass" if rows and passed == len(rows) else "fail"
-    if doc.get("verdict") != want:
-        problems.append(f"verdict {doc.get('verdict')!r} where the rows say {want!r}")
+    marked, refused = mark_rows(name or "", doc)
+    problems += refused
+    every = "pass" if rows and passed == len(rows) else "fail"
+    if doc.get("verdict") not in (every, marked["verdict"]):
+        problems.append(f"verdict {doc.get('verdict')!r} where the rows say {every!r} "
+                        f"and the gated rows {marked['verdict']!r}")
     path = OUT / f"{name}.json"
     if not problems and not path.exists():
         problems.append(f"no committed record at {path} to write the block onto")
@@ -1385,7 +1552,7 @@ def write_long_run(verdict_path: str) -> int:
             print(f"REFUSED: {p}", file=sys.stderr)
         return 1
     record = json.loads(path.read_text(encoding="utf-8"))
-    block = public_paths(dict(doc))
+    block = public_paths(marked)
     block["coefficients"] = dict(sorted(record["coefficients"].items()))
     record["long_run"] = block
     path.write_text(json.dumps(record, indent=2, ensure_ascii=False) + "\n",
@@ -1395,8 +1562,9 @@ def write_long_run(verdict_path: str) -> int:
             f"  (NOTE: the long run was measured on {measured.get('engine_commit')}, "
             f"the record's panel on {rec_commit})")
     shown = path.relative_to(ROOT) if path.is_relative_to(ROOT) else path
-    print(f"  wrote {shown}  long_run: {doc['verdict']} "
-          f"{passed} of {len(rows)}" + note)
+    print(f"  wrote {shown}  long_run: {block['verdict']} {block['passed']} of "
+          f"{block['of']} gated ({block['all_rows']['passed']} of "
+          f"{block['all_rows']['of']} rows)" + note)
     return 0
 
 

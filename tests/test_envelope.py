@@ -238,18 +238,20 @@ def test_a_measured_mix_is_inside_on_the_shape_rows_it_held(mix):
 
 @pytest.mark.parametrize("mix", sorted(env.ROSTER_SHAPES))
 def test_the_roster_grant_is_refused_on_the_default(mix):
-    """pt-v21 is the default and the mixes hold on pt-v19 only.
+    """pt-v22 is the default (pt-v21 was, from 0.10.0) and the mixes hold
+    on pt-v19 only.
 
-    The grant the test above asks on pt-v19 is refused on pt-v21, whether
-    the caller names it or leaves the default, and the reason says which
-    preset the grant was measured on. The same run on pt-v21 misses a shape
-    row at 504 days for two mixes, as it did on pt-v20
-    (`test_the_pt_v21_roster_run_does_not_hold`), so the refusal stays.
+    The grant the test above asks on pt-v19 is refused on pt-v22, whether
+    the caller names it or leaves the default, and on pt-v21 and pt-v20, and
+    the reason says which preset the grant was measured on. The same run on
+    pt-v21 misses a shape row at 504 days for two mixes, as it did on pt-v20
+    (`test_the_pt_v21_roster_run_does_not_hold`); it has not been run on
+    pt-v22, so the grant stays pt-v19's alone.
     """
-    assert env.PRESET == "pt-v21" and ROSTER_PRESET == "pt-v19"
+    assert env.PRESET == "pt-v22" and ROSTER_PRESET == "pt-v19"
     rows = [k for k in env.ROSTER_SHAPE_ROWS[mix][252]
             if k not in DECAY_ROWS]
-    for named in ({}, {"preset": "pt-v21"}, {"preset": "pt-v20"}):
+    for named in ({}, {"preset": "pt-v22"}, {"preset": "pt-v21"}, {"preset": "pt-v20"}):
         v = env.check(horizon_days=252, statistics=rows,
                       sector_concentrated=mix, **named)
         assert not v.inside, named
@@ -1196,14 +1198,15 @@ def test_abs_return_acf1_is_in_band_and_placed_among_the_real_windows():
     """The reviewer's second report, as numbers a user can read. pt-v20's
     certified median, 0.0282, was inside its ruled band and below every
     non-crisis real year of 2015-2025, whose lowest is 0.039. pt-v21's,
-    0.0948, is inside its band and above five of the nine."""
+    0.0948, was inside its band and above five of the nine; pt-v22's, the
+    default from 0.11.0, is 0.1052, inside its band and above the same five."""
     row = env.score(env.certified_panel())["statistics"]["abs_return_acf1"]
     assert row["in_band"]
     assert row["real"]["position"] == "above 5 of 9"
     assert row["real"]["lowest"] == 0.039
     assert row["real"]["median"] == 0.083
     said = _check_warning("abs_return_acf1")
-    for part in ("0.0948", "above 5 of 9", "lowest 0.039", "median 0.083"):
+    for part in ("0.1052", "above 5 of 9", "lowest 0.039", "median 0.083"):  # 0.0948 on pt-v21
         assert part in said, (part, said)
 
 

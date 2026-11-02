@@ -230,6 +230,14 @@ pub enum Site {
     /// Marsaglia and Tsang (a variable count), on [`stream::OVERNIGHT`]
     /// after every other overnight site. Taken only while the dial is set.
     MarketDayTailChi2 = 25,
+    /// The index futures' basis: one normal per step of the futures (each
+    /// open tick and each night step), on [`stream::DERIVATIVES`], only
+    /// while `futures_index_listed` is set.
+    FuturesBasisZ = 26,
+    /// The night's path for the index futures: one normal per night step,
+    /// after the basis's, on [`stream::DERIVATIVES`], only while
+    /// `night_session_steps` is set and a night is walked.
+    NightBridgeZ = 27,
 }
 
 impl Site {
@@ -261,6 +269,8 @@ impl Site {
             Site::CycleNowcastU => "cycle_nowcast_u",
             Site::OvernightIdioChi2 => "overnight_idio_chi2",
             Site::MarketDayTailChi2 => "market_day_tail_chi2",
+            Site::FuturesBasisZ => "futures_basis_z",
+            Site::NightBridgeZ => "night_bridge_z",
         }
     }
 }
@@ -563,6 +573,17 @@ pub mod stream {
     /// in sim/r13 and [`ARRIVAL`] 12.
     pub const EARNINGS: u32 = 13;
 
+    /// The derivatives' own draws: the index futures' basis, one normal per
+    /// futures step, and the night's path, one normal per night step
+    /// (`futures_index_listed`, `night_session_steps`). Outside [`COUNT`]
+    /// like [`CYCLE_NOWCAST`], so no array indexed by stream id grows and
+    /// every engine with the switches at 0.0 is the engine it was; its
+    /// generator is carried in the snapshot and the state hash only while
+    /// `futures_index_listed` is set. Nothing else reads it, and a futures
+    /// price feeds nothing a stock price reads, so no other stream moves at
+    /// any setting.
+    pub const DERIVATIVES: u32 = 14;
+
     /// How many streams there are. Every array indexed by stream id, the
     /// snapshot's generator and count vectors, the day mark's positions
     /// and the loops that enable, clear or stamp every stream are sized
@@ -632,8 +653,99 @@ pub fn prehistory_key(key: u64) -> u64 {
     splitmix64_mix(key ^ (PREHISTORY_TAG << 32 | PREHISTORY_TAG))
 }
 
+/// The tag of the economy's long run for the forecast's cycle
+/// (`oil_forecast_cycle_growth`), ASCII "AGEL": the surgery seed its stream
+/// generators are derived under, and the word its counter keys are mixed
+/// with, so that run draws nothing the run's own sessions draw.
+pub const AGE_LAW_TAG: u64 = 0x4147_454C;
+
+/// A counter key of the economy's long run (`oil_forecast_cycle_growth`):
+/// the run's own key mixed with [`AGE_LAW_TAG`], as [`prehistory_key`].
+pub fn age_law_key(key: u64) -> u64 {
+    splitmix64_mix(key ^ (AGE_LAW_TAG << 32 | AGE_LAW_TAG))
+}
+
+/// The tag of the oil price's long factor (`oil_target_drift_sd`), ASCII
+/// "OILD".
+pub const OIL_DRIFT_TAG: u32 = 0x4F49_4C44;
+
+/// The key of a root seed's oil long-factor draws: as [`publication_key`]
+/// under [`OIL_DRIFT_TAG`]. Each session's normal is the first of
+/// `GameRng::keyed(key, OIL_DRIFT_TAG, session)`, so it takes nothing from
+/// any stream and moves no other draw.
+pub fn oil_drift_key(root_seed: u64) -> u64 {
+    splitmix64_mix(root_seed ^ (((OIL_DRIFT_TAG as u64) << 32) | 0xFFFF_FFFF))
+}
+
+/// The tag of core inflation's slow trend (`core_trend_sd`), ASCII "CTRD".
+pub const CORE_TREND_TAG: u32 = 0x4354_5244;
+
+/// The key of a root seed's core-trend draws: as [`publication_key`] under
+/// [`CORE_TREND_TAG`]. Each month's normal is the first of
+/// `GameRng::keyed(key, CORE_TREND_TAG, month)`, and the opening's the first
+/// of `GameRng::keyed(key, CORE_TREND_TAG, u64::MAX)`, so it takes nothing
+/// from any stream.
+pub fn core_trend_key(root_seed: u64) -> u64 {
+    splitmix64_mix(root_seed ^ (((CORE_TREND_TAG as u64) << 32) | 0xFFFF_FFFF))
+}
+
+/// The tag of credit's own state (`corporate_spread_noise_sd`), ASCII
+/// "CSPN".
+pub const SPREAD_NOISE_TAG: u32 = 0x4353_504E;
+
+/// The key of a root seed's credit-state draws: as [`publication_key`] under
+/// [`SPREAD_NOISE_TAG`]. Each session's normal is the first of
+/// `GameRng::keyed(key, SPREAD_NOISE_TAG, day)`, and the opening's the first
+/// of `GameRng::keyed(key, SPREAD_NOISE_TAG, u64::MAX)`, so it takes nothing
+/// from any stream.
+pub fn spread_noise_key(root_seed: u64) -> u64 {
+    splitmix64_mix(root_seed ^ (((SPREAD_NOISE_TAG as u64) << 32) | 0xFFFF_FFFF))
+}
+
+/// The tag of the 10-year's own term premium (`treasury_term_premium_sd`),
+/// ASCII "TTPM".
+pub const TERM_PREMIUM_TAG: u32 = 0x5454_504D;
+
+/// The key of a root seed's term-premium draws: as [`publication_key`] under
+/// [`TERM_PREMIUM_TAG`]. A run's session `day` takes the first normal of
+/// `GameRng::keyed(key, TERM_PREMIUM_TAG, day)`, a burn-in day the first of
+/// `GameRng::keyed(key, TERM_PREMIUM_TAG, day | 1 << 40)` (the burn-in counts
+/// its own days from 1 as the run does), and the opening the first of
+/// `GameRng::keyed(key, TERM_PREMIUM_TAG << 32, 0)`, so it takes nothing from
+/// any stream.
+pub fn term_premium_key(root_seed: u64) -> u64 {
+    splitmix64_mix(root_seed ^ (((TERM_PREMIUM_TAG as u64) << 32) | 0xFFFF_FFFF))
+}
+
 pub fn publication_key(root_seed: u64) -> u64 {
     splitmix64_mix(root_seed ^ (((PUBLICATION_TAG as u64) << 32) | 0xFFFF_FFFF))
+}
+
+/// The tag of the skew premium's own noise (`surface_skew_noise_sd`), ASCII
+/// "SKWN".
+pub const SKEW_NOISE_TAG: u32 = 0x534B_574E;
+
+/// The key of a root seed's skew-noise draws: as [`publication_key`] under
+/// [`SKEW_NOISE_TAG`]. Each session's normal is the first of
+/// `GameRng::keyed(key, SKEW_NOISE_TAG, session)`, and the opening's the
+/// first of `GameRng::keyed(key, SKEW_NOISE_TAG << 32, 0)`, so it takes
+/// nothing from any stream and moves no other draw.
+pub fn skew_noise_key(root_seed: u64) -> u64 {
+    splitmix64_mix(root_seed ^ (((SKEW_NOISE_TAG as u64) << 32) | 0xFFFF_FFFF))
+}
+
+/// The tag of the guidance's signal noise (`policy_guidance_signal_sd`),
+/// ASCII "GSIG".
+pub const GUIDANCE_SIGNAL_TAG: u32 = 0x4753_4947;
+
+/// The key of a root seed's guidance signals: as [`publication_key`] under
+/// [`GUIDANCE_SIGNAL_TAG`]. The signal of the meeting held at the close whose
+/// day count is `meeting` takes the first normal of
+/// `GameRng::keyed(key, GUIDANCE_SIGNAL_TAG, meeting)`, one for every close
+/// that forecasts that meeting, so it takes nothing from any stream and
+/// moves no other draw.
+pub fn guidance_signal_key(root_seed: u64) -> u64 {
+    splitmix64_mix(root_seed ^ (((GUIDANCE_SIGNAL_TAG as u64) << 32) | 0xFFFF_FFFF))
 }
 
 /// The `k`-th publication uniform in [0, 1) of a key:

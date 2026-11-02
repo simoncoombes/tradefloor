@@ -46,6 +46,14 @@ def scores():
                             universe=UNIVERSE, days=5)
 
 
+@pytest.fixture(scope="module")
+def scores_v21():
+    # The fixture above on pt-v21 by name: the default from 0.10.0 until
+    # pt-v22 took it, and still a preset the Oracle is no ceiling on.
+    return tradefloor.evaluate(reference_agents(seed=3), seed=7,
+                            universe=UNIVERSE, days=5, model="pt-v21")
+
+
 #: The roster the Oracle's measurements below are made on, from 0.8.5.
 ORACLE_UNIVERSE = tradefloor.Universe.random(20, seed=11)
 
@@ -994,30 +1002,33 @@ def test_on_pt_v20_the_oracle_loses_where_the_market_falls_for_good():
 # --------------------------------------------------------------------------
 
 
-def test_pt_v20_and_pt_v21_are_the_shipped_presets_without_a_ceiling():
+def test_pt_v20_to_pt_v22_are_the_shipped_presets_without_a_ceiling():
     """The condition is a list naming presets, read against a scorecard's
-    `model_fingerprint`. Every shipped preset but pt-v20 and pt-v21 keeps
-    the capture ratio; `None` is the default, pt-v21 on this build (pt-v20
-    before 0.10.0); a custom model keeps it whatever it was built from,
-    since its card names no base."""
-    without = {"pt-v20", "pt-v21"}
+    `model_fingerprint`. Every shipped preset but pt-v20 to pt-v22 keeps
+    the capture ratio; `None` is the default, whichever preset that is; a
+    custom model keeps it whatever it was built from, since its card names
+    no base."""
+    without = {"pt-v20", "pt-v21", "pt-v22"}
     assert set(ORACLE_NOT_A_CEILING) == without
     for name in tradefloor.preset_names():
         assert oracle_is_ceiling(name) is (name not in without), name
         assert oracle_is_ceiling(
             tradefloor.ModelParams.from_preset(name)) is (name not in without)
-    assert oracle_is_ceiling(None) is False
+    # None is the default, whichever preset that is.
+    assert oracle_is_ceiling(None) is oracle_is_ceiling(
+        tradefloor.model_preset()["name"])
     custom = tradefloor.ModelParams.from_preset(
         "pt-v20", opening_market_sigma=0.10)
     assert custom.fingerprint.startswith("custom-")
     assert oracle_is_ceiling(custom) is True
 
 
-def test_on_the_default_no_capture_ratio_is_reported(scores):
-    """The default's five-day fixture. No ratio at all, not zeros and not
+def test_on_pt_v21_no_capture_ratio_is_reported(scores_v21):
+    """The five-day fixture on pt-v21. No ratio at all, not zeros and not
     NaN, whatever the Oracle earned; the reason from `capture_withheld`;
-    and buy-and-hold's difference as the comparison instead. The default
-    is pt-v21 from 0.10.0; this read pt-v20 while it was."""
+    and buy-and-hold's difference as the comparison instead. It read the
+    default while pt-v21 was it, and pt-v20 before that."""
+    scores = scores_v21
     assert scores["oracle"].model_fingerprint == "pt-v21"
     assert capture_ratio(scores) == {}
     assert capture_withheld(scores) == ORACLE_NOT_A_CEILING["pt-v21"]

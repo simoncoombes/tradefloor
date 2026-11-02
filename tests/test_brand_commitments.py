@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import base64
 import gzip
+import hashlib
 import pathlib
 import re
 import subprocess
@@ -506,12 +507,24 @@ class TreeScan(typing.NamedTuple):
 
 
 #: Tracked files kept gzipped, which the walk reads through gzip so the text
-#: inside is checked like any other. Two today: the S&P 500 and VIX tape that
-#: grade box ptv20g6 and certification box ptv21c1 unpacked, each kept as the
-#: bytes it ran on so its sha256 still matches its folder's
-#: `scripts-as-run.txt`.
+#: inside is checked like any other. Three today: the S&P 500 and VIX tape that
+#: grade box ptv20g6, certification box ptv21c1 and pt-v22's grading boxes
+#: unpacked, each kept as the bytes it ran on so its sha256 still matches its
+#: folder's `scripts-as-run.txt`.
 GZIPPED_TEXT = ("validation/pt-v20/programme/longrun/data/tape.json.gz",
-                "validation/pt-v21/programme/longrun/data/tape.json.gz")
+                "validation/pt-v21/programme/longrun/data/tape.json.gz",
+                "validation/pt-v22/programme/longrun/data/tape.json.gz")
+
+
+#: Tracked archives kept as the bytes a grading box ran, so their sha256
+#: still matches their folder's `scripts-as-run.txt`: binary, so not read as
+#: text, and allowed only at this path with this sha256 (any other bytes
+#: there are a finding). Each is also published unpacked beside it, where the
+#: walk reads every file.
+ARCHIVES_AS_RUN = {
+    "validation/pt-v22/programme/r13reg/box/regr.tgz":
+        "c825d70faa32e9f84600ced269e48d97c628b5a740e9d88e3c665e6080d9e399",
+}
 
 
 def scan_tree(paths: list[str] | None = None) -> TreeScan:
@@ -530,6 +543,11 @@ def scan_tree(paths: list[str] | None = None) -> TreeScan:
             missing.append(path)
             continue
         raw = p.read_bytes()
+        if path in ARCHIVES_AS_RUN:
+            if hashlib.sha256(raw).hexdigest() != ARCHIVES_AS_RUN[path]:
+                findings.append(f"{path}: not the archive the box ran (sha256 changed)")
+            seen.append(path)
+            continue
         if path in GZIPPED_TEXT:
             raw = gzip.decompress(raw)
         try:

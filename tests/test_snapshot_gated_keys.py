@@ -87,6 +87,9 @@ CASES = {
                 "gdp_publication", "earnings_cycle"), (), {}),
     "garch_cascade": (dict(garch_cascade_components=3.0), ("garch_cascade",), (), (), {}),
     "market_vol_leverage": (LEVERAGE, ("market_vol_leverage_memory",), (), (), {}),
+    "market_vol_leverage_fast": (dict(market_vol_leverage_fast=2.0,
+                                      market_vol_leverage_fast_half_life=5.0),
+                                 ("market_vol_leverage_fast_memory",), (), (), {}),
     "market_vol_cycle": (CYCLE_VOL, (), (), ("market_vol_cycle_log",), {}),
     "vix_stress_premium": (dict(vix_stress_premium=3.0, vix_stress_premium_knee=0.6,
                                 vix_stress_premium_cap=0.35),
@@ -143,6 +146,17 @@ CASES = {
     "spread_equity_gain": (dict(corporate_spread_equity_gain=1.8,
                                 corporate_spread_equity_half_life=126.0),
                            (), ("spread_equity_gap",), (), {}),
+    # Credit's repricing lag: the priced gap beside the gap.
+    "spread_equity_lag": (dict(corporate_spread_equity_gain=1.8,
+                               corporate_spread_equity_half_life=126.0,
+                               corporate_spread_equity_lag=5.0),
+                          (), ("spread_equity_gap", "spread_priced_gap"), (), {}),
+    # The 10-year's repricing lag: its priced gap beside the leverage gap.
+    "treasury_equity_lag": (dict(corporate_spread_equity_gain=1.8,
+                                 corporate_spread_equity_half_life=126.0,
+                                 treasury_equity_lag=21.0,
+                                 treasury_equity_lag_gain=2.0),
+                            (), ("spread_equity_gap", "treasury_equity_priced_gap"), (), {}),
     "cycle_equity_hazard": (dict(cycle_equity_hazard=5.0, cycle_equity_hazard_knee=0.1,
                                  cycle_equity_hazard_opening=0.007,
                                  corporate_spread_equity_half_life=126.0),
@@ -153,6 +167,58 @@ CASES = {
     "impact_memory": (MEMORY, (), (), ("book",), {"trade": True}),
     "population": ({}, (), (), (), {"population": "crowded"}),
     "macro_anchors": (MACRO, (), (), (), {}),
+    # What derivatives read (pt-v22 phase 1): the index's divisor is carried
+    # whenever its switch is set; the live VIX within a session; the
+    # forecast once a close has computed it.
+    "index_level": (dict(index_level_listed=1.0), ("index_divisor",), (), (), {}),
+    "vix_live": (dict(vix_intraday_live=1.0), (), (), ("vix_live",), {}),
+    "forecast": (dict(forecast_horizon_sessions=21.0), (), (), ("forecast",), {}),
+    # The index futures: their numbers and generator whenever the switch is
+    # set; the night's path from a close to the next open.
+    "index_futures": (dict(index_level_listed=1.0, futures_index_listed=1.0, basis_sd=3.7,
+                           basis_persistence=0.42, night_session_steps=6.0),
+                      ("futures", "derivatives_rng"), (), ("night_bridge",), {}),
+    # The VIX's fear memory, carried whenever its switch is set.
+    "vix_fear": (dict(vix_fear_uptake=0.2, vix_fear_half_life=20.0), ("vix_fear",), (), (), {}),
+    # The published VIX's log average the slow level's nowcast reads, carried
+    # whenever its dial is set.
+    "vix_log_average": (dict(forecast_horizon_sessions=21.0, vix_level_sigma=0.0181,
+                             forecast_vix_level_nowcast=0.4, forecast_vix_level_nowcast_half_life=126.0,
+                             forecast_vix_level_nowcast_centre=2.9), ("vix_log_average",), (), (), {}),
+    # The VIX futures, carried whenever their switch is set.
+    "vix_futures": (dict(forecast_horizon_sessions=126.0, futures_vix_listed=1.0), ("vix_futures",), (), (), {}),
+    # The rate futures, carried whenever their switch is set.
+    "rate_futures": (dict(futures_rates_listed=1.0), ("rate_futures",), (), (), {}),
+    # The oil futures, carried whenever their switch is set.
+    "oil_futures": (dict(futures_oil_listed=1.0), ("oil_futures",), (), (), {}),
+    # The contracts' margin, carried whenever its dial is set.
+    "margin": (dict(futures_oil_listed=1.0, margin_scan_coverage=0.99), ("oil_futures", "margin"), (), (), {}),
+    # Credit's own state and its key, stepped every session on its own draws.
+    "spread_noise": (dict(corporate_spread_noise_sd=0.025, corporate_spread_noise_half_life=16.0,
+                          corporate_yield_daily=1.0),
+                     ("spread_noise",), (), (), {}),
+    # The 10-year's own term premium and its key, stepped every session on
+    # its own draws.
+    "term_premium": (dict(treasury_term_premium_sd=0.06, treasury_term_premium_half_life=49.0),
+                     ("term_premium",), (), (), {}),
+    # The time-held fade's clock and the held VIX, held once a close has
+    # started the clock.
+    "cycle_hold": (dict(CYCLE_VOL, market_vol_cycle_hold_onset=0.9,
+                        market_vol_cycle_hold_fade=0.335, market_vol_cycle_hold_half_life=295.0,
+                        market_vol_vix_hold_half_life=198.0),
+                   (), (), ("market_vol_cycle_log", "cycle_hold"), {}),
+    "oil_target_drift": (dict(oil_target_drift_sd=0.018, oil_target_drift_reversion=0.001),
+                         ("oil_target_drift",), (), (), {}),
+    # The oil pushes' part of the price, in the economy, under its switch.
+    "oil_push_level": (dict(oil_pushes_in_target=1.0, oil_noise_log_sd=0.017),
+                       (), ("oil_push_level",), (), {}),
+    # The dollar's safe-haven bid, in the economy, under the measured dollar.
+    "usd_haven_level": (dict(usd_mean_reversion=0.00095, usd_noise_sd=0.43),
+                        (), ("usd_haven_level",), (), {}),
+    # The index options and the surface's clock, carried whenever the
+    # surface's switch is set.
+    "options": (dict(index_level_listed=1.0, surface_ssvi=1.0, options_index_listed=1.0,
+                     option_dealer_spread=0.004), ("index_divisor", "options"), (), (), {}),
     "every_r21_dial": (dict(EVERY_R21_DIAL, **MACRO),
                        ("market_vol_leverage_memory", "vix_stress_memory",
                         "cycle_nowcast_rng", "fed_stress_vix_max", "fed_stress_hold_age",

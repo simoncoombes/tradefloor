@@ -67,7 +67,9 @@ pub use hours::{
     get_market_status, intraday_fraction, intraday_vol, intraday_volume, is_market_open, GameTime,
     MarketStatus, MARKET_MINUTES,
 };
-pub use index_value::{calculate_market_index, IndexConstituent, IndexValue};
+pub use index_value::{
+    calculate_market_index, rebased_divisor, IndexConstituent, IndexLevel, IndexValue, INDEX_BASE,
+};
 pub use index_var::{index_conditional_variance, index_conditional_variance_terms,
                     index_unconditional_variance, intraday_variance_factor,
                     vix_from_variance, IndexVarianceTerms, NameVariance};

@@ -60,8 +60,8 @@ from . import _checks
 from ._arith import ordered_sum
 from ._core import Engine, Instrument, Macro, ModelParams, OrderError, ValidationError
 from ._core import check_seed
-from .portfolio import (Cancel, LeverageError, Limit, Portfolio, check_order,
-                        order_items)
+from .portfolio import (Cancel, Exercise, LeverageError, Limit, Portfolio,
+                        check_order, order_items)
 from .sandbox import (PUBLISHED_MACRO, HiddenState, MarketView,
                       PortfolioView, TamperGuard, declares_hidden_state)
 from .universe_util import fingerprint_of
@@ -439,7 +439,7 @@ def _warm_up(engine: Engine, days: int, *, steps_per_day: int,
     """
     hour, minute, day_of_week = start
     for k in range(days):
-        engine.open_market()
+        open_day(engine)
         for step in range(steps_per_day):
             engine.run_session(*session_clock((hour, minute, day_of_week),
                                               step, ticks_per_step),
@@ -532,6 +532,12 @@ class Scorecard:
     each step's session (infinite once net worth is gone), and the other two
     read it: the share of steps that ended holding any position, and the
     mean multiple over the steps with a finite one.
+
+    Shares an agent did not order, handed over or taken by a single-name
+    option's exercise or assignment, are holdings like any
+    other: valued at the price in the equity curve and counted in the
+    exposure. They are not trades, so ``trades``, ``turnover`` and
+    ``impact_bps`` leave them out.
 
     ``rejected`` counts the orders the market refused and the actions an
     LLM adapter refused on its own (its ``refusals()``, such as a ticker
@@ -800,6 +806,17 @@ class Scorecard:
         if gross is not None:
             text += f", exposure={gross:.2f}x"
         return text
+
+
+def open_day(engine: Engine) -> None:
+    """The next open, after the night session when the model has one
+    (``night_session_steps``): between a close and the open the index
+    futures walk the night (:meth:`Engine.run_night`), as the graded runs
+    walk it, so an agent trades the futures market that is measured. With
+    no night, or before the first close, the open alone, as before."""
+    if engine.model.night_session_steps > 0:
+        engine.run_night()
+    engine.open_market()
 
 
 def session_clock(start: tuple[int, int, int], step_within_day: int,
@@ -1165,9 +1182,11 @@ def _warn_fractional(name: str, fills: list[dict[str, Any]]) -> None:
         ticker = asked[0][0]
         warnings.warn(
             f"Agent {name!r} asked for fractions of a share ({shown}{more}). "
-            "act() returns numbers of shares, not portfolio weights. To put "
-            f"20% of your money in {ticker}, send 0.2 * net_worth / "
-            f"obs.price({ticker!r}) shares.", stacklevel=4)
+            "act() returns numbers of shares, not portfolio weights. To hold "
+            f"20% of your money in {ticker}, send the shares that close the "
+            f"gap: int(0.2 * obs.portfolio.net_worth() / obs.price({ticker!r})) "
+            f"- obs.position({ticker!r}), less any shares still waiting in "
+            "open orders on it.", stacklevel=4)
         return
 
 
@@ -1193,7 +1212,7 @@ def _run_untraded(seed, universe, macro, days, steps_per_day, ticks_per_step,
     for day in range(days):
         if scenario is not None:
             scenario.apply(engine, day)
-        engine.open_market()
+        open_day(engine)
         for step in range(steps_per_day):
             # The same advancing clock as the traded run. If this stepped
             # differently the two worlds would differ for a reason that had
@@ -1282,12 +1301,16 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
             # daily re-read of every ordinary run would be a column copy
             # nobody asked for.
             adv = _f64(engine.column("avg_volume"))
-        engine.open_market()
+        open_day(engine)
         # The dividends this open made payable, before the agent acts: the
         # price already carries the ex-date drop. Reinvested in the paying
         # name under the portfolio's plan, cash otherwise. Nothing on a
         # model without dividends.
         portfolio.collect_dividends(engine)
+        # The futures the open settled, and the last close's margin call met
+        # or the account's futures liquidated. Nothing for
+        # a portfolio without futures.
+        portfolio.settle_open(engine)
         for _ in range(steps_per_day):
             # The roster and the depth are copies, so an agent that sorts or
             # edits what it was shown edits its own copy and not the lists
@@ -1350,6 +1373,11 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
                     if isinstance(order, Cancel):
                         portfolio.cancel(engine, ticker=ticker)
                         continue
+                    if isinstance(order, Exercise):
+                        # An instruction for the close, not a trade: the
+                        # shares move at settle_close.
+                        portfolio.exercise(engine, ticker, order.quantity)
+                        continue
                     if isinstance(order, Limit):
                         # As World does it: a new limit on a name replaces
                         # the one waiting there. What fills at once is a
@@ -1409,6 +1437,10 @@ def _evaluate_one(name, agent, seed, universe, macro, days, steps_per_day,
         # `explain(day)` below already sees today in `obs.history`.
         history._close(engine, day)
         engine.close_market()
+        # Variation margin to the close's settlement marks, the contracts
+        # settled at it, and a margin call under maintenance. Nothing for a
+        # portfolio without futures.
+        portfolio.settle_close(engine)
         # Marked after the close, which on pt-v20 re-marks every name, so
         # the last value is the final net worth below.
         equity_curve.append(portfolio.net_worth(engine))
@@ -1503,7 +1535,12 @@ def _impact_bps(portfolio, tickers, baseline, actual) -> float:
     """Notional-weighted impact, signed so positive is worse for the trader."""
     traded: dict[str, float] = {}
     direction: dict[str, float] = {}
+    names = set(tickers)
     for fill in portfolio.fills:
+        # Impact is on the names' prices. A listed contract holds no slot in
+        # them, and its flow moves none of them.
+        if fill["ticker"] not in names:
+            continue
         traded[fill["ticker"]] = traded.get(fill["ticker"], 0.0) + abs(fill["notional"])
         direction[fill["ticker"]] = direction.get(fill["ticker"], 0.0) + fill["quantity"]
 

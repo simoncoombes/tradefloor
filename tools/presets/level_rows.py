@@ -79,7 +79,12 @@ def published_block(control: str, keys: list[str]) -> tuple[dict, str]:
     """The constants the control arm has to reproduce, and where they came from."""
     from tradefloor import envelope
 
-    if control == envelope.PRESET:
+    # The envelope's two pooled rows (`facts.LEVEL_POOL`, 360 seeds) are not
+    # what a thirty-seed control arm reads, so a control whose record carries
+    # its own thirty-seed block is checked against that block.
+    path = record_path(control)
+    if control == envelope.PRESET and not (
+            path.exists() and (load(str(path)).get("level_protocol") or {}).get("certified_level")):
         block = dict(envelope.CERTIFIED_LEVEL)
         block.update(envelope.CERTIFIED_CRISIS)
         missing = [k for k in keys if k not in block]
@@ -89,7 +94,6 @@ def published_block(control: str, keys: list[str]) -> tuple[dict, str]:
                 "missing %s" % (control, ", ".join(missing)))
         return block, "envelope.CERTIFIED_LEVEL + CERTIFIED_CRISIS"
 
-    path = record_path(control)
     if not path.exists():
         raise SystemExit(
             "REFUSED: the control %s is not the envelope's preset and has no "

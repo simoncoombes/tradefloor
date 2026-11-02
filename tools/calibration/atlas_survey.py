@@ -449,6 +449,96 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # survey records a draw there as the model's refusal.
     "rate_close_remark": (0.0, 1.0),
     "rate_intraday_live": (0.0, 1.0),
+    # What derivatives read (pt-v22 phase 1): two switches and the forecast's
+    # horizon in sessions, none of which moves a price, so a survey draw on
+    # them reads the market it would read without them.
+    "index_level_listed": (0.0, 1.0),
+    "vix_intraday_live": (0.0, 1.0),
+    "forecast_horizon_sessions": (0.0, 252.0),
+    # The forecast's derived dials, read only with the horizon set: the log
+    # VIX's spread about the forecast (about 0.3 on pt-v21's histories), its
+    # half-life and its skewness (about 0.8), and the policy path's three
+    # projection shares.
+    "forecast_vix_dispersion": (0.0, 0.6),
+    "forecast_vix_dispersion_half_life": (0.0, 126.0),
+    "forecast_vix_dispersion_skew": (0.0, 0.99),
+    # The slow level's nowcast: its gain, its average's half-life and centre.
+    "forecast_vix_level_nowcast": (0.0, 1.0),
+    "forecast_vix_level_nowcast_half_life": (0.0, 504.0),
+    "forecast_vix_level_nowcast_centre": (0.0, 3.5),
+    "forecast_policy_shadow_discount": (0.0, 0.5),
+    "forecast_policy_persistence": (0.0, 0.9),
+    "forecast_policy_reversion": (0.0, 0.3),
+    # The index futures and their night session (pt-v22 phase 1): a switch,
+    # the basis noise's sd (index basis points) and close-to-close
+    # persistence, and the night's steps. None of them moves a stock price.
+    "futures_index_listed": (0.0, 1.0),
+    "basis_sd": (0.0, 10.0),
+    "basis_persistence": (0.0, 0.9),
+    "basis_night_share": (0.0, 1.0),
+    "night_session_steps": (0.0, 30.0),
+    "futures_impact_memory": (0.0, 1.0),
+    "futures_impact_memory_half_life": (0.0, 3900.0),
+    # The VIX futures (pt-v22 phase 1): a switch and the intraday loading's
+    # share and half-lives (sessions). None of them moves a stock price.
+    "futures_vix_listed": (0.0, 1.0),
+    "futures_vix_live_fast_share": (0.0, 1.0),
+    "futures_vix_live_fast_half_life": (0.0, 10.0),
+    "futures_vix_live_slow_half_life": (0.0, 120.0),
+    # The premium's slope moved toward its measured time-series response: a share.
+    "futures_vix_premium_response": (0.0, 1.0),
+    # The rate futures (pt-v22 phase 1): a switch. It moves no stock price.
+    "futures_rates_listed": (0.0, 1.0),
+    "rate_premium_per_fixing": (0.0, 1.0),
+    # The oil futures (pt-v22 phase 1): a switch. It moves no stock price.
+    "futures_oil_listed": (0.0, 1.0),
+    # The contracts' margin (pt-v22 phase 1): its coverage and tail allowance.
+    "margin_scan_coverage": (0.0, 0.995),
+    "margin_scan_tail": (0.0, 2.0),
+    "margin_scan_option_tail": (0.0, 2.0),
+    "margin_option_minimum": (0.0, 10.0),
+    "margin_option_scan_range": (0.0, 1.0),
+    "margin_pretrade_check": (0.0, 1.0),
+    "margin_liquidation_worked": (0.0, 1.0),
+    "margin_deficit_liquidates": (0.0, 1.0),
+    # The index options, their surface and their dealer (pt-v22 phase 2):
+    # two switches, the surface's skew, curvature, term premia and earnings
+    # weight, and the dealer's half-spread. None of them moves a stock price.
+    "surface_ssvi": (0.0, 1.0),
+    "options_index_listed": (0.0, 1.0),
+    "surface_skew_physical": (-2.0, 0.0),
+    "surface_skew_physical_slope": (-1.0, 1.0),
+    "surface_skew_premium": (-2.0, 0.0),
+    "surface_skew_premium_slope": (0.0, 2.0),
+    "surface_skew_noise_sd": (0.0, 2.0),
+    "surface_skew_noise_half_life": (0.0, 500.0),
+    "surface_curvature": (0.0, 1.5),
+    "surface_index_curvature": (0.0, 1.5),
+    "surface_index_tenor_exponent": (0.0, 0.9),
+    "surface_index_tenor_strip": (0.0, 1.0),
+    "surface_index_vertex": (0.0, 1.0),
+    "surface_curvature_exponent": (0.0, 0.5),
+    "surface_term_premium_short": (-0.3, 0.3),
+    "surface_term_premium_long": (-0.3, 0.3),
+    "surface_earnings_weight": (0.0, 2.0),
+    "option_dealer_spread": (0.0, 0.02),
+    "options_index_forward_from_future": (0.0, 1.0),
+    # The single-name options (pt-v22 phase 3): a switch, the single-name
+    # volatility premium and the names' share of the index skew. None of
+    # them moves a stock price.
+    "options_names_listed": (0.0, 1.0),
+    "surface_name_premium": (0.0, 0.25),
+    "surface_name_skew": (0.0, 1.0),
+    # The options' position limit, in multiples of the dealer's displayed
+    # depth: it refuses orders and moves no stock price.
+    "option_position_limit": (0.0, 5.0),
+    "option_name_inventory_slope": (0.0, 0.01),
+    "option_name_inventory_half_life": (0.0, 252.0),
+    "option_name_spread_otm": (0.0, 5.0),
+    "option_name_spread_itm": (0.0, 5.0),
+    "option_name_spread_tenor_exponent": (-1.0, 1.0),
+    "surface_name_earnings_premium": (0.0, 5.0),
+    "surface_name_term_slope": (-1.0, 1.0),
     # The central bank's stress cut, points per step: 0.5 is a half-point
     # step, two steps a point, which is 2001's and 2008's emergency size.
     "fed_stress_cut": (0.0, 0.5),
@@ -470,6 +560,12 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "market_vol_leverage_half_life": (0.0, 126.0),
     # A share: 0 counts up and down days alike, 1 counts falls only.
     "market_vol_leverage_down": (0.0, 1.0),
+    # The fast return memory: off to twice a gain that gives the S&P 500's
+    # first-week asymmetry; half-life off to a month.
+    "market_vol_leverage_fast": (0.0, 6.0),
+    "market_vol_leverage_fast_half_life": (0.0, 21.0),
+    # A share: 0 counts falls and rises alike, 1 counts rises only.
+    "market_vol_leverage_fast_up": (0.0, 1.0),
     # The power on the day's own sd the memory counts a day in: 0 the
     # baseline sd (as shipped), 1 the day's z-score.
     "market_vol_leverage_standardise": (0.0, 1.0),
@@ -522,6 +618,15 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "vix_stress_premium_knee": (0.0, 1.5),
     # The largest log premium of the quote over the state; 0.5 is 1.65x.
     "vix_stress_premium_cap": (0.0, 0.5),
+    # The stress memory's own rate: off (the anchor's) to 0.1 a session,
+    # about three times the pt-v22 law's 0.035 anchor rate.
+    "vix_stress_premium_memory": (0.0, 0.1),
+    # The undo form: a switch.
+    "vix_stress_premium_undo": (0.0, 1.0),
+    # The VIX's fear memory: the uptake up to half the excursion a session,
+    # and the half-life from a week to a year of sessions.
+    "vix_fear_uptake": (0.0, 0.5),
+    "vix_fear_half_life": (0.0, 252.0),
     # The Fed put: pp of cut per unit of intermeeting log fall. 10 cuts a
     # point on a 10 per cent fall, over three times Cieslak and
     # Vissing-Jorgensen's 30bp.
@@ -612,6 +717,113 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # applied both sides, and 2.0 is twice it.
     "oil_inventory_reversion": (0.0, 0.01),
     "oil_inflation_passthrough": (0.0, 2.0),
+    "oil_mean_reversion": (0.0, 0.03),
+    "oil_noise_sd": (0.0, 3.0),
+    "oil_inventory_level_gain": (0.0, 100.0),
+    # The convenience premium's elasticity to inventory: 4 is the grid's
+    # steepest, a target 16 times higher at the floor of 25. Refused where
+    # the draw puts oil_inventory_reversion at 0.
+    "oil_convenience_yield": (0.0, 4.0),
+    # Oil's long factor: double EIA's 0.018 a session at the top. The pull
+    # is a share a session; 0.002 is a half-life of a year and a half.
+    "oil_target_drift_sd": (0.0, 0.036),
+    "oil_target_drift_reversion": (0.0, 0.002),
+    # A switch, and the short factor's log sd: EIA's 0.017 a session, double
+    # it at the top.
+    "oil_pushes_in_target": (0.0, 1.0),
+    "oil_noise_log_sd": (0.0, 0.034),
+    # The oil curve's elasticity to the dollar as a level: EIA against FRED
+    # gives 0.69 (daily) to 2.3 (broad dollar, 2006 on); 2.4 at the top.
+    "oil_dollar_elasticity": (0.0, 2.4),
+    # Inventory's daily noise: 0.35 matches EIA's deviation sd; the shipped
+    # 0.5 at the top. The forecast's clamp is a switch.
+    "oil_inventory_noise_sd": (0.0, 0.5),
+    # The dollar's reversion: DTWEXM's AR(1) half-life of 729 sessions is
+    # 0.00095; the shipped 0.02 at the top. Its noise: DTWEXM's 0.43 a
+    # session at 100, double it at the top.
+    "usd_mean_reversion": (0.0, 0.02),
+    "usd_noise_sd": (0.0, 0.86),
+    "usd_safe_haven_gain": (0.0, 0.1),
+    # Oil's bounds: WTI deflated by CPIAUCSL, 1987 to 2024, at the model's
+    # centre of 81 gives 16.4 and 279; the standing 35 and 150 inside. 0.0
+    # is the standing value on both, and every box contains the base
+    # preset's 0.0, as the floor's already did.
+    "oil_price_floor": (0.0, 35.0),
+    "oil_price_ceiling": (0.0, 300.0),
+    "oil_forecast_clamp": (0.0, 1.0),
+    "oil_forecast_opec_spread": (0.0, 1.0),
+    "oil_forecast_cycle_growth": (0.0, 1.0),
+    # Switches: the bank's and the curve's inflation, headline or core.
+    "fed_core_inflation": (0.0, 1.0),
+    "treasury_core_inflation": (0.0, 1.0),
+    # The zero bound's pieces: off at the bottom, about twice the solved
+    # values (design PR #9, zlb/SOLVE.md) at the top.
+    "treasury_zlb_path": (0.0, 2.0),
+    "treasury_zlb_haven_gain": (0.0, 0.1),
+    # The Taylor rule's neutral real rate: off at the bottom, HLW's 1990-2025
+    # high (3.9) at the top.
+    "fed_neutral_real_rate": (0.0, 4.0),
+    # Core inflation's trend: off to twice the CPILFESL fit's sd; persistence
+    # off to 0.998.
+    "core_trend_sd": (0.0, 0.34),
+    # The expansion's inflation and rate hazards: off (the legacy 0.1) to
+    # the legacy value itself.
+    "cycle_inflation_hazard": (0.0, 0.1),
+    # Two switches.
+    "fed_eve_decision": (0.0, 1.0),
+    "policy_guidance_signal_sd": (0.0, 100.0),
+    "treasury_path_owed_excluded": (0.0, 1.0),
+    # Credit's repricing lag, sessions.
+    "corporate_spread_equity_lag": (0.0, 21.0),
+    "corporate_spread_equity_lag_gain": (0.0, 2.0),
+    # The market's next-session reversal: off to twice the S&P's lag-1 autocorrelation.
+    "market_factor_reversal": (0.0, 0.16),
+    "market_factor_reversal_vix_power": (0.0, 2.0),
+    "market_factor_reversal_transient": (0.0, 1.0),
+    # The share of company news released before the open.
+    "news_preopen_share": (0.0, 1.0),
+    # The share of session news released on the measured in-session profile.
+    "news_session_release_share": (0.0, 1.0),
+    # The share of the close's re-mark's growth the next open prices.
+    "remark_growth_open_share": (0.0, 1.0),
+    # The 10-year's repricing lag, sessions, and its term, points per unit gap.
+    "treasury_equity_lag": (0.0, 63.0),
+    "treasury_equity_lag_gain": (0.0, 4.0),
+    # Credit's own state: off to twice addendum L's sd; half-life off to a year.
+    "corporate_spread_noise_sd": (0.0, 0.05),
+    # Every pin sets the variance: a switch.
+    "pinned_vix_sets_variance": (0.0, 1.0),
+    "pinned_vix_return": (0.0, 0.05),
+    "corporate_spread_noise_half_life": (0.0, 252.0),
+    # The 10-year's own term premium: off to twice the measured sd; half-life
+    # off to a year.
+    "treasury_term_premium_sd": (0.0, 0.12),
+    "treasury_term_premium_half_life": (0.0, 252.0),
+    # The time-held fade: the onset a quantile of the model's own sojourn;
+    # the fade a share; its half-lives off to two years.
+    "market_vol_cycle_hold_onset": (0.0, 0.99),
+    "fair_value_aggregate_jensen": (0.0, 1.0),
+    "fair_value_aggregate_half_life": (0.0, 5040.0),
+    "fair_value_aggregate_remark": (0.0, 1.0),
+    "fair_value_aggregate_expected": (0.0, 1.0),
+    "earnings_lookthrough_half_life": (0.0, 2520.0),
+    "earnings_lookthrough_gain": (0.0, 1.0),
+    "earnings_lookthrough_discount_half_life": (0.0, 25200.0),
+    "market_vol_cycle_hold_fade": (0.0, 1.0),
+    "market_vol_cycle_hold_half_life": (0.0, 504.0),
+    "market_vol_vix_hold_half_life": (0.0, 504.0),
+    "cycle_rate_hazard": (0.0, 0.1),
+    "core_trend_persistence": (0.0, 0.998),
+    # The 2-year's carry through a meeting: a share, so its own bounds.
+    "treasury_2y_meeting_carry": (0.0, 1.0),
+    "treasury_2y_expected_path": (0.0, 1.0),
+    "flight_to_quality_reversal_cut": (0.0, 1.0),
+    # The priced meeting's half-life: off at the bottom, a quarter at the top.
+    "policy_anticipation_half_life": (0.0, 63.0),
+    # A switch.
+    "treasury_path_anticipated": (0.0, 1.0),
+    # A share.
+    "policy_anticipation_guidance": (0.0, 1.0),
     # The share of oil demand supply answers on the daily step. Bounded by
     # meaning again: 0.0 is the hardcoded zero the reference writes, 1.0 is
     # the value that makes the inventory random walk driftless, and past 1.0
@@ -946,6 +1158,10 @@ EXPLICIT_RANGES: dict[str, tuple[float, float]] = {
     "dividend_yield_ceiling": (1.0, 4.0),
     "dividend_growth_cutoff": (0.1, 1.0),
     "dividend_adjustment_speed": (0.1, 1.0),
+    # The policy rate the forecast's path reverts toward, read only with
+    # `forecast_policy_reversion` set: per cent, about the range the model's
+    # policy rate spends its time in.
+    "forecast_policy_neutral": (0.0, 5.0),
     # The stop and squeeze ladders' scale: 1.0 on every preset through
     # pt-v19, 0.1 on pt-v20 (measured against the daily Lo-MacKinlay book).
     # The whole unit range, off to full.

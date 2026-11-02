@@ -60,7 +60,8 @@ def path(seed, days, **dials):
 
 # pt-v21, the default from 0.10.0, sets Okun's law and both oil switches;
 # the test after this one holds its values.
-@pytest.mark.parametrize("preset", [p for p in tf.preset_names() if p != "pt-v21"])
+# pt-v22 ships its arm's values, which tests/test_validation.py holds.
+@pytest.mark.parametrize("preset", [p for p in tf.preset_names() if p not in ("pt-v21", "pt-v22")])
 def test_off_on_every_shipped_preset_and_silent_in_its_digest(preset):
     params = tf.ModelParams.from_preset(preset)
     values = params.to_dict()

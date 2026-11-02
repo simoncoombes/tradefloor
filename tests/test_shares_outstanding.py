@@ -117,3 +117,15 @@ def test_a_count_write_is_logged_and_replayed():
                          model=tf.ModelParams.from_preset("pt-v21"))
     assert _floats(replayed.prices()) == _floats(e.prices())
     assert replayed.shares_outstanding() == e.shares_outstanding()
+
+
+def test_the_listed_index_keeps_its_level_across_a_write():
+    e = _engine(index_level_listed=1.0)
+    e.run_days(2, record=False)
+    e.open_market()
+    e.run_session(9, 30, 3, 10)
+    before = e.index_level
+    e.set_shares_outstanding(_moved(e))
+    after = e.index_level
+    assert after["level"] == pytest.approx(before["level"], rel=1e-12)
+    assert after["divisor"] != before["divisor"]

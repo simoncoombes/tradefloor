@@ -1,0 +1,4 @@
+  sim      3a063f0d207bc37b  expected 3a063f0d207bc37b  ok
+  presets  abdfc2bc7a60b74f  expected abdfc2bc7a60b74f  ok
+  pt-v20   07ab6e0c1cea8fe4  expected 07ab6e0c1cea8fe4  ok
+PH2 PASS: pre-history off leaves the digests unchanged

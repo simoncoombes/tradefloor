@@ -126,7 +126,7 @@ from ._arith import ordered_sum
 from ._core import (Engine, Instrument, Macro, ModelParams, OrderError,
                     ValidationError)
 from .harness import History, Observation, _warm_up, session_clock
-from .portfolio import Cancel, Limit, Portfolio, check_order, order_items
+from .portfolio import Cancel, Exercise, Limit, Portfolio, check_order, order_items
 from .sandbox import (HiddenState, MarketView, PortfolioView, TamperGuard,
                       declares_hidden_state)
 from .universe_util import as_universe, fingerprint_of
@@ -538,6 +538,14 @@ def analyse(
                     # Not an order, so not an execution: skipped like a
                     # refused one.
                     continue
+                if isinstance(quantity, Exercise):
+                    raise ValidationError(
+                        f"step {step}: the agent sent {quantity!r} for "
+                        f"{ticker!r}, and analyse() prices market orders "
+                        "only. An exercise delivers shares at the close, "
+                        "which no execution in the untraded world prices. "
+                        "Run the agent in tradefloor.evaluate or "
+                        "tradefloor.World.")
                 if isinstance(quantity, Limit):
                     raise ValidationError(
                         f"step {step}: the agent sent {quantity!r} for "

@@ -291,6 +291,15 @@ PERTURBATIONS = [
     # LIVE with the memory on (its companions): counting a day in its own
     # sd moves the memory on every session drawn off the baseline.
     ("market_vol_leverage_standardise", 1.0, True),
+    # The fast return memory's gain, read with its half-life as the
+    # companion (refused without one). LIVE: the first close moves the
+    # memory and the next session draws at the multiplied variance.
+    ("market_vol_leverage_fast", 1.0, True),
+    # INERT: unread at `market_vol_leverage_fast` 0.0, the default's value.
+    ("market_vol_leverage_fast_half_life", 5.0, False),
+    # LIVE with the fast memory on (its companions): counting rises only
+    # moves the memory differently on every down day.
+    ("market_vol_leverage_fast_up", 1.0, True),
     # The roster's beta normalised at construction (tails). Ships at 0.0, so
     # the perturbation is TO a roster whose cap-weighted beta is one; LIVE
     # from the first tick, which loads every name on the market factor by
@@ -937,6 +946,103 @@ PERTURBATIONS = [
     ("unemployment_natural_rate", 4.5, True),
     ("oil_inventory_reversion", 0.002, True),
     ("oil_inflation_passthrough", 1.0, True),
+    # The oil law's reversion, noise and inventory level effect (pt-v22, the
+    # oil law), each a branch at 0.0 on every preset. LIVE: each moves the
+    # oil price the burn-in's inflation and the bank read.
+    ("oil_mean_reversion", 0.0035, True),
+    ("oil_noise_sd", 1.4, True),
+    ("oil_inventory_level_gain", 30.0, True),
+    # The convenience premium on oil's target (pt-v22, the oil law's
+    # storage), LIVE: it moves the oil price the burn-in's inflation reads.
+    ("oil_convenience_yield", 2.0, True),
+    # Oil's long factor and its pull (Schwartz and Smith 2000), LIVE: the
+    # random walk moves the oil price the burn-in's inflation reads.
+    ("oil_target_drift_sd", 0.018, True),
+    ("oil_target_drift_reversion", 0.001, True),
+    # The pushes at their shipped long-run response, and the noise as a
+    # share of the price, LIVE: each moves the oil price.
+    # INERT on the probe by construction: at the standing reversion (0.03,
+    # oil_mean_reversion 0.0) the split's two parts recombine to the shipped
+    # step, so the switch moves the price only beside a slower reversion.
+    ("oil_pushes_in_target", 1.0, False),
+    ("oil_noise_log_sd", 0.017, True),
+    # The dollar as a level the oil curve carries, LIVE.
+    ("oil_dollar_elasticity", 1.2, True),
+    # Oil inventory's noise anchored to EIA's stocks, LIVE: it moves the
+    # inventory the oil price reads.
+    ("oil_inventory_noise_sd", 0.35, True),
+    # The dollar's measured persistence and noise (FRED DTWEXM), LIVE: the
+    # dollar reaches oil's drag, and through it inflation and the bank.
+    ("usd_mean_reversion", 0.00095, True),
+    ("usd_noise_sd", 0.43, True),
+    # The dollar's crisis drift at FRED DTWEXM's measured 0.001. INERT on the
+    # probe: its VIX closes at 19.7, 19.3 and 21.6, under the 25.5 threshold
+    # (`usd_crisis_vix_threshold`), so the bid never fires; a gain of 0.5
+    # moves nothing either. It acts only in a crisis. Measured 2026-10-10.
+    ("usd_safe_haven_gain", 0.001, False),
+    # Core inflation for the bank (headline less the oil pass-through's
+    # part), LIVE with its companion pass-through: the probe's oil sits at 98,
+    # off the anchor, so the meeting reads a lower inflation and the prices
+    # move. Without the companion the shipped three-way branch pays nothing
+    # in the 50 to 80 band the probe's burn-in mostly holds.
+    ("fed_core_inflation", 1.0, True),
+    # Core inflation for the curve, INERT on the probe's market columns: its
+    # headline closes at 1.1, under the term premium's 2, the flight to
+    # quality's 3 and the haven's 4, so no gate the three sessions read
+    # changes; the 10-year differs from the burn-in's months above 2 by
+    # 1e-17 and no price reads that. Measured 2026-10-11.
+    ("treasury_core_inflation", 1.0, False),
+    # The zero bound's pieces, LIVE: the probe's funds rate closes at 0.0 and
+    # its VIX at 21.6, so the unmet put (with its companion put and path) and
+    # the zero bound's compression both move the 10-year and the prices.
+    # Measured 2026-10-11.
+    ("treasury_zlb_path", 1.0, True),
+    ("treasury_zlb_haven_gain", 0.05, True),
+    # The Taylor rule's neutral real rate: the probe's meetings read the rule.
+    ("fed_neutral_real_rate", 2.0, True),
+    # Core inflation's trend: its opening draw moves the month-start step.
+    ("core_trend_sd", 0.17, True),
+    # The persistence alone is read by nothing (the sd is 0).
+    ("core_trend_persistence", 0.993, False),
+    # The expansion's inflation and rate hazards. INERT on the probe
+    # (measured 2026-10-11): the dials only replace the legacy 0.1 where an
+    # expansion has inflation above 4 or the funds rate above 5, and the
+    # probe's path never does.
+    ("cycle_inflation_hazard", 0.0219, False),
+    ("cycle_rate_hazard", 0.0013, False),
+    # The eve's decision: the probe's meetings deliver the eve's silent
+    # shadow instead of re-reading the day, which moves its rate path.
+    ("fed_eve_decision", 1.0, True),
+    # INERT: the guidance's signal moves only the forecast the contracts
+    # read, and no stock price reads the forecast.
+    ("policy_guidance_signal_sd", 5.0, False),
+    # The owed step left out. INERT on the probe: read only with
+    # treasury_path_anticipated, which pt-v20 leaves off.
+    ("treasury_path_owed_excluded", 1.0, False),
+    # The 2-year's carry through a meeting. INERT on the probe's market: the
+    # burn-in's meetings move the 2-year (pt-v20's own 2-year noise leaves it
+    # a gap to keep: 0.15% against 0.23% after the third close, measured
+    # 2026-10-11), but no column this table reads takes the 2-year.
+    ("treasury_2y_meeting_carry", 1.0, False),
+    # The 2-year's expected path. INERT on the probe's market: it moves only
+    # the 2-year's target, and no column this table reads takes the 2-year.
+    ("treasury_2y_expected_path", 1.0, False),
+    # The reversed flight to quality's cut. INERT on the probe: pt-v20's curve
+    # reads headline, which the probe's path keeps under 4.
+    ("flight_to_quality_reversal_cut", 0.5, False),
+    # The priced meeting's half-life. INERT on the probe: pt-v20 has
+    # policy_anticipation off, so no change is priced to smooth.
+    ("policy_anticipation_half_life", 10.0, False),
+    # The anticipated path. INERT on the probe: pt-v20 has
+    # treasury_path_pricing off, so there is no path to move.
+    ("treasury_path_anticipated", 1.0, False),
+    # The Fed's guidance. INERT on the probe: pt-v20 has
+    # policy_anticipation off, so no shadow is priced.
+    ("policy_anticipation_guidance", 0.5, False),
+    # Oil's bounds from WTI in real terms. INERT on the probe: its burn-in's
+    # oil stays inside 35 to 150, so moving the bounds outward moves nothing.
+    ("oil_price_floor", 16.4, False),
+    ("oil_price_ceiling", 279.0, False),
     # INERT by construction: nothing a price reads is downstream of the
     # index (tests/test_fear_greed_published.py). RE-VALUED 2026-09-26: 1.0
     # is pt-v20's own value since its graded arm, so the row perturbs back
@@ -1144,6 +1250,130 @@ PERTURBATIONS = [
     # engine holding rate indices and only ever moves their prints. Carries
     # the close's re-mark as its companion, which it requires.
     ("rate_intraday_live", 1.0, False),
+    # What derivatives read (pt-v22 phase 1). INERT by construction: the
+    # index, the live VIX and the forecast read the state and write only
+    # their own fields, so no price moves (tests/test_derivative_foundations.py).
+    ("index_level_listed", 1.0, False),
+    ("vix_intraday_live", 1.0, False),
+    ("forecast_horizon_sessions", 21.0, False),
+    # The forecast's clamped oil (`oil_forecast_clamp`): INERT for the same
+    # reason, it changes only what the forecast publishes.
+    ("oil_forecast_clamp", 1.0, False),
+    # The spread the forecast's expected OPEC decision reads: INERT for the
+    # same reason.
+    ("oil_forecast_opec_spread", 1.0, False),
+    # The growth oil's forecast reads: INERT for the same reason.
+    ("oil_forecast_cycle_growth", 1.0, False),
+    # The forecast's derived dials: INERT for the same reason, and read only
+    # with the horizon set.
+    ("forecast_vix_dispersion", 0.3, False),
+    ("forecast_vix_dispersion_half_life", 21.0, False),
+    ("forecast_vix_dispersion_skew", 0.8, False),
+    # The slow level's nowcast: INERT for the same reason (it changes only
+    # what the forecast publishes); its companions set the level and the
+    # horizon it needs.
+    ("forecast_vix_level_nowcast", 0.4, False),
+    ("forecast_vix_level_nowcast_half_life", 126.0, False),
+    ("forecast_vix_level_nowcast_centre", 2.9, False),
+    ("forecast_policy_shadow_discount", 0.25, False),
+    ("forecast_policy_persistence", 0.5, False),
+    ("forecast_policy_reversion", 0.1, False),
+    ("forecast_policy_neutral", 1.7, False),
+    # The index futures and their night session (pt-v22 phase 1). INERT by
+    # construction: a future reads the index, the dividends and the forecast
+    # and draws only on its own stream, so no stock price moves
+    # (tests/test_index_futures.py). Each carries the switch it requires as
+    # its companion; the basis dials are read only with the futures listed.
+    ("futures_index_listed", 1.0, False),
+    ("basis_sd", 3.7, False),
+    ("basis_persistence", 0.42, False),
+    # The basis's night share: the futures' own noise, no price moves.
+    ("basis_night_share", 0.76, False),
+    ("night_session_steps", 10.0, False),
+    # The index futures' metaorder memory (pt-v22). INERT untraded: it reads
+    # only agents' futures flow, so with no agent trading a contract every
+    # price, the basis and the state are the run without it.
+    ("futures_impact_memory", 0.65, False),
+    # Its half-life: INERT untraded for the same reason.
+    ("futures_impact_memory_half_life", 780.0, False),
+    # The VIX futures (pt-v22 phase 1). INERT by construction: a VIX future
+    # reads the published and live VIX and the forecast, draws nothing and
+    # writes only its own state, so no stock price or VIX moves
+    # (tests/test_vix_futures.py). The switch carries the forecast's horizon
+    # it requires; the loading's dials, the switch.
+    ("futures_vix_listed", 1.0, False),
+    ("futures_vix_live_fast_share", 0.27, False),
+    ("futures_vix_live_fast_half_life", 1.3, False),
+    ("futures_vix_live_slow_half_life", 28.6, False),
+    # INERT: the premium's slope moves only the VIX futures' own marks.
+    ("futures_vix_premium_response", 1.0, False),
+    # The rate futures (pt-v22 phase 1). INERT by construction: a rate future
+    # reads the policy rate each close sets and the forecast, draws nothing
+    # and writes only its own state (tests/test_rate_futures.py).
+    ("futures_rates_listed", 1.0, False),
+    # INERT: the rate futures' premium moves only their prices, which no
+    # stock price reads.
+    ("rate_premium_per_fixing", 1.0, False),
+    # The oil futures (pt-v22 phase 1). INERT by construction: an oil future
+    # reads the oil price and the forecast, draws nothing and writes only its
+    # own state (tests/test_oil_futures.py).
+    ("futures_oil_listed", 1.0, False),
+    # The contracts' margin (pt-v22 phase 1). INERT by construction: it reads
+    # the marks and writes only its own state (tests/test_margin.py). The
+    # tail allowance carries the coverage it requires.
+    ("margin_scan_coverage", 0.99, False),
+    ("margin_scan_tail", 1.3, False),
+    ("margin_scan_option_tail", 0.8, False),
+    # INERT: the portfolio-margin minimum floors the option margin, which
+    # reads quotes and writes nothing; the pre-trade check is read by accounts.
+    ("margin_option_minimum", 0.375, False),
+    ("margin_option_scan_range", 0.15, False),
+    ("margin_pretrade_check", 1.0, False),
+    ("margin_liquidation_worked", 1.0, False),
+    ("margin_deficit_liquidates", 1.0, False),
+    # The index options, their surface and their dealer (pt-v22 phase 2).
+    # INERT by construction: the surface and the options read public state,
+    # draw nothing and write only their own state, so no stock price moves
+    # (tests/test_index_options.py). Each carries what it requires as its
+    # companion.
+    ("surface_ssvi", 1.0, False),
+    ("surface_skew_physical", -0.8, False),
+    ("surface_skew_physical_slope", 0.3, False),
+    ("surface_skew_premium", -1.0, False),
+    ("surface_skew_premium_slope", 0.5, False),
+    ("surface_skew_noise_sd", 1.0, False),
+    ("surface_skew_noise_half_life", 100.0, False),
+    ("surface_curvature", 1.0, False),
+    ("surface_index_curvature", 0.8, False),
+    ("surface_index_vertex", 0.5, False),
+    ("surface_index_tenor_exponent", 0.4, False),
+    ("surface_index_tenor_strip", 1.0, False),
+    ("surface_curvature_exponent", 0.5, False),
+    ("surface_term_premium_short", -0.03, False),
+    ("surface_term_premium_long", 0.1, False),
+    ("surface_earnings_weight", 1.0, False),
+    ("options_index_listed", 1.0, False),
+    ("option_dealer_spread", 0.004, False),
+    ("options_index_forward_from_future", 1.0, False),
+    ("options_names_listed", 1.0, False),
+    ("surface_name_premium", 0.1, False),
+    ("surface_name_skew", 0.5, False),
+    ("option_position_limit", 1.0, False),
+    ("option_name_inventory_slope", 0.0002, False),
+    ("option_name_inventory_half_life", 10.0, False),
+    ("option_name_spread_otm", 1.4, False),
+    ("option_name_spread_itm", 0.7, False),
+    ("option_name_spread_tenor_exponent", -0.2, False),
+    ("surface_name_earnings_premium", 1.2, False),
+    ("surface_name_term_slope", 0.1, False),
+    # The VIX's fear memory (pt-v22 phase 1). LIVE: the first close's VIX
+    # sits off its target, the memory takes up a share of the gap, and the
+    # target the step reverts to moves, which the factor's VIX-coupled
+    # variance carries into prices. Carries its half-life as the companion,
+    # without which it is refused.
+    ("vix_fear_uptake", 0.2, True),
+    # INERT: read only with vix_fear_uptake non-zero.
+    ("vix_fear_half_life", 20.0, False),
     # LIVE with the companion start of 15: at pt-v20's 30 no meeting in the
     # probe's burn-in or its three sessions reads a VIX of 30 (measured: the
     # row at 0.25 alone is inert), and at 15 the first meeting cuts a
@@ -1225,6 +1455,30 @@ PERTURBATIONS = [
     ("market_vol_cycle_recovery_release", 1.0, False),
     # INERT: read only with the release above set.
     ("market_vol_cycle_recovery_scale", 0.1, False),
+    # INERT on this probe: the time-held fade's clock counts the phase's
+    # closes and moves no price, and both of its fades act only past a
+    # contraction's or trough's onset (158 and 111 sessions on the US
+    # table), which three calm sessions never reach.
+    ("market_vol_cycle_hold_onset", 0.9, False),
+    # The aggregate earnings level's step: a common shift of every name's
+    # fair-value level at the close.
+    ("fair_value_aggregate_jensen", 1.0, True),
+    ("fair_value_aggregate_half_life", 1959.0, True),
+    # INERT: read only with an aggregate dial set, which the probe is not.
+    ("fair_value_aggregate_remark", 1.0, False),
+    # INERT: read only with fair_value_aggregate_jensen set, which the probe is not.
+    ("fair_value_aggregate_expected", 1.0, False),
+    # INERT: the look-through reads only a `market.earnings` write, which the
+    # probe never makes; its companions are read only with it set.
+    ("earnings_lookthrough_half_life", 598.0, False),
+    ("earnings_lookthrough_gain", 0.1605, False),
+    ("earnings_lookthrough_discount_half_life", 5267.0, False),
+    # INERT: past the onset only (its companion), which the probe never is.
+    ("market_vol_cycle_hold_fade", 0.335, False),
+    # INERT: read only with the fade set.
+    ("market_vol_cycle_hold_half_life", 295.0, False),
+    # INERT: past the onset only (its companion), which the probe never is.
+    ("market_vol_vix_hold_half_life", 198.0, False),
     # INERT on every column this probe reads, at any value: the premium
     # scales the PUBLISHED VIX only (`Engine::published_vix`) and nothing
     # inside the engine reads the quote, and on this probe's three calm days
@@ -1236,6 +1490,10 @@ PERTURBATIONS = [
     ("vix_stress_premium_knee", 0.5, False),
     # INERT: read only with vix_stress_premium non-zero.
     ("vix_stress_premium_cap", 0.25, False),
+    # INERT: read only with vix_stress_premium non-zero.
+    ("vix_stress_premium_memory", 0.0556, False),
+    # INERT: read only with vix_stress_premium non-zero.
+    ("vix_stress_premium_undo", 1.0, False),
     # INERT on this probe, measured: the put reads the index's fall since
     # the last meeting, and the burn-in's prices do not move, the probe's
     # three sessions hold no meeting, and no burn-in meeting is at a VIX of
@@ -1286,6 +1544,51 @@ PERTURBATIONS = [
     ("corporate_spread_equity_gain", 1.5, True),
     # INERT: read only with corporate_spread_equity_gain non-zero.
     ("corporate_spread_equity_half_life", 126.0, False),
+    # INERT: credit's repricing lag is read only with
+    # corporate_spread_equity_gain non-zero, which pt-v20 leaves off.
+    ("corporate_spread_equity_lag", 5.0, False),
+    # INERT: the lagged term is read only with corporate_spread_equity_gain
+    # non-zero, which pt-v20 leaves off (and it is refused without the lag).
+    ("corporate_spread_equity_lag_gain", 0.9, False),
+    # The market's next-session reversal moves every name on every open tick
+    # after the first.
+    ("market_factor_reversal", 0.08, True),
+    # INERT: the VIX's power is read only with the reversal set, which pt-v20
+    # leaves off.
+    ("market_factor_reversal_vix_power", 2.0, False),
+    # INERT: the reversal's transient share is read only with the reversal
+    # set, which pt-v20 leaves off.
+    ("market_factor_reversal_transient", 1.0, False),
+    # INERT: the pre-open news is read only under a night split, which
+    # pt-v20 leaves off (and it is refused without one).
+    ("news_preopen_share", 0.259, False),
+    # INERT here: it moves only when an event is drawn, and the probe's news
+    # uniforms deliver none (as for the absorption profile above).
+    # test_news_session_release.py moves it on days that have news.
+    ("news_session_release_share", 1.0, False),
+    # The close's re-mark (pt-v20 sets macro_publication_repricing) leaves
+    # its growth to the opening print the companion's night split prices.
+    ("remark_growth_open_share", 0.707, True),
+    # INERT: the 10-year's priced gap needs its gain, and the term reads the
+    # leverage gap, which pt-v20 does not carry.
+    ("treasury_equity_lag", 21.0, False),
+    # INERT: read only with the leverage gap carried, which pt-v20 leaves off
+    # (and it is refused without the lag).
+    ("treasury_equity_lag_gain", 2.0, False),
+    # Credit's own state: its opening draw moves the meeting's corporate
+    # re-anchor, and with it the discount rate.
+    ("corporate_spread_noise_sd", 0.025, True),
+    # INERT: read only by a VIX pin; the probe pins nothing.
+    ("pinned_vix_sets_variance", 1.0, False),
+    # INERT: read only by a VIX pin; the probe pins nothing.
+    ("pinned_vix_return", 0.005375, False),
+    # INERT: the half-life alone is read by nothing (the sd is 0).
+    ("corporate_spread_noise_half_life", 16.0, False),
+    # The 10-year's own term premium: its opening draw moves the 10-year's
+    # anchor, and with it the meeting's corporate re-anchor.
+    ("treasury_term_premium_sd", 0.06, True),
+    # INERT: the half-life alone is read by nothing (the sd is 0).
+    ("treasury_term_premium_half_life", 49.0, False),
     # The market's fall in the cycle's hazard (sim/r17-b12). Carries its
     # half-life as a companion, without which it is refused. INERT on this
     # probe: the ladder reads the gap only in an expansion or at a peak past
@@ -1808,6 +2111,11 @@ ECONOMY_STREAM_MOVERS = frozenset({
     # burn-in lives through, and with them which state-dependent macro
     # sites fire there, as `cycle_stationary_opening` does.
     "cycle_equity_hazard_opening",
+    # Core inflation's trend: its draws are on its own key (stream positions
+    # identical at a negligible sd, tests/test_core_trend_process.py), but
+    # its opening moves headline through the burn-in, and with it which
+    # state-dependent macro sites fire, as the cycle openings above do.
+    "core_trend_sd",
     # The return-driven arrival rate takes the same arrival draw as
     # `vix_jump_intensity` on every session it is non-zero, for the same
     # reason: the draw IS the mechanism.
@@ -1861,6 +2169,30 @@ ECONOMY_STREAM_MOVERS = frozenset({
     # follow the path the two dials move. Both were here at 0.8.0 and left
     # with pt-v20's first composition.
     "oil_supply_response", "oil_opec_symmetry",
+    # The oil law (pt-v22, 2026-10-09), measured on this probe: the reversion
+    # at 0.0035 and the inventory level effect at 30 each move the economy
+    # stream and not the market stream. Each moves the burn-in's oil price,
+    # and the OPEC decision's conditional draws (economy/daily.rs: 0 on an
+    # ordinary day, 1 to 3 on a decision day by the price band) follow the
+    # band the price is in. The noise's scale at 1.4 moves no draw count.
+    "oil_mean_reversion", "oil_inventory_level_gain",
+    # The convenience premium (2026-10-09), measured on this probe at 2.0:
+    # it moves the burn-in's oil price through its target, and the OPEC
+    # decision's conditional draws follow the band, as the two above.
+    "oil_convenience_yield",
+    # Oil's long factor (2026-10-09): its draws are keyed and take nothing
+    # from the economy stream, but the price it moves sets the OPEC
+    # decision's band, and that decision's conditional draws follow. Its
+    # pull at 0.001, beside the factor at 0.018, keeps the probe's burn-in
+    # in the same OPEC bands, so it is not here.
+    "oil_target_drift_sd",
+    # The dollar as a level and inventory's noise (2026-10-09), measured on
+    # this probe: each moves the burn-in's oil price across OPEC's bands.
+    "oil_dollar_elasticity", "oil_inventory_noise_sd",
+    # The dollar's measured persistence moves the burn-in's dollar, which
+    # the oil drag reads, so OPEC's decisions follow the price band too.
+    # Its noise at 0.43 keeps the probe's burn-in in the same bands.
+    "usd_mean_reversion",
     # The risk-management cut (r13 macro-clock, 2026-09-26), measured on
     # this probe: `fed_growth_cut` 2.0 moves the economy stream by +34 draws
     # (9172 to 9206), the market stream by 0. It acts on the 755-day
@@ -1948,12 +2280,118 @@ def test_the_perturbation_table_covers_the_whole_settable_surface():
 #: carrying the same companions, none of the three moved. The companions
 #: are the default's 0.375 now, and the three rows are re-valued.
 COMPANIONS: dict[str, dict[str, float]] = {
+    # The eve holds a decision only under fed_eve_decision, and the signal
+    # carries the own reading's share under policy_anticipation_guidance.
+    "policy_guidance_signal_sd": {"fed_eve_decision": 1.0, "policy_anticipation_guidance": 1.0},
+    # Core differs from headline only where oil pays inflation, which the
+    # symmetric pass-through does either side of 81 (the shipped branch pays
+    # nothing between 50 and 80).
+    "fed_core_inflation": {"oil_inflation_passthrough": 1.0},
+    "core_trend_sd": {"core_trend_persistence": 0.993},
+    "corporate_spread_noise_sd": {"corporate_spread_noise_half_life": 16.0},
+    "treasury_term_premium_sd": {"treasury_term_premium_half_life": 49.0},
+    # Both fades act past the onset and are refused without it.
+    "market_vol_cycle_hold_fade": {"market_vol_cycle_hold_onset": 0.9},
+    "market_vol_vix_hold_half_life": {"market_vol_cycle_hold_onset": 0.9},
+    "treasury_core_inflation": {"oil_inflation_passthrough": 1.0},
+    # The unmet put needs the put and the priced path it decays like.
+    "treasury_zlb_path": {"fed_put_gain": 3.0, "fed_put_half_life": 126.0, "treasury_put_pricing": 1.0,
+                          "treasury_path_pricing": 1.0, "treasury_path_half_life": 63.0},
     # The knee pulls at its half-life, and the pair is refused without it.
     "fair_value_relative_knee": {"fair_value_relative_half_life": 252.0},
     # The valuation is carried from the prehistory, and refused without one.
     "market_prehistory_valuation": {"market_prehistory_sessions": 21.0},
     # The live mark requires the close's re-mark (`ModelParams::invariants`).
     "rate_intraday_live": {"rate_close_remark": 1.0},
+    # An index future settles on the price index, and the night walks the
+    # futures: each is refused without the switch it reads.
+    "futures_index_listed": {"index_level_listed": 1.0},
+    "night_session_steps": {"index_level_listed": 1.0, "futures_index_listed": 1.0},
+    "futures_impact_memory": {"index_level_listed": 1.0, "futures_index_listed": 1.0},
+    "futures_impact_memory_half_life": {"index_level_listed": 1.0, "futures_index_listed": 1.0,
+                                        "futures_impact_memory": 0.65},
+    "basis_night_share": {"index_level_listed": 1.0, "futures_index_listed": 1.0, "night_session_steps": 10.0},
+    # A VIX future is priced on the forecast, out to its sixth contract's
+    # 126 sessions; the loading's dials are refused without the switch.
+    "futures_vix_listed": {"forecast_horizon_sessions": 126.0},
+    # The tail allowance scales the margin, which the coverage sets.
+    "margin_scan_tail": {"margin_scan_coverage": 0.99},
+    "margin_scan_option_tail": {"margin_scan_coverage": 0.99},
+    "margin_option_minimum": {"margin_scan_coverage": 0.99},
+    "margin_option_scan_range": {"margin_scan_coverage": 0.99},
+    "margin_pretrade_check": {"margin_scan_coverage": 0.99},
+    "margin_liquidation_worked": {"margin_scan_coverage": 0.99},
+    "margin_deficit_liquidates": {"margin_scan_coverage": 0.99},
+    # The premium per fixing prices the rate futures, listed by their switch.
+    "rate_premium_per_fixing": {"futures_rates_listed": 1.0, "index_level_listed": 1.0,
+                                "forecast_horizon_sessions": 252.0},
+    # Credit's lagged term reads the priced gap, which the lag steps.
+    "corporate_spread_equity_lag_gain": {"corporate_spread_equity_lag": 5.0},
+    # The open prices the pre-open news only under a night split.
+    "news_preopen_share": {"overnight_idio_share": 0.1},
+    # The opening print prices the held-back growth only under a night split.
+    "remark_growth_open_share": {"overnight_idio_share": 0.1},
+    # The 10-year's lagged term reads the priced gap, which the lag steps.
+    "treasury_equity_lag_gain": {"treasury_equity_lag": 21.0},
+    # The convenience premium unwinds as inventory refills, which only the
+    # inventory's reversion gives it; refused without it.
+    "oil_convenience_yield": {"oil_inventory_reversion": 0.002},
+    # The pull acts on the long factor, and is refused without it.
+    "oil_target_drift_reversion": {"oil_target_drift_sd": 0.018},
+    # The surface is on the price index; its companions are refused without
+    # it, the earnings term without the forecast; the options and the
+    # dealer's spread needs the options, and they the surface.
+    "surface_ssvi": {"index_level_listed": 1.0},
+    **{name: {"index_level_listed": 1.0, "surface_ssvi": 1.0}
+       for name in ("surface_skew_physical", "surface_skew_physical_slope", "surface_skew_premium",
+                    "surface_skew_premium_slope",
+                    "surface_curvature", "surface_index_curvature", "surface_index_vertex",
+                    "surface_index_tenor_exponent", "surface_index_tenor_strip", "surface_curvature_exponent",
+                    "surface_term_premium_short",
+                    "surface_term_premium_long")},
+    "surface_earnings_weight": {"index_level_listed": 1.0, "surface_ssvi": 1.0,
+                                "forecast_horizon_sessions": 21.0},
+    # The skew noise moves the skewness the curvature's smile is fitted to;
+    # its half-life is the noise's.
+    "surface_skew_noise_sd": {"index_level_listed": 1.0, "surface_ssvi": 1.0, "surface_curvature": 1.0},
+    "surface_skew_noise_half_life": {"index_level_listed": 1.0, "surface_ssvi": 1.0, "surface_curvature": 1.0,
+                                     "surface_skew_noise_sd": 1.0},
+    "options_index_listed": {"index_level_listed": 1.0, "surface_ssvi": 1.0},
+    "option_dealer_spread": {"index_level_listed": 1.0, "surface_ssvi": 1.0,
+                             "options_index_listed": 1.0},
+    "options_index_forward_from_future": {"index_level_listed": 1.0, "surface_ssvi": 1.0,
+                                          "options_index_listed": 1.0, "futures_index_listed": 1.0},
+    "options_names_listed": {"index_level_listed": 1.0, "surface_ssvi": 1.0,
+                             "forecast_horizon_sessions": 63.0},
+    **{name: {"index_level_listed": 1.0, "surface_ssvi": 1.0, "forecast_horizon_sessions": 63.0,
+              "options_names_listed": 1.0}
+       for name in ("surface_name_premium", "surface_name_skew", "option_position_limit",
+                    "option_name_inventory_slope", "option_name_inventory_half_life",
+                    "option_name_spread_tenor_exponent")},
+    "surface_name_earnings_premium": {"index_level_listed": 1.0, "surface_ssvi": 1.0,
+                                      "forecast_horizon_sessions": 63.0, "options_names_listed": 1.0,
+                                      "earnings_surprise_sigma": 3.5, "overnight_idio_share": 0.1},
+    "surface_name_term_slope": {"index_level_listed": 1.0, "surface_ssvi": 1.0,
+                                "forecast_horizon_sessions": 63.0, "options_names_listed": 1.0},
+    **{name: {"index_level_listed": 1.0, "surface_ssvi": 1.0, "forecast_horizon_sessions": 63.0,
+              "options_names_listed": 1.0}
+       for name in ("option_name_spread_otm", "option_name_spread_itm")},
+    "futures_vix_live_fast_share": {"forecast_horizon_sessions": 126.0, "futures_vix_listed": 1.0},
+    "futures_vix_live_fast_half_life": {"forecast_horizon_sessions": 126.0, "futures_vix_listed": 1.0},
+    "futures_vix_live_slow_half_life": {"forecast_horizon_sessions": 126.0, "futures_vix_listed": 1.0},
+    "futures_vix_premium_response": {"forecast_horizon_sessions": 126.0, "futures_vix_listed": 1.0},
+    # The slow level's nowcast needs the horizon and the level; its half-life
+    # and centre need the gain.
+    "forecast_vix_level_nowcast": {"forecast_horizon_sessions": 21.0, "vix_level_sigma": 0.0181,
+                                   "vix_level_identity": 1.0,
+                                   "forecast_vix_level_nowcast_half_life": 126.0},
+    "forecast_vix_level_nowcast_half_life": {"forecast_horizon_sessions": 21.0, "vix_level_sigma": 0.0181,
+                                             "vix_level_identity": 1.0,
+                                             "forecast_vix_level_nowcast": 0.4},
+    "forecast_vix_level_nowcast_centre": {"forecast_horizon_sessions": 21.0, "vix_level_sigma": 0.0181,
+                                          "vix_level_identity": 1.0,
+                                          "forecast_vix_level_nowcast": 0.4,
+                                          "forecast_vix_level_nowcast_half_life": 126.0},
     # The stress cut's start at 15, where the probe's burn-in reads it (see
     # the rows), and the cut on for the two dials read only with it.
     "fed_stress_cut": {"fed_stress_vix": 15.0},
@@ -2012,6 +2450,11 @@ COMPANIONS: dict[str, dict[str, float]] = {
     # The anchor weight blends the read-back with the derived anchor, and
     # both exist only under the identity.
     "vix_anchor_weight": {"vix_level_identity": 1.0},
+    # The fear memory decays at its half-life, so the uptake is refused
+    # without one; the half-life alone is unread, so both arms are the
+    # default's. The memory moves the identity's target, so it is refused
+    # without the identity, which the default ships and pt-v18 does not.
+    "vix_fear_uptake": {"vix_fear_half_life": 20.0, "vix_level_identity": 1.0},
     # The memory is what the weight pulls against, so it is refused without one.
     # The weight is the default's 0.375 since the fifth composition (it was
     # 0.45, the route-1 cell's, while the default shipped none).
@@ -2038,6 +2481,10 @@ COMPANIONS: dict[str, dict[str, float]] = {
                                  "market_vol_leverage_half_life": 40.0},
     "market_vol_leverage_standardise": {"market_vol_leverage": 3.0,
                                         "market_vol_leverage_half_life": 40.0},
+    # The fast return memory's gain is refused without its half-life.
+    "market_vol_leverage_fast": {"market_vol_leverage_fast_half_life": 5.0},
+    "market_vol_leverage_fast_up": {"market_vol_leverage_fast": 2.0,
+                                    "market_vol_leverage_fast_half_life": 5.0},
     # The state's share of the day's t scale is read only with the scale on
     # (d1tail).
     "market_day_tail_state_share": {"market_day_tail_df": 7.0},

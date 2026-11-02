@@ -17,8 +17,9 @@ volatility, fat tails, how much stocks move together and how far the VIX jumps
 after a fall. `tf.facts.measure()` reads 18 of them over 252 days, and
 `tf.facts.crisis_statistics()` the nineteenth, which needs a run with a crisis
 in it. `tf.envelope.score()` compares each with the range real markets show
-over a year. On `pt-v21`, the default from 0.10.0, all 19 are inside
-their ranges on the ruled bands `score()` uses.
+over a year. On `pt-v22`, the default, 19 are inside
+their ranges on the ruled bands `score()` uses. On `pt-v21`, the default
+from 0.10.0 to 0.10.2, all 19 are inside them.
 The check runs 30 random seeds, and 360 for the index's return and its rate
 of 3 percent falls. Fifteen of the statistics are read on one fixed set of
 companies, and that fixed-roster panel is repeated on held-out seeds and on a
@@ -33,12 +34,13 @@ beside its range.
 
 A shape statistic's range is the median of 35 real one-year windows, plus or
 minus 2.1 times their trimmed standard deviation. That makes it wide, and
-passing it is weak evidence. Volatility clustering shows the gap. On pt-v21
-`abs_return_acf1` reads 0.095, near the median real year's 0.1025, but
-`abs_return_acf5` reads 0.020, below the lowest of the ten 2015 to 2025
+passing it is weak evidence. Volatility clustering shows the gap. On pt-v22
+`abs_return_acf1` reads 0.105, near the median real year's 0.1025, but
+`abs_return_acf5` reads 0.028, below the lowest of the ten 2015 to 2025
 windows in `tf.facts.REAL_MARKETS_WINDOWS` (0.034), and passes because its
-range reaches lower than those windows do. `sector_excess_corr`, 0.112, is
-also below every one of those windows (the lowest is 0.133). Changing them
+range reaches lower than those windows do. `sector_excess_corr`, 0.126, is
+below the nine of those windows outside the crisis (the lowest is 0.133),
+though above the 2019-07 to 2020-07 crisis window's 0.103. Changing them
 changes the simulation, so it waits for the next preset.
 
 Four of the 19 describe the index as a whole. On pt-v21 an equal-weight index
@@ -53,7 +55,7 @@ across seeds, and the rate is the falls on every seed over the sessions of
 every seed. The two VIX rows are read over 30.
 
 The VIX's own day-to-day persistence (`vix_ar1_debiased`) has no band and is
-graded by a sign test against the real tape's centre. pt-v21 reads 0.956
+graded by a sign test against the real tape's centre. pt-v22 reads 0.956
 against the tape's 0.930 and the test refuses it, at one year and on held-out
 seeds. That is a gap: the VIX is stickier from day to day than the real
 one.
@@ -256,7 +258,7 @@ a shipped preset never changes, so those wait for a new one.
 | limit | what it means | closed by |
 |---|---|---|
 | horizon | one year is certified. Two years is graded on the two-year panel, and longer runs only by the long-run criteria | bands derived at longer horizons |
-| volatility memory | on pt-v21 the |return| autocorrelation reads 0.095 against a real 0.107 at lag 1, 0.020 against 0.052 at lag 5 and 0.001 against 0.029 at lag 20, so the memory fades faster than real after the first day | the next preset |
+| volatility memory | on pt-v22 the |return| autocorrelation reads 0.105 against a real 0.107 at lag 1, 0.028 against 0.052 at lag 5 and 0.004 against 0.029 at lag 20, so the memory fades faster than real after the first day | the next preset |
 | scenario size | a driven scenario moves prices at about half to four-fifths of the real size, in the right direction. On the real 2020-21 path pt-v21's response to the VIX, the credit yield and valuations is 0.72, 0.79 and 0.54 of real AAPL's. Use a scenario to detect a response, and do not read its size as a forecast | the next preset |
 | macro crises | an inflation crisis or a policy crisis needs a scenario to drive it | a scenario |
 | roster | certification used a sector-balanced roster. Four concentrated sector mixes hold every graded shape row for up to two years on pt-v19, so `check` grants them on pt-v19 only. On pt-v21 they hold at one year, but at two years the technology-heavy and all-technology mixes read `volume_abs_return_corr` at 0.630 and 0.641 against a ceiling of 0.63 | the next preset |

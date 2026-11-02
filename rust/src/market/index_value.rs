@@ -50,6 +50,46 @@ impl IndexConstituent {
     }
 }
 
+/// The level the engine's index opens its first session at, under
+/// `index_level_listed`.
+pub const INDEX_BASE: f64 = 1000.0;
+
+/// The engine's price index as it stands (`index_level_listed`): read by
+/// [`crate::engine::Engine::index_level`].
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
+pub struct IndexLevel {
+    /// `sum(price * shares_outstanding) / divisor` over the public, solvent
+    /// names, on the prices as they stand: the live level during a session,
+    /// and between sessions the level on the prices the close's re-mark left.
+    /// [`INDEX_BASE`] before the first session has opened.
+    pub level: f64,
+    /// The level on the last close's prints, the session's last prices.
+    /// `None` before the first close.
+    pub close: Option<f64>,
+    /// The divisor. `None` before the first session has opened, which is
+    /// when it is set.
+    pub divisor: Option<f64>,
+    /// The names in the index: public and not bankrupt.
+    pub constituents: usize,
+}
+
+/// The divisor that keeps an index at `level` once its constituents'
+/// total capitalisation is `cap`: what a listing, a delisting or a
+/// bankruptcy sets, at the prices standing when it happens. `None` when
+/// either is not finite and positive, where the divisor stays as it was.
+pub fn rebased_divisor(cap: f64, level: f64) -> Option<f64> {
+    if !(cap > 0.0 && cap.is_finite() && level > 0.0 && level.is_finite()) {
+        return None;
+    }
+    let divisor = cap / level;
+    if divisor > 0.0 && divisor.is_finite() {
+        Some(divisor)
+    } else {
+        None
+    }
+}
+
 /// Recompute an index from its constituents.
 ///
 /// Returns the PREVIOUS value unchanged on every degenerate input — an empty

@@ -266,6 +266,133 @@ def test_days_advance_through_the_next_close():
     assert mcp.session_step(sid, days=2)["clock"]["step"] == 12
 
 
+# -- dividends -------------------------------------------------------------
+
+#: On pt-v21 with `Universe.random(12, seed=111)` and seed 5, AAE goes ex
+#: at day 3's open and AAH at day 7's, the run's first two ex-dates. The
+#: tests read them from the engine rather than trusting this line.
+HOLD = {"AAA": 500, "AAE": 1000, "AAH": 1000}
+HOLD_DAYS = 9
+
+
+class _HoldsFromTheOpen:
+    """Sends `HOLD` at the first step and never trades again."""
+
+    def act(self, obs):
+        return dict(HOLD) if obs.step == 0 else {}
+
+
+def _held_session():
+    sid = opened(universe_size=12, seed=5, preset="pt-v21")
+    r = mcp.session_step(sid, steps=1, orders=dict(HOLD))
+    assert r["ok"], r
+    return sid
+
+
+def _paid(sid):
+    """What the session's one agent shows, and the dividends its book
+    entered, one row per position that went ex."""
+    me = mcp.session_state(sid)["agents"]["me"]
+    book = mcp._sessions[sid].live["portfolios"]["me"]
+    rows = [(d["day"], d["ticker"], d["quantity"], d["amount"])
+            for d in book.distributions]
+    return me, rows
+
+
+def _evaluated():
+    return tf.evaluate({"me": _HoldsFromTheOpen()}, seed=5,
+                       universe=tf.Universe.random(12, seed=111),
+                       days=HOLD_DAYS, trusted_agents=False,
+                       model="pt-v21")["me"]
+
+
+def test_a_holder_through_an_ex_date_is_paid_what_evaluate_pays():
+    """The session pays at the ex-date open what the harness's day loop
+    pays the same holder in the same market, and its cash, net worth and
+    P&L carry it."""
+    sid = _held_session()
+    final = mcp.session_step(sid, days=HOLD_DAYS)
+    assert final["ok"] and final["clock"]["days_closed"] == HOLD_DAYS
+    me, rows = _paid(sid)
+    card = _evaluated()
+    assert card.dividends > 0
+    assert [(day, ticker) for day, ticker, _, _ in rows] == [
+        (3, "AAE"), (7, "AAH")]
+    assert me["dividends"] == round(card.dividends, 2)
+    assert me["net_worth"] == round(card.final_net_worth, 2)
+    assert me["pnl"] == round(card.pnl, 2)
+    # Reinvested by default, as evaluate does: the payer's holding grew and
+    # the cash did not move after the first step.
+    assert me["positions"]["AAE"]["quantity"] > HOLD["AAE"]
+    assert me["positions"]["AAA"]["quantity"] == HOLD["AAA"]
+
+
+def test_a_model_without_dividends_shows_none():
+    sid = opened(universe_size=12, seed=5, preset="pt-v20")
+    mcp.session_step(sid, steps=1, orders=dict(HOLD))
+    r = mcp.session_step(sid, days=HOLD_DAYS)
+    assert "dividends" not in r["agents"]["me"]
+    assert mcp._sessions[sid].live["portfolios"]["me"].distributions == []
+
+
+def _ended(sid):
+    """The market and the books a session ends on, without its id, its
+    lineage or the checkpoints its own line kept."""
+    state = mcp.session_state(sid)
+    return json.dumps({k: state[k] for k in ("clock", "market", "agents")},
+                      sort_keys=True), _paid(sid)[1]
+
+
+def test_a_fork_or_a_rewind_around_an_ex_date_pays_once():
+    """Day 3's open is step 18. A fork or a rewind just before it, or just
+    after it with the day's dividend already paid, ends where the straight
+    line ends, with each ex-date paid once."""
+    last = HOLD_DAYS * mcp.DEFAULT_STEPS_PER_DAY
+    sid = _held_session()
+    mcp.session_step(sid, steps=17)
+    before_open = mcp.session_fork(sid)["session_id"]
+    mcp.session_step(sid, steps=1)
+    after_open = mcp.session_fork(sid)["session_id"]
+    mcp.session_step(sid, steps=last - 19)
+    straight = _ended(sid)
+    me, rows = _paid(sid)
+    assert len(rows) == 2 and me["dividends"] > 0
+
+    mcp.session_step(before_open, steps=last - 18)
+    mcp.session_step(after_open, steps=last - 19)
+    assert _ended(before_open) == straight
+    assert _ended(after_open) == straight
+
+    for mark in (19, 18, 1):
+        assert mcp.session_rewind(sid, mark)["ok"]
+        mcp.session_step(sid, steps=last - mark)
+        assert _ended(sid) == straight
+
+
+def test_replaying_a_sessions_orders_pays_what_it_paid():
+    """The orders `close_session` returns re-run the session, dividends
+    included, on a fresh open."""
+    sid = _held_session()
+    mcp.session_step(sid, days=4)
+    mcp.session_step(sid, steps=7, orders={"AAE": -400})
+    mcp.session_step(sid, days=3)
+    paid = _paid(sid)
+    closed = mcp.close_session(sid)
+    assert closed["agents"]["me"]["dividends"] == paid[0]["dividends"]
+
+    again = opened(universe_size=12, seed=5, preset="pt-v21")
+    at = 0
+    for sent in closed["provenance"]["orders"]:
+        if sent["step"] > at:
+            mcp.session_step(again, steps=sent["step"] - at)
+        r = mcp.session_step(again, orders=sent["orders"],
+                             agent=sent["agent"])
+        assert r["ok"], r
+        at = sent["step"] + 1
+    mcp.session_step(again, steps=closed["clock"]["step"] - at)
+    assert _paid(again) == paid
+
+
 # -- what the caller sees --------------------------------------------------
 
 #: Engine methods that read simulator state a trader cannot see, or copy

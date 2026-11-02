@@ -110,7 +110,7 @@ The walkthrough is
 | `RunManifest` | what a reader needs to replay a run, checked by `reproduce()` |
 | `World` / `compare` | fork a running experiment, change one variable, and measure where the two came apart |
 | scenarios | seven packaged shocks, and a file format for your own |
-| MCP server | nineteen tools for a coding agent, thirteen of them read-only, with scenarios, any shipped preset, a shipped population of background traders, and market sessions you step, fork and rewind |
+| MCP server | twenty-two tools for a coding agent, sixteen of them read-only, with scenarios, any shipped preset, a shipped population of background traders, and market sessions you step, fork and rewind |
 | more | a Gymnasium environment, Arrow output, checkpoints, SEC EDGAR data, simulated rate indices, a browser build |
 
 ## Drive it from an agent
@@ -184,12 +184,17 @@ exactly on its named preset in every later release. Each release checks that
 with a digest per preset. A run with agent orders in it replays exactly on the
 same release. Across releases the promise is narrower. 0.8.5 changed how an
 agent's fills reach the market, on every preset, so a traded run recorded
-before 0.8.5 matches up to its first trade and differs after it. The default
-preset is `pt-v21`, and any earlier one can be named:
+before 0.8.5 matches up to its first trade and differs after it.
+The default preset is `pt-v22`, and pt-v21 or any other shipped one can be
+named:
 
 ```python
 eng = tf.Engine(seed=42, universe=u, model="pt-v10")
 ```
+
+`pt-v22` lists index, rate and oil futures and options on every name. It is
+the default from this release, so a run that left `model` out on an earlier
+release gives a different market here.
 
 To let a reader rerun a result, publish its `RunManifest`. It records the
 version, preset, seed, universe, macro state and scenario, and `reproduce()`
@@ -208,17 +213,22 @@ says which release to pin for a long study.
 tradefloor checks its market against real ones with three named sets of
 statistics, listed in
 [docs/STATISTICS.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/STATISTICS.md).
-On pt-v21, the default from 0.10.0, all 19 statistics of the one-year
-table (volatility, fat tails, how much stocks move together, how far the VIX
-jumps after a fall) are inside the range real markets show over a year, on
-the ruled bands. The index's return and the share of days it falls 3% or
-more are read over 360 seeds, as the long-run criteria read them: the index
-falls 3% or more on 0.98% of days, against a range of 0.64 to 2.34. All 15
-statistics of the two-year panel are inside their two-year ranges. The
-long-run criteria are 40 rows over 21 years, covering crash depth, how long
-fear lasts, bear markets per decade, the 2008 and 2020 replays, the rate
-indices and the cost of size in the book. pt-v21 meets all 40, read on 270
-histories.
+On pt-v22, the default, 19 of the 19 statistics of the
+one-year table (volatility, fat tails, how much stocks move together, how far
+the VIX jumps after a fall) are inside the range real markets show over a
+year. pt-v22's long-run criteria are 190 rows over 21 years, covering crash
+depth, how long fear lasts, bear markets per decade, the 2008 and 2020
+replays, the rate indices, the cost of size in the book, strategies built
+to find an edge, and the futures, options and margin
+([docs/MODEL.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/MODEL.md)).
+pt-v22 meets all 190, read on 270 histories. Two more rows are shown for
+comparison and not counted.
+On pt-v21 (the default from 0.10.0 to 0.10.2), all 19 one-year statistics are
+inside their ranges, on the ruled bands. The index's return and the share of
+days it falls 3% or more are read over 360 seeds, as the long-run criteria
+read them: the index falls 3% or more on 0.98% of days, against a range of 0.64 to 2.34. All 15
+statistics of the two-year panel are inside their two-year ranges. pt-v21
+meets all 40 of the long-run rows it was graded on, read on 270 histories.
 
 Read those claims narrowly:
 
@@ -230,12 +240,12 @@ Read those claims narrowly:
   spread across seeds.
 - A shape statistic's range is the median of 35 real one-year windows plus
   or minus 2.1 trimmed standard deviations, so passing one is weak evidence.
-  Volatility clustering is one case. `abs_return_acf5` reads 0.020, below
+  Volatility clustering is one case. `abs_return_acf5` reads 0.028, below
   every real 2015 to 2025 window (the lowest is 0.034), and it passes
   because its range reaches lower than those windows do.
 - The VIX is stickier than real: its day-to-day persistence reads 0.956
   against the tape's 0.930, and the sign test that grades it refuses it.
-- The one-year table helped choose many of the coefficients pt-v21 keeps, so the
+- The one-year table helped choose many of the coefficients pt-v22 keeps, so the
   held-out checks are the fresh seeds and the fresh set of companies the
   panel is repeated on.
 - One year is the certified horizon. Two years is graded on the two-year
@@ -302,7 +312,7 @@ The twelve numbered [`examples/`](https://github.com/simoncoombes/tradefloor/tre
 | [`06-execution-and-impact`](https://github.com/simoncoombes/tradefloor/blob/main/examples/06-execution-and-impact.ipynb) | TCA and the counterfactual run |
 | [`07-research-workflow.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/07-research-workflow.py) | A whole study in one file. It takes about forty seconds of CPU and needs `tradefloor[arrow]` |
 | [`08-claude-agent.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/08-claude-agent.py) | An LLM agent trading the market through the harness |
-| [`09-a-pandemic-shaped-market`](https://github.com/simoncoombes/tradefloor/blob/main/examples/09-a-pandemic-shaped-market.ipynb) | A real 2020-21 macro path, and which fields transmit. Pinned to `pt-v12`, whose QE channel carries the valuation path, with the same path on the default, `pt-v21`, at the end |
+| [`09-a-pandemic-shaped-market`](https://github.com/simoncoombes/tradefloor/blob/main/examples/09-a-pandemic-shaped-market.ipynb) | A real 2020-21 macro path, and which fields transmit. Pinned to `pt-v12`, whose QE channel carries the valuation path, with the same path on `pt-v21`, the default until 0.10.2, at the end |
 | [`10-forking-a-market`](https://github.com/simoncoombes/tradefloor/blob/main/examples/10-forking-a-market.py) | Fork a market, raise the rate in one branch, and compare the futures |
 | [`11-scenario-fork.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/11-scenario-fork.py) | A scenario file applied to one branch of a fork, and what it cost |
 
@@ -365,10 +375,10 @@ several presets, and results depend on the preset.
 @software{tradefloor,
   author  = {Coombes, Simon},
   title   = {tradefloor: a deterministic market simulator with a limit order book},
-  version = {0.10.2},
+  version = {0.11.0},
   year    = {2026},
   url     = {https://github.com/simoncoombes/tradefloor},
-  note    = {Model preset pt-v21}
+  note    = {Model preset pt-v22}
 }
 ```
 
@@ -376,8 +386,8 @@ several presets, and results depend on the preset.
 carries the same details, and GitHub's "Cite this repository" button reads
 it.
 
-In the text, say which model you used, for example: "tradefloor 0.10.2,
-preset pt-v21, specified in its docs/MODEL.md".
+In the text, say which model you used, for example: "tradefloor 0.11.0,
+preset pt-v22, specified in its docs/MODEL.md".
 [docs/REPRODUCIBILITY.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/REPRODUCIBILITY.md)
 says how to publish a result so a reader can rerun it, and how to show a
 score was not tuned to its seeds.
