@@ -12,8 +12,8 @@ The model itself is specified in
 
 ## The sets at a glance
 
-pt-v22, the default, has {{G19:one_year_in}} of the 19 one-year statistics
-in band and meets {{G19:long_run_passed}} of the {{G19:long_run_of}}
+pt-v22, the default, has 19 of the 19 one-year statistics
+in band and meets 190 of the 190
 long-run criteria that count toward its grade. Its futures and options rows
 are read on their own histories, in
 [MODEL.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/MODEL.md).

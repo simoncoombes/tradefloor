@@ -387,15 +387,15 @@ RECORD22 = ROOT / "python" / "tradefloor" / "presets" / "pt-v22.json"
 GRADE22 = {
     # The boxes that ran the grade, as `record.py`'s PT_V22_GRADE_BOXES
     # names them, joined by "+" in the verdict's `measured.box`.
-    "boxes": None,
+    "boxes": ('g23gen-e1a', 'g23b1-e1a', 'g23b2-e1a', 'g23traded-e7a', 'g23reads-e1a', 'g23gate-e20a'),
     # The engine commit the boxes ran, and the package version it builds.
-    "engine_commit": None,
-    "package": None,
+    "engine_commit": 'e132a66acbdec409f8f0d48875bdec068adbdd68',
+    "package": '0.10.2',
     # Per box: (files unpacked, sha256 of the archive), as the box recorded.
-    "scripts": None,
+    "scripts": {'g23gen-e1a': (77, 'f148ef3eb3d16c32558ff0c09ab61b2b67d567e82ab64fc1ae55b0b4250d3a29'), 'g23b1-e1a': (77, '9f2c1fe951ae13d45b3c4dab3343a192eb291ee55acf12de86905b6a30bb1b0c'), 'g23b2-e1a': (77, 'c34118e004618d1a882f5aa092fb24240ee471caa07c1cffd7a01bee427ed246'), 'g23traded-e7a': (77, '879e2fe1e77bca99e983ba56b42aa745d4c65c73b8aa75a05c33b84a37872fb1'), 'g23reads-e1a': (77, 'bd91e07cfc725a4a4d2e8546875dd320b48f47a7418dc98150b3251a5a84e77f'), 'g23gate-e20a': (30, '6ab6d6a12cf41e238707469d447f4b86937301c6340c8aa46d141eb68999c118')},
     # The verdict the record carries: its file under validation/pt-v22/,
     # its result, the rows passed and the rows graded.
-    "verdict": None,
+    "verdict": ('verdict-pt-v22.json', 'pass', 190, 190),
 }
 
 

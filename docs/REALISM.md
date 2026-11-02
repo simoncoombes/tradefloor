@@ -17,7 +17,7 @@ volatility, fat tails, how much stocks move together and how far the VIX jumps
 after a fall. `tf.facts.measure()` reads 18 of them over 252 days, and
 `tf.facts.crisis_statistics()` the nineteenth, which needs a run with a crisis
 in it. `tf.envelope.score()` compares each with the range real markets show
-over a year. On `pt-v22`, the default, {{G19:one_year_in}} are inside
+over a year. On `pt-v22`, the default, 19 are inside
 their ranges on the ruled bands `score()` uses. On `pt-v21`, the default
 from 0.10.0 to 0.10.2, all 19 are inside them.
 The check runs 30 random seeds, and 360 for the index's return and its rate

@@ -212,10 +212,10 @@ says which release to pin for a long study.
 tradefloor checks its market against real ones with three named sets of
 statistics, listed in
 [docs/STATISTICS.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/STATISTICS.md).
-On pt-v22, the default, {{G19:one_year_in}} of the 19 statistics of the
+On pt-v22, the default, 19 of the 19 statistics of the
 one-year table (volatility, fat tails, how much stocks move together, how far
 the VIX jumps after a fall) are inside the range real markets show over a
-year. pt-v22 meets {{G19:long_run_passed}} of the {{G19:long_run_of}}
+year. pt-v22 meets 190 of the 190
 long-run criteria that count toward its grade, and its futures and options
 rows are read on their own histories ([docs/MODEL.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/MODEL.md)).
 On pt-v21, the default from 0.10.0 to 0.10.2, all 19 one-year statistics are

@@ -65,7 +65,7 @@ _DESIGN_PATH = re.compile(r"(?<![\w./-])programme/")
 #: The boxes that ran pt-v22's grade, for `PUBLISHED_GRADES`. A SLOT: empty
 #: until the grade has run and its files are published under
 #: `validation/pt-v22/`.
-PT_V22_GRADE_BOXES: tuple[str, ...] = ()
+PT_V22_GRADE_BOXES: tuple[str, ...] = ("g23gen-e1a", "g23b1-e1a", "g23b2-e1a", "g23traded-e7a", "g23reads-e1a", "g23gate-e20a",)
 PUBLISHED_GRADES.update({box: "validation/pt-v22" for box in PT_V22_GRADE_BOXES})
 
 #: The blocks a grade measures, in a record's order, and the writer that

@@ -1,0 +1,2959 @@
+{
+ "grade": "pt-v22, twenty-third registration",
+ "arm": "R22-fixd2RWPD",
+ "rows": [
+  {
+   "group": "registered",
+   "id": "A1",
+   "value": "100 / 98",
+   "band": "84 / 95",
+   "pass": true,
+   "usage": 0.639,
+   "note": "2008 at +19%",
+   "gated": true
+  },
+  {
+   "group": "registered",
+   "id": "A2",
+   "value": "0.44 / 0.34",
+   "band": "0.57 / 0.34",
+   "pass": true,
+   "usage": 0.725,
+   "note": "2008 at -22%",
+   "gated": true
+  },
+  {
+   "group": "registered",
+   "id": "A3",
+   "value": "0.81 / 0.86",
+   "band": "0.75 / 0.87",
+   "pass": true,
+   "usage": 0.431,
+   "note": "2008 at +0.06",
+   "gated": true
+  },
+  {
+   "group": "registered",
+   "id": "B1",
+   "value": "6.8%",
+   "band": "8.2%",
+   "pass": true,
+   "usage": 0.268,
+   "note": "0.83x",
+   "gated": true
+  },
+  {
+   "group": "registered",
+   "id": "B2",
+   "value": "24",
+   "band": "22",
+   "pass": true,
+   "usage": 0.109,
+   "note": "1.08x",
+   "gated": true
+  },
+  {
+   "group": "registered",
+   "id": "B3",
+   "value": "1.69",
+   "band": "1.16",
+   "pass": true,
+   "usage": 0.547,
+   "note": "1.46x",
+   "gated": true
+  },
+  {
+   "group": "registered",
+   "id": "B4",
+   "value": "4.62",
+   "band": "2.84",
+   "pass": true,
+   "usage": 0.702,
+   "note": "1.63x",
+   "gated": true
+  },
+  {
+   "group": "registered",
+   "id": "B5",
+   "value": "7.2",
+   "band": "6.2",
+   "pass": true,
+   "usage": 0.217,
+   "note": "1.16x",
+   "gated": true
+  },
+  {
+   "group": "registered",
+   "id": "B6",
+   "value": "30.8%",
+   "band": "32.6%",
+   "pass": true,
+   "usage": 0.082,
+   "note": "0.94x",
+   "gated": true
+  },
+  {
+   "group": "registered",
+   "id": "B7",
+   "value": "18.4",
+   "band": "18.1",
+   "pass": true,
+   "usage": 0.09,
+   "note": "+2%",
+   "gated": true
+  },
+  {
+   "group": "registered",
+   "id": "B8",
+   "value": "7.0",
+   "band": "6.25",
+   "pass": true,
+   "usage": 0.384,
+   "note": "+0.8 points",
+   "gated": true
+  },
+  {
+   "group": "registered",
+   "id": "C1",
+   "value": "1.12x",
+   "band": "1.0x",
+   "pass": true,
+   "usage": 0.275,
+   "note": "1.12x",
+   "gated": true
+  },
+  {
+   "group": "registered",
+   "id": "C2",
+   "value": "5 of 270",
+   "band": "0",
+   "pass": true,
+   "usage": 0.556,
+   "note": "5 of 270",
+   "gated": true
+  },
+  {
+   "group": "registered",
+   "id": "C3",
+   "value": "+18bp",
+   "band": "~0",
+   "pass": true,
+   "usage": 0.895,
+   "note": "+17.9 bp",
+   "gated": true
+  },
+  {
+   "group": "registered",
+   "id": "C4a",
+   "value": "-0.044 / 1.5x",
+   "band": "~0 (Roll)",
+   "pass": true,
+   "usage": 0.748,
+   "note": "-0.044, Roll 1.5x",
+   "gated": true
+  },
+  {
+   "group": "registered",
+   "id": "C4b",
+   "value": "-3.0 pts, 8/20",
+   "band": "~0",
+   "pass": true,
+   "usage": 0.571,
+   "note": "momentum_5day_daily -3.0 pts, 8 of 20",
+   "gated": true
+  },
+  {
+   "group": "registered",
+   "id": "C5",
+   "value": "0.952",
+   "band": [
+    [
+     0.8,
+     1.05
+    ]
+   ],
+   "pass": true,
+   "usage": 0.22,
+   "note": "0.952",
+   "gated": true
+  },
+  {
+   "group": "registered",
+   "id": "C6",
+   "value": "+0.002 / +0.002",
+   "band": [
+    [
+     -0.03,
+     0.05
+    ],
+    [
+     -0.03,
+     0.05
+    ]
+   ],
+   "pass": true,
+   "usage": 0.199,
+   "note": "+0.002 / +0.002",
+   "gated": true
+  },
+  {
+   "group": "registered",
+   "id": "C7",
+   "value": "+0.005 / +0.001",
+   "band": [
+    [
+     -0.04,
+     0.095
+    ],
+    [
+     -0.02,
+     0.1
+    ]
+   ],
+   "pass": true,
+   "usage": 0.648,
+   "note": "+0.005 / +0.001",
+   "gated": true
+  },
+  {
+   "group": "registered",
+   "id": "C8",
+   "value": "-1.1",
+   "band": [
+    [
+     -6.4,
+     2.9
+    ]
+   ],
+   "pass": true,
+   "usage": 0.148,
+   "note": "-1.1",
+   "gated": true
+  },
+  {
+   "group": "registered",
+   "id": "D2",
+   "value": "0.382 / 167.5",
+   "band": [
+    [
+     0.237,
+     0.441
+    ],
+    [
+     63,
+     252
+    ]
+   ],
+   "pass": true,
+   "usage": 0.42,
+   "note": "0.382 / 167.500",
+   "gated": true
+  },
+  {
+   "group": "registered",
+   "id": "F1",
+   "value": "0.382 / 31.5",
+   "band": [
+    [
+     0.237,
+     0.441
+    ],
+    [
+     12,
+     46
+    ]
+   ],
+   "pass": true,
+   "usage": 0.42,
+   "note": "0.382 / 31.500",
+   "gated": true
+  },
+  {
+   "group": "registered",
+   "id": "L1",
+   "value": "+71",
+   "band": [
+    [
+     1,
+     136
+    ]
+   ],
+   "pass": true,
+   "usage": 0.037,
+   "note": "+71",
+   "gated": true
+  },
+  {
+   "group": "registered",
+   "id": "C10",
+   "value": "+0.01, 0.50 / -1.2, +1.0",
+   "band": "-2.0 / -5.9, +4.3",
+   "pass": true,
+   "usage": 0.75,
+   "note": "worst rule out21_after_fear_greed_index_p99.9_down",
+   "gated": true
+  },
+  {
+   "group": "registered",
+   "id": "R5",
+   "value": "0.221",
+   "band": [
+    [
+     0.178,
+     0.33
+    ]
+   ],
+   "pass": true,
+   "usage": 0.428,
+   "note": "0.221",
+   "gated": true
+  },
+  {
+   "group": "registered",
+   "id": "R7a",
+   "value": "+1.8 / -0.7",
+   "band": "0 / 0",
+   "pass": true,
+   "usage": 0.356,
+   "note": "hike +1.8 of 5.0, cut -0.7 of 5.0",
+   "gated": true
+  },
+  {
+   "group": "registered",
+   "id": "R7b",
+   "value": "-1.22, 2/30",
+   "band": "0, <=20/30",
+   "pass": true,
+   "usage": 0.1,
+   "note": "-1.22 pts, 2 of 30",
+   "gated": true
+  },
+  {
+   "group": "registered",
+   "id": "S1a",
+   "value": "0.88",
+   "band": [
+    [
+     0.45,
+     1.0
+    ]
+   ],
+   "pass": true,
+   "usage": 0.564,
+   "note": "0.88",
+   "gated": true
+  },
+  {
+   "group": "registered",
+   "id": "S2",
+   "value": "+60.6",
+   "band": [
+    [
+     25.0,
+     80.0
+    ]
+   ],
+   "pass": true,
+   "usage": 0.294,
+   "note": "+60.6",
+   "gated": true
+  },
+  {
+   "group": "registered",
+   "id": "S1b",
+   "value": "180/180",
+   "band": "all seeds",
+   "pass": true,
+   "usage": 0.0,
+   "note": "180 of 180",
+   "gated": true
+  },
+  {
+   "group": "registered",
+   "id": "V1",
+   "value": "0.91 / 0.82",
+   "band": [
+    [
+     0.75,
+     1.15
+    ],
+    [
+     0.55,
+     1.2
+    ]
+   ],
+   "pass": true,
+   "usage": 0.203,
+   "note": "0.91 / 0.82",
+   "gated": true
+  },
+  {
+   "group": "registered",
+   "id": "C9",
+   "value": "0.459 / 0.474",
+   "band": "0.5 / 0.5",
+   "pass": true,
+   "usage": 0.607,
+   "note": "0.459 / 0.474",
+   "gated": true
+  },
+  {
+   "group": "registered",
+   "id": "R1",
+   "value": "5.30",
+   "band": [
+    [
+     3.65,
+     6.8
+    ]
+   ],
+   "pass": true,
+   "usage": 0.049,
+   "note": "5.30",
+   "gated": true
+  },
+  {
+   "group": "registered",
+   "id": "R2",
+   "value": "5.89",
+   "band": [
+    [
+     4.54,
+     6.27
+    ]
+   ],
+   "pass": true,
+   "usage": 0.566,
+   "note": "5.89",
+   "gated": true
+  },
+  {
+   "group": "registered",
+   "id": "R4",
+   "value": "+0.293",
+   "band": [
+    [
+     0.15,
+     0.39
+    ]
+   ],
+   "pass": true,
+   "usage": 0.194,
+   "note": "graded on the held close; last print reported",
+   "gated": true
+  },
+  {
+   "group": "registered",
+   "id": "B9",
+   "value": "16.78 / 1.14",
+   "band": [
+    [
+     13.9,
+     20.9
+    ],
+    [
+     0.6667,
+     1.5
+    ]
+   ],
+   "pass": true,
+   "usage": 0.178,
+   "note": "16.78 / 1.14",
+   "gated": true
+  },
+  {
+   "group": "registered",
+   "id": "D1",
+   "value": "in",
+   "band": "--",
+   "pass": true,
+   "usage": 0.0,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "DV3",
+   "value": 1.8671118513946905,
+   "band": [
+    1.3,
+    2.5
+   ],
+   "pass": true,
+   "usage": 0.055,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "DV4",
+   "value": 2.371465030755237,
+   "band": [
+    1.8,
+    3.4
+   ],
+   "pass": true,
+   "usage": 0.286,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "DV5",
+   "value": 0.8497738948115124,
+   "band": [
+    0.56,
+    1.04
+   ],
+   "pass": true,
+   "usage": 0.207,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "DV6",
+   "value": 3.3677687756907897,
+   "band": [
+    -2.1,
+    3.9
+   ],
+   "pass": true,
+   "usage": 0.823,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "DV7sd",
+   "value": 5.590310756180491,
+   "band": [
+    3.6,
+    14.2
+   ],
+   "pass": true,
+   "usage": 0.624,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "DV7cut",
+   "value": 0.139766081871345,
+   "band": [
+    0.045,
+    0.18
+   ],
+   "pass": true,
+   "usage": 0.404,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "DV8",
+   "value": 0.9719193701652475,
+   "band": [
+    0.8,
+    1.05
+   ],
+   "pass": true,
+   "usage": 0.375,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "CV1",
+   "value": -0.9073920044288756,
+   "band": [
+    -1.75,
+    -0.8
+   ],
+   "pass": true,
+   "usage": 0.774,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "CV3",
+   "value": -0.8032674456402075,
+   "band": [
+    -1.3,
+    -0.35
+   ],
+   "pass": true,
+   "usage": 0.046,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "V2",
+   "value": 0.7915244336914797,
+   "band": [
+    0.74,
+    0.92
+   ],
+   "pass": true,
+   "usage": 0.428,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "V3",
+   "value": 1.0237360376249265,
+   "band": [
+    0.42,
+    1.67
+   ],
+   "pass": true,
+   "usage": 0.034,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "B10",
+   "value": 1.657813627078449,
+   "band": [
+    1.45,
+    2.3
+   ],
+   "pass": true,
+   "usage": 0.511,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "B11",
+   "value": 1.4702175298099238,
+   "band": [
+    1.25,
+    2.0
+   ],
+   "pass": true,
+   "usage": 0.413,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "B12",
+   "value": 0.5895953757225434,
+   "band": [
+    0.45,
+    0.85
+   ],
+   "pass": true,
+   "usage": 0.302,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "H1",
+   "value": -0.5221737800882392,
+   "band": [
+    -0.69,
+    -0.13
+   ],
+   "pass": true,
+   "usage": 0.401,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "H2",
+   "value": 0.0038188761593016913,
+   "band": [
+    null,
+    0.2
+   ],
+   "pass": true,
+   "usage": 0.019,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "H3",
+   "value": -0.4765580462706122,
+   "band": [
+    -0.84,
+    -0.4
+   ],
+   "pass": true,
+   "usage": 0.652,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "H4",
+   "value": -0.28733810548910615,
+   "band": [
+    -0.94,
+    -0.24
+   ],
+   "pass": true,
+   "usage": 0.865,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "H5",
+   "value": -0.33958888463345344,
+   "band": [
+    -0.35,
+    -0.02
+   ],
+   "pass": true,
+   "usage": 0.937,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "VC1",
+   "value": 0.09595586160219063,
+   "band": [
+    0.065,
+    0.11
+   ],
+   "pass": true,
+   "usage": 0.376,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "VC2",
+   "value": 1.2582074210432612,
+   "band": [
+    1.16,
+    1.42
+   ],
+   "pass": true,
+   "usage": 0.245,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "VC3",
+   "value": 0.0756409051838733,
+   "band": [
+    0.039,
+    0.17
+   ],
+   "pass": true,
+   "usage": 0.441,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "VC4a",
+   "value": 0.25506804386531023,
+   "band": [
+    0.158,
+    0.305
+   ],
+   "pass": true,
+   "usage": 0.321,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "VC4b",
+   "value": 0.2420009595036719,
+   "band": [
+    0.152,
+    0.346
+   ],
+   "pass": true,
+   "usage": 0.072,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "VC4c",
+   "value": 0.19488346037472362,
+   "band": [
+    0.077,
+    0.245
+   ],
+   "pass": true,
+   "usage": 0.403,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "VC4d",
+   "value": 0.06988626327110228,
+   "band": [
+    0.025,
+    0.126
+   ],
+   "pass": true,
+   "usage": 0.111,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "VC4e",
+   "value": -0.3589671851308185,
+   "band": [
+    -0.687,
+    -0.13
+   ],
+   "pass": true,
+   "usage": 0.178,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "VC4f",
+   "value": 0.669130603321307,
+   "band": [
+    0.489,
+    0.74
+   ],
+   "pass": true,
+   "usage": 0.435,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "G1",
+   "value": 0.366243220878577,
+   "band": [
+    0.3,
+    0.48
+   ],
+   "pass": true,
+   "usage": 0.264,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "G1c",
+   "value": 0.47422351542258334,
+   "band": [
+    0.3,
+    0.6
+   ],
+   "pass": true,
+   "usage": 0.161,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "G2",
+   "value": 10.682540024638602,
+   "band": [
+    6.5,
+    14.0
+   ],
+   "pass": true,
+   "usage": 0.115,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "G2b",
+   "value": 0.14753389441230674,
+   "band": [
+    0.09,
+    0.2
+   ],
+   "pass": true,
+   "usage": 0.046,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "G3",
+   "value": 0.7277303289538928,
+   "band": [
+    0.65,
+    0.85
+   ],
+   "pass": true,
+   "usage": 0.223,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "G3b",
+   "value": 1.6632244162855876,
+   "band": [
+    1.2,
+    2.4
+   ],
+   "pass": true,
+   "usage": 0.228,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "G4",
+   "value": 9.260202052316874,
+   "band": [
+    4.7,
+    14.1
+   ],
+   "pass": true,
+   "usage": 0.03,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "G7",
+   "value": 30.645403169930965,
+   "band": [
+    26,
+    50
+   ],
+   "pass": true,
+   "usage": 0.613,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "G7b",
+   "value": 1.9838285069575026,
+   "band": [
+    0.8,
+    4.0
+   ],
+   "pass": true,
+   "usage": 0.26,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "G8",
+   "value": 3.0015983452425723,
+   "band": [
+    2.0,
+    5.0
+   ],
+   "pass": true,
+   "usage": 0.332,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "G9",
+   "value": 2.0882728937314177,
+   "band": [
+    1.6,
+    3.0
+   ],
+   "pass": true,
+   "usage": 0.302,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "G10",
+   "value": 0.025607718107174174,
+   "band": [
+    -0.04,
+    0.09
+   ],
+   "pass": true,
+   "usage": 0.009,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "C10e-cal",
+   "value": -0.2679642663636227,
+   "band": [
+    null,
+    1.0
+   ],
+   "pass": true,
+   "usage": 0.683,
+   "note": "ahead 0.455",
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "PH1",
+   "value": 1.0,
+   "band": [
+    1,
+    1
+   ],
+   "pass": true,
+   "usage": 0.0,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "PH3",
+   "value": 1.0,
+   "band": [
+    1.0,
+    1.0
+   ],
+   "pass": true,
+   "usage": 0.0,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "PH5",
+   "value": 1.0,
+   "band": [
+    1,
+    1
+   ],
+   "pass": true,
+   "usage": 0.281,
+   "note": "vol clause worst year 2: gap 0.005 against 0.018; return d +0.0068 se 0.0158; 270 histories (90 alone: PH5 1.0, vol use 0.5365342405000276)",
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "Q1",
+   "value": 0.6442828652879463,
+   "band": [
+    0.4,
+    0.7
+   ],
+   "pass": true,
+   "usage": 0.629,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "Q2",
+   "value": 0.346091636033309,
+   "band": [
+    0.3,
+    1.0
+   ],
+   "pass": true,
+   "usage": 0.868,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "Q3",
+   "value": 0.709126383120054,
+   "band": [
+    0.62,
+    0.82
+   ],
+   "pass": true,
+   "usage": 0.109,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "Q4",
+   "value": 0.560110750622688,
+   "band": [
+    0.55,
+    0.8
+   ],
+   "pass": true,
+   "usage": 0.919,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "Q5",
+   "value": 0.4838406347873474,
+   "band": [
+    0.4,
+    0.7
+   ],
+   "pass": true,
+   "usage": 0.441,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "Q6",
+   "value": 0.11905396080596263,
+   "band": [
+    0.1,
+    0.21
+   ],
+   "pass": true,
+   "usage": 0.654,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "Q7",
+   "value": 0.783733228088241,
+   "band": [
+    0.5,
+    0.9
+   ],
+   "pass": true,
+   "usage": 0.419,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "Q8",
+   "value": 0.6222220737742146,
+   "band": [
+    0.5,
+    0.8
+   ],
+   "pass": true,
+   "usage": 0.185,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "Q9",
+   "value": 0.6329551895113743,
+   "band": [
+    0.5,
+    0.8
+   ],
+   "pass": true,
+   "usage": 0.114,
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "G-rt",
+   "value": -1.02,
+   "band": [
+    null,
+    0.0
+   ],
+   "pass": true,
+   "usage": null,
+   "note": "wash0.02 R22-fixd2RWPD_9422532.txt",
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "AO1",
+   "value": 0.5007361111111112,
+   "band": [
+    0.498,
+    0.502
+   ],
+   "pass": true,
+   "usage": null,
+   "note": "keys 1008000, se 0.0004980119205559973",
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "AO2",
+   "value": 19.11026289116641,
+   "band": [
+    10,
+    40
+   ],
+   "pass": true,
+   "usage": 0.393,
+   "note": "positive on 30/30",
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "AO3",
+   "value": -0.5827863105952688,
+   "band": [
+    -3.0,
+    3.0
+   ],
+   "pass": true,
+   "usage": null,
+   "note": "intercept -0.7018499189674632 se 1.2043006265033587 n 400 ",
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "AO4",
+   "value": -0.8837171910390023,
+   "band": [
+    -3.0,
+    3.0
+   ],
+   "pass": true,
+   "usage": null,
+   "note": "intercept -0.017178931430111923 se 0.019439399396445307 n 400 ",
+   "gated": true
+  },
+  {
+   "group": "proposed",
+   "id": "AO5",
+   "value": 0,
+   "band": [
+    0,
+    0
+   ],
+   "pass": true,
+   "usage": 0.0,
+   "note": "{'engine': True, 'readers': True, 'scripts': True, 'paired': True, 'live': True}",
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "T1 median bp",
+   "value": 18.957294996089534,
+   "band": [
+    null,
+    50
+   ],
+   "pass": true,
+   "usage": 0.379,
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "T1 share over 1.7%",
+   "value": 0.003437269825681316,
+   "band": [
+    null,
+    0.1
+   ],
+   "pass": true,
+   "usage": 0.034,
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "T2 sd bp",
+   "value": 3.920055507436226,
+   "band": [
+    1.5,
+    6.2
+   ],
+   "pass": true,
+   "usage": 0.03,
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "T2 days a decade over 50 bp",
+   "value": 0.014814814814814814,
+   "band": [
+    null,
+    1.0
+   ],
+   "pass": true,
+   "usage": 0.015,
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "T3 bp",
+   "value": 1.5732022787253426,
+   "band": [
+    null,
+    25
+   ],
+   "pass": true,
+   "usage": 0.063,
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "C10c",
+   "value": 0,
+   "band": "0 of 384 (270 pooled histories)",
+   "pass": true,
+   "usage": null,
+   "note": "270 histories; worst ; 90 alone 0 (); 270 histories: longrun 9420201-9420230,9420501-9420530,9420801-9420830 + pool 9421201-9421230,9421501-9421530,9421801-9421830,9423201-9423230,9423501-9423530,9423801-9423830",
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "C10d",
+   "value": 0,
+   "band": "0 cells",
+   "pass": true,
+   "usage": null,
+   "note": "[]",
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "C10e",
+   "value": 0.7459058388682313,
+   "band": [
+    -13.5,
+    15.7
+   ],
+   "pass": true,
+   "usage": 0.024,
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "I-rate",
+   "value": 4.440892098500626e-12,
+   "band": "< 0.01",
+   "pass": true,
+   "usage": null,
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "R3 held",
+   "value": -0.13760163784455978,
+   "band": [
+    -0.36,
+    0.03
+   ],
+   "pass": true,
+   "usage": 0.141,
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "R3m",
+   "value": -0.23492894221729704,
+   "band": [
+    -0.4,
+    0.1
+   ],
+   "pass": true,
+   "usage": 0.34,
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "R4m",
+   "value": 0.21392125264382444,
+   "band": [
+    0.2,
+    0.65
+   ],
+   "pass": true,
+   "usage": 0.938,
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "R4-lag",
+   "value": -0.012013055511202596,
+   "band": [
+    -0.1,
+    0.1
+   ],
+   "pass": true,
+   "usage": 0.12,
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "L-rate:IGCORP-4-sign",
+   "value": [
+    -4.0,
+    "10/36"
+   ],
+   "band": "mean <= +3, ahead <= 2/3",
+   "pass": true,
+   "usage": 0.417,
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "L-rate:IGCORP-5-sign",
+   "value": [
+    -3.6,
+    "10/36"
+   ],
+   "band": "mean <= +3, ahead <= 2/3",
+   "pass": true,
+   "usage": 0.417,
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "L-rate:UST10Y-4-sign",
+   "value": [
+    -4.2,
+    "9/36"
+   ],
+   "band": "mean <= +3, ahead <= 2/3",
+   "pass": true,
+   "usage": 0.375,
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "L-rate:UST10Y-5-sign",
+   "value": [
+    -4.2,
+    "8/36"
+   ],
+   "band": "mean <= +3, ahead <= 2/3",
+   "pass": true,
+   "usage": 0.333,
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "F-stress cut (rate > 0.25)",
+   "value": 0.8807477145586028,
+   "band": [
+    0.5,
+    1.0
+   ],
+   "pass": true,
+   "usage": 0.523,
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "F-stress hike",
+   "value": 0.006372936920642098,
+   "band": [
+    null,
+    0.1
+   ],
+   "pass": true,
+   "usage": 0.064,
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "F-bear",
+   "value": -0.55,
+   "band": [
+    null,
+    -0.5
+   ],
+   "pass": true,
+   "usage": 1.1,
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "SF2:curve",
+   "value": [
+    -0.544728983084833,
+    "9/216"
+   ],
+   "band": "<= +8, <= 2/3",
+   "pass": true,
+   "usage": 0.062,
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "SF2:geo",
+   "value": [
+    0.34830607958576576,
+    "29/216"
+   ],
+   "band": "<= +8, <= 2/3",
+   "pass": true,
+   "usage": 0.201,
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "SF2:lc",
+   "value": [
+    -2.7665637918031893,
+    "68/216"
+   ],
+   "band": "<= +8, <= 2/3",
+   "pass": true,
+   "usage": 0.472,
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "SF2:oil",
+   "value": [
+    -0.4816377241310236,
+    "9/216"
+   ],
+   "band": "<= +8, <= 2/3",
+   "pass": true,
+   "usage": 0.062,
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "SF2:prs",
+   "value": [
+    -0.23753415407437276,
+    "11/216"
+   ],
+   "band": "<= +8, <= 2/3",
+   "pass": true,
+   "usage": 0.076,
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "SF2:rate",
+   "value": [
+    -0.544728983084833,
+    "9/216"
+   ],
+   "band": "<= +8, <= 2/3",
+   "pass": true,
+   "usage": 0.062,
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "SF2:rec_pkg",
+   "value": [
+    -0.4195428879838066,
+    "0/30"
+   ],
+   "band": "<= +8, <= 2/3",
+   "pass": true,
+   "usage": 0.0,
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "SF3:curve",
+   "value": -7.9836005776867225,
+   "band": ">= -13",
+   "pass": true,
+   "usage": 0.614,
+   "note": "min -18.7, reported",
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "SF3:geo",
+   "value": -4.975339395612188,
+   "band": ">= -13",
+   "pass": true,
+   "usage": 0.383,
+   "note": "min -17.3, reported",
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "SF3:lc",
+   "value": -7.635176062471771,
+   "band": ">= -13",
+   "pass": true,
+   "usage": 0.587,
+   "note": "min -15.6, reported",
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "SF3:oil",
+   "value": -3.3626494046261612,
+   "band": ">= -13",
+   "pass": true,
+   "usage": 0.259,
+   "note": "min -11.6, reported",
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "SF3:prs",
+   "value": -3.543784656842952,
+   "band": ">= -13",
+   "pass": true,
+   "usage": 0.273,
+   "note": "min -13.5, reported",
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "SF3:rate",
+   "value": -7.9836005776867225,
+   "band": ">= -13",
+   "pass": true,
+   "usage": 0.614,
+   "note": "min -18.7, reported",
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "SF3:rec_pkg",
+   "value": -10.015634278280316,
+   "band": ">= -13",
+   "pass": true,
+   "usage": 0.77,
+   "note": "min -14.8, reported",
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "SF4:rec_pkg",
+   "value": 0,
+   "band": "0",
+   "pass": true,
+   "usage": null,
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "SF5:curve",
+   "value": 6.179607790090815,
+   "band": [
+    3,
+    13
+   ],
+   "pass": true,
+   "usage": 0.364,
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "SF5:geo",
+   "value": 8.114322182501759,
+   "band": [
+    3,
+    13
+   ],
+   "pass": true,
+   "usage": 0.023,
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "SF5:lc",
+   "value": 7.7178029102086425,
+   "band": [
+    3,
+    13
+   ],
+   "pass": true,
+   "usage": 0.056,
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "SF5:oil",
+   "value": 5.828417401079953,
+   "band": [
+    3,
+    13
+   ],
+   "pass": true,
+   "usage": 0.434,
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "SF5:prs",
+   "value": 5.7581367417029785,
+   "band": [
+    3,
+    13
+   ],
+   "pass": true,
+   "usage": 0.448,
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "SF5:rate",
+   "value": 6.1711498978916435,
+   "band": [
+    3,
+    13
+   ],
+   "pass": true,
+   "usage": 0.366,
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "SF5:rec_pkg",
+   "value": 7.3881557180492905,
+   "band": [
+    3,
+    13
+   ],
+   "pass": true,
+   "usage": 0.122,
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "H1-100y",
+   "value": "H1 pass",
+   "band": "every decade in",
+   "pass": true,
+   "usage": null,
+   "gated": true
+  },
+  {
+   "group": "leak",
+   "id": "R7a-pre",
+   "value": [
+    [
+     1.7813591434770433,
+     0.8242750451566542
+    ],
+    [
+     -0.7269825981375793,
+     1.4793485684568135
+    ]
+   ],
+   "band": "within 5 bp or 2 se",
+   "pass": true,
+   "usage": null,
+   "gated": true
+  },
+  {
+   "group": "exploit",
+   "id": "exploit gate",
+   "value": {
+    "outputs": 25,
+    "rules_gated": 509,
+    "exploits": 0
+   },
+   "band": "0 exploits",
+   "pass": true,
+   "usage": null,
+   "gated": true
+  },
+  {
+   "group": "pt-v21",
+   "id": "ON1",
+   "value": 0.34650952673797314,
+   "band": [
+    0.24492113232476248,
+    0.41454247239018177
+   ],
+   "pass": true,
+   "usage": 0.198,
+   "gated": true,
+   "exception": "worse than v21 on its corrected reader (0.345 against 0.325, real 0.330, both in band), an exception the owner accepts to the rule that no row is worse than v21 (draft item 25(h)): the measured pre-open news share"
+  },
+  {
+   "group": "pt-v21",
+   "id": "U1",
+   "value": 0.16666666666666666,
+   "band": [
+    -0.020492390372391478,
+    0.28715905703905814
+   ],
+   "pass": true,
+   "usage": 0.217,
+   "gated": true
+  },
+  {
+   "group": "pt-v21",
+   "id": "U2",
+   "value": 2.3993944301121797,
+   "band": [
+    -0.21221609106116368,
+    6.012216091061164
+   ],
+   "pass": true,
+   "usage": 0.161,
+   "gated": true
+  },
+  {
+   "group": "pt-v21",
+   "id": "U3",
+   "value": 0.13530634521137347,
+   "band": [
+    -0.14651662260929504,
+    0.6816694291815899
+   ],
+   "pass": true,
+   "usage": 0.319,
+   "gated": true
+  },
+  {
+   "group": "pt-v21",
+   "id": "U4",
+   "value": 0.841055730482042,
+   "band": [
+    -0.4941315933074144,
+    2.2216261920406444
+   ],
+   "pass": true,
+   "usage": 0.017,
+   "gated": true
+  },
+  {
+   "group": "pt-v21",
+   "id": "O1",
+   "value": 0.9232097573819769,
+   "band": [
+    0.4403173230552676,
+    1.8243453792967075
+   ],
+   "pass": true,
+   "usage": 0.302,
+   "gated": true
+  },
+  {
+   "group": "pt-v21",
+   "id": "O2",
+   "value": 0.05,
+   "band": [
+    0.03521997860573309,
+    0.09811335472760024
+   ],
+   "pass": true,
+   "usage": 0.53,
+   "gated": true
+  },
+  {
+   "group": "pt-v21",
+   "id": "O3",
+   "value": 0.07905403191129068,
+   "band": [
+    -0.43322704734909895,
+    0.7145876491109622
+   ],
+   "pass": true,
+   "usage": 0.107,
+   "gated": true
+  },
+  {
+   "group": "pt-v21",
+   "id": "O4",
+   "value": 0.2861515534765324,
+   "band": [
+    -0.018254899950916614,
+    0.5361323385715968
+   ],
+   "pass": true,
+   "usage": 0.098,
+   "gated": true
+  },
+  {
+   "group": "pt-v21",
+   "id": "SK1",
+   "value": -0.1587137622655354,
+   "band": [
+    -0.28680126847222165,
+    -0.013914093882596706
+   ],
+   "pass": true,
+   "usage": 0.061,
+   "gated": true
+  },
+  {
+   "group": "pt-v21",
+   "id": "SK2",
+   "value": 1.2097609561752989,
+   "band": [
+    0.998018092925739,
+    1.501981907074261
+   ],
+   "pass": true,
+   "usage": 0.16,
+   "gated": true
+  },
+  {
+   "group": "amended (registration 19)",
+   "id": "R3",
+   "value": -0.13760163784455978,
+   "band": [
+    -0.36,
+    0.03
+   ],
+   "pass": true,
+   "note": "R3 held (restated 2026-10-14)",
+   "gated": true
+  },
+  {
+   "group": "amended (registration 19)",
+   "id": "SF1",
+   "value": 1.030659051293843,
+   "band": [
+    0.75,
+    null
+   ],
+   "pass": true,
+   "note": "ratio of medians (gate amended 2026-10-14)",
+   "gated": true
+  },
+  {
+   "group": "amended (registration 19)",
+   "id": "DV1c",
+   "value": 6.399923976085777,
+   "band": [
+    3.7,
+    7.7
+   ],
+   "pass": true,
+   "note": "median over the gen histories of DV1 less rho_rep, the change in ln(index / TTM reported EPS with v) (item 25, amendments A and E)",
+   "gated": true
+  },
+  {
+   "group": "amended (registration 19)",
+   "id": "E1",
+   "value": -0.09143668380356129,
+   "band": [
+    -0.4,
+    -0.046
+   ],
+   "pass": true,
+   "note": "pooled median over the gen histories' contractions of the TTM reported EPS's fall (item 25, amendments A and E)",
+   "gated": true,
+   "exception": "worse than v21 on its corrected reader (-0.086 against -0.117, real -0.17), an exception the owner accepts to the rule that no row is worse than v21 (draft item 25(j)): v21's earnings level drifts down by half its variance a year, which pt-v22's aggregate earnings-level fix removes; the tape has no such drift"
+  },
+  {
+   "group": "amended (registration 19)",
+   "id": "PH4",
+   "value": 0.6678104120056167,
+   "band": [
+    0.574,
+    0.79
+   ],
+   "pass": true,
+   "note": "every seam offset averaged (item 20), on the long run's 270 (grade_all.load_pool)",
+   "gated": true
+  },
+  {
+   "group": "amended (registration 19)",
+   "id": "PH4b",
+   "value": 0.6091258896824869,
+   "band": [
+    0.514,
+    0.781
+   ],
+   "pass": true,
+   "note": "every seam offset averaged (item 20), on the long run's 270 (grade_all.load_pool)",
+   "gated": true
+  },
+  {
+   "group": "registered",
+   "id": "R6",
+   "value": "-2.08",
+   "band": [
+    [
+     -10.86,
+     -2.72
+    ]
+   ],
+   "pass": false,
+   "usage": 1.156,
+   "note": "-2.08",
+   "gated": false,
+   "reported_because": "reported, not gated (draft item 25(i))"
+  },
+  {
+   "group": "pt-v22",
+   "id": "IF1",
+   "value": 3.7183188603459607,
+   "band": [
+    1.209256369040696,
+    6.267280393713019
+   ],
+   "rule": "fixed",
+   "pass": true,
+   "gated": true
+  },
+  {
+   "group": "pt-v22",
+   "id": "IF2",
+   "value": 0.4154337249734389,
+   "band": [
+    0.12666979481012236,
+    0.7158637407060751
+   ],
+   "rule": "fixed",
+   "pass": true,
+   "gated": true
+  },
+  {
+   "group": "pt-v22",
+   "id": "IF3",
+   "value": 0.0,
+   "band": [
+    0.0,
+    1e-12
+   ],
+   "rule": "construction",
+   "pass": true,
+   "gated": true
+  },
+  {
+   "group": "pt-v22",
+   "id": "NS1",
+   "value": 0.4695905020824342,
+   "band": [
+    0.3,
+    0.6
+   ],
+   "rule": "adopted G1c",
+   "pass": true,
+   "gated": true
+  },
+  {
+   "group": "pt-v22",
+   "id": "NS2",
+   "value": 3.6460631943807553,
+   "band": [
+    0.0,
+    6.267280393713019
+   ],
+   "rule": "construction, IF1's ceiling",
+   "pass": true,
+   "gated": true
+  },
+  {
+   "group": "pt-v22",
+   "id": "RF1_m1",
+   "value": 1.4162412844792966,
+   "band": [
+    -0.06952594939365819,
+    2.623654510985814
+   ],
+   "rule": "2se",
+   "pass": true,
+   "gated": true
+  },
+  {
+   "group": "pt-v22",
+   "id": "RF1_m3",
+   "value": 11.206099461109279,
+   "band": [
+    3.5,
+    17.5
+   ],
+   "rule": "literature",
+   "pass": true,
+   "gated": true
+  },
+  {
+   "group": "pt-v22",
+   "id": "RF1_m6",
+   "value": 31.223174120238994,
+   "band": [
+    7.959259259259259,
+    53.440740740740736
+   ],
+   "rule": "literature",
+   "pass": true,
+   "gated": true
+  },
+  {
+   "group": "pt-v22",
+   "id": "RF2",
+   "value": 1.3861252360072425,
+   "band": [
+    1.0640643500043467,
+    3.3203847393738597
+   ],
+   "rule": "2se",
+   "pass": true,
+   "gated": true
+  },
+  {
+   "group": "pt-v22",
+   "id": "RF3",
+   "value": 0.0,
+   "band": [
+    0.0,
+    1e-09
+   ],
+   "rule": "construction",
+   "pass": true,
+   "gated": true
+  },
+  {
+   "group": "pt-v22",
+   "id": "RF4",
+   "value": 18.286937803961607,
+   "band": [
+    -160.28077163006793,
+    70.61151080236596
+   ],
+   "rule": "fixed",
+   "pass": true,
+   "gated": true
+  },
+  {
+   "group": "pt-v22",
+   "id": "RF5",
+   "value": 0.6874775366109966,
+   "band": [
+    0.0,
+    2.0
+   ],
+   "rule": "construction",
+   "pass": true,
+   "gated": true
+  },
+  {
+   "group": "pt-v22",
+   "id": "OF1",
+   "value": 0.440027189888301,
+   "band": [
+    0.3959271859672713,
+    0.6384679881252253
+   ],
+   "rule": "2se",
+   "pass": true,
+   "gated": true
+  },
+  {
+   "group": "pt-v22",
+   "id": "OF2",
+   "value": 0.5879865635784399,
+   "band": [
+    0.4429930694932701,
+    0.6647925684296406
+   ],
+   "rule": "2se",
+   "pass": true,
+   "gated": true
+  },
+  {
+   "group": "pt-v22",
+   "id": "OF3",
+   "value": 0.8482281891065542,
+   "band": [
+    0.4846874482893982,
+    1.0629803280985424
+   ],
+   "rule": "fixed",
+   "pass": true,
+   "gated": true
+  },
+  {
+   "group": "pt-v22",
+   "id": "MG1",
+   "value": 0.010001859822519794,
+   "band": [
+    0.005,
+    0.015
+   ],
+   "rule": "construction (99% scan)",
+   "pass": true,
+   "gated": true
+  },
+  {
+   "group": "pt-v22",
+   "id": "MG2",
+   "value": 0.0,
+   "band": [
+    0,
+    0
+   ],
+   "rule": "construction, traded stage",
+   "pass": true,
+   "gated": true
+  },
+  {
+   "group": "pt-v22",
+   "id": "XD1",
+   "value": 0.0,
+   "band": [
+    null,
+    null
+   ],
+   "rule": "C10a bound, traded stage",
+   "pass": true,
+   "gated": true
+  },
+  {
+   "group": "pt-v22",
+   "id": "XD2",
+   "value": 0.0,
+   "band": [
+    null,
+    null
+   ],
+   "rule": "C10a bound, traded stage",
+   "pass": true,
+   "gated": true
+  },
+  {
+   "group": "pt-v22",
+   "id": "IF4",
+   "value": 0.16428152432315263,
+   "band": [
+    0.1,
+    0.21
+   ],
+   "rule": "adopted Q6",
+   "pass": true,
+   "gated": true
+  },
+  {
+   "group": "pt-v22",
+   "id": "XD3",
+   "value": -625071.5649277072,
+   "band": [
+    null,
+    0.0
+   ],
+   "rule": "construction, traded stage",
+   "pass": true,
+   "gated": true
+  },
+  {
+   "group": "pt-v22",
+   "id": "SS1",
+   "value": 1.3503620157648148,
+   "band": [
+    1.083418788426055,
+    1.4069293836624692
+   ],
+   "rule": "fixed",
+   "pass": true,
+   "gated": true
+  },
+  {
+   "group": "pt-v22",
+   "id": "SS2",
+   "value": 41.615189012372355,
+   "band": [
+    34.124028035683935,
+    47.655971964316066
+   ],
+   "rule": "2se",
+   "pass": true,
+   "gated": true
+  },
+  {
+   "group": "pt-v22",
+   "id": "SS3",
+   "value": 0.10892307389469259,
+   "band": [
+    -0.07829733333649955,
+    0.18472002168112248
+   ],
+   "rule": "fixed",
+   "pass": true,
+   "gated": true
+  },
+  {
+   "group": "pt-v22",
+   "id": "SS4",
+   "value": 8.56895502120668,
+   "band": [
+    null,
+    null
+   ],
+   "rule": "directional",
+   "pass": true,
+   "gated": true
+  },
+  {
+   "group": "pt-v22",
+   "id": "EV1",
+   "value": -0.15114766037842275,
+   "band": [
+    -0.39041655541266046,
+    -0.1365739935011931
+   ],
+   "rule": "fixed",
+   "pass": true,
+   "gated": true
+  },
+  {
+   "group": "pt-v22",
+   "id": "EV2",
+   "value": -0.011418526370954467,
+   "band": [
+    -0.062229742638824824,
+    0.16406715982413414
+   ],
+   "rule": "fixed",
+   "pass": true,
+   "gated": true
+  },
+  {
+   "group": "pt-v22",
+   "id": "EV3",
+   "value": 1.2918190873246673,
+   "band": [
+    0.7192153275039348,
+    1.3053076865826405
+   ],
+   "rule": "fixed",
+   "pass": true,
+   "gated": true
+  },
+  {
+   "group": "pt-v22",
+   "id": "MG3",
+   "value": 4.786829157282651e-05,
+   "band": [
+    0.0,
+    0.00112
+   ],
+   "rule": "2se (tape: the forty, 2015-2025, moves past +-15%), traded stage",
+   "pass": true,
+   "gated": true
+  },
+  {
+   "group": "pt-v22",
+   "id": "XD5",
+   "value": 0,
+   "band": [
+    null,
+    null
+   ],
+   "rule": "as XD4, traded stage",
+   "pass": true,
+   "gated": true
+  },
+  {
+   "group": "pt-v22",
+   "id": "AX1",
+   "value": 0,
+   "band": [
+    0,
+    0
+   ],
+   "rule": "construction",
+   "pass": true,
+   "gated": true
+  },
+  {
+   "group": "pt-v22",
+   "id": "AX2",
+   "value": 3.725290298461914e-09,
+   "band": [
+    0.0,
+    0.005
+   ],
+   "rule": "construction, traded stage",
+   "pass": true,
+   "gated": true
+  },
+  {
+   "group": "pt-v22",
+   "id": "OF4",
+   "value": 2.002697346451327,
+   "band": [
+    0.0,
+    2.0
+   ],
+   "rule": "construction",
+   "pass": false,
+   "gated": false,
+   "reported_because": "reported, not gated (draft item 21): six attempts to remove the oil forecast's 126-session bias failed; on the grade it is $0.36 a barrel, about 0.5% of the price"
+  },
+  {
+   "group": "pt-v22",
+   "id": "SV1",
+   "value": 1.5006662579253316e-11,
+   "band": [
+    0.0,
+    0.1
+   ],
+   "rule": "construction",
+   "pass": true,
+   "gated": false,
+   "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
+  },
+  {
+   "group": "pt-v22",
+   "id": "SV2",
+   "value": 0,
+   "band": [
+    0,
+    0
+   ],
+   "rule": "construction",
+   "pass": true,
+   "gated": false,
+   "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
+  },
+  {
+   "group": "pt-v22",
+   "id": "SV3",
+   "value": 1.1208439238906578,
+   "band": [
+    1.1119349770509113,
+    1.150042679222002
+   ],
+   "rule": "2se",
+   "pass": true,
+   "gated": false,
+   "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
+  },
+  {
+   "group": "pt-v22",
+   "id": "SV4",
+   "value": 0.10960758377425044,
+   "band": [
+    0.04223044458060209,
+    0.10888895840447252
+   ],
+   "rule": "2se",
+   "pass": false,
+   "gated": false,
+   "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
+  },
+  {
+   "group": "pt-v22",
+   "id": "SV5_9D",
+   "value": 0.9367888389890605,
+   "band": [
+    0.9237664912825676,
+    0.9592299607452444
+   ],
+   "rule": "2se",
+   "pass": true,
+   "gated": false,
+   "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
+  },
+  {
+   "group": "pt-v22",
+   "id": "SV5_6M",
+   "value": 1.2336736136114386,
+   "band": [
+    1.1804219104501739,
+    1.2646628485427227
+   ],
+   "rule": "2se",
+   "pass": true,
+   "gated": false,
+   "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
+  },
+  {
+   "group": "pt-v22",
+   "id": "SV5_1Y",
+   "value": 1.3486099300223113,
+   "band": [
+    1.2219767534914145,
+    1.3657479830243948
+   ],
+   "rule": "2se",
+   "pass": true,
+   "gated": false,
+   "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
+  },
+  {
+   "group": "pt-v22",
+   "id": "SV6_median",
+   "value": 119.75747950203163,
+   "band": [
+    117.23878262484884,
+    122.63121737515117
+   ],
+   "rule": "2se",
+   "pass": true,
+   "gated": false,
+   "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
+  },
+  {
+   "group": "pt-v22",
+   "id": "SV6_sd",
+   "value": 10.01161164789053,
+   "band": [
+    9.256971596248516,
+    14.212814682229347
+   ],
+   "rule": "2se",
+   "pass": true,
+   "gated": false,
+   "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
+  },
+  {
+   "group": "pt-v22",
+   "id": "SV7",
+   "value": -0.36798260644365427,
+   "band": [
+    -0.7702911492240678,
+    0.3735378224974626
+   ],
+   "rule": "fixed",
+   "pass": true,
+   "gated": false,
+   "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
+  },
+  {
+   "group": "pt-v22",
+   "id": "SV8",
+   "value": 1.2951546122004403,
+   "band": [
+    1.3264348387868303,
+    1.4286622382624687
+   ],
+   "rule": "2se",
+   "pass": false,
+   "gated": false,
+   "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
+  },
+  {
+   "group": "pt-v22",
+   "id": "SV9",
+   "value": -4.448522217334986,
+   "band": [
+    -5.091868014695722,
+    -3.5101361025506717
+   ],
+   "rule": "2se",
+   "pass": true,
+   "gated": false,
+   "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
+  },
+  {
+   "group": "pt-v22",
+   "id": "OB1r",
+   "value": -0.09609936746861092,
+   "band": [
+    -0.17983131540525282,
+    0.0891628439374808
+   ],
+   "rule": "fixed",
+   "pass": true,
+   "gated": false,
+   "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
+  },
+  {
+   "group": "pt-v22",
+   "id": "OB1v",
+   "value": 0.0,
+   "band": [
+    0.4798484845340991,
+    0.8941669756973236
+   ],
+   "rule": "fixed",
+   "pass": false,
+   "gated": false,
+   "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
+  },
+  {
+   "group": "pt-v22",
+   "id": "OB1d",
+   "value": 0.0,
+   "band": [
+    0.42634167322491323,
+    0.9778033434218769
+   ],
+   "rule": "fixed",
+   "pass": false,
+   "gated": false,
+   "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
+  },
+  {
+   "group": "pt-v22",
+   "id": "OB2r",
+   "value": -0.09609936746861092,
+   "band": [
+    -0.17457578540378393,
+    0.08351267761015645
+   ],
+   "rule": "fixed",
+   "pass": true,
+   "gated": false,
+   "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
+  },
+  {
+   "group": "pt-v22",
+   "id": "OB2v",
+   "value": 0.0,
+   "band": [
+    0.5465682086013922,
+    0.8608621114053846
+   ],
+   "rule": "fixed",
+   "pass": false,
+   "gated": false,
+   "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
+  },
+  {
+   "group": "pt-v22",
+   "id": "OB2d",
+   "value": 0.0,
+   "band": [
+    0.4664910803222973,
+    0.973090040154942
+   ],
+   "rule": "fixed",
+   "pass": false,
+   "gated": false,
+   "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
+  },
+  {
+   "group": "pt-v22",
+   "id": "OB3r",
+   "value": -0.09609936746861092,
+   "band": [
+    -0.3366083001877864,
+    0.17504257612260388
+   ],
+   "rule": "fixed",
+   "pass": true,
+   "gated": false,
+   "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
+  },
+  {
+   "group": "pt-v22",
+   "id": "OB3v",
+   "value": 0.0,
+   "band": [
+    0.1926536179129349,
+    0.7478503846665557
+   ],
+   "rule": "fixed",
+   "pass": false,
+   "gated": false,
+   "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
+  },
+  {
+   "group": "pt-v22",
+   "id": "OB3d",
+   "value": 0.0,
+   "band": [
+    0.041722565330268524,
+    0.9504196336863853
+   ],
+   "rule": "fixed",
+   "pass": false,
+   "gated": false,
+   "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
+  },
+  {
+   "group": "pt-v22",
+   "id": "OB4r",
+   "value": -0.09609936746861092,
+   "band": [
+    -0.38764913328945516,
+    0.2574463002571552
+   ],
+   "rule": "fixed",
+   "pass": true,
+   "gated": false,
+   "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
+  },
+  {
+   "group": "pt-v22",
+   "id": "OB4v",
+   "value": 0.0,
+   "band": [
+    0.3897115766958382,
+    1.1508675812896705
+   ],
+   "rule": "fixed",
+   "pass": false,
+   "gated": false,
+   "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
+  },
+  {
+   "group": "pt-v22",
+   "id": "OB4d",
+   "value": 0.0,
+   "band": [
+    0.058342549173640124,
+    1.694050609892213
+   ],
+   "rule": "fixed",
+   "pass": false,
+   "gated": false,
+   "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
+  },
+  {
+   "group": "pt-v22",
+   "id": "OB5",
+   "value": null,
+   "band": [
+    -0.06,
+    -0.015
+   ],
+   "rule": "literature",
+   "pass": null,
+   "gated": false,
+   "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
+  },
+  {
+   "group": "pt-v22",
+   "id": "OB6",
+   "value": null,
+   "band": [
+    null,
+    0.0
+   ],
+   "rule": "signed",
+   "pass": null,
+   "gated": false,
+   "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
+  },
+  {
+   "group": "pt-v22",
+   "id": "XD4",
+   "value": null,
+   "band": [
+    null,
+    null
+   ],
+   "rule": "C10a bound and construction, traded stage",
+   "pass": null,
+   "gated": false,
+   "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
+  },
+  {
+   "group": "pt-v22",
+   "id": "VF1",
+   "value": null,
+   "band": [
+    0.7787583552861578,
+    0.8882714195867544
+   ],
+   "rule": "2se",
+   "pass": null,
+   "gated": false,
+   "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
+  },
+  {
+   "group": "pt-v22",
+   "id": "VF2",
+   "value": null,
+   "band": [
+    0.6007153456452341,
+    0.8683928008272288
+   ],
+   "rule": "2se",
+   "pass": null,
+   "gated": false,
+   "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
+  },
+  {
+   "group": "pt-v22",
+   "id": "VF3",
+   "value": null,
+   "band": [
+    0.6763555505172418,
+    0.9049362089482371
+   ],
+   "rule": "2se",
+   "pass": null,
+   "gated": false,
+   "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
+  },
+  {
+   "group": "pt-v22",
+   "id": "VF4_F1",
+   "value": null,
+   "band": [
+    0.5822703853045272,
+    0.6466837515125627
+   ],
+   "rule": "2se",
+   "pass": null,
+   "gated": false,
+   "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
+  },
+  {
+   "group": "pt-v22",
+   "id": "VF4_F2",
+   "value": null,
+   "band": [
+    0.36799804516984624,
+    0.4576279055712781
+   ],
+   "rule": "2se",
+   "pass": null,
+   "gated": false,
+   "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
+  },
+  {
+   "group": "pt-v22",
+   "id": "VF4_F4",
+   "value": null,
+   "band": [
+    0.23406197833938408,
+    0.27167832244195217
+   ],
+   "rule": "2se",
+   "pass": null,
+   "gated": false,
+   "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
+  },
+  {
+   "group": "pt-v22",
+   "id": "VF5",
+   "value": null,
+   "band": [
+    -1.6320541510052942,
+    0.5775469501961309
+   ],
+   "rule": "fixed",
+   "pass": null,
+   "gated": false,
+   "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
+  },
+  {
+   "group": "pt-v22",
+   "id": "VF6_h21",
+   "value": null,
+   "band": [
+    0.31759253807354126,
+    1.797961249805247
+   ],
+   "rule": "2se",
+   "pass": null,
+   "gated": false,
+   "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
+  },
+  {
+   "group": "pt-v22",
+   "id": "VF6_h63",
+   "value": null,
+   "band": [
+    0.5255408449043948,
+    3.6624454454181867
+   ],
+   "rule": "2se",
+   "pass": null,
+   "gated": false,
+   "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
+  },
+  {
+   "group": "pt-v22",
+   "id": "VF6_h126",
+   "value": null,
+   "band": [
+    0.8783175386027171,
+    4.912345122341488
+   ],
+   "rule": "2se",
+   "pass": null,
+   "gated": false,
+   "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
+  },
+  {
+   "group": "pt-v22",
+   "id": "VF7",
+   "value": null,
+   "band": [
+    0.0,
+    1e-12
+   ],
+   "rule": "construction",
+   "pass": null,
+   "gated": false,
+   "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
+  },
+  {
+   "group": "pt-v22",
+   "id": "VF8",
+   "value": 6.941070683296917,
+   "band": [
+    0.0,
+    2.0
+   ],
+   "rule": "construction",
+   "pass": false,
+   "gated": false,
+   "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
+  }
+ ],
+ "superseded": [
+  {
+   "group": "registered",
+   "id": "E1",
+   "value": "-0.113",
+   "band": [
+    [
+     -0.4,
+     -0.046
+    ]
+   ],
+   "pass": true,
+   "usage": 0.621,
+   "note": "-0.113",
+   "superseded_by": "draft item 25: E1 on the TTM reported EPS with v (amend19.py)"
+  },
+  {
+   "group": "registered",
+   "id": "R6",
+   "value": "-2.08",
+   "band": [
+    [
+     -10.86,
+     -2.72
+    ]
+   ],
+   "pass": false,
+   "usage": 1.156,
+   "note": "-2.08",
+   "superseded_by": "draft item 25(i): reported, not gated (read on amendments D and E)"
+  },
+  {
+   "group": "registered",
+   "id": "R3",
+   "value": "-0.372",
+   "band": [
+    [
+     -0.36,
+     0.03
+    ]
+   ],
+   "pass": false,
+   "usage": 1.061,
+   "note": "-0.372",
+   "superseded_by": "draft item 4: R3 on the held close (amend19.py), not the last print"
+  },
+  {
+   "group": "proposed",
+   "id": "DV1",
+   "value": 6.025009291520897,
+   "band": [
+    4.6,
+    8.6
+   ],
+   "pass": true,
+   "usage": 0.287,
+   "superseded_by": "draft item 7: DV1c (amend19.py)"
+  },
+  {
+   "group": "proposed",
+   "id": "PH4",
+   "value": 0.6662391935961767,
+   "band": [
+    0.575,
+    0.743
+   ],
+   "pass": true,
+   "usage": 0.086,
+   "superseded_by": "draft item 20: PH4 at every seam offset (amend19.py)"
+  },
+  {
+   "group": "proposed",
+   "id": "PH4b",
+   "value": 0.6108394332919341,
+   "band": [
+    0.586,
+    0.838
+   ],
+   "pass": true,
+   "usage": 0.803,
+   "superseded_by": "draft item 20: PH4b at every seam offset (amend19.py)"
+  },
+  {
+   "group": "leak",
+   "id": "SF1",
+   "value": 1.043449007639455,
+   "band": ">= 0.75",
+   "pass": true,
+   "usage": null,
+   "note": "sf.json (12 seeds), as grade_all reads it",
+   "superseded_by": "draft item 3: SF1 as a ratio of medians (amend19.py), not the median of per-seed ratios"
+  },
+  {
+   "value": 6.025009291520897,
+   "superseded_by": "DV1c (item 7)",
+   "pass": null,
+   "id": "DV1"
+  },
+  {
+   "value": -0.11307105910784843,
+   "superseded_by": "E1 (item 25)",
+   "pass": null,
+   "id": "E1 registered"
+  }
+ ],
+ "replaced_by_amendments": [],
+ "measured": {
+  "fingerprint": "pt-v22",
+  "graded_fingerprint": "custom-9ac114fd",
+  "box": "g23gen-e1a+g23b1-e1a+g23b2-e1a+g23traded-e7a+g23reads-e1a+g23gate-e20a",
+  "engine_commit": "e132a66acbdec409f8f0d48875bdec068adbdd68",
+  "desk": "validation/pt-v22/",
+  "verdict16": "validation/pt-v22/programme/results/ptv22/grade/verdict-R22-fixd2RWPD.json",
+  "amend19": "validation/pt-v22/programme/results/ptv22/grade/amend19-R22-fixd2RWPD.json",
+  "ptv22grade": "validation/pt-v22/programme/results/ptv22/grade/ptv22-R22-fixd2RWPD.json"
+ },
+ "passed": 190,
+ "of": 190,
+ "verdict": "pass",
+ "all_rows": {
+  "passed": 204,
+  "of": 231
+ }
+}
