@@ -43,6 +43,7 @@ from __future__ import annotations
 
 import argparse
 import difflib
+import importlib.util
 import json
 import pathlib
 import re
@@ -116,6 +117,108 @@ def _files(d: pathlib.Path) -> int | None:
     return None
 
 
+#: The criteria the long-run rows are graded under, as grade 23's grade_all names them, at their published paths.
+CRITERIA = ("validation/pt-v21/programme/longrun/CRITERIA.md (adopted 2026-09-23; C4a and C4b added 2026-09-24; "
+            "C5-C8 registered 2026-09-24); the pt-v22 rows registered in "
+            "validation/pt-v22/programme/ptv22-registration-23-DRAFT.md (the twenty-third registration)")
+#: The long-run criteria's script, as published with pt-v21; its `_row` is unchanged at grade 23's JOBS_REF.
+CRITERIA_SCRIPT = "validation/pt-v21/programme/longrun/criteria.py"
+#: The day grade 23 ran. Its desk files carry no date; the verdict and ptv22grade were written that day.
+GRADE_DATE = "2026-11-01"
+
+
+def criteria_module():
+    """pt-v21's published criteria.py, whose `_row`, WORDS and RULE are unchanged at the grade's JOBS_REF."""
+    spec = importlib.util.spec_from_file_location("criteria", ROOT / CRITERIA_SCRIPT)
+    criteria = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(criteria)
+    return criteria
+
+
+def registered_numbers(desk: pathlib.Path, arm: str, rows: dict[str, dict]) -> None:
+    """The registered rows' value and real as numbers, the types pt-v21's rows carry.
+
+    verdict16 shows each registered row as grade_all prints it: `value` a display string ("0.44 / 0.34") and, for a
+    ratio or "within" rule, the real/target column under `band` ("0.57 / 0.34"). The numbers are grade_all's own
+    (`ga-ARM.json`'s `existing` block, the one verdict16 reads, R4 on the held close), turned into a row's value and
+    real by the long-run criteria's own `_row`, the function pt-v21's rows were written by (unchanged at the grade's
+    JOBS_REF). The display strings are kept as `value_text` and `real_text`; a numeric band stays `band`.
+    """
+    criteria = criteria_module()
+    existing = json.loads((desk / f"ga-{arm}.json").read_text())[arm]["existing"]
+    for rid, r in rows.items():
+        if r.get("group") != "registered" or rid not in existing:
+            continue
+        x = criteria._row(rid, existing[rid])
+        if x["pass"] != r["pass"]:
+            raise SystemExit(f"row {rid}: grade_all reads pass {x['pass']} and verdict16 {r['pass']}")
+        r["value_text"] = r["value"]
+        if isinstance(r.get("band"), str):
+            r["real_text"] = r.pop("band")
+        r["value"], r["real"] = x["value"], x["real"]
+        # The criterion's words and rule, verbatim from the same script: the grade's own texts.
+        r["words"], r["rule"] = x["words"], x["rule"]
+        applied = rule_applied(rid, existing[rid])
+        if applied:
+            r["rule_applied"] = applied
+
+
+def amended_reals(desk: pathlib.Path, arm: str, a19: dict, rows: dict[str, dict]) -> None:
+    """The amended rows' real value, in pt-v21's shape (a one-item list): amend19's own where it gives one (E1, the
+    TTM reported EPS's fall), and otherwise the long-run criteria's, which the amendment re-reads the model side of
+    and leaves the real side of (R3, `criteria-MERGED.json`)."""
+    merged = json.loads((desk / "criteria-MERGED.json").read_text())["arms"][arm]
+    criteria = criteria_module()
+    for rid, r in rows.items():
+        if r.get("group") != "amended (registration 19)":
+            continue
+        # The criterion's words and rule, verbatim, as for the registered rows; the amendment's own reading is in `note`.
+        if rid in criteria.WORDS:
+            r["words"], r["rule"] = criteria.WORDS[rid], criteria.RULE[rid]
+        if "real" in r:
+            continue
+        real = (a19.get("rows") or {}).get(rid, {}).get("real")
+        if real is None:
+            real = (merged.get(rid) or {}).get("real")
+        if real is not None:
+            r["real"] = real if isinstance(real, list) else [real]
+
+
+def rule_applied(rid: str, c: dict) -> str | None:
+    """The mark a rule the grade scales by history count is applied at, where it differs from the rule as written.
+
+    C2's rule is a rate, at most one history in thirty, and the grade allows `max(1, n // 30)` of its n histories
+    (criteria.py at the grade's JOBS_REF). R7b's "ahead in at most 20 of 30" scales the same way, as 20n/30 of n.
+    """
+    if rid == "C2" and c.get("histories"):
+        n = int(c["histories"])
+        return f"at most {max(1, n // 30)} of {n} (1 per 30)" if n != 30 else None
+    if rid == "R6" and c.get("bands"):
+        # R6's rule is written for pt-v21's 2022 reading; grade 23 applies the band it registered.
+        lo, hi = c["bands"][0]
+        return f"{lo:g} to {hi:g} per cent"
+    if rid == "R7b":
+        m = re.search(r"(\d+) of (\d+)", c.get("edge_note") or "")
+        if m and int(m.group(2)) != 30:
+            n = int(m.group(2))
+            return f"at most 0 points a year, ahead in at most {20 * n / 30:g} of {n} (20 per 30)"
+    return None
+
+
+def long_run_size(desk: pathlib.Path, arm: str) -> tuple[int, int]:
+    """The long run's histories and years for the arm, from the longrun report grade_all names."""
+    line = next(l for l in (desk / "grade_all.txt").read_text().splitlines() if l.startswith("long run"))
+    report = json.loads(pathlib.Path(line.split(None, 2)[2].strip()).read_text())
+    a = report["arms"][arm]
+    return int(a["n"]), int(a["years"])
+
+
+#: The four Cboe option rules' rows: each rule's return, volatility and drawdown.
+OPTION_RULE_ROW = re.compile(r"OB[1-4][rvd]")
+OPTION_RULES_NOT_READ = ("not read: the grade's chain histories carry no option quotes (the index option stage, "
+                         "ptv22idx, is off), so no rule opened a position")
+
+
 def assemble(desk: pathlib.Path, boxes: dict[str, dict], graded_fp: str | None = None) -> dict:
     """The verdict the record carries: see the module note, step 1."""
     arm, v16 = _one(desk, "verdict")
@@ -136,6 +239,13 @@ def assemble(desk: pathlib.Path, boxes: dict[str, dict], graded_fp: str | None =
     for s in v16.get("superseded") or []:
         if s.get("id") in rec.REPORTED_ROWS.get(NAME, {}) and s["id"] not in rows:
             rows[s["id"]] = {k: v for k, v in s.items() if k != "superseded_by"}
+    # The four Cboe option rules (OB1..OB4) trade only on rows that carry an option chain. When the
+    # grade's chain histories carried none, ptv22grade reports no ATM entry, every rule's account stays
+    # at 1.0, and its r, v and d are the index's own return and two zeros, not readings of the rule. They
+    # are written unread, as OB5 and OB6 are.
+    chainless = "ATM" not in (p22.get("reported") or {})
+    registered_numbers(desk, arm, rows)
+    amended_reals(desk, arm, a19, rows)
     for rid, r in (p22.get("rows") or {}).items():
         if rid in rows:
             raise SystemExit(f"row {rid} is in ptv22-{arm}.json and in verdict16 or amend19: say which is the grade's")
@@ -144,6 +254,11 @@ def assemble(desk: pathlib.Path, boxes: dict[str, dict], graded_fp: str | None =
         if r.get("gated") is False:
             # ptv22grade's "reported, not graded" rows: the grade's own gating, and an unread one stays unread.
             row.update(gated=False, **({"pass": r.get("pass")} if r.get("pass") is None else {}))
+        if chainless and OPTION_RULE_ROW.fullmatch(rid):
+            if r.get("gated") is not False:
+                raise SystemExit(f"row {rid} is gated, and the chain histories carried no option quotes to read it on")
+            row.update(value=None, gated=False, note=OPTION_RULES_NOT_READ)
+            row["pass"] = None
         rows[rid] = row
     commits = {b["commit"] for b in boxes.values()}
     if len(commits) != 1:
@@ -155,10 +270,14 @@ def assemble(desk: pathlib.Path, boxes: dict[str, dict], graded_fp: str | None =
     want = f"custom-{digest_prefix()}"
     if fp not in (want, NAME):
         raise SystemExit(f"the grade ran {fp}, which is not pt-v22's digest {want}: the swapped preset is not the graded arm")
-    doc = {"grade": "pt-v22, twenty-third registration", "arm": arm, "rows": list(rows.values()),
+    seeds, years = long_run_size(desk, arm)
+    doc = {"grade": "pt-v22, twenty-third registration", "arm": arm, "criteria": CRITERIA, "rows": list(rows.values()),
            "superseded": superseded, "replaced_by_amendments": sorted(replaced),
            "measured": {"fingerprint": NAME, "graded_fingerprint": fp, "box": "+".join(boxes),
                         "engine_commit": commits.pop(), "desk": "validation/pt-v22/",
+                        "seeds": seeds, "years": years, "date": GRADE_DATE,
+                        # The stages read other counts than the long run's: each one's, as ptv22grade gives it.
+                        "histories": dict(p22.get("histories") or {}),
                         **{k: v for k, v in published.items() if (ROOT / v).is_file()}}}
     reported = rec.reported_rows(NAME, doc["rows"])
     gated = [r for r in doc["rows"] if r["id"] not in reported]
@@ -320,12 +439,18 @@ def mock(d: pathlib.Path) -> None:
     (desk / f"verdict-{arm}.json").write_text(json.dumps(
         {"arm": arm, "rows": v16, "superseded": sup, "verdict": "pass", "passed": len(v16), "of": len(v16)}))
     (desk / f"amend19-{arm}.json").write_text(json.dumps({"arm": arm, "rows": {
-        "E1": {"value": -0.09, "band": [-0.3, -0.046], "pass": True, "source": "TTM reported EPS with v"},
+        "E1": {"value": -0.09, "band": [-0.3, -0.046], "pass": True, "real": -0.17, "source": "TTM reported EPS with v"},
         "B3": {"value": 1.2, "band": [0.58, 2.31], "pass": True},
         "DV1": {"value": 0.1, "superseded_by": "DV1c (item 7)", "pass": None}}}))
     (desk / f"ptv22-{arm}.json").write_text(json.dumps({"arm": arm, "rows": {
         "OF4": {"value": 0.87, "low": 1.0, "high": None, "rule": "ratio >= 1", "pass": False, "gated": False},
         "IF1": {"value": 3.7, "low": 1.2, "high": 6.3, "rule": "band", "pass": True, "gated": True}}}))
+    # grade_all's own numbers for the registered rows, and the long-run report it names.
+    (desk / f"ga-{arm}.json").write_text(json.dumps({arm: {"existing": {
+        f"B{i}": {"pass": True, "model": 1.0, "real": 1.0} for i in (1, 2, 4, 5, 6, 7, 8)}}}))
+    (desk / "criteria-MERGED.json").write_text(json.dumps({"arms": {arm: {"B3": {"real": 1.156}}}}))
+    (d / "longrun-report.json").write_text(json.dumps({"arms": {arm: {"n": 270, "years": 21}}}))
+    (desk / "grade_all.txt").write_text(f"PASS CRITERIA\nlong run  {d / 'longrun-report.json'}\n")
     for b in ("ptv22g1", "ptv22g2"):
         bd = d / b
         bd.mkdir(exist_ok=True)

@@ -2630,171 +2630,269 @@
   "long_run": {
     "grade": "pt-v22, twenty-third registration",
     "arm": "R22-fixd2RWPD",
+    "criteria": "validation/pt-v21/programme/longrun/CRITERIA.md (adopted 2026-09-23; C4a and C4b added 2026-09-24; C5-C8 registered 2026-09-24); the pt-v22 rows registered in validation/pt-v22/programme/ptv22-registration-23-DRAFT.md (the twenty-third registration)",
     "rows": [
       {
         "group": "registered",
         "id": "A1",
-        "value": "100 / 98",
-        "band": "84 / 95",
+        "value": [
+          100.4,
+          98.3
+        ],
         "pass": true,
         "usage": 0.639,
         "note": "2008 at +19%",
+        "value_text": "100 / 98",
+        "real_text": "84 / 95",
+        "real": [
+          84.3,
+          94.5
+        ],
+        "words": "worst month's volatility in the 2008 and 2020 replays within 30% of real",
+        "rule": "within 30%",
         "gated": true
       },
       {
         "group": "registered",
         "id": "A2",
-        "value": "0.44 / 0.34",
-        "band": "0.57 / 0.34",
+        "value": [
+          0.444,
+          0.343
+        ],
         "pass": true,
         "usage": 0.725,
         "note": "2008 at -22%",
+        "value_text": "0.44 / 0.34",
+        "real_text": "0.57 / 0.34",
+        "real": [
+          0.568,
+          0.339
+        ],
+        "words": "maximum drawdown in the 2008 and 2020 replays within 30% of real",
+        "rule": "within 30%",
         "gated": true
       },
       {
         "group": "registered",
         "id": "A3",
-        "value": "0.81 / 0.86",
-        "band": "0.75 / 0.87",
+        "value": [
+          0.813,
+          0.864
+        ],
         "pass": true,
         "usage": 0.431,
         "note": "2008 at +0.06",
+        "value_text": "0.81 / 0.86",
+        "real_text": "0.75 / 0.87",
+        "real": [
+          0.748,
+          0.872
+        ],
+        "words": "peak stock correlation in the 2008 and 2020 replays within 0.15 of real",
+        "rule": "within 0.15",
         "gated": true
       },
       {
         "group": "registered",
         "id": "B1",
-        "value": "6.8%",
-        "band": "8.2%",
+        "value": 0.068,
         "pass": true,
         "usage": 0.268,
         "note": "0.83x",
+        "value_text": "6.8%",
+        "real_text": "8.2%",
+        "real": 0.082,
+        "words": "share of sessions with the VIX above 30",
+        "rule": "1/2x to 2x",
         "gated": true
       },
       {
         "group": "registered",
         "id": "B2",
-        "value": "24",
-        "band": "22",
+        "value": 24,
         "pass": true,
         "usage": 0.109,
         "note": "1.08x",
+        "value_text": "24",
+        "real_text": "22",
+        "real": 22,
+        "words": "mean length of a fear spell above VIX 30, sessions",
+        "rule": "1/2x to 2x",
         "gated": true
       },
       {
         "group": "registered",
         "id": "B3",
-        "value": "1.69",
-        "band": "1.16",
+        "value": 1.69,
         "pass": true,
         "usage": 0.547,
         "note": "1.46x",
+        "value_text": "1.69",
+        "real_text": "1.16",
+        "real": 1.16,
+        "words": "20% bear markets per decade",
+        "rule": "1/2x to 2x",
         "gated": true
       },
       {
         "group": "registered",
         "id": "B4",
-        "value": "4.62",
-        "band": "2.84",
+        "value": 4.62,
         "pass": true,
         "usage": 0.702,
         "note": "1.63x",
+        "value_text": "4.62",
+        "real_text": "2.84",
+        "real": 2.84,
+        "words": "10% corrections per decade",
+        "rule": "1/2x to 2x",
         "gated": true
       },
       {
         "group": "registered",
         "id": "B5",
-        "value": "7.2",
-        "band": "6.2",
+        "value": 7.2,
         "pass": true,
         "usage": 0.217,
         "note": "1.16x",
+        "value_text": "7.2",
+        "real_text": "6.2",
+        "real": 6.2,
+        "words": "sessions down more than 5% per decade",
+        "rule": "1/2x to 2x",
         "gated": true
       },
       {
         "group": "registered",
         "id": "B6",
-        "value": "30.8%",
-        "band": "32.6%",
+        "value": 0.308,
         "pass": true,
         "usage": 0.082,
         "note": "0.94x",
+        "value_text": "30.8%",
+        "real_text": "32.6%",
+        "real": 0.326,
+        "words": "share of sessions with the VIX under 15",
+        "rule": "1/2x to 2x",
         "gated": true
       },
       {
         "group": "registered",
         "id": "B7",
-        "value": "18.4",
-        "band": "18.1",
+        "value": 18.4,
         "pass": true,
         "usage": 0.09,
         "note": "+2%",
+        "value_text": "18.4",
+        "real_text": "18.1",
+        "real": 18.1,
+        "words": "index annual volatility, %",
+        "rule": "within 20%",
         "gated": true
       },
       {
         "group": "registered",
         "id": "B8",
-        "value": "7.0",
-        "band": "6.25",
+        "value": 7.0,
         "pass": true,
         "usage": 0.384,
         "note": "+0.8 points",
+        "value_text": "7.0",
+        "real_text": "6.25",
+        "real": 6.25,
+        "words": "long-run index return, % a year",
+        "rule": "within 2 points of the honest target",
         "gated": true
       },
       {
         "group": "registered",
         "id": "C1",
-        "value": "1.12x",
-        "band": "1.0x",
+        "value": 1.12,
         "pass": true,
         "usage": 0.275,
         "note": "1.12x",
+        "value_text": "1.12x",
+        "real_text": "1.0x",
+        "real": 1.0,
+        "words": "crash rate in years 3-21 against years 1-2",
+        "rule": "2/3x to 1.5x",
         "gated": true
       },
       {
         "group": "registered",
         "id": "C2",
-        "value": "5 of 270",
-        "band": "0",
+        "value": 5,
         "pass": true,
         "usage": 0.556,
         "note": "5 of 270",
+        "value_text": "5 of 270",
+        "real_text": "0",
+        "real": 0,
+        "words": "histories touching the VIX ceiling, of 30",
+        "rule": "at most 1",
+        "rule_applied": "at most 9 of 270 (1 per 30)",
         "gated": true
       },
       {
         "group": "registered",
         "id": "C3",
-        "value": "+18bp",
-        "band": "~0",
+        "value": 17.9,
         "pass": true,
         "usage": 0.895,
         "note": "+17.9 bp",
+        "value_text": "+18bp",
+        "real_text": "~0",
+        "real": 0.0,
+        "words": "edge from reading a headline 5 ticks late, bp",
+        "rule": "under 20 bp",
         "gated": true
       },
       {
         "group": "registered",
         "id": "C4a",
-        "value": "-0.044 / 1.5x",
-        "band": "~0 (Roll)",
+        "value": [
+          -0.044,
+          1.5
+        ],
         "pass": true,
         "usage": 0.748,
         "note": "-0.044, Roll 1.5x",
+        "value_text": "-0.044 / 1.5x",
+        "real_text": "~0 (Roll)",
+        "real": [
+          0.0,
+          1.0
+        ],
+        "words": "65-minute lag-1 autocorrelation of print returns, median name; Roll spread over quoted",
+        "rule": "at or above -0.05, or Roll at most 2x quoted",
         "gated": true
       },
       {
         "group": "registered",
         "id": "C4b",
-        "value": "-3.0 pts, 8/20",
-        "band": "~0",
+        "value": [
+          -3.0,
+          8
+        ],
         "pass": true,
         "usage": 0.571,
         "note": "momentum_5day_daily -3.0 pts, 8 of 20",
+        "value_text": "-3.0 pts, 8/20",
+        "real_text": "~0",
+        "real": [
+          0.0,
+          10
+        ],
+        "words": "the price-only rule furthest over its line on tf-suite-2026.1 (named in `worst`): median points over buy-and-hold, markets beaten of 20",
+        "rule": "every rule at most +5 points and 14 of 20",
         "gated": true
       },
       {
         "group": "registered",
         "id": "C5",
-        "value": "0.952",
+        "value": [
+          0.9524
+        ],
         "band": [
           [
             0.8,
@@ -2804,12 +2902,21 @@
         "pass": true,
         "usage": 0.22,
         "note": "0.952",
+        "value_text": "0.952",
+        "real": [
+          0.9242
+        ],
+        "words": "stock-level (idiosyncratic) variance ratio at 60 sessions, median name, 30 histories of 2,660 sessions",
+        "rule": "in 0.80 to 1.05",
         "gated": true
       },
       {
         "group": "registered",
         "id": "C6",
-        "value": "+0.002 / +0.002",
+        "value": [
+          0.002,
+          0.0024
+        ],
         "band": [
           [
             -0.03,
@@ -2823,12 +2930,22 @@
         "pass": true,
         "usage": 0.199,
         "note": "+0.002 / +0.002",
+        "value_text": "+0.002 / +0.002",
+        "real": [
+          0.0093,
+          0.0093
+        ],
+        "words": "rank IC of the value signal on published fundamentals against the next 20 sessions: whole history, first 60 sessions",
+        "rule": "both in -0.03 to +0.05",
         "gated": true
       },
       {
         "group": "registered",
         "id": "C7",
-        "value": "+0.005 / +0.001",
+        "value": [
+          0.0053,
+          0.0011
+        ],
         "band": [
           [
             -0.04,
@@ -2842,12 +2959,21 @@
         "pass": true,
         "usage": 0.648,
         "note": "+0.005 / +0.001",
+        "value_text": "+0.005 / +0.001",
+        "real": [
+          0.0267,
+          0.0413
+        ],
+        "words": "rank IC of 12-1 and 6-1 month momentum against the next 20 sessions",
+        "rule": "12-1 in -0.04 to +0.095, 6-1 in -0.02 to +0.10",
         "gated": true
       },
       {
         "group": "registered",
         "id": "C8",
-        "value": "-1.1",
+        "value": [
+          -1.0628
+        ],
         "band": [
           [
             -6.4,
@@ -2857,12 +2983,21 @@
         "pass": true,
         "usage": 0.148,
         "note": "-1.1",
+        "value_text": "-1.1",
+        "real": [
+          -1.7388
+        ],
+        "words": "Lo-MacKinlay one-day loser-minus-winner book, bp a day",
+        "rule": "in -6.4 to +2.9",
         "gated": true
       },
       {
         "group": "registered",
         "id": "D2",
-        "value": "0.382 / 167.5",
+        "value": [
+          0.3818,
+          167.5
+        ],
         "band": [
           [
             0.237,
@@ -2876,12 +3011,22 @@
         "pass": true,
         "usage": 0.42,
         "note": "0.382 / 167.500",
+        "value_text": "0.382 / 167.5",
+        "real": [
+          0.339,
+          126
+        ],
+        "words": "the driven 2020-21 market: the index's maximum drawdown and the sessions from the pre-crash high back to it, medians over histories (driven2020.py)",
+        "rule": "drawdown in 0.237 to 0.441 and sessions in 63 to 252",
         "gated": true
       },
       {
         "group": "registered",
         "id": "F1",
-        "value": "0.382 / 31.5",
+        "value": [
+          0.3818,
+          31.5
+        ],
         "band": [
           [
             0.237,
@@ -2895,12 +3040,21 @@
         "pass": true,
         "usage": 0.42,
         "note": "0.382 / 31.500",
+        "value_text": "0.382 / 31.5",
+        "real": [
+          0.339,
+          23
+        ],
+        "words": "the driven 2020 path's fast crash: the high to the lowest close within 60 sessions, and the sessions it took (driven2020.py)",
+        "rule": "drop in 0.237 to 0.441 within 12 to 46 sessions",
         "gated": true
       },
       {
         "group": "registered",
         "id": "L1",
-        "value": "+71",
+        "value": [
+          71.0
+        ],
         "band": [
           [
             1,
@@ -2910,22 +3064,44 @@
         "pass": true,
         "usage": 0.037,
         "note": "+71",
+        "value_text": "+71",
+        "real": [
+          68
+        ],
+        "words": "look-through: sessions from the index's trough to the aggregate earnings level's trough on the driven 2020 path (driven2020.py)",
+        "rule": "lead in 1 to 136 sessions",
         "gated": true
       },
       {
         "group": "registered",
         "id": "C10",
-        "value": "+0.01, 0.50 / -1.2, +1.0",
-        "band": "-2.0 / -5.9, +4.3",
+        "value": [
+          0.0059,
+          0.5,
+          -1.2498,
+          0.9879
+        ],
         "pass": true,
         "usage": 0.75,
         "note": "worst rule out21_after_fear_greed_index_p99.9_down",
+        "value_text": "+0.01, 0.50 / -1.2, +1.0",
+        "real_text": "-2.0 / -5.9, +4.3",
+        "real": [
+          -2.0,
+          0.324,
+          -5.9,
+          4.3
+        ],
+        "words": "timing rules on published macro data against buy-and-hold, and the drift after a published turn (c10.py)",
+        "rule": "every rule at most +1.0 point a year and ahead in at most 2/3; drifts no larger than the S&P's after NBER turns",
         "gated": true
       },
       {
         "group": "registered",
         "id": "R5",
-        "value": "0.221",
+        "value": [
+          0.2214
+        ],
         "band": [
           [
             0.178,
@@ -2935,32 +3111,60 @@
         "pass": true,
         "usage": 0.428,
         "note": "0.221",
+        "value_text": "0.221",
+        "real": [
+          0.254
+        ],
+        "words": "the driven 2022 market: the index's maximum drawdown (driven2022.py)",
+        "rule": "drawdown in 0.178 to 0.330",
         "gated": true
       },
       {
         "group": "registered",
         "id": "R7a",
-        "value": "+1.8 / -0.7",
-        "band": "0 / 0",
+        "value": [
+          1.7814,
+          -0.727
+        ],
         "pass": true,
         "usage": 0.356,
         "note": "hike +1.8 of 5.0, cut -0.7 of 5.0",
+        "value_text": "+1.8 / -0.7",
+        "real_text": "0 / 0",
+        "real": [
+          0.0,
+          0.0
+        ],
+        "words": "the equal-weight index's mean log move from the first price readable after a changed policy rate to the end of the first 65-minute bar, less the mean first bar of all days, bp: after a hike, after a cut (r7_event.py)",
+        "rule": "each within 5 bp, or 2 se where wider",
         "gated": true
       },
       {
         "group": "registered",
         "id": "R7b",
-        "value": "-1.22, 2/30",
-        "band": "0, <=20/30",
+        "value": [
+          -1.2178,
+          2.0
+        ],
         "pass": true,
         "usage": 0.1,
         "note": "-1.22 pts, 2 of 30",
+        "value_text": "-1.22, 2/30",
+        "real_text": "0, <=20/30",
+        "real": [
+          0.0,
+          15
+        ],
+        "words": "the audit's rate-news agent through tf.evaluate: mean annual excess over holding in points, histories ahead (r7_eval.py)",
+        "rule": "at most 0 points a year, ahead in at most 20 of 30",
         "gated": true
       },
       {
         "group": "registered",
         "id": "S1a",
-        "value": "0.88",
+        "value": [
+          0.88
+        ],
         "band": [
           [
             0.45,
@@ -2970,12 +3174,20 @@
         "pass": true,
         "usage": 0.564,
         "note": "0.88",
+        "value_text": "0.88",
+        "real": [
+          0.62
+        ],
+        "words": "the packaged recession: share of the index's paired log fall, at its lowest, won back 252 sessions later, mean over seeds (recession_rows.py)",
+        "rule": "in 45% to 100%",
         "gated": true
       },
       {
         "group": "registered",
         "id": "S2",
-        "value": "+60.6",
+        "value": [
+          60.5755
+        ],
         "band": [
           [
             25.0,
@@ -2985,22 +3197,39 @@
         "pass": true,
         "usage": 0.294,
         "note": "+60.6",
+        "value_text": "+60.6",
+        "real": [
+          69.0
+        ],
+        "words": "the packaged recession: the index's own rise in the 252 sessions after its low, per cent, mean over seeds (recession_rows.py)",
+        "rule": "in +25% to +80%",
         "gated": true
       },
       {
         "group": "registered",
         "id": "S1b",
-        "value": "180/180",
-        "band": "all seeds",
+        "value": [
+          180.0
+        ],
         "pass": true,
         "usage": 0.0,
         "note": "180 of 180",
+        "value_text": "180/180",
+        "real_text": "all seeds",
+        "real": [
+          180
+        ],
+        "words": "the packaged recession: seeds whose cycle has left contraction and trough within 24 months of the onset (recession_rows.py)",
+        "rule": "every seed",
         "gated": true
       },
       {
         "group": "registered",
         "id": "V1",
-        "value": "0.91 / 0.82",
+        "value": [
+          0.9093,
+          0.8245
+        ],
         "band": [
           [
             0.75,
@@ -3014,22 +3243,41 @@
         "pass": true,
         "usage": 0.203,
         "note": "0.91 / 0.82",
+        "value_text": "0.91 / 0.82",
+        "real": [
+          0.93,
+          0.87
+        ],
+        "words": "the index's variance ratio at two and five years relative to one, years 2-21 of the pooled free histories (v1.py)",
+        "rule": "2y/1y in 0.75 to 1.15 and 5y/1y in 0.55 to 1.20",
         "gated": true
       },
       {
         "group": "registered",
         "id": "C9",
-        "value": "0.459 / 0.474",
-        "band": "0.5 / 0.5",
+        "value": [
+          0.459,
+          0.4736
+        ],
         "pass": true,
         "usage": 0.607,
         "note": "0.459 / 0.474",
+        "value_text": "0.459 / 0.474",
+        "real_text": "0.5 / 0.5",
+        "real": [
+          0.5,
+          0.5
+        ],
+        "words": "the cost of size in the agent-facing book: exponent and coefficient of the average cost against Q/V, in sigma units (impact_curve.py)",
+        "rule": "exponent in 0.4 to 0.7 and coefficient in 0.33 to 0.67",
         "gated": true
       },
       {
         "group": "registered",
         "id": "R1",
-        "value": "5.30",
+        "value": [
+          5.3016
+        ],
         "band": [
           [
             3.65,
@@ -3039,12 +3287,20 @@
         "pass": true,
         "usage": 0.049,
         "note": "5.30",
+        "value_text": "5.30",
+        "real": [
+          5.226
+        ],
+        "words": "sd of the 2-year Treasury yield's daily change, bp (FRED DGS2 2015-2025)",
+        "rule": "in 3.65 to 6.80",
         "gated": true
       },
       {
         "group": "registered",
         "id": "R2",
-        "value": "5.89",
+        "value": [
+          5.8944
+        ],
         "band": [
           [
             4.54,
@@ -3054,12 +3310,20 @@
         "pass": true,
         "usage": 0.566,
         "note": "5.89",
+        "value_text": "5.89",
+        "real": [
+          5.406
+        ],
+        "words": "sd of the 10-year Treasury yield's daily change, bp (FRED DGS10)",
+        "rule": "in 4.54 to 6.27",
         "gated": true
       },
       {
         "group": "registered",
         "id": "R4",
-        "value": "+0.293",
+        "value": [
+          0.2933
+        ],
         "band": [
           [
             0.15,
@@ -3069,12 +3333,21 @@
         "pass": true,
         "usage": 0.194,
         "note": "graded on the held close; last print reported",
+        "value_text": "+0.293",
+        "real": [
+          0.272
+        ],
+        "words": "daily correlation of the roster index with an IG bond's return (minus the corporate yield's change; SPY against LQD)",
+        "rule": "in +0.15 to +0.39",
         "gated": true
       },
       {
         "group": "registered",
         "id": "B9",
-        "value": "16.78 / 1.14",
+        "value": [
+          16.7785,
+          1.1385
+        ],
         "band": [
           [
             13.9,
@@ -3088,15 +3361,26 @@
         "pass": true,
         "usage": 0.178,
         "note": "16.78 / 1.14",
+        "value_text": "16.78 / 1.14",
+        "real": [
+          17.4,
+          1.0
+        ],
+        "words": "sd of annual index log returns, years 2-21, per cent; the start-up drift: sd of the first 60 sessions' index return over the steady state's, across 50 markets",
+        "rule": "annual within 20% of 17.4; start-up 2/3x to 1.5x",
         "gated": true
       },
       {
         "group": "registered",
         "id": "D1",
-        "value": "in",
-        "band": "--",
+        "value": "all",
         "pass": true,
         "usage": 0.0,
+        "value_text": "in",
+        "real_text": "--",
+        "real": "all",
+        "words": "ruled bands of the one-year realism table in, on all four cells",
+        "rule": "every band in",
         "gated": true
       },
       {
@@ -4478,6 +4762,11 @@
         ],
         "pass": true,
         "note": "R3 held (restated 2026-10-14)",
+        "words": "daily correlation of the roster index with a Treasury bond's return (minus the 10-year's change; SPY against IEF)",
+        "rule": "in -0.36 to +0.03",
+        "real": [
+          -0.161
+        ],
         "gated": true
       },
       {
@@ -4514,6 +4803,11 @@
         ],
         "pass": true,
         "note": "pooled median over the gen histories' contractions of the TTM reported EPS's fall (item 25, amendments A and E)",
+        "words": "the aggregate earnings fall around a contraction, median over the 30 histories' contractions (Shiller 1953-2020)",
+        "rule": "in -0.40 to -0.046",
+        "real": [
+          -0.17
+        ],
         "gated": true,
         "exception": "worse than v21 on its corrected reader (-0.086 against -0.117, real -0.17), an exception the owner accepts to the rule that no row is worse than v21 (draft item 25(j)): v21's earnings level drifts down by half its variance a year, which pt-v22's aggregate earnings-level fix removes; the tape has no such drift"
       },
@@ -4544,7 +4838,9 @@
       {
         "group": "registered",
         "id": "R6",
-        "value": "-2.08",
+        "value": [
+          -2.0847
+        ],
         "band": [
           [
             -10.86,
@@ -4554,6 +4850,13 @@
         "pass": false,
         "usage": 1.156,
         "note": "-2.08",
+        "value_text": "-2.08",
+        "real": [
+          -5.43
+        ],
+        "words": "the driven 2022 market: the market P/E's log change per 100 bp of the corporate yield, monthly averages (driven2022.py)",
+        "rule": "-10.4 to -2.6 per cent",
+        "rule_applied": "-10.86 to -2.72 per cent",
         "gated": false,
         "reported_because": "reported, not gated (draft item 25(i))"
       },
@@ -5113,157 +5416,169 @@
       {
         "group": "pt-v22",
         "id": "OB1r",
-        "value": -0.09609936746861092,
+        "value": null,
         "band": [
           -0.17983131540525282,
           0.0891628439374808
         ],
         "rule": "fixed",
-        "pass": true,
+        "pass": null,
         "gated": false,
+        "note": "not read: the grade's chain histories carry no option quotes (the index option stage, ptv22idx, is off), so no rule opened a position",
         "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
       },
       {
         "group": "pt-v22",
         "id": "OB1v",
-        "value": 0.0,
+        "value": null,
         "band": [
           0.4798484845340991,
           0.8941669756973236
         ],
         "rule": "fixed",
-        "pass": false,
+        "pass": null,
         "gated": false,
+        "note": "not read: the grade's chain histories carry no option quotes (the index option stage, ptv22idx, is off), so no rule opened a position",
         "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
       },
       {
         "group": "pt-v22",
         "id": "OB1d",
-        "value": 0.0,
+        "value": null,
         "band": [
           0.42634167322491323,
           0.9778033434218769
         ],
         "rule": "fixed",
-        "pass": false,
+        "pass": null,
         "gated": false,
+        "note": "not read: the grade's chain histories carry no option quotes (the index option stage, ptv22idx, is off), so no rule opened a position",
         "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
       },
       {
         "group": "pt-v22",
         "id": "OB2r",
-        "value": -0.09609936746861092,
+        "value": null,
         "band": [
           -0.17457578540378393,
           0.08351267761015645
         ],
         "rule": "fixed",
-        "pass": true,
+        "pass": null,
         "gated": false,
+        "note": "not read: the grade's chain histories carry no option quotes (the index option stage, ptv22idx, is off), so no rule opened a position",
         "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
       },
       {
         "group": "pt-v22",
         "id": "OB2v",
-        "value": 0.0,
+        "value": null,
         "band": [
           0.5465682086013922,
           0.8608621114053846
         ],
         "rule": "fixed",
-        "pass": false,
+        "pass": null,
         "gated": false,
+        "note": "not read: the grade's chain histories carry no option quotes (the index option stage, ptv22idx, is off), so no rule opened a position",
         "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
       },
       {
         "group": "pt-v22",
         "id": "OB2d",
-        "value": 0.0,
+        "value": null,
         "band": [
           0.4664910803222973,
           0.973090040154942
         ],
         "rule": "fixed",
-        "pass": false,
+        "pass": null,
         "gated": false,
+        "note": "not read: the grade's chain histories carry no option quotes (the index option stage, ptv22idx, is off), so no rule opened a position",
         "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
       },
       {
         "group": "pt-v22",
         "id": "OB3r",
-        "value": -0.09609936746861092,
+        "value": null,
         "band": [
           -0.3366083001877864,
           0.17504257612260388
         ],
         "rule": "fixed",
-        "pass": true,
+        "pass": null,
         "gated": false,
+        "note": "not read: the grade's chain histories carry no option quotes (the index option stage, ptv22idx, is off), so no rule opened a position",
         "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
       },
       {
         "group": "pt-v22",
         "id": "OB3v",
-        "value": 0.0,
+        "value": null,
         "band": [
           0.1926536179129349,
           0.7478503846665557
         ],
         "rule": "fixed",
-        "pass": false,
+        "pass": null,
         "gated": false,
+        "note": "not read: the grade's chain histories carry no option quotes (the index option stage, ptv22idx, is off), so no rule opened a position",
         "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
       },
       {
         "group": "pt-v22",
         "id": "OB3d",
-        "value": 0.0,
+        "value": null,
         "band": [
           0.041722565330268524,
           0.9504196336863853
         ],
         "rule": "fixed",
-        "pass": false,
+        "pass": null,
         "gated": false,
+        "note": "not read: the grade's chain histories carry no option quotes (the index option stage, ptv22idx, is off), so no rule opened a position",
         "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
       },
       {
         "group": "pt-v22",
         "id": "OB4r",
-        "value": -0.09609936746861092,
+        "value": null,
         "band": [
           -0.38764913328945516,
           0.2574463002571552
         ],
         "rule": "fixed",
-        "pass": true,
+        "pass": null,
         "gated": false,
+        "note": "not read: the grade's chain histories carry no option quotes (the index option stage, ptv22idx, is off), so no rule opened a position",
         "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
       },
       {
         "group": "pt-v22",
         "id": "OB4v",
-        "value": 0.0,
+        "value": null,
         "band": [
           0.3897115766958382,
           1.1508675812896705
         ],
         "rule": "fixed",
-        "pass": false,
+        "pass": null,
         "gated": false,
+        "note": "not read: the grade's chain histories carry no option quotes (the index option stage, ptv22idx, is off), so no rule opened a position",
         "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
       },
       {
         "group": "pt-v22",
         "id": "OB4d",
-        "value": 0.0,
+        "value": null,
         "band": [
           0.058342549173640124,
           1.694050609892213
         ],
         "rule": "fixed",
-        "pass": false,
+        "pass": null,
         "gated": false,
+        "note": "not read: the grade's chain histories carry no option quotes (the index option stage, ptv22idx, is off), so no rule opened a position",
         "reported_because": "reported, not gated: the grade reads it and reports it without gating it"
       },
       {
@@ -5574,6 +5889,17 @@
       "box": "g23gen-e1a+g23b1-e1a+g23b2-e1a+g23traded-e7a+g23reads-e1a+g23gate-e20a",
       "engine_commit": "e132a66acbdec409f8f0d48875bdec068adbdd68",
       "desk": "validation/pt-v22/",
+      "seeds": 270,
+      "years": 21,
+      "date": "2026-11-01",
+      "histories": {
+        "ptv22fut": 270,
+        "ptv22traded": 270,
+        "ptv22mp metaorder": 30,
+        "ptv22mp push": 30,
+        "ptv22chain": 270,
+        "ptv22names": 270
+      },
       "verdict16": "validation/pt-v22/programme/results/ptv22/grade/verdict-R22-fixd2RWPD.json",
       "amend19": "validation/pt-v22/programme/results/ptv22/grade/amend19-R22-fixd2RWPD.json",
       "ptv22grade": "validation/pt-v22/programme/results/ptv22/grade/ptv22-R22-fixd2RWPD.json"
@@ -5582,7 +5908,7 @@
     "of": 190,
     "verdict": "pass",
     "all_rows": {
-      "passed": 204,
+      "passed": 200,
       "of": 231
     },
     "coefficients": {

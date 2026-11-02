@@ -245,7 +245,7 @@ Read those claims narrowly:
   because its range reaches lower than those windows do.
 - The VIX is stickier than real: its day-to-day persistence reads 0.956
   against the tape's 0.930, and the sign test that grades it refuses it.
-- The one-year table helped choose many of the coefficients pt-v21 keeps, so the
+- The one-year table helped choose many of the coefficients pt-v22 keeps, so the
   held-out checks are the fresh seeds and the fresh set of companies the
   panel is repeated on.
 - One year is the certified horizon. Two years is graded on the two-year
