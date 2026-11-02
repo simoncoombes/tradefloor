@@ -1,30 +1,31 @@
-## Unreleased
+## 0.11.0
 
-**pt-v22** lists contracts beside the stocks: index futures with a night
-session, monthly policy-rate and quarterly term-rate futures, monthly oil
-futures, and American options on every name. An agent trades them by symbol
-in whole contracts, as it trades a ticker, and exercises an option at a
-close with `tf.Exercise`.
+pt-v22 is the default preset. It lists contracts beside the stocks: index
+futures with a night session, policy-rate, term-rate and oil futures, and
+American options on every name. An agent trades them by symbol in whole
+contracts and exercises an option at a close with `tf.Exercise`. pt-v22
+passes all 190 graded rows registered for it, over 21 years
+(`validation/pt-v22/`).
 
-pt-v22 is the default preset, and pt-v21 and earlier presets stay available
-by name. A run that left `model` out gives a different market.
+Margin is set at every close. A future is margined from a risk scan and pays
+its move to the day's settlement mark in cash. A name's options and stock
+are margined together, as a broker's portfolio margin is: the worst loss
+over ten moves of the name up to 15% either way, and at least $.375 a share
+for each option. An order that would leave equity under the initial margin
+is refused with `MarginError`. A close under the maintenance level makes a
+call due by the next open. If equity isn't back at the initial margin then,
+or the close left the account below zero, the account's contracts and its
+options' stock are sold at the market.
 
-Margin is set at every close, with a lower maintenance level. A future is
-margined from a risk scan and pays its move to the day's settlement mark in
-cash. A name's options and stock are margined together, as a broker's
-portfolio margin is: the worst loss over ten moves of the name up to 15%
-either way, and at least $.375 a share for each option. Stock without its
-options, such as shares an exercise or an assignment delivers, asks 15% of
-its value from the close it arrives. An order that would leave equity under
-the initial margin is refused. If equity falls below maintenance at a close,
-the call is due by the next open, and if equity isn't back at the initial
-margin, the account's contracts and its options' stock are sold at the
-market.
+`Scenario.load("recession_2008")` adds the 2007-09 recession, with the VIX
+on its 2008-09 path. `tradefloor.contracts.explain_move` says why a
+contract's price moved, and a strategy spec can hold the front index future
+as a hedge.
 
-`tradefloor.contracts.explain_move` says why a contract's price moved, cause
-by cause, and a strategy spec can hold the front index future as a hedge.
-An MCP market session pays dividends. Listing the contracts moves no stock
-price.
+**What breaks.** A run that leaves `model` out gives pt-v22's market;
+`model="pt-v21"` keeps 0.10.2's, and every preset replays as it did. On the
+default an agent's observation carries the contracts (payload version 3).
+The Rust crate's API only grows.
 
 <!-- release-note-ends -->
 
