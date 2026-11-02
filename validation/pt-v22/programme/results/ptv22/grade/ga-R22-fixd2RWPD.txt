@@ -1,0 +1,337 @@
+PT-V21 REGISTRATION GRADE (EIGHTEENTH REGISTRATION; LONG-RUN ROWS ON 270 HISTORIES): EVERY ROW, PER ARM, THE REGISTERED EXAM SEEDS (REGISTERED_GRADE bce2dbb8d91aff4d89e31935562551a6852b396e)
+
+== 1. EXISTING REGISTERED ROWS (criteria.py, twelfth registration; C9 on the arm's own impact curve)
+
+PASS CRITERIA (programme/longrun/CRITERIA.md, adopted 2026-09-23, C4 added 2026-09-24, C5-C8 registered 2026-09-24), computed by criteria.py
+long run  /Users/simoncoombes/Dev/runs/reg23/MERGED/lr270/longrun-report.json
+  R22-fixd2RWPD: base pt-v20, 209 dials, 270 seeds x 21 years, engine e132a66acbde, fingerprint custom-9ac114fd
+cert      /Users/simoncoombes/Dev/runs/reg23/grade/certgrade-MERGED.json  (arms R22-fixd2RWPD=R22-fixd2RWPD)
+edge      R22-fixd2RWPD=R22-fixd2RWPD from /Users/simoncoombes/Dev/runs/reg23/MERGED/edge.json: base pt-v20, 10 seeds from 9420201 x 300 days, 4418 events
+c4        R22-fixd2RWPD=R22-fixd2RWPD from /Users/simoncoombes/Dev/runs/reg23/MERGED/c4a.json, /Users/simoncoombes/Dev/runs/reg23/MERGED/c4b.json (tradefloor 0.10.2 at e132a66acbde): c4a, c4b
+
+    criterion                                      real/target   R22-fixd2RWPD             
+    A1 worst month's volatility within 30%         84 / 95       100 / 98  pass            
+    A2 maximum drawdown within 30%                 0.57 / 0.34   0.44 / 0.34  pass         
+    A3 peak stock correlation within 0.15          0.75 / 0.87   0.81 / 0.86  pass         
+    B1 time with VIX above 30, within 1/2x to 2x   8.2%          6.8%  pass                
+    B2 fear-spell length above 30, 1/2x to 2x      22            24  pass                  
+    B3 20% bear markets per decade, 1/2x to 2x     1.16          1.69  pass                
+    B4 10% corrections per decade, 1/2x to 2x      2.84          4.62  pass                
+    B5 sessions under -5% per decade, 1/2x to 2x   6.2           7.2  pass                 
+    B6 time with VIX under 15, 1/2x to 2x          32.6%         30.8%  pass               
+    B7 index volatility within 20%                 18.1          18.4  pass                
+    B8 long-run index return within 2 points       6.25          7.0  pass                 
+    B9 annual return spread within 20%; start-up 2/3x-1.5x 17.40 / 1.00  16.78 / 1.14  pass        
+    C1 crash rate steady, years 3-21 / 1-2         1.0x          1.12x  pass               
+    C2 VIX ceiling hits, at most 1 of 30           0             5 of 270  pass            
+    C3 headline edge 5 ticks late, under 20 bp     ~0            +18bp  pass               
+    C4a 65-min return ACF1 >= -0.05, or Roll <= 2x ~0 (Roll)     -0.044 / 1.5x  pass       
+    C4b price-only rules: <= +5 pts, <= 14 of 20   ~0            -3.0 pts, 8/20  pass      
+    C5 stock-level variance ratio, 60 sessions     0.924         0.952  pass               
+    C6 value signal rank IC, whole / first 60      +0.009        +0.002 / +0.002  pass     
+    C7 momentum rank IC, 12-1 / 6-1                +0.027 / +0.041+0.005 / +0.001  pass     
+    C8 daily loser-minus-winner, bp                -1.7          -1.1  pass                
+    C9 cost of size: exponent / average coefficient 0.5 / 0.5     0.459 / 0.474  pass       
+    R1 2-year yield daily sd, bp                   5.23          5.30  pass                
+    R2 10-year yield daily sd, bp                  5.41          5.89  pass                
+    R3 stock-Treasury daily correlation            -0.161        -0.372  FAIL              
+    R4 stock-IG corporate daily correlation        +0.272        -0.034  FAIL              
+    E1 aggregate earnings fall in a contraction    -0.170        -0.113  pass              
+    D2 driven 2020-21: drawdown / sessions back to the high 0.339 / 126   0.382 / 167.5  pass       
+    F1 driven 2020 fast crash: drop / sessions     0.339 / 23    0.382 / 31.5  pass        
+    L1 look-through: price trough leads earnings, sessions +68           +71  pass                 
+    R5 driven 2022: index drawdown                 0.254         0.221  pass               
+    R6 driven 2022: P/E per 100 bp of the corporate yield, % -5.43         -2.08  FAIL               
+    C10 no public macro signal: worst rule pts/yr / drifts -2.0 / -5.9, +4.3+0.01, 0.50 / -1.2, +1.0  pass
+    R7a first bar after a rate decision less all days, bp 0 / 0         +1.8 / -0.7  pass         
+    R7b rate-news agent: pts/yr over holding, ahead of 30 0, <=20/30    -1.22, 2/30  pass         
+    S1a recession: share of the fall won back in 252 0.62 (2009)   0.88  pass                
+    S1b recession: seeds out of contraction in 24 months all seeds     180/180  pass             
+    S2 recession: the index's rise 252 after its low, % +69 (2009)    +60.6  pass               
+    V1 long-horizon variance ratio, 2y/1y and 5y/1y 0.93 / 0.87   0.91 / 0.82  pass         
+    D1 every ruled band in, all four cells         --            in  pass                  
+
+Result
+    R22-fixd2RWPD  fails 3 of 40: R3, R4, R6
+
+Reported, not gated (CRITERIA.md): the certification's VIX rows, the mechanism certificate, the lever
+    R22-fixd2RWPD  VIX row: panel_252 k 27/30 refused/above; panel_504 k 11/30 refused/below; heldout_seeds k 26/30 refused/above
+                   mechanisms: panel_252 10/10; heldout_seeds 10/10; lever 5.15x (tape 6.16x)
+
+D1's crisis_sector_dispersion, at least 10 readings per cell (own seeds, then blocks of 30 from 1001 to 1270 at most)
+    R22-fixd2RWPD  panel_252         own  1 of 30, 2 block(s) 9422001-9422060, total 12, median 1.2605, band [0.79, 1.74]: pass
+    R22-fixd2RWPD  panel_504         own  7 of 30, 1 block(s) 9422001-9422030, total 18, median 1.3081, band [1.03, 1.66]: pass
+    R22-fixd2RWPD  heldout_seeds     own  8 of 30, 1 block(s) 9422001-9422030, total 13, median 1.2570, band [0.79, 1.74]: pass
+    R22-fixd2RWPD  heldout_universe  own  8 of 30, 1 block(s) 9422001-9422030, total 11, median 1.1872, band [0.79, 1.74]: pass
+
+R4 RESTATED (owner 2026-09-28 (4)): graded once on the held close, band [0.15, 0.39], real +0.272; the last-print reading above is reported only.
+   R22-fixd2RWPD held 0.293 pass (last print -0.034, reported)
+
+== 2. NEW ROWS (statistic | band | real reference, source | per arm value and verdict)
+
+DV1      premium over cash: index total return less the policy rate, log %/yr, years 2-21, median over histories
+         band [4.6, 8.6]; real 6.59 (Ken French Mkt-RF 1926-2025 (log); Damodaran 1928-2025 6.23)
+         R22-fixd2RWPD 6.025 pass
+DV2      premium over the 10-year constant-maturity bond, log %/yr
+         band reported; real 5.11 (Damodaran 1928-2025 (reported only))
+         R22-fixd2RWPD 5.003 rep
+DV3      index dividend yield, cap-weighted declared annual rate over price, %
+         band [1.3, 2.5]; real 1.81 (Damodaran 2001-2025; Shiller 1990-2023 2.02)
+         R22-fixd2RWPD 1.867 pass
+DV4      delivered buyback yield, cap-weighted log share-count reduction a year, %
+         band [1.8, 3.4]; real 2.58 (Damodaran B/P 2001-2025 (gross))
+         R22-fixd2RWPD 2.371 pass
+DV5      total payout (D+B)/E on the valuation's per-share earnings
+         band [0.56, 1.04]; real 0.80 (Damodaran 2001-2025)
+         R22-fixd2RWPD 0.850 pass
+DV6      D/P-quintile total-return spread, top minus bottom, pts/yr, mean over histories
+         band [-2.1, 3.9]; real +0.89 (se 1.48) (Ken French D/P portfolios, value-weighted, 1927-2025)
+         R22-fixd2RWPD 3.368 pass
+DV7sd    sd of annual aggregate dividend growth, %
+         band [3.6, 14.2]; real 7.10 (Shiller 1990-2023 (1946-2023 6.25))
+         R22-fixd2RWPD 5.590 pass
+DV7cut   share of years with an aggregate dividend cut, pooled
+         band [0.045, 0.18]; real 0.088 (3 of 34) (Shiller 1990-2023)
+         R22-fixd2RWPD 0.140 pass
+DV8      ex-date drop per unit of dividend (prior close less open over D), median over events
+         band [0.8, 1.05]; real 0.88 (se 0.04) (40-name tape 2015-2025, 1121 events)
+         R22-fixd2RWPD 0.972 pass
+DV9      rank IC of D/P against the next 20 sessions' total return, every 5 sessions
+         band reported; real +0.005 (se 0.008) (Ken French D/P portfolios read as an IC (reported only))
+         R22-fixd2RWPD 0.026 rep
+CV1      leverage sum: sum_k=1..20 corr(r_t, |r_t+k|), index daily log returns, years 2-21, median over histories
+         band [-1.75, -0.8]; real -1.35 (S&P 500 1990-2025 (tape); CRSP 1926-2025 -1.25)
+         R22-fixd2RWPD -0.907 pass
+CV3      skew of non-overlapping 21-session index log returns, median over histories
+         band [-1.3, -0.35]; real -1.083 (S&P 500 1990-2025; CRSP 20-year windows median -0.85; item 25 (convention rule 2b): the real read at the model's length, the median over the tape's 21-year windows of each window's mean over the 21 block offsets (cv3check.py), -1.083 (was -0.80); band unchanged)
+         R22-fixd2RWPD -0.803 pass
+CV2      VIX memory of a fall: k20/k0 slope ratio (reported)
+         band reported; real 0.57 (S&P 500 / VIX 1990-2025)
+         R22-fixd2RWPD --
+V2       median published VIX / RV21 over sessions with RV21 >= 40, pooled, years 2-21
+         band [0.74, 0.92]; real 0.831 (se 0.045) (S&P 500 and ^VIX tape 1990-01-02 to 2025-07-31)
+         R22-fixd2RWPD 0.792 pass
+V3       share of sessions with the published VIX above 50, %
+         band [0.42, 1.67]; real 0.84 (1/2x to 2x) (same tape (2008-09, 2020, 2025))
+         R22-fixd2RWPD 1.024 pass
+B10      index sd on TRUE contraction/trough sessions over sd on the rest, pooled, years 2-21
+         band [1.45, 2.3]; real 1.87 (S&P 500 daily 1928-2025 by NBER USREC month (1.66 for 1950-2025))
+         R22-fixd2RWPD 1.658 pass
+B11      median VIX (state) on TRUE contraction/trough sessions over the median on the rest
+         band [1.25, 2]; real 1.62 (27.5 vs 17.0) (FRED VIXCLS 1990-2025 by NBER USREC)
+         R22-fixd2RWPD 1.470 pass
+B12      share of B3's 20% bears with a TRUE contraction/trough between peak and trough+63
+         band [0.45, 0.85]; real 0.64 (7 of 11) (S&P 500 bears 1950-2025 against NBER recessions)
+         R22-fixd2RWPD 0.590 pass
+H1       mean policy-rate change over 63 sessions after a close with VIX >= 30, rate >= 0.5, CPI < 4 (published)
+         band [-0.69, -0.13]; real -0.411 (se 0.139) (FRED DFF + VIX tape 1990-2025)
+         R22-fixd2RWPD -0.522 pass
+H2       share of policy-rate changes at VIX >= 30 (previous close) and CPI < 4 that are hikes
+         band [-inf, 0.2]; real 0 of 9 (FRED DFEDTAR/DFEDTARU 1990-2025)
+         R22-fixd2RWPD 0.004 pass
+H3       mean 10-year change (pp) over 63-session windows with the index down >10%, CPI<4 at start
+         band [-0.84, -0.4]; real -0.624 (se 0.108) (FRED DGS10 + S&P 500 1990-2025)
+         R22-fixd2RWPD -0.477 pass
+H4       same windows: mean 10-year constant-maturity bond return over mean index return
+         band [-0.94, -0.24]; real -0.473 (se 0.064) (FRED DGS10 + S&P 500 1990-2025)
+         R22-fixd2RWPD -0.287 pass
+H5       monthly corr(index log return, minus the 10-year's change), blocks starting with CPI < 3
+         band [-0.35, -0.02]; real -0.188 (se 0.082) (FRED DGS10/CPI + S&P 500 1990-2025)
+         R22-fixd2RWPD -0.340 pass
+Hf       policy-rate changes a year (reported guard)
+         band reported; real 3.0 (FOMC target changes 1990-2025)
+         R22-fixd2RWPD 3.931 rep
+Hz       share of sessions with the policy rate <= 0.25 (reported)
+         band reported; real 0.255 (FRED DFF 1990-2025)
+         R22-fixd2RWPD 0.113 rep
+VC1      idiosyncratic |e| lag-1 ACF (residual on leave-one-out EW roster), 252-return windows, median names/windows/histories
+         band [0.065, 0.11]; real 0.088 (se 0.010) (real forty 2015-2025)
+         R22-fixd2RWPD 0.096 pass
+VC2      aftershock: mean |e| after a top-2.5% |e| session over mean |e|
+         band [1.16, 1.42]; real 1.29 (se 0.062) (real forty 2015-2025)
+         R22-fixd2RWPD 1.258 pass
+VC3      certification abs_return_acf1, panel_252 cell median (graded in D1)
+         band [0.039, 0.17]; real 0.1025 median of REAL_MARKETS_WINDOWS (facts.REAL_MARKETS_WINDOWS 2015-07 to 2025-07 (lowest 0.039))
+         R22-fixd2RWPD 0.076 pass
+VC4a     cap-weighted index |r| ACF lag 1
+         band [0.158, 0.305]; real p10-p90 of 20-year windows (CRSP 1926-2026)
+         R22-fixd2RWPD 0.255 pass
+VC4b     index |r| ACF lag 5
+         band [0.152, 0.346]; real  (CRSP 1926-2026)
+         R22-fixd2RWPD 0.242 pass
+VC4c     index |r| ACF lag 20
+         band [0.077, 0.245]; real  (CRSP 1926-2026)
+         R22-fixd2RWPD 0.195 pass
+VC4d     index |r| ACF lag 100
+         band [0.025, 0.126]; real  (CRSP 1926-2026)
+         R22-fixd2RWPD 0.070 pass
+VC4e     power-law slope of the |r| ACF, lags 1-100
+         band [-0.687, -0.13]; real  (CRSP 1926-2026)
+         R22-fixd2RWPD -0.359 pass
+VC4f     ACF1 of log monthly realised vol
+         band [0.489, 0.74]; real  (CRSP 1926-2026)
+         R22-fixd2RWPD 0.669 pass
+G1       overnight share of name variance, median name
+         band [0.3, 0.48]; real 0.391 (0.326-0.441) (the forty 2015-2025 with EDGAR 8-K 2.02 dates)
+         R22-fixd2RWPD 0.366 pass
+G1c      overnight share of the EQUAL-weighted 40-name index variance
+         band [0.3, 0.6]; real 0.461 (0.332-0.558) (same)
+         R22-fixd2RWPD 0.474 pass
+G2       earnings reaction-day idiosyncratic variance ratio
+         band [6.5, 14]; real 10.2 (7.3-12.6) (same)
+         R22-fixd2RWPD 10.683 pass
+G2b      reaction days' share of idiosyncratic variance
+         band [0.09, 0.2]; real 0.144 (0.108-0.173) (same)
+         R22-fixd2RWPD 0.148 pass
+G3       night's share of reaction-day variance
+         band [0.65, 0.85]; real 0.759 (0.731-0.779) (same)
+         R22-fixd2RWPD 0.728 pass
+G3b      day-after idiosyncratic variance ratio
+         band [1.2, 2.4]; real 1.71 (1.34-2.14) (same)
+         R22-fixd2RWPD 1.663 pass
+G4       idiosyncratic excess kurtosis, median name
+         band [4.7, 14.1]; real 9.4 (6.1-9.7) (same)
+         R22-fixd2RWPD 9.260 pass
+G7       median |gap|, bp
+         band [26, 50]; real 37.5 (33.1-43.7) (same)
+         R22-fixd2RWPD 30.645 pass
+G7b      nights beyond 8x the name's median |gap|, %
+         band [0.8, 4]; real 1.96 (same)
+         R22-fixd2RWPD 1.984 pass
+G8       nights opening through a stop 2 median daily |r| below the close, %
+         band [2, 5]; real 3.28 (same)
+         R22-fixd2RWPD 3.002 pass
+G9       reaction-day volume ratio
+         band [1.6, 3]; real 2.16 (2.06-2.25) (same)
+         R22-fixd2RWPD 2.088 pass
+G10      gap continuation: slope of the EW session return (open to close print) on the EW night return
+         band [-0.04, 0.09]; real +0.022 (se ~0.03) (the forty 2015-2025)
+         R22-fixd2RWPD 0.026 pass
+C10e-cal calendar rule, out through each report: median annualised excess pts/yr (<= +1.0) and share ahead (<= 2/3)
+         band [-inf, 1]; real -1.48, ahead 11 of 39 (the forty 2015-2025 with EDGAR report dates)
+         R22-fixd2RWPD -0.27/0.46 pass
+PH1      state hash after prehistory(N)+T equals an untraded N+T run; forks identical; baseline equal (15 cells)
+         band [1, 1]; real construction (harness identity)
+         R22-fixd2RWPD 1.000 pass
+PH3      with history_days=252, SMA200 and TSMOM252 active on every scored day (fraction)
+         band [1, 1]; real construction (cold: 0.21 and 0) (harness identity)
+         R22-fixd2RWPD 1.000 pass
+PH4      within-seed corr of log RV20 before/after seams every 40 sessions
+         band [0.575, 0.743]; real 0.659 (se 0.042) (S&P 500 1990-2025 (Yahoo ^GSPC))
+         R22-fixd2RWPD 0.666 pass
+PH4b     same, RV60 (companion)
+         band [0.586, 0.838]; real 0.712 (se 0.063) (S&P 500 1990-2025)
+         R22-fixd2RWPD 0.611 pass
+PH5      paired index log return, year 1 minus year 0: |mean| < 2 se; year-0 vol within 2 sqrt(se_0^2 + se_y^2) of each year y = 1..7 (se of the yearly means across seeds; owner 2026-09-28), over 270 pooled long-run histories (owner decision 15)
+         band [1, 1]; real construction (stationarity)
+         R22-fixd2RWPD 1.000 pass
+Q1       exponent of the print peak in f, half-day schedule, 1-30% ADV
+         band [0.4, 0.7]; real 0.47-0.51 (Zarinelli et al. 2015; Toth et al. 2011; Almgren et al. 2005 (0.6))
+         R22-fixd2RWPD 0.644 pass
+Q2       print peak at 10% ADV, half-day, over sqrt(0.1), in daily sigma
+         band [0.3, 1]; real 0.46 (Bucci 0.4 range units x 1.14) (Bucci et al. PRL 122 108302 (2019); Toth et al. 2011)
+         R22-fixd2RWPD 0.346 pass
+Q3       share of the final displacement reached halfway through a day TWAP at 10%
+         band [0.62, 0.82]; real 0.71 (square root) (square-root / propagator shape)
+         R22-fixd2RWPD 0.709 pass
+Q4       close over peak of the displacement, half-day orders, f >= 3%
+         band [0.55, 0.8]; real 0.66 +- 0.04 (Bucci et al. arXiv 1901.05332 Fig. 1)
+         R22-fixd2RWPD 0.560 pass
+Q5       next close over peak, same orders
+         band [0.4, 0.7]; real ~0.55 (0.44 with zeta) (Bucci et al. arXiv 1901.05332 Fig. 2)
+         R22-fixd2RWPD 0.484 pass
+Q6       IS of a day TWAP at 10% ADV, in daily sigma
+         band [0.1, 0.21]; real 0.105-0.21 (Toth Y 0.5-1 x 2/3; Almgren et al. with turnover factor 0.152-0.165)
+         R22-fixd2RWPD 0.119 pass
+Q7       IS of a day TWAP over IS of a one-hour TWAP at 10%
+         band [0.5, 0.9]; real ~0.63 (Bacry et al. 2015 (T^-0.25); Almgren temporary T^-0.6)
+         R22-fixd2RWPD 0.784 pass
+Q8       IS of a day TWAP over IS of a block at 10%
+         band [0.5, 0.8]; real 0.55-0.64 (Almgren et al. 2005 over a sixth of a day; Bacry et al. 2015)
+         R22-fixd2RWPD 0.622 pass
+Q9       IS of a day TWAP over IS of a block at 3%
+         band [0.5, 0.8]; real 0.55-0.64 (same)
+         R22-fixd2RWPD 0.633 pass
+G-rt     the most profitable round trip (pump, two-name, block/slice, next-day, alternating, wash) against the twin, bp
+         band [-inf, 0]; real every round trip loses (construction)
+         R22-fixd2RWPD -1.020 pass
+MARK     mark-the-close gain over cost, 10% ADV holder buying 0.01% two ticks before the close (reported)
+         band reported; real illegal in practice (marking the close) ()
+         R22-fixd2RWPD 47.662 rep
+AO1      the book coin: P(a first) over >= 1,000,000 (seed, day, step) keys (ao_coin.py, 400 seeds x 420 days x 6 steps)
+         band [0.498, 0.502]; real 0.5 (no identity priority) (Nasdaq Rule 4757; NYSE Pillar 7.36-7.37; owner decision 10)
+         R22-fixd2RWPD 0.501 pass (a first 0.501 +- 0.00050 over 1,008,000 keys, 400 seeds)
+AO2      second arrival's VWAP premium over the first, mean bp (and positive on >= 28/30)
+         band [10, 40]; real ~24 bp (square-root law (Toth et al. 2011))
+         R22-fixd2RWPD 19.110 pass
+AO3      label effect with arrival luck removed: intercept / se of a's lead (bp) regressed on its a-first share - 0.5, two identical momentum agents, >= 400 seeds
+         band [-3, 3]; real 0 (identical agents of equal speed; owner decision 10)
+         R22-fixd2RWPD -0.583 pass (intercept -0.7018 se 1.2043, slope +595.648, n 400, raw mean -0.9128)
+AO4      label effect with arrival luck removed: intercept / se of Spearman(label rank, cost) regressed on Spearman(label rank, mean arrival position), four agents, >= 400 seeds
+         band [-3, 3]; real 0 (random activation (Axtell 2001); owner decision 10)
+         R22-fixd2RWPD -0.884 pass (intercept -0.0172 se 0.0194, slope +0.732, n 400, raw mean -0.0015)
+AO1n30   seeds (of 30) where the later label pays the higher VWAP, two identical 10%-ADV buys (reported)
+         band reported; real 15 (the thirteenth registration's AO1)
+         R22-fixd2RWPD 15.000 rep
+AO3n30   seeds (of 30) where label a ends ahead (reported)
+         band reported; real 15 (the thirteenth registration's AO3)
+         R22-fixd2RWPD 21.000 rep
+AO4n30   mean Spearman(label rank, execution cost) over 30 seeds (reported)
+         band reported; real 0 (the thirteenth registration's AO4)
+         R22-fixd2RWPD -0.133 rep
+AO5      checks failed of 5: the 40 registered rows unchanged by the arrival shuffle switch (ao5.py: engine, readers, scripts, paired, live)
+         band [0, 0]; real 0 (construction)
+         R22-fixd2RWPD 0.000 pass
+B1q      time with the PUBLISHED VIX above 30, % (B1 reads the state)
+         band reported; real 8.2 (tape 1990-2025)
+         R22-fixd2RWPD 6.782 rep
+B6q      time with the PUBLISHED VIX under 15, %
+         band reported; real 32.6 (tape 1990-2025)
+         R22-fixd2RWPD 30.817 rep
+
+== 3. LEAK ROWS (r13 screen's definitions with the owner's restatements of 2026-09-28; bands in brackets)
+
+  T1 turn tell median |re-mark| at a true turn, bp [<= 50]
+     R22-fixd2RWPD 18.957 pass
+  T1 share of true turns over 1.7% [<= 0.10]
+     R22-fixd2RWPD 0.003 pass
+  T2 credit spread daily change sd, bp [1.5-6.2]
+     R22-fixd2RWPD 3.920 pass
+  T2 days a decade the spread moves > 50 bp [<= 1]
+     R22-fixd2RWPD 0.015 pass
+  T3 meeting step after a true turn less other meetings, bp [<= 25]
+     R22-fixd2RWPD 1.573 pass
+  T4 contraction+trough spread over expansion (reported; real 1.5-2.5)
+     R22-fixd2RWPD 1.443 
+  C10e forward 252 excess from 84 sessions into a true contraction [-13.5, +15.7]
+     R22-fixd2RWPD 0.746 pass
+  C10d cells outside [-5.9,+4.3] at 63 / [-10,+8] at 126 [0]
+     R22-fixd2RWPD 0 pass
+  C10c mirrored/levered C10 rules breaching median<=+1.0 & ahead<=2/3 (of 384), 270 pooled long-run histories (owner decision 14) [0]
+     R22-fixd2RWPD 0 pass
+  C10c on the long run's 90 alone (reported)
+     R22-fixd2RWPD 0 
+  I-rate same-close invariant, max error bp [< 0.01]
+     R22-fixd2RWPD 0.000 pass
+  R3 on held closes [-0.36, +0.03]
+     R22-fixd2RWPD -0.138 pass
+  R4 on held closes (now the registered R4, section 1) [+0.15, +0.39]
+     R22-fixd2RWPD 0.293 
+  R3m monthly [-0.40, +0.10]
+     R22-fixd2RWPD -0.235 pass
+  R4m monthly [+0.20, +0.65]
+     R22-fixd2RWPD 0.214 pass
+  R4-lag corr(index_t, IGCORP_t+1) [|.| <= 0.10]
+     R22-fixd2RWPD -0.012 pass
+  F-stress P(cut within 42 | VIX 40+, policy rate > 0.25) [0.50-1.00]; real 0.90
+     R22-fixd2RWPD 0.881 pass
+  F-stress P(cut within 42 | VIX 40+), unconditioned (reported; real 0.40)
+     R22-fixd2RWPD 0.675 
+  F-stress P(hike within 42 | VIX 30+) [<= 0.10]
+     R22-fixd2RWPD 0.006 pass
+  F-bear median policy change peak to trough in a 20% bear [<= -0.5]
+     R22-fixd2RWPD -0.550 pass
+  SF1 forced VIX priced the day it is published [>= 0.75]
+     R22-fixd2RWPD 1.043 pass
+
+  R22-fixd2RWPD: PH5_90 1.000; PH5_90_vol_use 0.537; PH5_90_diff 0.011; PH5_pool_note 270 histories: longrun 9420201-9420230,9420501-9420530,9420801-9420830 + pool 9421201-9421230,9421501-9421530,9421801-9421830,9423201-9423230,9423501-9423530,9423801-9423830; PH5_vol0 0.166; PH5_vol0_se 0.005; PH5_vol_gap 0.005; PH5_vol_worst_year 2; PH5_vol_worst_gap 0.005; PH5_vol_worst_bound 0.018; PH5_vol_use 0.281; PH5_vol_fixed002 1.000; PH5_vol_z 2.690; PH5_vol_alt 1.000; PH5_vol_alt_z 2.000; PH5_n 270; firstcut_vs_onset_median -85.000; firstcut_before_onset_share 0.701; C10c_worst_90 ; lever:2x while pub peak|con +1.01/0.70; lever:2x while pub con|tro +1.49/0.83; lever:2x 126 after pub peak -0.01/0.49; lever:2x 252 after pub con +1.20/0.78; lever:2x 252 after first cut +1.69/0.75; lever:2x 63 after any cut +1.64/0.72; lever:2x while pub GDP < 1 +0.82/0.67; C10c_pool_note 270 histories: longrun 9420201-9420230,9420501-9420530,9420801-9420830 + pool 9421201-9421230,9421501-9421530,9421801-9421830,9423201-9423230,9423501-9423530,9423801-9423830; C10c_worst ; SF2:rec_pkg (-0.4195428879838066, 0, 30); SF3:rec_pkg -10.016; SF3min:rec_pkg -14.833; SF5:rec_pkg 7.388; SF4:rec_pkg 0; S1a:rec_pkg 0.537; S2:rec_pkg 55.863; S1b:rec_pkg 30/30; SF2:lc (-2.7665637918031893, 68, 216); SF3:lc -7.635; SF3min:lc -15.597; SF5:lc 7.718; SF2:oil (-0.4816377241310236, 9, 216); SF3:oil -3.363; SF3min:oil -11.575; SF5:oil 5.828; SF2:prs (-0.23753415407437276, 11, 216); SF3:prs -3.544; SF3min:prs -13.545; SF5:prs 5.758; SF2:rate (-0.544728983084833, 9, 216); SF3:rate -7.984; SF3min:rate -18.664; SF5:rate 6.171; SF2:curve (-0.544728983084833, 9, 216); SF3:curve -7.984; SF3min:curve -18.664; SF5:curve 6.180; SF2:geo (0.34830607958576576, 29, 216); SF3:geo -4.975; SF3min:geo -17.299; SF5:geo 8.114; L-rate:IGCORP-5-sign (-3.6, 10, 36); L-rate:IGCORP-4-sign (-4.0, 10, 36); L-rate:IGCORP-5-long (2.3, 27, 36); L-rate:UST10Y-5-sign (-4.2, 8, 36); L-rate:UST10Y-4-sign (-4.2, 9, 36); H1-100y H1 pass; R7a_pre_pass True; R7a_pre_hike (1.7813591434770433, 0.8242750451566542); R7a_pre_cut (-0.7269825981375793, 1.4793485684568135)

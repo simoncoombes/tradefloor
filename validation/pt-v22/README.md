@@ -1,73 +1,24 @@
-# pt-v22's grade: not run yet
+# pt-v22's grade
 
-This folder will hold the grade pt-v22 ships on, laid out as `../pt-v21/` is:
-the registered rows, the scripts the grading machines ran with
-`scripts-as-run.txt`, what they wrote (less the raw histories), the verdict the
-preset record carries, and `run-box.sh`. Until the grade has run it holds only
-this file.
+This folder holds the grade pt-v22 ships on: the twenty-third registration's,
+run on 2026-11-01. The boxes ran the engine at e132a66a (package 0.10.2) with
+the arm R22-fixd2RWPD, 209 dials on pt-v20. The grade ran the arm as the
+custom model `custom-9ac114fd`, and pt-v22 is that arm value for value
+(`tools/presets/arms/pt-v22.txt`, `@status graded`). The layout follows
+`../pt-v21/`:
 
-pt-v22 is in the engine already, so its preset, its record and its known
-answer can be checked before the grade. Its values come from a STAND-IN arm:
-`tools/presets/arms/pt-v22.txt`, whose `@status` line says `stand-in`. Those
-are not the values pt-v22 will ship.
-
-## On release day
-
-1. **Swap in the graded arm**, from the repository's root:
-
-   ```
-   python tools/presets/arm_preset.py --arm <the graded arm> --graded
-   ```
-
-   It writes the arm file and `ModelParams::pt_v22`, builds the engine, checks
-   that pt-v22 is the arm, writes the record's identity (fingerprint,
-   coefficients, mechanisms, the arm) and pt-v22's known-answer row, and brings
-   the pt-v22 values in `provenance.py` in line. It lists any provenance entry
-   that needs a person: a measured value that moved, or a dial the graded arm
-   brings into scope or takes out. `python tools/presets/arm_preset.py --check`
-   then exits 0.
-
-2. **Publish the grade here**, as `../pt-v21/` is published.
-
-3. **Fill the record's slots.** `python/tradefloor/presets/pt-v22.json` holds
-   each block the grade measures as `{"slot": ..., "filled_by": ...}`, and
-   `tf.preset_record("pt-v22")` refuses to load it while any slot is empty.
-   `tools/presets/record.py` fills them:
-
-   | Slot | Filled by |
-   |---|---|
-   | `measured`, `panel_252`, `panel_504`, `mechanism_252`, `mechanism_heldout_seeds`, `in_band`, `misses`, `unreadable`, `absent`, `dispersion`, `crisis_lever` | `record.py --panel <the grade's preset_panel.py artefact>` |
-   | `structure_252`, `structure_heldout_seeds`, `structure_rise` | `record.py --panel`, or `--structure-rows` when the artefact keeps no per-seed rows |
-   | `level_protocol` | `record.py --level-rows <the grade's level_rows.py artefact>` |
-   | `long_run` | `record.py --long-run <the grade's criteria.py verdict>` |
-
-   The `long_run` block marks each row (`tools/presets/record.py` `REPORTED_ROWS` and `ROW_EXCEPTIONS`):
-
-   | row | on the record | why |
-   |---|---|---|
-   | OF4 | `gated: false`, `reported_because` | read and reported, not gated (draft item 21) |
-   | R6 | `gated: false`, `reported_because` | read and reported, not gated (draft item 25(i)) |
-   | ON1 | gated, `exception` | worse than v21, an exception the owner accepts (draft item 25(h)) |
-
-   - **`pass`** stays the plain fact of whether a row sits inside its mark, on every row.
-   - **The counts:** the block's `passed` and `of` count gated rows, and `all_rows` counts every row.
-   - **The verdict** is "pass" when every gated row passes.
-   - **Refusal:** `tf.preset_record("pt-v22")` refuses a record that gates a row outside its mark, and
-     `record.py --long-run` refuses a verdict that has no OF4, R6 or ON1.
-
-4. **Fill the named values the tests hold.** Each is empty until the grade has
-   run, and `tests/test_validation.py` fails if some are filled and others are
-   not:
-
-   | Where | Name | What |
-   |---|---|---|
-   | `tools/presets/record.py` | `PT_V22_GRADE_BOXES` | the boxes that ran the grade |
-   | `tests/test_validation.py` | `GRADE22["boxes"]` | the same boxes |
-   | | `GRADE22["engine_commit"]` | the engine commit the boxes ran |
-   | | `GRADE22["package"]` | the package version that commit builds |
-   | | `GRADE22["scripts"]` | per box, how many files it unpacked and the sha256 of its archive |
-   | | `GRADE22["verdict"]` | the verdict's file under this folder, its result, rows passed and rows graded |
-
-If pt-v22 becomes the default in that release, that is a separate change:
-`DEFAULT_PRESET_NAME`, `DEFAULT_SINCE` and `record.py --default-since`, as
-pt-v21's move to the default was.
+- `scripts-as-run.txt` lists every file the five grading boxes unpacked
+  before they ran (g23gen-e1a, g23b1-e1a, g23b2-e1a, g23traded-e7a and
+  g23reads-e1a): its sha256, the box and its path in that box's archive, and
+  its path here.
+- `programme/` holds those files at their paths in the design repository at
+  the registration's commit.
+  - `programme/results/ptv22/BOX/` holds each box's engine commit, archive
+    sha256, known answer, wheel and digests.
+  - `programme/results/ptv22/grade/` holds the desk's grade: the outputs of
+    the nine steps, less the exploit search's per-rule dump.
+- `registration-files.txt` lists the registration's own files: its
+  document, the arm, the exam seeds and the input manifest.
+- `verdict-pt-v22.json` is the verdict the preset record carries
+  (`python/tradefloor/presets/pt-v22.json`, `long_run`).
+- `level-pool/pt-v22.json` is the record's pooled level read, 360 seeds.

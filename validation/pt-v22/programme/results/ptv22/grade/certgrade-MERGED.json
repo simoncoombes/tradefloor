@@ -1,0 +1,245 @@
+{
+ "kind": "certgrade_box",
+ "box": "/Users/simoncoombes/Dev/runs/reg23/MERGED",
+ "arms": {
+  "R22-fixd2RWPD": {
+   "bands": {
+    "panel_252": {
+     "in_band": 15,
+     "misses": [],
+     "unreadable": [],
+     "absent": [],
+     "unresolved": []
+    },
+    "panel_504": {
+     "in_band": 15,
+     "misses": [],
+     "unreadable": [],
+     "absent": [],
+     "unresolved": []
+    },
+    "heldout_seeds": {
+     "in_band": 15,
+     "misses": [],
+     "unreadable": [],
+     "absent": [],
+     "unresolved": []
+    },
+    "heldout_universe": {
+     "in_band": 15,
+     "misses": [],
+     "unreadable": [],
+     "absent": [],
+     "unresolved": []
+    }
+   },
+   "certify": {
+    "panel_252": {
+     "ruled_in_band": 14,
+     "ruled_of": 14,
+     "shown": [
+      "abs_return_acf1",
+      "abs_return_acf5",
+      "corr_asymmetry",
+      "corr_asymmetry_lagged",
+      "corr_persistence_acf1",
+      "cross_sectional_corr",
+      "excess_kurtosis",
+      "leverage_effect",
+      "sector_excess_corr",
+      "volume_abs_return_corr"
+     ],
+     "not_shown": [],
+     "reversed": []
+    },
+    "heldout_seeds": {
+     "ruled_in_band": 14,
+     "ruled_of": 14,
+     "shown": [
+      "abs_return_acf1",
+      "abs_return_acf5",
+      "corr_asymmetry",
+      "corr_asymmetry_lagged",
+      "corr_persistence_acf1",
+      "cross_sectional_corr",
+      "excess_kurtosis",
+      "leverage_effect",
+      "sector_excess_corr",
+      "volume_abs_return_corr"
+     ],
+     "not_shown": [],
+     "reversed": []
+    }
+   },
+   "vix_row": {
+    "panel_252": {
+     "median": 0.9522225636754229,
+     "real_centre": 0.9299390277777778,
+     "k": 27,
+     "n": 30,
+     "cut": 21,
+     "verdict": "refused",
+     "side": "above"
+    },
+    "panel_504": {
+     "median": 0.9476588178712084,
+     "real_centre": 0.959348001984127,
+     "k": 11,
+     "n": 30,
+     "cut": 19,
+     "verdict": "refused",
+     "side": "below"
+    },
+    "heldout_seeds": {
+     "median": 0.9593455177482415,
+     "real_centre": 0.9299390277777778,
+     "k": 26,
+     "n": 30,
+     "cut": 21,
+     "verdict": "refused",
+     "side": "above"
+    }
+   },
+   "rise": {
+    "median_rise": -0.003641013597836751,
+    "verdict": "below",
+    "side": "below"
+   },
+   "lever": {
+    "hi": 86.34769033442308,
+    "lo": 16.775618645689395,
+    "ratio": 5.14721347439611,
+    "tape": 6.16
+   },
+   "level": {
+    "index_drift_pct": {
+     "value": 7.347762782602737,
+     "band": [
+      1.1,
+      10.3
+     ],
+     "in_band": true,
+     "pooled": true,
+     "n": 360,
+     "se": 0.8362114434080747,
+     "margin_se": 3.5304912898167067,
+     "cert30": 9.375103168696624
+    },
+    "fear_gauge_dn1": {
+     "value": 1.9893964921568839,
+     "band": [
+      0.39,
+      3.03
+     ],
+     "in_band": true
+    },
+    "fear_gauge_dn3": {
+     "value": 5.411479691305261,
+     "band": [
+      2.6,
+      9.58
+     ],
+     "in_band": true
+    },
+    "index_tail_dn3_pct": {
+     "value": 1.2782204515272244,
+     "band": [
+      0.64,
+      2.34
+     ],
+     "in_band": true,
+     "pooled": true,
+     "n": 360,
+     "se": 0.11892327114301085,
+     "margin_se": 5.366657386675263,
+     "cert30": 0.4648074369189907
+    }
+   },
+   "crisis_dispersion": {
+    "panel_252": {
+     "own_seeds": 30,
+     "own_readings": 1,
+     "blocks_used": 2,
+     "extension_seeds": [
+      9422001,
+      9422060
+     ],
+     "extension_readings": 11,
+     "total": 12,
+     "median": 1.2604563392648518,
+     "band": [
+      0.79,
+      1.74
+     ],
+     "extended": true,
+     "status": "pass",
+     "note": null
+    },
+    "panel_504": {
+     "own_seeds": 30,
+     "own_readings": 7,
+     "blocks_used": 1,
+     "extension_seeds": [
+      9422001,
+      9422030
+     ],
+     "extension_readings": 11,
+     "total": 18,
+     "median": 1.3080734577735755,
+     "band": [
+      1.03,
+      1.66
+     ],
+     "extended": true,
+     "status": "pass",
+     "note": null
+    },
+    "heldout_seeds": {
+     "own_seeds": 30,
+     "own_readings": 8,
+     "blocks_used": 1,
+     "extension_seeds": [
+      9422001,
+      9422030
+     ],
+     "extension_readings": 5,
+     "total": 13,
+     "median": 1.2570458404611,
+     "band": [
+      0.79,
+      1.74
+     ],
+     "extended": true,
+     "status": "pass",
+     "note": null
+    },
+    "heldout_universe": {
+     "own_seeds": 30,
+     "own_readings": 8,
+     "blocks_used": 1,
+     "extension_seeds": [
+      9422001,
+      9422030
+     ],
+     "extension_readings": 3,
+     "total": 11,
+     "median": 1.187216898912666,
+     "band": [
+      0.79,
+      1.74
+     ],
+     "extended": true,
+     "status": "pass",
+     "note": null
+    }
+   }
+  }
+ },
+ "crisis_rule": {
+  "row": "crisis_sector_dispersion",
+  "need": 10,
+  "block": 30,
+  "first": 9422001,
+  "blocks": 9
+ }
+}

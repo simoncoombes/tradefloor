@@ -159,11 +159,13 @@ def test_nothing_published_names_a_grade_that_has_not_run():
     """A registration's exam seeds stay private until its grade has run.
 
     The twelfth registration's grade ran on 2026-09-26 and the eighteenth's
-    (pt-v21's, published with its certification) on 2026-10-05. A later
-    registration's name would mean a pending exam went public.
+    (pt-v21's, published with its certification) on 2026-10-05. The
+    nineteenth to the twenty-third ran by 2026-11-01; pt-v22 ships on the
+    twenty-third's, published here, and its scripts name the earlier ones. A
+    later registration's name would mean a pending exam went public.
     """
-    later = re.compile(r"nineteenth|twentieth|registration[-_ ]?(?:19|2\d)|"
-                       r"ptv2[12]g(?:19|2\d)|box-g(?:19|2\d)",
+    later = re.compile(r"twenty-(?:fourth|fifth|sixth|seventh|eighth|ninth)|"
+                       r"registration[-_ ]?2[4-9]|ptv2[12]g2[4-9]|box-g2[4-9]",
                        re.IGNORECASE)
     hits = []
     for path in sorted((ROOT / "validation").rglob("*")):

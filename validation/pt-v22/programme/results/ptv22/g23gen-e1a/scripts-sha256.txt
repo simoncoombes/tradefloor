@@ -1,0 +1,1 @@
+f148ef3eb3d16c32558ff0c09ab61b2b67d567e82ab64fc1ae55b0b4250d3a29  /home/ec2-user/scripts.tgz

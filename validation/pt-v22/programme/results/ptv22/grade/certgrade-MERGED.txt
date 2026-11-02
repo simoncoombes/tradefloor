@@ -1,0 +1,21 @@
+=== R22-fixd2RWPD
+  panel_252         in band 15  misses -
+    crisis_sector_dispersion: own  1 of 30, extension blocks 2 (9422001-9422060) +11, total  12, median 1.2605, band [0.79, 1.74] -> pass
+  panel_504         in band 15  misses -
+    crisis_sector_dispersion: own  7 of 30, extension blocks 1 (9422001-9422030) +11, total  18, median 1.3081, band [1.03, 1.66] -> pass
+  heldout_seeds     in band 15  misses -
+    crisis_sector_dispersion: own  8 of 30, extension blocks 1 (9422001-9422030) +5, total  13, median 1.2570, band [0.79, 1.74] -> pass
+  heldout_universe  in band 15  misses -
+    crisis_sector_dispersion: own  8 of 30, extension blocks 1 (9422001-9422030) +3, total  11, median 1.1872, band [0.79, 1.74] -> pass
+  certify(panel_252): ruled 14/14; mechanism shown 10, not shown [], reversed []
+  certify(heldout_seeds): ruled 14/14; mechanism shown 10, not shown [], reversed []
+  VIX row panel_252      median 0.9522 centre 0.9299 k 27/30 cut 21 -> refused/above
+  VIX row panel_504      median 0.9477 centre 0.9593 k 11/30 cut 19 -> refused/below
+  VIX row heldout_seeds  median 0.9593 centre 0.9299 k 26/30 cut 21 -> refused/above
+  VIX rise -0.0036 -> below/below
+  crisis lever 86.35 / 16.78 = 5.147x  (tape 6.16x)
+  level index_drift_pct      7.3478  band (1.1, 10.3)  in band  pooled over 360 seeds, se 0.8362, margin +3.53 se; 30-seed cert 9.3751 (reported)
+  level fear_gauge_dn1       1.9894  band (0.39, 3.03)  in band
+  level fear_gauge_dn3       5.4115  band (2.6, 9.58)  in band
+  level index_tail_dn3_pct   1.2782  band (0.64, 2.34)  in band  pooled over 360 seeds, se 0.1189, margin +5.37 se; 30-seed cert 0.4648 (reported)
+

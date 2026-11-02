@@ -1,0 +1,17 @@
+== R22-fixd2RWPD on pt-v20 (custom-9ac114fd), tradefloor 0.10.2
+  OS1  median VIX at the first close of a history                       16.691  [14.422, 21.438]   pass
+  OS2  sd of log VIX at the first close                                  0.333  [0.259, 0.382]     pass
+  ON1  overnight share of name variance, one year from the opening       0.347  [0.245, 0.415]     pass
+  G1   overnight share of name variance, median name, to 2660 session    0.411  [0.300, 0.480]     pass
+  G1c  overnight share of the EW index variance, to 2660 sessions        0.474  [0.300, 0.600]     pass
+  U1   unemployment: share of months within 0.2 pt of the 5-year low     0.167  [-0.020, 0.287]    pass
+  U2   unemployment: 5-year range, points                                2.399  [-0.212, 6.012]    pass
+  U3   unemployment: lag-12 autocorrelation of the monthly level         0.135  [-0.147, 0.682]    pass
+  U4   unemployment: sd of the 12-month change, points                   0.841  [-0.494, 2.222]    pass
+  O1   oil: 5-year log range                                             0.923  [0.440, 1.824]     pass
+  O2   oil: share of months within 2% of the 5-year high or low          0.050  [0.035, 0.098]     pass
+  O3   oil: lag-12 autocorrelation of the monthly log price              0.079  [-0.433, 0.715]    pass
+  O4   oil: sd of the 12-month log change                                0.286  [-0.018, 0.536]    pass
+  SK1  median one-year skew of daily index log returns                  -0.159  [-0.287, -0.014]   pass
+  SK2  index sessions under -3% over over +3% (log)                      1.210  [0.998, 1.502]     pass
+  reported: {"OS3_ks": {"D": 0.08499999999999999, "p": 0.547143914500777, "n_open": 90, "n_year_starts": 1800}, "vix_state0": [10.0, 10.46, 10.81, 11.1, 11.56, 11.74, 11.93, 11.99, 12.1, 12.18, 12.3, 12.34, 12.43, 12.69, 12.72, 12.78, 12.91, 13.34, 13.37, 13.43, 13.52, 13.54, 13.65, 13.91, 14.0, 14.57, 14.85, 15.31, 15.41, 15.47, 15.53, 15.61, 15.79, 15.83, 15.99, 16.21, 16.22, 16.43, 16.54, 16.57, 16.7, 16.8, 16.92, 17.4, 17.42, 17.48, 17.8, 17.87, 17.88, 18.19, 18.26, 18.42, 18.45, 18.51, 18.64, 18.68, 18.7, 19.0, 19.61, 19.81, 19.94, 20.03, 20.06, 20.98, 21.47, 21.95, 22.05, 22.73, 23.21, 23.85, 23.89, 24.01, 24.15, 26.43, 26.81, 26.86, 29.64, 30.05, 30.56, 30.6, 31.11, 31.45, 31.66, 32.36, 34.35, 40.08, 47.56], "SK": {"model_years": 1710, "burn": 252, "dn": 6073, "up": 5020, "pooled_skew": -0.2873166912352607}, "ON": {"first_tick_sd_median": 0.008827726457393999, "day_sd_median": 0.014009905611031704, "year1_ew_share": 0.4771080562597617, "ON1_first_tick_print": 0.40055380816823405, "G1c_open_print": 0.4695905020824342}, "unemployment_share_at_2.5_floor": 0.003428130511463845, "oil_share_within_0.5pct_of_150_or_36.8": 0.32749779541446206, "free": {"histories": 90, "sessions": 5292}}

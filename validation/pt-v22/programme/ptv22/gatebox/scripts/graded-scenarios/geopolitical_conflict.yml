@@ -1,0 +1,109 @@
+# Example experimental assumptions. This scenario is not a forecast, and not
+# a claim about how a real market responds to a real conflict.
+#
+# There is no `war: true` here and there will not be one. A narrative is not
+# a mechanism, and a simulator that accepted one would be inventing the part
+# a researcher is supposed to state.
+#
+# So the narrative "elevated geopolitical risk" is written out as what it is
+# assumed to DO: volatility rises and stays up, quoted depth thins, credit
+# widens, and crude catches a risk bid a couple of days later. Every one of
+# those is a number somebody chose, and every one is visible and editable.
+#
+# Measured on `Universe.random(20, seed=101)` over 120 days, seeds 3/11/29:
+# macro.vix x2.0 held for twenty-five days moved the median instrument
+# -2.23%, with the worst name -9.64%. VIX is the strongest short-horizon
+# stress lever here, because it reaches the market factor's variance target,
+# the quoted spread and cross-sectional correlation at once.
+#
+# RESHAPED IN r13. The VIX and the credit widening now ramp in over ten
+# sessions and hold, and credit is written on `macro.corporate_spread`, the
+# spread over the 10-year, and ramped back over ten sessions when the window
+# ends. Written at once, the VIX's 80 per cent jump is priced in that
+# session's re-mark under `pinned_vix_feedback`, and on top of the credit
+# write the index fell -23 to -27 per cent (log) in one morning on four of
+# twelve desk seeds; released at once, the next meeting took the whole 200
+# basis points off the corporate yield in one session. DESK FIGURES, pt-v20,
+# certified roster `Universe.random(40, seed=111).with_bonds()`, paired
+# against the same seed with no scenario, seeds 201-212, medians: the morning
+# of day 50 moves the index -0.8 per cent (log), the close 24 sessions later
+# is -7.6 below that mark, the largest one-session fall is -3.9 (-10.9 on
+# the worst seed), a VIX timer (out above 40, back in below 30) earns -3.3
+# points against holding (mean), and the corporate yield's daily sd over
+# the 245 sessions from day 55 is 8.0 bp against 5.3 unshocked. With
+# `macro_pins_hold` and `pinned_vix_feedback` on: -0.9, -8.5, -4.0 (-10.9),
+# -3.6 and 8.3 bp.
+
+version: 1
+
+scenario:
+  name: geopolitical_conflict
+
+  description: >
+    Elevated and persistent risk: volatility 80% higher, reached over two
+    weeks and held to day 80, quoted depth down a third for twenty days,
+    credit 200 basis points wider over the 10-year for the same window,
+    and an assumed bid under crude. Example experimental assumptions, not a forecast.
+
+  shocks:
+
+    # Ramped in over two weeks and held, rather than written at once: a
+    # VIX that jumps 80 per cent in one session is priced in that session's
+    # re-mark (`pinned_vix_feedback`), and from an already fearful VIX the
+    # one-morning fall reached -27 per cent (log) on desk seeds.
+    - target: macro.vix
+      operation: multiply
+      value: 1.80
+      at: 50
+      shape: ramp
+      duration: 10
+
+    - target: macro.vix
+      operation: multiply
+      value: 1.0
+      at: 60
+      duration: 20
+
+    - target: market.liquidity
+      operation: multiply
+      value: 0.65
+      at: 50
+      duration: 20
+
+  transmission:
+
+    # Assumed risk repricing. There is no equity risk premium term in this
+    # model -- valuation discounts off the corporate bond yield -- so a
+    # wider required return is written as a wider corporate yield, which is
+    # the same statement in the units the engine actually has. Written as the
+    # spread over the 10-year, so the curve still moves the level.
+    - target: macro.corporate_spread
+      operation: add
+      value: 0.020
+      at: 50
+      shape: ramp
+      duration: 10
+
+    - target: macro.corporate_spread
+      operation: add
+      value: 0.0
+      at: 60
+      duration: 20
+
+    # And back over ten sessions, so the chain takes the spread up where it
+    # stood before and the next meeting's re-anchoring is small. Released
+    # at once, the meeting took the whole 200 basis points off in one
+    # session.
+    - target: macro.corporate_spread
+      operation: add
+      value: -0.020
+      at: 80
+      shape: ramp
+      duration: 10
+
+    # Assumed commodity response, two days behind the risk move.
+    - target: commodity.oil
+      operation: multiply
+      value: 1.25
+      at: 52
+      shape: permanent
