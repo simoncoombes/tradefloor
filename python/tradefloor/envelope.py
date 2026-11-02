@@ -78,7 +78,7 @@ from .facts import (CERTIFIED_HORIZON_DAYS, REAL_MARKETS, SEED_SD,
 #: constants below (DECAY_252, DECAY_SLOPE, MEMORY_VALID_TO_LAG, the
 #: structural rows, ROSTER_MEASUREMENT) and the GAPS prose were measured on
 #: pt-v21 on 2026-10-05.
-PRESET = "pt-v21"
+PRESET = "pt-v22"
 
 #: The measurement horizon the envelope certifies, in trading days.
 #: Not a soft preference, and not a band count either. What holds the
@@ -214,30 +214,30 @@ PRESET = "pt-v21"
 #: is what every caller that GRADES this table reads. `band_distance(None,
 #: ...)` is a TypeError, and a row with no reading has no verdict to give.
 CERTIFIED: dict[str, float | None] = {
-    "annualised_vol_pct": 19.1661,
-    "excess_kurtosis": 6.0075,
-    "return_acf1": -0.0013,
-    "abs_return_acf1": 0.0948,
-    "abs_return_acf5": 0.0204,
-    "abs_return_acf20": 0.0012,
-    "cross_sectional_corr": 0.2798,
+    "annualised_vol_pct": 19.9402,
+    "excess_kurtosis": 6.7198,
+    "return_acf1": -0.0049,
+    "abs_return_acf1": 0.1052,
+    "abs_return_acf5": 0.0281,
+    "abs_return_acf20": 0.0044,
+    "cross_sectional_corr": 0.3115,
     # The two volume rows were re-measured on 2026-10-01 at `ada871e`, after
     # owner decision 1 fixed bar volume (a day bar had read the sum of the
     # day's running totals). Same protocol, roster and seeds; every other
     # row reproduced to the last digit. Before the fix they read 0.5084 and
     # -0.2540. Artefact: tools/presets/results/volume-remeasure-2026-10-01/.
-    "volume_abs_return_corr": 0.5933,
-    "leverage_effect": -0.0410,
-    "volume_change_acf1": -0.2456,
-    "corr_asymmetry": 0.0853,
-    "corr_asymmetry_lagged": 0.1067,
-    "sector_excess_corr": 0.1118,
-    "corr_persistence_acf1": 0.1386,
+    "volume_abs_return_corr": 0.5928,
+    "leverage_effect": -0.0434,
+    "volume_change_acf1": -0.2414,
+    "corr_asymmetry": 0.0646,
+    "corr_asymmetry_lagged": 0.0734,
+    "sector_excess_corr": 0.1264,
+    "corr_persistence_acf1": 0.0505,
     # Read on 4 of the 30 seeds at this preset, with the reason above.
     # Written by `envelope_tables.py` from the record's `panel_252`, which
     # carries the row only when a seed read it; `dispersion["panel_252"]` on
     # the record carries how many of the thirty did and why the rest did not.
-    "crisis_sector_dispersion": 1.2677,
+    "crisis_sector_dispersion": 1.3177,
 }
 
 
@@ -329,7 +329,7 @@ CERTIFIED_LEVEL: dict[str, float] = {
     # pt-v21, over the 360 seeds of `facts.LEVEL_POOL`: a mean of 7.0047 on
     # an across-seed standard error of 0.6677, inside the ruled band of 1.1
     # to 10.3 (the thirty certification seeds read 8.8202).
-    "index_drift_pct": 7.0047,
+    "index_drift_pct": 7.3319,
 }
 
 #: The CRISIS rows, reserved for the fear gauge and the index tail, measured
@@ -382,8 +382,8 @@ CERTIFIED_CRISIS: dict[str, float] = {
     # 7,530), all inside their 2015-2025 bands; before its graded arm it
     # read 1.7201, 5.1188 and 0.8234. The comments above and below describe
     # pt-v19's fifth composition.
-    "fear_gauge_dn1": 1.9980,
-    "fear_gauge_dn3": 5.2968,
+    "fear_gauge_dn1": 1.9803,
+    "fear_gauge_dn3": 5.7468,
     # The index tail row on the same thirty seeds, fifth composition: 86
     # sessions at or below -3 per cent in 7,530, a pooled rate of 1.1421 per
     # cent against the 2015-2025 band of 0.47 to 1.96 (position 0.45) and
@@ -417,7 +417,7 @@ CERTIFIED_CRISIS: dict[str, float] = {
     # error of 0.1080, inside the ruled band of 0.64 to 2.34 and below the
     # tape centre of 1.2132. The record's `certified_crisis` keeps the
     # thirty certification seeds' 0.5976 (45 in 7,530) beside it.
-    "index_tail_dn3_pct": 0.9827,
+    "index_tail_dn3_pct": 1.2450,
 }
 
 #: THE STRUCTURAL ROWS: the fourth certification block, and the only one
@@ -679,27 +679,27 @@ BAR_BAND_BASIS = "ruled"
 #: dispersion row is graded on `facts.REAL_MARKETS_RULED_504` and is not in
 #: `BANDS_504`, and the count is over the rows this table can be graded by.
 MEASURED_504: dict[str, float | None] = {
-    "annualised_vol_pct": 20.4445,
-    "excess_kurtosis": 6.6373,
-    "return_acf1": -0.0003,
-    "abs_return_acf1": 0.1057,
-    "abs_return_acf5": 0.0504,
-    "abs_return_acf20": 0.0295,
-    "cross_sectional_corr": 0.3078,
+    "annualised_vol_pct": 20.9822,
+    "excess_kurtosis": 6.8414,
+    "return_acf1": 0.0035,
+    "abs_return_acf1": 0.1171,
+    "abs_return_acf5": 0.0551,
+    "abs_return_acf20": 0.0293,
+    "cross_sectional_corr": 0.3210,
     # Re-measured on the fixed bars on 2026-10-01, as in `CERTIFIED`. Before
     # the fix they read 0.5614 and -0.2415. 0.6266 is 0.0034 under the ruled
     # ceiling of 0.63 (`facts.REAL_MARKETS_RULED_504`), about 0.4 of a
     # 504-day seed sd, and 13 of the 30 seeds read above 0.63.
-    "volume_abs_return_corr": 0.5935,
-    "leverage_effect": -0.0485,
-    "volume_change_acf1": -0.2431,
-    "corr_asymmetry": 0.0776,
-    "corr_asymmetry_lagged": 0.1119,
-    "sector_excess_corr": 0.1152,
-    "corr_persistence_acf1": 0.3411,
+    "volume_abs_return_corr": 0.5863,
+    "leverage_effect": -0.0495,
+    "volume_change_acf1": -0.2406,
+    "corr_asymmetry": 0.0780,
+    "corr_asymmetry_lagged": 0.0878,
+    "sector_excess_corr": 0.1221,
+    "corr_persistence_acf1": 0.3458,
     # Read on 9 of the 30 seeds at this preset, and the value is their
     # median. See the note above and `CERTIFIED`'s.
-    "crisis_sector_dispersion": 1.3921,
+    "crisis_sector_dispersion": 1.1903,
 }
 
 #: |return| autocorrelation at the certified horizon, against real markets.
