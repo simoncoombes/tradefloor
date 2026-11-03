@@ -93,9 +93,9 @@ pub fn name_offset(key: u64, name: u64) -> i64 {
 /// often the two keyed generators are built.
 pub fn reaction_session(key: u64, name: u64, quarter: i64) -> i64 {
     const SLOTS: usize = 128;
+    type Memo = [Option<(u64, u64, i64, i64)>; SLOTS];
     std::thread_local! {
-        static MEMO: std::cell::RefCell<[Option<(u64, u64, i64, i64)>; SLOTS]> =
-            const { std::cell::RefCell::new([None; SLOTS]) };
+        static MEMO: std::cell::RefCell<Memo> = const { std::cell::RefCell::new([None; SLOTS]) };
     }
     let slot = ((name ^ (quarter as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15))
         .wrapping_mul(0x9E37_79B9_7F4A_7C15) >> 57) as usize % SLOTS;
