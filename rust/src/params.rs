@@ -7251,6 +7251,19 @@ pub struct ModelParams {
     /// `1 + g * (garch_variance / sector base - 1)`, clamped.
     /// pt-v21 ships 0.65.
     pub volume_idio_variance_gain: f64,
+    /// A switch: 1.0 makes `volume_idio_variance_gain` scale a name's volume
+    /// with its own VOLATILITY instead of its variance. 0.0, on every shipped
+    /// preset, reads the variance ratio as it stood, and a value of 0.0 is
+    /// left out of the model's digest.
+    ///
+    /// On, the multiplier is `1 + g * (sqrt(variance ratio) - 1)` on the
+    /// same ratio (`garch_variance` over the sector's base), with the same
+    /// gain and the same clamp to [0.25, 4]: volume moves
+    /// with the size of a name's moves (a standard deviation), so in a
+    /// stressed name it rises by the volatility ratio rather than its
+    /// square. Read only with `volume_idio_variance_gain` set, which is
+    /// unread at 0.0. 0 or 1.
+    pub volume_idio_scale_on_vol: f64,
     /// Innovation size of the per-name volume state. 0.0 on every shipped
     /// preset. See [`ModelParams::volume_idio_persistence`].
     pub volume_idio_sigma: f64,
@@ -7718,6 +7731,20 @@ pub struct ModelParams {
     /// 10.40 against 10 at $5B, 5.00 against 5 at $25B, 2.66 against 3 at
     /// $100B.
     pub spread_size_exponent: f64,
+    /// A switch: 1.0 spaces the stock maker's ladder one tick apart after
+    /// the touch. 0.0, on every shipped preset, keeps the legacy display
+    /// book's spacing, half a spread between successive levels
+    /// (`LadderParams::level_step` 0.5), and a value of 0.0 is left out of
+    /// the model's digest.
+    ///
+    /// Real books hold resting size at every tick behind the touch, so a
+    /// marketable order that walks k levels pays about k ticks, not k half
+    /// spreads. The tick is the engine's own: prices round to cents. There
+    /// is no share or width to set: the ladder's step becomes
+    /// `max(0.01, spread x 0)` = one cent, and only the spacing moves; the
+    /// touch, the sizes and the number of levels are as before. Read by the
+    /// stock settlement (`SettleOptions::ladder_tick_spacing`). 0 or 1.
+    pub maker_ladder_tick_spacing: f64,
 
     // ── The agent-facing book (agent_book.rs, engine.rs) ─────────────────
     //
@@ -9260,6 +9287,8 @@ impl ModelParams {
             earnings_nominal_growth: 0.0,
             market_vol_slow_weight: 0.0,
             volume_idio_variance_gain: 0.0,
+            volume_idio_scale_on_vol: 0.0,
+            maker_ladder_tick_spacing: 0.0,
             volume_idio_persistence: 0.0,
             volume_idio_sigma: 0.0,
             garch_cascade_components: 0.0,
@@ -12231,6 +12260,8 @@ impl ModelParams {
             "earnings_nominal_growth" => self.earnings_nominal_growth,
             "market_vol_slow_weight" => self.market_vol_slow_weight,
             "volume_idio_variance_gain" => self.volume_idio_variance_gain,
+            "volume_idio_scale_on_vol" => self.volume_idio_scale_on_vol,
+            "maker_ladder_tick_spacing" => self.maker_ladder_tick_spacing,
             "volume_idio_persistence" => self.volume_idio_persistence,
             "volume_idio_sigma" => self.volume_idio_sigma,
             "garch_cascade_components" => self.garch_cascade_components,
@@ -12717,6 +12748,8 @@ impl ModelParams {
             "earnings_nominal_growth" => out.earnings_nominal_growth = value,
             "market_vol_slow_weight" => out.market_vol_slow_weight = value,
             "volume_idio_variance_gain" => out.volume_idio_variance_gain = value,
+            "volume_idio_scale_on_vol" => out.volume_idio_scale_on_vol = value,
+            "maker_ladder_tick_spacing" => out.maker_ladder_tick_spacing = value,
             "volume_idio_persistence" => out.volume_idio_persistence = value,
             "volume_idio_sigma" => out.volume_idio_sigma = value,
             "garch_cascade_components" => out.garch_cascade_components = value,
@@ -15063,6 +15096,18 @@ impl ModelParams {
                  liquidation, which only margin_scan_coverage makes: set margin_scan_coverage first.",
                 self.margin_liquidation_worked));
         }
+        if !(self.maker_ladder_tick_spacing == 0.0 || self.maker_ladder_tick_spacing == 1.0) {
+            return Err(format!(
+                "maker_ladder_tick_spacing is {}. It is a switch: 0 (the ladder's levels half a spread apart) or \
+                 1 (one tick apart after the touch).",
+                self.maker_ladder_tick_spacing));
+        }
+        if !(self.volume_idio_scale_on_vol == 0.0 || self.volume_idio_scale_on_vol == 1.0) {
+            return Err(format!(
+                "volume_idio_scale_on_vol is {}. It is a switch: 0 (volume on the name's variance ratio) or \
+                 1 (on its volatility ratio).",
+                self.volume_idio_scale_on_vol));
+        }
         if !(self.margin_deficit_liquidates == 0.0 || self.margin_deficit_liquidates == 1.0) {
             return Err(format!(
                 "margin_deficit_liquidates is {}. It is a switch: 0 (a call decided on the equity at the open) or \
@@ -15670,6 +15715,8 @@ fn shipped_digests() -> &'static [(&'static str, String)] {
 /// recorded state hash of a custom model moves. Only a switch whose zero is
 /// a branch belongs here; a dial whose zero is arithmetic does not.
 pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
+    "maker_ladder_tick_spacing",
+    "volume_idio_scale_on_vol",
     "book_arrival_shuffle",
     "book_cross_at_limit",
     "book_depth_nesting",
@@ -16377,6 +16424,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "volume_idio_persistence",
         "volume_idio_sigma",
         "volume_idio_variance_gain",
+        "volume_idio_scale_on_vol",
+        "maker_ladder_tick_spacing",
         "volume_innovation_sigma",
         "volume_move_cap",
         "volume_move_floor",
@@ -16450,6 +16499,29 @@ fn carried_read_only_pairs() -> Vec<(String, f64)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The two C4a switches: settable, refused off {0, 1}, and silent in the
+    /// digest at 0, so every shipped preset keeps its fingerprint and digest.
+    #[test]
+    fn the_ladder_and_volume_switches_are_switches_and_silent_at_zero() {
+        for name in ["maker_ladder_tick_spacing", "volume_idio_scale_on_vol"] {
+            assert!(settable_names().contains(&name), "{name} is settable");
+            assert!(DIGEST_SILENT_AT_ZERO.contains(&name), "{name} is left out of the digest at 0");
+            for preset in ["pt-v20", "pt-v21", "pt-v22"] {
+                let p = ModelParams::preset(preset).unwrap();
+                assert_eq!(p.get(name), Some(0.0), "{preset} ships {name} at 0");
+                let zero = p.with_override(name, 0.0).unwrap();
+                assert_eq!(zero.digest(), p.digest(), "{preset}: {name} = 0 leaves the digest");
+                assert_eq!(zero.fingerprint(), preset);
+                let on = p.with_override(name, 1.0).unwrap();
+                assert_ne!(on.digest(), p.digest(), "{preset}: {name} = 1 is a different model");
+                assert!(on.invariants().is_ok());
+            }
+            let half = ModelParams::preset("pt-v22").unwrap().with_override(name, 0.5);
+            let refused = half.map(|p| p.invariants()).unwrap_or_else(Err);
+            assert!(refused.is_err(), "{name} = 0.5 is refused");
+        }
+    }
 
     #[test]
     fn the_shipped_preset_fingerprints_as_its_own_name() {

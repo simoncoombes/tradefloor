@@ -368,6 +368,20 @@ RETURNED_TO_BASELINE = {
 #: where it sits. Move the partner and this entry becomes false -- which is
 #: why each one names the partner rather than saying "inert".
 OUT_OF_SCOPE = {
+    # C4a round 2's two switches (2026-11-04), inert on every shipped preset.
+    "maker_ladder_tick_spacing":
+        "inert at 0.0: `fill_live_book` passes the legacy `level_step` 0.5 "
+        "(a branch on `LiveBookOptions::ladder_tick_spacing`, which the tick "
+        "and the agent book set from the dial), so the maker quotes the same "
+        "ladder and nothing is snapshotted or hashed. On, the levels behind "
+        "the touch sit one tick (one cent) apart; there is no width to set. "
+        "At 0.0 it is also left out of the model's digest",
+    "volume_idio_scale_on_vol":
+        "unread while `volume_idio_variance_gain` is 0.0, and inert at 0.0 on "
+        "every preset that sets the gain: `idio_volume_multiplier` reads the "
+        "variance ratio as it stood (a branch). On, the same gain and clamp "
+        "read the volatility ratio, the square root of the variance ratio. At "
+        "0.0 it is also left out of the model's digest",
     # What derivatives read. pt-v22 sets most of these and they have entries;
     # what is left here is inert on every shipped preset.
     # None of them writes anything a price reads, so off zero they leave every

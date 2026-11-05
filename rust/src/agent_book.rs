@@ -979,6 +979,9 @@ pub fn maker_ladder(company: &TickCompany, vix: f64, params: &ModelParams) -> Or
             spread_size_smoothness: params.spread_size_smoothness,
             spread_size_exponent: params.spread_size_exponent,
             levels: BOOK_LEVELS,
+            // The same ladder settlement quotes, so an agent walks the levels
+            // the tick's flow walks.
+            ladder_tick_spacing: params.maker_ladder_tick_spacing != 0.0,
             ..Default::default()
         },
     )

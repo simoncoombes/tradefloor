@@ -1207,6 +1207,10 @@ def _nothing_dormant():
                    margin_pretrade_check=1.0,
                    margin_liquidation_worked=1.0,
                    margin_deficit_liquidates=1.0,
+                   # C4a round 2's two switches: the tick-spaced ladder and
+                   # volume on volatility.
+                   maker_ladder_tick_spacing=1.0,
+                   volume_idio_scale_on_vol=1.0,
                    # The index options, their surface and their dealer (pt-v22
                    # phase 2): two switches; the surface's companions and the
                    # dealer's spread take the blanket 0.05.

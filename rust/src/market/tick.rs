@@ -1746,10 +1746,12 @@ pub fn simulate_market_tick(
                 .map(|s| s.base_daily_variance())
             {
                 Some(base) if base > 0.0 => {
-                    let ratio = companies[idx].stock.garch_variance / base;
-                    let raw = 1.0
-                        + inputs.params.volume_idio_variance_gain * (ratio - 1.0);
-                    volume_multiplier * mathx::clamp(raw, 0.25, 4.0)
+                    volume_multiplier
+                        * idio_volume_multiplier(
+                            inputs.params.volume_idio_variance_gain,
+                            companies[idx].stock.garch_variance / base,
+                            inputs.params.volume_idio_scale_on_vol != 0.0,
+                        )
                 }
                 _ => volume_multiplier,
             }
@@ -1929,6 +1931,7 @@ pub fn simulate_market_tick(
                 // The shipped bound. `settle_price_through_book` returns it
                 // untouched at 1.0, so this line moves no trajectory.
                 depth_multiplier: 1.0,
+                ladder_tick_spacing: inputs.params.maker_ladder_tick_spacing != 0.0,
             };
             // Agents' resting orders for this name, if any. With none, the
             // settlement is the shipped call, untouched.
@@ -2316,9 +2319,41 @@ impl Rng for PredrawnUniforms {
     }
 }
 
+/// A name's own volume multiplier from its variance ratio (`garch_variance`
+/// over the sector's base): `1 + gain * (ratio - 1)`, clamped to [0.25, 4].
+/// With `on_vol` (`ModelParams::volume_idio_scale_on_vol`) the ratio is the
+/// VOLATILITY ratio, the square root of the variance ratio, with the same
+/// gain and clamp. Off, it is the arithmetic the tick has always done.
+pub(crate) fn idio_volume_multiplier(gain: f64, variance_ratio: f64, on_vol: bool) -> f64 {
+    let ratio = if on_vol { mathx::sqrt(variance_ratio) } else { variance_ratio };
+    let raw = 1.0 + gain * (ratio - 1.0);
+    mathx::clamp(raw, 0.25, 4.0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// `volume_idio_scale_on_vol`: off is `1 + g (r - 1)` on the variance
+    /// ratio r, as the tick has always computed it; on is the same on
+    /// sqrt(r), the volatility ratio; both clamped to [0.25, 4].
+    #[test]
+    fn the_idio_volume_multiplier_reads_the_volatility_ratio_when_switched() {
+        let g = 0.65;
+        for r in [0.04_f64, 0.5, 1.0, 2.25, 4.0, 16.0, 100.0] {
+            let off = idio_volume_multiplier(g, r, false);
+            assert_eq!(off.to_bits(), mathx::clamp(1.0 + g * (r - 1.0), 0.25, 4.0).to_bits());
+            let on = idio_volume_multiplier(g, r, true);
+            assert_eq!(on.to_bits(), mathx::clamp(1.0 + g * (mathx::sqrt(r) - 1.0), 0.25, 4.0).to_bits());
+        }
+        // At a ratio of one both are one; above it the volatility form rises less.
+        assert_eq!(idio_volume_multiplier(g, 1.0, true), 1.0);
+        assert!(idio_volume_multiplier(g, 4.0, true) < idio_volume_multiplier(g, 4.0, false));
+        assert_eq!(idio_volume_multiplier(g, 4.0, true), 1.0 + g);
+        // The clamp holds on both.
+        assert_eq!(idio_volume_multiplier(g, 1.0e6, true), 4.0);
+        assert_eq!(idio_volume_multiplier(g, 0.0, true), mathx::clamp(1.0 - g, 0.25, 4.0));
+    }
 
     #[test]
     fn the_excess_share_is_a_floor_under_the_share_above_the_ceiling() {
