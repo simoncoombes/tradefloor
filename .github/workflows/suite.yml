@@ -117,7 +117,7 @@ jobs:
       # 1.83 is a real floor, not a guess: `f64::from_bits` in a const
       # (S_PHI_TICK, MISPRICING_PHI) became stable in 1.83, and 1.82 stops
       # there with "not yet stable as a const fn".
-      - uses: dtolnay/rust-toolchain@1.83
+      - uses: dtolnay/rust-toolchain@1.120
       - name: Every target and feature builds on the oldest supported Rust
         working-directory: rust
         # No --locked: Cargo.lock is not committed (this is a library crate,
