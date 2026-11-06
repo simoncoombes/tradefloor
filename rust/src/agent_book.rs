@@ -981,7 +981,11 @@ pub fn maker_ladder(company: &TickCompany, vix: f64, params: &ModelParams) -> Or
             levels: BOOK_LEVELS,
             // The same ladder settlement quotes, so an agent walks the levels
             // the tick's flow walks.
+            // `market_ladder_tick_spacing` is NOT read here: it spaces the
+            // market's own settlement only, and the agent book keeps the
+            // levels half a spread apart.
             ladder_tick_spacing: params.maker_ladder_tick_spacing != 0.0,
+            vix_slope: params.quote_spread_vix_slope,
             ..Default::default()
         },
     )

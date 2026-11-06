@@ -376,6 +376,21 @@ OUT_OF_SCOPE = {
         "ladder and nothing is snapshotted or hashed. On, the levels behind "
         "the touch sit one tick (one cent) apart; there is no width to set. "
         "At 0.0 it is also left out of the model's digest",
+    # v23 round 1's fix 1 and fix 2 (2026-11-06), inert on every shipped preset.
+    "market_ladder_tick_spacing":
+        "inert at 0.0: the tick's settlement passes the legacy `level_step` "
+        "0.5 unless `maker_ladder_tick_spacing` is on (a branch on "
+        "`SettleOptions::ladder_tick_spacing`, which the tick sets from either "
+        "switch), and the agent book never reads it. On, the levels behind the "
+        "touch sit one tick apart in the market's own settlement only. At 0.0 "
+        "it is also left out of the model's digest",
+    "quote_spread_vix_slope":
+        "inert at 0.0: `vix_spread_multiplier_with` returns the shipped "
+        "`1 + max(0, (vix - 15) / 30)` itself (a branch), so every stock quote "
+        "is bit-identical. Off zero it replaces the 1/30 in the stock quote's "
+        "VIX term (settlement, agent book and displayed book); the rate "
+        "indices and the option dealer keep 1/30. At 0.0 it is also left out "
+        "of the model's digest",
     "volume_idio_scale_on_vol":
         "unread while `volume_idio_variance_gain` is 0.0, and inert at 0.0 on "
         "every preset that sets the gain: `idio_volume_multiplier` reads the "

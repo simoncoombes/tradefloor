@@ -1931,7 +1931,12 @@ pub fn simulate_market_tick(
                 // The shipped bound. `settle_price_through_book` returns it
                 // untouched at 1.0, so this line moves no trajectory.
                 depth_multiplier: 1.0,
-                ladder_tick_spacing: inputs.params.maker_ladder_tick_spacing != 0.0,
+                // The market's own settlement takes the tick-spaced ladder from
+                // either switch; the agent book reads only the first
+                // (`agent_book::maker_ladder`).
+                ladder_tick_spacing: inputs.params.maker_ladder_tick_spacing != 0.0
+                    || inputs.params.market_ladder_tick_spacing != 0.0,
+                vix_slope: inputs.params.quote_spread_vix_slope,
             };
             // Agents' resting orders for this name, if any. With none, the
             // settlement is the shipped call, untouched.

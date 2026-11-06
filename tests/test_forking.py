@@ -1210,6 +1210,10 @@ def _nothing_dormant():
                    # C4a round 2's two switches: the tick-spaced ladder and
                    # volume on volatility.
                    maker_ladder_tick_spacing=1.0,
+                   # v23 round 1's fix 1 and fix 2: the settlement-only
+                   # ladder and the quote's VIX slope.
+                   market_ladder_tick_spacing=1.0,
+                   quote_spread_vix_slope=0.05,
                    volume_idio_scale_on_vol=1.0,
                    # The index options, their surface and their dealer (pt-v22
                    # phase 2): two switches; the surface's companions and the

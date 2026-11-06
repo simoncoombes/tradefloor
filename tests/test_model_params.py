@@ -1099,7 +1099,9 @@ PERTURBATIONS = [
     ("sector_loading_beta_slope", 0.8, True),    # spreads the loading across names by beta, so the cross-section moves even though the mean loading does not
     ("volume_idio_variance_gain", 1.0, True),    # couples volume to the name's own variance, which is non-trivial from the first tick
     ("volume_idio_scale_on_vol", 1.0, True),     # the same coupling on the volatility ratio: pt-v20 carries the gain at 0.2, so volume, and the flow it settles, moves from the first tick
-    ("maker_ladder_tick_spacing", 1.0, True),    # the maker's levels behind the touch one tick apart: a slice that walks past the touch fills at different prices from the first tick
+    ("maker_ladder_tick_spacing", 1.0, True),
+    ("market_ladder_tick_spacing", 1.0, True),   # the market's own settlement ladder one tick apart: the background flow fills at different prices from the first tick
+    ("quote_spread_vix_slope", 0.05, True),      # the stock quote's VIX slope off the shipped 1/30: every quote above VIX 15 is wider from the first tick    # the maker's levels behind the touch one tick apart: a slice that walks past the touch fills at different prices from the first tick
     # 0.5, not 12.0: RAISING the cap is inert in this short window because
     # no name here moves more than the shipped 4 percent from its open,
     # which is the measurement that makes the cap a CRISIS dial. Lowering
