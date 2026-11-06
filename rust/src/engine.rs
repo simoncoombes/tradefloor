@@ -13594,6 +13594,9 @@ impl Engine {
                 spread_size_smoothness: 0.0,
                 spread_size_exponent: crate::microstructure::SPREAD_SIZE_EXPONENT,
                 vix: self.economy.vix,
+                // The quote's VIX slope reaches the displayed book too, so a
+                // reader of the quoted spread sees the one the flow trades.
+                vix_slope: self.params.quote_spread_vix_slope,
                 ..Default::default()
             },
         ))

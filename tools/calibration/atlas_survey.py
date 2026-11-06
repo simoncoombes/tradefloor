@@ -501,6 +501,14 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "margin_pretrade_check": (0.0, 1.0),
     "margin_liquidation_worked": (0.0, 1.0),
     "margin_deficit_liquidates": (0.0, 1.0),
+    # C4a round 2's two switches (2026-11-04): 0 or 1, refused anywhere else,
+    # so the range is the switch itself.
+    "maker_ladder_tick_spacing": (0.0, 1.0),
+    # v23 round 1's fix 1 (a switch) and fix 2 (the quote's VIX slope; 0 is
+    # the shipped 1/30, 1/15 doubles it).
+    "market_ladder_tick_spacing": (0.0, 1.0),
+    "quote_spread_vix_slope": (0.0, 0.0667),
+    "volume_idio_scale_on_vol": (0.0, 1.0),
     # The index options, their surface and their dealer (pt-v22 phase 2):
     # two switches, the surface's skew, curvature, term premia and earnings
     # weight, and the dealer's half-spread. None of them moves a stock price.
