@@ -944,6 +944,8 @@ PARAM_SPECS: dict[str, dict] = {
     "market_factor_reversal": {"kind": "abs", "step_unit": 0.01, "hard_range": (0.0, 0.5), "derived": False},
     "market_factor_reversal_vix_power": {"kind": "abs", "step_unit": 0.5, "hard_range": (0.0, 4.0), "derived": False},
     "market_factor_reversal_transient": {"kind": "abs", "step_unit": 0.1, "hard_range": (0.0, 1.0), "derived": False},
+    "cycle_hazard_compound": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0), "derived": False},
+    "phase_entry_shock_once": {"kind": "abs", "step_unit": 1.0, "hard_range": (0.0, 1.0), "derived": False},
     "news_preopen_share": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0), "derived": False},
     "news_session_release_share": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0), "derived": False},
     "remark_growth_open_share": {"kind": "abs", "step_unit": 0.05, "hard_range": (0.0, 1.0), "derived": False},

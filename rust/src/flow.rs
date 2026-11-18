@@ -185,6 +185,7 @@ fn cycle_spec_of(params: &ModelParams) -> CycleSpec {
         equity_opening: 0.0,
         inflation_hazard: params.cycle_inflation_hazard,
         rate_hazard: params.cycle_rate_hazard,
+        compound: params.cycle_hazard_compound != 0.0,
     }
 }
 

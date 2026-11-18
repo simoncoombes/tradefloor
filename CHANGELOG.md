@@ -1,3 +1,8 @@
+## Unreleased
+
+- `cycle_hazard_compound` and `phase_entry_shock_once` are two new switches, 0.0 on every preset and left out of the model's digest, so no preset or known-answer digest moves. `cycle_hazard_compound` (refused unless `cycle_hazard_per_month` is 1.0) reads the cycle's daily transition probability as `1 - (1 - h)^(1/m)` instead of `h/m`, in the roll, the stationary opening and the forecast alike. `phase_entry_shock_once` fires the growth shock on entering a phase (its uniform, and the target redraw under `phase_target_range_draw`) on the phase's first session instead of its first two.
+- MODEL.md's known gaps said `h/21` runs high against the compound form. It runs low: by about 5% at a monthly hazard of 0.1 and 15% at 0.3.
+
 ## 0.11.0
 
 pt-v22 is the default preset. It lists contracts beside the stocks: index

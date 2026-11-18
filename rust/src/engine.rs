@@ -4367,6 +4367,7 @@ impl Engine {
             },
             inflation_hazard: self.params.cycle_inflation_hazard,
             rate_hazard: self.params.cycle_rate_hazard,
+            compound: self.params.cycle_hazard_compound != 0.0,
         }
     }
 
@@ -10653,6 +10654,7 @@ impl Engine {
             oil_seasonality_target: self.params.oil_seasonality_target,
             trough_growth_floor: self.params.trough_growth_floor,
             phase_target_range_draw: self.params.phase_target_range_draw,
+            phase_entry_shock_once: self.params.phase_entry_shock_once,
             unemployment_adjustment: self.unemployment_adjustment(),
             unemployment_natural_pull: self.params.unemployment_natural_pull,
             unemployment_okun_coefficient: self.params.unemployment_okun_coefficient,

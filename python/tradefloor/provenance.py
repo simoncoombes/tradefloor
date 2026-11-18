@@ -495,6 +495,17 @@ OUT_OF_SCOPE = {
         "decides the release minute) and no state carried between days, the "
         "day's release minutes being snapshotted and hashed only while it is "
         "set; at 0.0 it is also left out of the model's digest",
+    "cycle_hazard_compound":
+        "inert at 0.0: the cycle's per-day conversion is the monthly hazard "
+        "over the month, as it stood (a branch in `economy/cycle.rs` "
+        "`per_day`); refused unless `cycle_hazard_per_month` is 1.0; no draw "
+        "and no state of its own; at 0.0 it is also left out of the model's "
+        "digest",
+    "phase_entry_shock_once":
+        "inert at 0.0: the phase-entry growth shock's gate is the expression "
+        "that stood (a branch in `economy/daily.rs`), firing on a phase's "
+        "first two sessions; no draw of its own and no state; at 0.0 it is "
+        "also left out of the model's digest",
     "corporate_spread_equity_lag_gain":
         "inert at 0.0 and read only with `corporate_spread_equity_gain` set; "
         "refused without `corporate_spread_equity_lag`: the spread's leverage "

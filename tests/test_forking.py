@@ -1268,7 +1268,16 @@ def _nothing_dormant():
                    # and its valuation carry a switch (r18 valopen); five
                    # sessions keep the build short and still hand on state.
                    market_prehistory_sessions=5.0,
-                   market_prehistory_valuation=1.0)
+                   market_prehistory_valuation=1.0,
+                   # Two cycle switches, 0.0 or 1.0, that carry no state of
+                   # their own for a restore to lose; held off, because on
+                   # they move this scenario's cycle off the path the drift
+                   # guard below is measured on (fed_stress_vix_max and
+                   # market_vol_cycle_log stop being exercised). Their
+                   # restores are tests/test_cycle_hazard_compound.py's and
+                   # tests/test_phase_entry_shock_once.py's.
+                   cycle_hazard_compound=0.0,
+                   phase_entry_shock_once=0.0)
     return tf.ModelParams.from_preset("pt-v21", **dormant)
 
 

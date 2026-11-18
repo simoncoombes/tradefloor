@@ -1678,6 +1678,13 @@ PERTURBATIONS = [
     # drawn opening off it is inert on both again, measured, which is the
     # old reason still standing where its condition does.
     ("cycle_hazard_per_month", 0.5, True),
+    # The compound reading of the monthly hazard (pt-v20 reads it per month,
+    # which the switch needs). LIVE through the burn-in, as the clock above:
+    # the drawn opening is walked on the compound law, so seed 42 opens at a
+    # different age, and the burn-in's transitions come sooner. Measured on
+    # this probe: every continuous column moves, the economy stream by +34
+    # draws, the market stream by 0.
+    ("cycle_hazard_compound", 1.0, True),
     # The floor moves only the trough's growth range (`economy/daily.rs`,
     # `effective_gdp_range`, which returns the declared range unless the
     # phase is a trough). INERT through pt-v19, whose burn-in at seed 42
@@ -1744,6 +1751,13 @@ PERTURBATIONS = [
     # are phase-change days again, and the dial moves the economy stream by
     # +2 and the market, as measured above.
     ("phase_target_range_draw", 0.5, True),
+    # The phase-entry growth shock on the first session only. LIVE through
+    # the burn-in: pt-v20's at seed 42 passes through a full turn of the
+    # cycle (see `qe_pe_gain`), and each entry it lives through takes one
+    # shock and one uniform fewer, which moves growth and with it the
+    # market. Measured on this probe: every continuous column moves, the
+    # economy stream by -94 draws, the market stream by 0.
+    ("phase_entry_shock_once", 1.0, True),
     # The yield at which the target multiple sits on its sector anchor.
     # 0.05 rather than either shipped value: 0.04 is the default this probe
     # perturbs and 0.0456 is pt-v18's, and an entry landing on a named
@@ -2227,6 +2241,15 @@ ECONOMY_STREAM_MOVERS = frozenset({
     # the second uniform and the other does not. It also needs the US table:
     # with `cycle_us_calibration` at 0.0 it moves no economy draw.
     "cycle_hazard_per_month", "cycle_us_calibration",
+    # Two cycle switches (off on every preset), measured on this probe on
+    # pt-v20. `cycle_hazard_compound` moves the economy stream by +34 draws:
+    # the drawn opening's age and the burn-in's transition days move, and
+    # with them which of the state-dependent sites fire, as the clock above
+    # does. `phase_entry_shock_once` moves it by -94: each phase entry the
+    # burn-in lives through takes its block's uniform once instead of twice,
+    # which is the switch's own mechanism, and the growth it no longer
+    # shocks moves which state-dependent sites fire after it.
+    "cycle_hazard_compound", "phase_entry_shock_once",
     # SIX LEFT WITH pt-v20 (0.8.5), and all six still move the market:
     # `inflation_reversion`, `fed_liftoff_rule`, and four of the nine that
     # arrived with 0.8.0, `price_hard_cap`, `jump_mean_market`,

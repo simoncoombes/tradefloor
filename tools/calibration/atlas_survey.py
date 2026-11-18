@@ -780,6 +780,13 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "market_factor_reversal": (0.0, 0.16),
     "market_factor_reversal_vix_power": (0.0, 2.0),
     "market_factor_reversal_transient": (0.0, 1.0),
+    # Two switches on the business cycle, off on every preset: the daily
+    # transition probability that compounds to the monthly hazard (refused
+    # unless the hazard is read per month), and the phase-entry growth
+    # shock on the first session only. Any value but the two ends is
+    # refused, so the interval is the pair of them.
+    "cycle_hazard_compound": (0.0, 1.0),
+    "phase_entry_shock_once": (0.0, 1.0),
     # The share of company news released before the open.
     "news_preopen_share": (0.0, 1.0),
     # The share of session news released on the measured in-session profile.

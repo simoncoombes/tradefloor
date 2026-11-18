@@ -580,6 +580,16 @@ h_d = \mathrm{clip}\big(h^{W}(a_d) + \Delta_d;\ 0,\ 1\big),
 
 (`economy/cycle.rs:31-65`, `economy/cycle.rs:238-262`)
 
+**The compound reading** (`cycle_hazard_compound`, a switch, off on every
+preset and refused unless `cycle_hazard_per_month` is 1). On, the day's
+probability is the one that compounds to the month's hazard over the
+month's 21 sessions, $1 - (1 - h_d)^{1/21}$, in place of $h_d / 21$, which
+understates it: by 5 per cent at $h_d = 0.1$, 15 per cent at 0.3 and about
+half at 0.8, and where the US table's cap of 1 binds the transition is
+certain on the next roll. The transition roll, the hazard-only law the
+stationary opening and the sojourn statistics walk, and the forecast's
+cohorts all read the same conversion.
+
 The adjustment $\Delta_d$ reads the economy after the day's update
 (`economy/cycle.rs:158-217`). $\pi$ is inflation, $r^{p}$ the policy rate,
 $y^{2}$ and $y^{10}$ the 2- and 10-year yields, $u$ unemployment, $g$ real
@@ -814,7 +824,10 @@ real output $Y$.
 Each phase has a growth midpoint $\bar g$: E 3.0, P 1.25, C -1.5, T -0.25,
 R 2.25 (`economy/state.rs:263-302`). On entering a phase, growth takes a
 shock $\delta$: C $-(2 + 2U)$, T -0.5, R +1, E +0.5, P none
-(`economy/daily.rs:745-767`), and then growth is updated in three steps:
+(`economy/daily.rs:745-767`). The step's gate holds at the phase's age 0 and
+again one session later, so the shock and its uniform are taken on the
+phase's first two sessions; `phase_entry_shock_once` (a switch, off on every
+preset) takes them on the first alone. Then growth is updated in three steps:
 
 ```math
 \text{quarterly: } g \leftarrow \mathrm{clip}\big(g + 0.25\,(\bar g - g) + 0.3\,Z;\ -10,\ 6\big)
@@ -5234,9 +5247,9 @@ changes, so it waits for a new preset.
 
 **Macro.**
 
-- The growth shock on entering a phase fires on the first two sessions of the phase, not one (`economy/daily.rs:742-767`). Whether that is intended is not recorded.
+- The growth shock on entering a phase fires on the first two sessions of the phase, not one (`economy/daily.rs`, the phase-change block): the gate reads the age before the step adds a session, and holds at 0 and at exactly one increment. `phase_entry_shock_once` fires it once; it is off on every preset, and the forecast counts the shock once, so it agrees with the simulation only with the switch on.
 - Unemployment sits on its 2.5% floor for much of an expansion. Its long-run mean is 3.6% against 5.7% in the US.
-- The cycle's monthly hazard is turned into a daily probability as $h/21$, an approximation to $1 - (1 - h)^{1/21}$ that runs 4% to 15% high. The opening draw uses the hazard alone, without the ladder, so it is close to stationary but not exactly so.
+- The cycle's monthly hazard is turned into a daily probability as $h/21$, which understates the probability that compounds to $h$ over a month, $1 - (1 - h)^{1/21}$, by about 5% at $h = 0.1$, 15% at 0.3 and half at 0.8. `cycle_hazard_compound` uses the compound form; it is off on every preset. On the US table the hazard's cap is 1.0, and under the switch a hazard at the cap ends the phase at the next roll. The opening draw uses the hazard alone, without the ladder, so it is close to stationary but not exactly so.
 - Row 6 of the central bank's ladder can never fire, because inflation is capped at 6%. While the emergency condition holds, a meeting is held at every close.
 - The QE terms apply once a meeting where the code's comments say once a day. QE has no price effect, so this changes nothing measurable.
 - The corporate spread and the earnings anticipation price the TRUE cycle phase, which no published field shows until the lag has run. A phase change between meetings changes the daily VIX term's multiplier at once, so the ratio of the spread's move to 2 bp a VIX point names the new phase, and changes the level only at the next meeting, which re-anchors it by $(1 + 0.02(X - 12))\,\Delta m$: on pt-v20, 111 bp on average at the first meeting after a turn and up to 304, against 2 bp at other meetings, with the spread's daily sd at 8.7 bp against FRED BAA10Y's 3.1. The anticipation's phase term $g_k$ moves by about ±4% at the turn's own close, where the repricing prints it. `cycle_nowcast_accuracy` and `corporate_spread_cycle` (0, off, on every preset) replace the true phase with a filtered belief over it and keep the spread on its formula every session; they are for the thirteenth registration.
