@@ -106,7 +106,7 @@ fn per_day(monthly: f64, spec: &CycleSpec) -> f64 {
 ///
 /// `compound` is `cycle_hazard_compound != 0.0`: the per-day conversion
 /// reads the probability that compounds to the monthly hazard rather than
-/// the hazard over the month (see [`per_day`]). Off in [`CycleSpec::shipped`].
+/// the hazard over the month (see `per_day`). Off in [`CycleSpec::shipped`].
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[non_exhaustive]
 pub struct CycleSpec {
