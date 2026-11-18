@@ -5387,8 +5387,8 @@ mod phase_entry_gate {
             }
             let mut entries = 0;
             let mut expected = vec![false; fired.len()];
-            for k in 0..sessions {
-                expected[k] = true;
+            for e in expected.iter_mut().take(sessions) {
+                *e = true;
             }
             for (t, &(changed, _)) in steps.iter().enumerate() {
                 if !changed {
