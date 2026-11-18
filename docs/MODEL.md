@@ -3410,6 +3410,15 @@ other side. On 40 names over four sessions, 2% of resting fills did.
 stays unfilled for the rest of the session and that one 5 bp outside the
 touch still fills.
 
+The settlement book keeps 32 orders a side and trims the worst-priced
+(`order_book.rs`, `MAX_DEPTH_PER_SIDE`). The ladder alone never fills it,
+but agents' orders can: past 32 at or inside the ladder's prices, the rest,
+and the maker's deeper levels, are out of that tick's book, and a slice
+that would have reached them stops where the book ran out. With
+`book_settle_every_order` (a switch, off on every preset) each settlement's
+cap is widened by the number of resting orders, so every one is posted and
+the flow walks them all, no further than the ladder's deepest price.
+
 A resting order that the maker's re-quote moves through (a bid at or above
 the new ask) trades against the re-quote before the tick's flow, at the
 maker's prices. Its fills are recorded with `liquidity="taker"` and
@@ -3676,6 +3685,7 @@ against -0.0), R7b (-1.00 against -0.98), AO2 to AO4 (22.9 bp, 18 of 30,
 | $w$ | `impact_memory_slow_weight` | 0 | 0.1 | same | for a new registration | the slow part's weight; refused without $H_2$ |
 | | `impact_memory_refill` | 0 (off) | 1 | same | for a new registration | a switch: a resting order filled against the memory's lean takes its size off $M$, never past zero (Obizhaeva and Wang 2013; Alfonsi, Fruth and Schied 2010; Eisler, Bouchaud and Kockelkoren 2012) |
 | | `book_cross_at_limit` | 0 (off) | 1 | same | for a new registration | a switch: a resting order crossed during the session trades at its own limit (price-time priority, Nasdaq Rule 4757) |
+| | `book_settle_every_order` | 0 (off) | same | same | for a new registration | a switch: each tick's settlement book keeps every agent's resting order, not 32 a side |
 | $m^*$ | `impact_memory_crossover` | 0 (pure power) | 0.001 | same | for a new registration | a size: ANcerno impact is about linear below a volume fraction of about $10^{-3}$ (Zarinelli et al. 2015; Bucci, Mastromatteo et al. 2018; as reported in Bucci et al., PRL 122, 108302, 2019, whose own crossover is in the participation rate) |
 | $c_{OF}$ | `order_flow_coefficient` | 50 | 800 | same | chosen | reference implementation |
 | | `order_flow_depth_law` | 0 | 1 | same | derived | a switch: 1 divides by depth once, restated at a million shares a day (Cont, Kukanov and Stoikov 2014) |
@@ -5267,7 +5277,7 @@ changes, so it waits for a new preset.
 - The fair-value level scales fair value inside a tick as if the valuation were homogeneous in earnings and book; the 0.01 floor and the buyback factor break that slightly, and the next tick recomputes.
 - `ModelParams`' doc comment says market and sector shocks stay in $s$; the code sends sector noise and sector news to $v$, as this document states.
 - The company GJR is fed the whole noise term, market and sector parts included, while its coefficients describe a company's own returns. The floor, not $\omega$, sets the resting level in 8 of 12 sectors.
-- The buyback factor is re-evaluated each tick at the current price over all elapsed sessions rather than integrated along the path, and it uses the engine's global session count, so a company listed mid-run is credited with buybacks from before it existed, and no shares are retired.
+- On pt-v20 and every earlier preset the buyback factor is re-evaluated each tick at the current price over all elapsed sessions rather than integrated along the path, and it uses the engine's global session count, so a company listed mid-run is credited with buybacks from before it existed. pt-v21 and pt-v22 close both: under `buyback_accrual` each name accrues its own log share-count reduction $L$ at each close, fair value reads $e^{L}$, which does not move within a session, and a listing starts at $L = 0$ (on pt-v22 a name listed after 251 sessions held $L = 0$ and took 8.0e-5 at its first close, where the term that stood credits it 1.9% at once). On every preset no shares are retired: `shares_outstanding`, and with it market cap and a name's weight, never moves, while pt-v22's fair value assumes a reduction of up to 5% after a year (the largest $L$ on a 12-name roster after 250 sessions, 0.051).
 
 **Volatility.**
 
@@ -5284,16 +5294,16 @@ changes, so it waits for a new preset.
 - An agent's permanent impact lives in $s$, so it decays on the mispricing's half-life rather than lasting. *Next preset.*
 - The model's own flow never meets depth an agent consumed or the latent depth, so an agent's temporary impact reaches the tape only through the maker's inventory. A one-shot buy of 60% of a day's volume pays 65 bp against the mid, while the public price moves 30 bp, the linear $\gamma \sigma Q/\bar A$, and that move decays with a half-life of about 40 sessions. Volume, depth and the background flow do not respond to agents, so the model cannot produce amplification, predatory trading or a liquidity spiral. *Next preset.*
 - An order sliced over time costs far less than the empirical law for such orders. Buying 10% of a day's volume in 36 slices ten minutes apart costs 0.040 of a daily standard deviation on a USD 160bn name, against 0.105 for one block and 0.15 to 0.3 implied by published metaorder studies, because consumed depth refills with a 27-tick half-life and nothing anticipates the order. Row C9 measures one sweep and cannot see this, and a schedule optimiser will overstate the value of trading slowly. pt-v21 and pt-v22 add a metaorder memory (`impact_memory_coefficient` and its half-lives), so a sliced order pays for the volume it has already taken: on pt-v21 the same programme costs a median 0.13 of a daily standard deviation ([REALISM.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/REALISM.md)).
-- On the closing tick, agents' resting-order fills are recorded at book prices while the print is the model price.
-- The settlement book keeps 32 orders a side, so a far agent order can be left out of a tick's settlement.
+- On the closing tick, agents' resting-order fills are recorded at book prices while the print is the model price (every preset with `closing_auction`, pt-v20 to pt-v22). On pt-v22, a bid and an offer a cent inside the touch on every name of a 20-name roster quoted at least three cents wide took 18 fills on the closing tick, from 0.5 to 45 bp from the close the tape printed and none at it; some are on the wrong side of their own limit for a cross at that close, so the fix is an auction for resting orders, not a re-price. *Next preset.*
+- Each tick's settlement book keeps 32 orders a side, so with more than 32 agent orders at or inside the settlement ladder's prices the worst-priced are left out of that tick's settlement, though the flow had the volume to fill them. On pt-v22, forty one-share bids a cent inside the spread filled 32 in one tick and 8 in the next, where the same 40 shares as 32 orders filled in that one tick. `book_settle_every_order` keeps every resting order in the settlement book; it is off on every preset.
 - The maker's inventory never decays; only opposing flow unwinds it.
 - Tick volume reads the model price, not the print. Tape volume is the modelled volume, not the traded quantity, and agent trades add none; average daily volume is fixed for the run.
 
 **Scenarios.**
 
-- A permanent change on the corporate yield freezes it: after that, no policy, inflation, VIX or cycle move reaches the discount rate.
+- A permanent change on the corporate yield freezes it: after that, no policy, inflation, VIX or cycle move reaches the discount rate. It holds on every preset: on pt-v22, under a permanent +200 bp the yield kept one value for 125 sessions while a 300 bp policy rise, an inflation hold, a VIX hold and a turn to contraction moved the unpinned yield by up to 344 bp. A permanent on `macro.corporate_spread` lets the 10-year's moves through, but holds the spread, so the VIX's and the cycle's own spread terms (about 44 bp each on that seed) do not reach it. A shock that rides the chain needs an offset the engine carries. *Next preset.*
 - The effect sizes in four of the seven scenario files were measured before pt-v20, and some docstrings describe an older VIX anchor, an older crisis threshold and the switched-off crisis blend. The `macro.treasury_2y` note says the 2-year is recomputed at every close, which is pt-v19's law.
-- A pinned change of phase does not get the growth shock a natural phase change gets.
+- On pt-v20 and every earlier preset a pinned change of phase does not get the growth shock a natural phase change gets: the pin leaves the phase's age where the old phase had it, and the shock's gate reads the age. pt-v21 and pt-v22 close it: under `macro_pins_hold` a pin that changes the phase starts the new phase's clock (`Engine::pin_cycle_phase`), so the pinned phase takes the entry shock on its first two sessions as a natural entry does (one with `phase_entry_shock_once`), whether the pin is made once or held every day, through `pin_macro`, `Scenario.hold` or a `macro.cycle` intervention. Growth pinned on the same day holds through the close, the shock included.
 - In the recession scenario the index rises too little from its low: about 58% in the 252 sessions after it, against 69% after the 2009 low (pt-v21: 70%). The cause is `pinned_vix_sets_variance`. The scenario pins the VIX through the recovery, every pin sets the variance, and the recovery is calmer than under the stepped law, so the index climbs less. The scenario's band was measured under the stepped law. With the switch off the rise ties pt-v21, but the 2020 crash replay loses its depth and timing. A pin that only raises the variance ties the rise but makes the crash's drawdown path worse. *Next preset.*
 - `World.run` builds a fresh scenario on every call, so a hold or ramp added with `World.apply` loses its anchor between calls. `pin_macro(epicentre=None)` does not clear an epicentre pin.
 

@@ -787,6 +787,10 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # refused, so the interval is the pair of them.
     "cycle_hazard_compound": (0.0, 1.0),
     "phase_entry_shock_once": (0.0, 1.0),
+    # A switch on the traded path, off on every preset: each tick's
+    # settlement book keeps every agent's resting order instead of 32 a
+    # side. Any value but the two ends is refused.
+    "book_settle_every_order": (0.0, 1.0),
     # The share of company news released before the open.
     "news_preopen_share": (0.0, 1.0),
     # The share of session news released on the measured in-session profile.

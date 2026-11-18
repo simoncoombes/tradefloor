@@ -506,6 +506,12 @@ OUT_OF_SCOPE = {
         "that stood (a branch in `economy/daily.rs`), firing on a phase's "
         "first two sessions; no draw of its own and no state; at 0.0 it is "
         "also left out of the model's digest",
+    "book_settle_every_order":
+        "inert at 0.0: each tick's settlement book keeps 32 orders a side, as "
+        "it stood (a branch in `microstructure.rs` `settle_inner`); read only "
+        "when agents' orders rest in the settlement book under `book_resting`; "
+        "no draw and no state; at 0.0 it is also left out of the model's "
+        "digest",
     "corporate_spread_equity_lag_gain":
         "inert at 0.0 and read only with `corporate_spread_equity_gain` set; "
         "refused without `corporate_spread_equity_lag`: the spread's leverage "

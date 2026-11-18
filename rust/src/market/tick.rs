@@ -1929,6 +1929,9 @@ pub fn simulate_market_tick(
                 // The shipped bound. `settle_price_through_book` returns it
                 // untouched at 1.0, so this line moves no trajectory.
                 depth_multiplier: 1.0,
+                // Read only with agents' resting orders in the book; false
+                // on every preset (`book_settle_every_order`).
+                keep_every_resting_order: inputs.params.book_settle_every_order != 0.0,
             };
             // Agents' resting orders for this name, if any. With none, the
             // settlement is the shipped call, untouched.

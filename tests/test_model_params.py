@@ -1095,6 +1095,10 @@ PERTURBATIONS = [
     # wash).
     ("impact_memory_refill", 1.0, False),
     ("book_cross_at_limit", 1.0, False),
+    # INERT on this probe: read only when agents' orders rest in a tick's
+    # settlement book, and the probe sends none.
+    # tests/test_book_settle_every_order.py moves it.
+    ("book_settle_every_order", 1.0, False),
     ("sector_loading", 1.0, True),               # the literal 0.5 made reachable: doubling a name's exposure to its own sector moves it from the first tick
     ("sector_loading_beta_slope", 0.8, True),    # spreads the loading across names by beta, so the cross-section moves even though the mean loading does not
     ("volume_idio_variance_gain", 1.0, True),    # couples volume to the name's own variance, which is non-trivial from the first tick

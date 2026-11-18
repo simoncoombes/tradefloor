@@ -1264,6 +1264,9 @@ def _nothing_dormant():
                    # wash); they are read only by resting orders.
                    book_cross_at_limit=1.0,
                    impact_memory_refill=1.0,
+                   # A switch read only by resting orders in a tick's
+                   # settlement book; no state of its own.
+                   book_settle_every_order=1.0,
                    # The market's prehistory is a whole number of sessions
                    # and its valuation carry a switch (r18 valopen); five
                    # sessions keep the build short and still hand on state.

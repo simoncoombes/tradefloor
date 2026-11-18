@@ -7937,6 +7937,30 @@ pub struct ModelParams {
     /// auction would fill it.
     /// pt-v21 ships 1.0.
     pub book_cross_at_limit: f64,
+    /// Keep every agent's resting order in each tick's settlement book: a
+    /// switch, 0.0 or 1.0.
+    ///
+    /// The book the model's flow settles through inside a tick is the
+    /// maker's ladder (two to ten levels a side) with every resting agent
+    /// order posted into it, and it keeps 32 orders a side
+    /// (`order_book::MAX_DEPTH_PER_SIDE`), trimming the worst-priced. More
+    /// than 32 orders at or inside the ladder's prices therefore push the
+    /// rest of them, and the maker's deeper levels, out of that tick's
+    /// book: a slice that would have reached them stops where the book
+    /// ran out, and the orders left out wait for a later tick though the
+    /// flow had the volume to fill them. On pt-v22, forty one-share bids a
+    /// cent inside the spread filled 32 and then 8 a tick later, where the
+    /// same 40 shares as 32 orders filled at once. The book an agent trades
+    /// against between ticks keeps 4096 (`agent_book::AGENT_BOOK_CAP`).
+    ///
+    /// 1.0 widens each settlement's cap by the number of resting orders, so
+    /// none is trimmed and the flow walks them all, still no further than
+    /// the deepest price the settlement's ladder quotes. 0.0, on every
+    /// shipped preset, is the cap as it stood, a branch in the settlement
+    /// with no draw; it is read only when agents have orders resting under
+    /// `book_resting`, carries no state, and a value of 0.0 is left out of
+    /// the model's digest.
+    pub book_settle_every_order: f64,
     /// Permanent impact of an agent's fills, linear in size: `gamma` in
     /// `ds = gamma * sigma * (bought - sold) / V`, applied to the name's
     /// mispricing `s` once, on the first tick after the fills. pt-v20
@@ -9656,6 +9680,7 @@ impl ModelParams {
             book_resting: 0.0,
             book_arrival_shuffle: 0.0,
             book_cross_at_limit: 0.0,
+            book_settle_every_order: 0.0,
             fill_impact_coefficient: 0.0,
             impact_memory_coefficient: 0.0,
             impact_memory_half_life: 0.0,
@@ -12612,6 +12637,7 @@ impl ModelParams {
             "book_resting" => self.book_resting,
             "book_arrival_shuffle" => self.book_arrival_shuffle,
             "book_cross_at_limit" => self.book_cross_at_limit,
+            "book_settle_every_order" => self.book_settle_every_order,
             "fill_impact_coefficient" => self.fill_impact_coefficient,
             "impact_memory_coefficient" => self.impact_memory_coefficient,
             "impact_memory_half_life" => self.impact_memory_half_life,
@@ -13100,6 +13126,7 @@ impl ModelParams {
             "book_resting" => out.book_resting = value,
             "book_arrival_shuffle" => out.book_arrival_shuffle = value,
             "book_cross_at_limit" => out.book_cross_at_limit = value,
+            "book_settle_every_order" => out.book_settle_every_order = value,
             "fill_impact_coefficient" => out.fill_impact_coefficient = value,
             "impact_memory_coefficient" => out.impact_memory_coefficient = value,
             "impact_memory_half_life" => out.impact_memory_half_life = value,
@@ -13593,7 +13620,8 @@ impl ModelParams {
                           ("book_shared", self.book_shared),
                           ("book_resting", self.book_resting),
                           ("book_arrival_shuffle", self.book_arrival_shuffle),
-                          ("book_cross_at_limit", self.book_cross_at_limit)] {
+                          ("book_cross_at_limit", self.book_cross_at_limit),
+                          ("book_settle_every_order", self.book_settle_every_order)] {
             if !(v == 0.0 || v == 1.0) {
                 return Err(format!(
                     "{name} is {v}. It is a switch: 0.0 as shipped, 1.0 on."));
@@ -15750,6 +15778,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "book_arrival_shuffle",
     "book_cross_at_limit",
     "book_depth_nesting",
+    "book_settle_every_order",
     "buyback_accrual",
     "corporate_spread_cycle",
     "corporate_spread_equity_gain",
@@ -16388,6 +16417,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "book_resting",
         "book_arrival_shuffle",
         "book_cross_at_limit",
+        "book_settle_every_order",
         "fill_impact_coefficient",
         "impact_memory_coefficient",
         "impact_memory_half_life",
