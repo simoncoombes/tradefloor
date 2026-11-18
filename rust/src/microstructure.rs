@@ -71,7 +71,7 @@ use crate::market_maker::{
     quote_ladder_into, LadderParams, MakerInventory, QuoteParams, MARKET_MAKER_ID,
 };
 use crate::mathx;
-use crate::order_book::{Fill, OrderBook, Side, SubmitOptions};
+use crate::order_book::{Fill, OrderBook, Side, SubmitOptions, MAX_DEPTH_PER_SIDE};
 use crate::rng::Rng;
 use crate::types::Difficulty;
 
@@ -548,6 +548,19 @@ pub struct SettleOptions {
     /// the unbounded-depth arm. Values between the two are arithmetic that
     /// works and nothing measures.
     pub depth_multiplier: f64,
+    /// Keep every agent's resting order in the settlement book
+    /// (`ModelParams::book_settle_every_order`).
+    ///
+    /// The settlement book keeps [`MAX_DEPTH_PER_SIDE`] orders a side and
+    /// trims the worst-priced. The ladder alone never reaches that, but
+    /// agents' resting orders can: more than 32 at or inside the ladder's
+    /// prices push the rest, and the maker's deeper levels, out of the book
+    /// for the tick, so a slice that would have filled them stops short.
+    /// True widens this settlement's cap by the number of resting orders,
+    /// so nothing posted is trimmed. Read only when there are resting
+    /// orders; `false`, the default and every preset, is the cap as it
+    /// stood. No draw either way.
+    pub keep_every_resting_order: bool,
 }
 
 impl Default for SettleOptions {
@@ -559,6 +572,7 @@ impl Default for SettleOptions {
             spread_size_smoothness: 0.0,
             spread_size_exponent: SPREAD_SIZE_EXPONENT,
             depth_multiplier: 1.0,
+            keep_every_resting_order: false,
         }
     }
 }
@@ -790,6 +804,14 @@ fn settle_inner(
             book.asks.last().map(|o| o.price),
         ))
     };
+
+    // `book_settle_every_order`: room for every resting order beside the
+    // ladder, which is at most `BOOK_LEVELS` a side, so posting them trims
+    // nothing. A branch, off on every preset; `reset` puts the cap back for
+    // the next settlement on this thread.
+    if options.keep_every_resting_order && !resting.is_empty() {
+        book.cap = MAX_DEPTH_PER_SIDE + resting.len();
+    }
 
     // Agents' resting orders, after the guard so no guard reads them. A
     // crossed order trades here, at the ladder's prices, before any flow.
@@ -1551,6 +1573,51 @@ mod tests {
         settle_price_through_book_with_orders(
             &company(), 99.0, 20_000.0, &SettleOptions::default(), &orders, &mut rng);
         assert_eq!(draws_consumed(&before, &rng), 4);
+    }
+
+    /// Forty bids of 100 a cent inside the spread, with every slice selling
+    /// 5,000: the settlement book keeps 32 orders a side, so off, the last
+    /// eight are trimmed with the maker's levels and the flow stops after
+    /// 32; `keep_every_resting_order` fills all forty in the same order, on
+    /// the same four draws.
+    #[test]
+    fn more_than_32_resting_orders_are_trimmed_unless_every_order_is_kept() {
+        let bid = build_live_book(&company(), &LiveBookOptions::default())
+            .best_bid()
+            .unwrap();
+        let orders: Vec<RestingOrder> = (0..40)
+            .map(|k| resting(&format!("a{k}-0"), Side::Buy, bid + 0.01, 100.0))
+            .collect();
+        let filled = |keep: bool| {
+            let (_, fills) = settle_price_through_book_with_orders(
+                &company(), 99.0, 20_000.0,
+                &SettleOptions { keep_every_resting_order: keep, ..SettleOptions::default() },
+                &orders, &mut Fixed([0.9, 0.9, 0.9, 0.9], 0));
+            fills.iter().map(|f| f.agent.clone()).collect::<Vec<_>>()
+        };
+        let off = filled(false);
+        assert_eq!(off.len(), MAX_DEPTH_PER_SIDE);
+        let on = filled(true);
+        assert_eq!(on, (0..40).map(|k| format!("a{k}")).collect::<Vec<_>>());
+        assert_eq!(off[..], on[..MAX_DEPTH_PER_SIDE]);
+        for keep in [false, true] {
+            let mut rng = GameRng::from_seed(42);
+            let before = rng.clone();
+            settle_price_through_book_with_orders(
+                &company(), 99.0, 20_000.0,
+                &SettleOptions { keep_every_resting_order: keep, ..SettleOptions::default() },
+                &orders, &mut rng);
+            assert_eq!(draws_consumed(&before, &rng), 4);
+        }
+        // Off with no orders, the switch reads nothing.
+        let mut a = GameRng::from_seed(3);
+        let mut b = GameRng::from_seed(3);
+        let x = settle_price_through_book(&company(), 101.0, 10_000.0, &SettleOptions::default(), &mut a);
+        let y = settle_price_through_book(
+            &company(), 101.0, 10_000.0,
+            &SettleOptions { keep_every_resting_order: true, ..SettleOptions::default() }, &mut b);
+        assert_eq!(x, y);
+        assert_eq!(a, b);
     }
 
     /// A slice smaller than the order fills it in part; the next slice

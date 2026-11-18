@@ -1,3 +1,17 @@
+## Unreleased
+
+Three switches for the next preset: `cycle_hazard_compound`,
+`phase_entry_shock_once` and `book_settle_every_order`. Each is 0.0 on every
+preset and left out of the model's digest, so no preset or known-answer
+digest moves. Five of MODEL.md's known gaps are re-measured on pt-v22.
+
+<!-- release-note-ends -->
+
+- `cycle_hazard_compound` and `phase_entry_shock_once` are two new switches, 0.0 on every preset and left out of the model's digest, so no preset or known-answer digest moves. `cycle_hazard_compound` (refused unless `cycle_hazard_per_month` is 1.0) reads the cycle's daily transition probability as `1 - (1 - h)^(1/m)` instead of `h/m`, in the roll, the stationary opening and the forecast alike. `phase_entry_shock_once` fires the growth shock on entering a phase (its uniform, and the target redraw under `phase_target_range_draw`) on the phase's first session instead of its first two.
+- `book_settle_every_order` is a new switch, 0.0 on every preset and left out of the model's digest, so no preset or known-answer digest moves. Each tick's settlement book keeps 32 orders a side and trims the worst-priced, so past 32 agent orders at or inside the ladder's prices the rest, and the maker's deeper levels, were left out of that tick's settlement: on pt-v22 forty one-share bids a cent inside the spread filled 32 in one tick and 8 in the next. On, each settlement keeps every resting order. It takes no draw and carries no state.
+- MODEL.md's known gaps are re-measured on pt-v22. A pinned change of phase takes the entry growth shock on pt-v21 and pt-v22 (`macro_pins_hold`); only pt-v20 and earlier lack it. The buyback factor's price-reading and mid-run-listing credit are closed on pt-v21 and pt-v22 (`buyback_accrual`), but no preset retires shares. The frozen permanent corporate yield and the closing tick's fills at book prices still hold on pt-v22, with measurements.
+- MODEL.md's known gaps said `h/21` runs high against the compound form. It runs low: by about 5% at a monthly hazard of 0.1 and 15% at 0.3.
+
 ## 0.11.0
 
 pt-v22 is the default preset. It lists contracts beside the stocks: index

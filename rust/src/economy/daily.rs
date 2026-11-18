@@ -291,6 +291,12 @@ pub struct DailyInputs<'a> {
     /// shipped behaviour exactly. See
     /// [`crate::params::ModelParams::phase_target_range_draw`].
     pub phase_target_range_draw: f64,
+    /// Whether the growth shock on entering a phase (and, under
+    /// `phase_target_range_draw`, the target's redraw) fires on the phase's
+    /// first session only. 0.0 is the gate that stood, which also fires on
+    /// the second. See
+    /// [`crate::params::ModelParams::phase_entry_shock_once`].
+    pub phase_entry_shock_once: f64,
     /// The share of the gap between the cyclical drive and the unemployment
     /// impulse closed at each monthly release: `1 - 0.5^(month / half_life)`
     /// from `ModelParams::unemployment_adjustment_half_life`. 0.0 is off,
@@ -609,6 +615,7 @@ impl<'a> Default for DailyInputs<'a> {
             game_day: 0,
             trough_growth_floor: 0.0,
             phase_target_range_draw: 0.0,
+            phase_entry_shock_once: 0.0,
             unemployment_adjustment: 0.0,
             unemployment_natural_pull: 0.0,
             unemployment_okun_coefficient: 0.0,
@@ -781,11 +788,35 @@ pub fn expected_return_spike(sigma_pct: f64, gain: f64, gain_up: f64, exponent: 
         return 0.5 * (gain - gain_up) * sigma_pct * (2.0 / SQRT_TWO_PI);
     }
     let e_abs = sigma_pct * (2.0 / SQRT_TWO_PI);
+    let (two, gamma) = gaussian_moment_factors(exponent);
     let e_pow = mathx::pow(sigma_pct, exponent)
-        * mathx::pow(2.0, 0.5 * exponent)
-        * mathx::tgamma(0.5 * (exponent + 1.0))
+        * two
+        * gamma
         / mathx::sqrt(core::f64::consts::PI);
     0.5 * (gain * e_pow - gain_up * e_abs)
+}
+
+/// The two factors of the Gaussian absolute moment of order `q` that depend
+/// on `q` alone, `(2^(q/2), Gamma((q + 1) / 2))`, each by the expression
+/// the moment always used. The order is a dial, so the last two orders asked
+/// for are kept per thread against their exact bits and a repeat returns
+/// the pair computed for them.
+fn gaussian_moment_factors(q: f64) -> (f64, f64) {
+    type Memo = [Option<(u64, f64, f64)>; 2];
+    std::thread_local! {
+        static LAST: std::cell::Cell<Memo> = const { std::cell::Cell::new([None; 2]) };
+    }
+    let key = q.to_bits();
+    let memo = LAST.with(|m| m.get());
+    for (k, two, gamma) in memo.iter().flatten() {
+        if *k == key {
+            return (*two, *gamma);
+        }
+    }
+    let two = mathx::pow(2.0, 0.5 * q);
+    let gamma = mathx::tgamma(0.5 * (q + 1.0));
+    LAST.with(|m| m.set([Some((key, two, gamma)), memo[0]]));
+    (two, gamma)
 }
 
 /// `sqrt(2 pi)`, as `market::factors` spells it. A literal because `sqrt`
@@ -909,8 +940,45 @@ pub fn return_spike_at_level(
 /// are the Gaussian ones `expected_return_spike` already carries, with the
 /// up side's own order. Same branch as the spike: at the three defaults it
 /// IS `expected_return_spike`, evaluated by that function.
+///
+/// A pure function of its eight arguments, and the projections of the close
+/// (the forecast's eight nodes a step, the live marks' eight) ask it the
+/// same question node after node, since only the session's return moves
+/// between them. So the last answer is kept per thread with the exact bits
+/// it was asked for, and a repeat returns it: the value is the one this
+/// function computed for those arguments, so nothing it returns changes.
 #[allow(clippy::too_many_arguments)]
 pub fn expected_return_spike_at_level(
+    sigma_pct: f64,
+    gain: f64,
+    gain_up: f64,
+    exponent: f64,
+    exponent_up: f64,
+    level_exponent: f64,
+    level_exponent_up: f64,
+    vix: f64,
+) -> f64 {
+    type Memo = Option<([u64; 8], f64)>;
+    std::thread_local! {
+        static LAST: std::cell::Cell<Memo> = const { std::cell::Cell::new(None) };
+    }
+    let key = [
+        sigma_pct.to_bits(), gain.to_bits(), gain_up.to_bits(), exponent.to_bits(),
+        exponent_up.to_bits(), level_exponent.to_bits(), level_exponent_up.to_bits(), vix.to_bits(),
+    ];
+    if let Some((k, value)) = LAST.with(|m| m.get()) {
+        if k == key {
+            return value;
+        }
+    }
+    let value = expected_return_spike_at_level_uncached(
+        sigma_pct, gain, gain_up, exponent, exponent_up, level_exponent, level_exponent_up, vix);
+    LAST.with(|m| m.set(Some((key, value))));
+    value
+}
+
+#[allow(clippy::too_many_arguments)]
+fn expected_return_spike_at_level_uncached(
     sigma_pct: f64,
     gain: f64,
     gain_up: f64,
@@ -924,9 +992,10 @@ pub fn expected_return_spike_at_level(
         return expected_return_spike(sigma_pct, gain, gain_up, exponent);
     }
     let moment = |q: f64| -> f64 {
+        let (two, gamma) = gaussian_moment_factors(q);
         mathx::pow(sigma_pct, q)
-            * mathx::pow(2.0, 0.5 * q)
-            * mathx::tgamma(0.5 * (q + 1.0))
+            * two
+            * gamma
             / mathx::sqrt(core::f64::consts::PI)
     };
     let down = if level_exponent == 0.0 { 1.0 } else { mathx::pow(vix, -level_exponent) };
@@ -971,7 +1040,27 @@ pub const OIL_CONVENIENCE_MIN: f64 = 0.25;
 /// standard deviations either side at a tenth of one, which the floor's kink
 /// costs nothing to (a Gauss-Hermite rule, exact for smooth polynomials,
 /// was 0.6 per cent off at the floor).
+///
+/// A pure function of its three arguments, and a forecast step asks it of
+/// the inventory the previous step left at the variance it left, which is
+/// the question that step asked last. So the last answer is kept per thread
+/// against the exact bits it was asked for, and a repeat returns it.
 pub fn oil_convenience_factor(kappa: f64, inventory: f64, var: f64) -> f64 {
+    std::thread_local! {
+        static LAST: std::cell::Cell<Option<([u64; 3], f64)>> = const { std::cell::Cell::new(None) };
+    }
+    let key = [kappa.to_bits(), inventory.to_bits(), var.to_bits()];
+    if let Some((k, value)) = LAST.with(|m| m.get()) {
+        if k == key {
+            return value;
+        }
+    }
+    let value = oil_convenience_factor_uncached(kappa, inventory, var);
+    LAST.with(|m| m.set(Some((key, value))));
+    value
+}
+
+fn oil_convenience_factor_uncached(kappa: f64, inventory: f64, var: f64) -> f64 {
     // LINEAR in log inventory, the convenience yield of Working (1949) and
     // Gibson and Schwartz (Journal of Finance 45(3), 1990), in which log
     // futures are linear in it: its expectation over inventory's spread is
@@ -990,14 +1079,32 @@ pub fn oil_convenience_factor(kappa: f64, inventory: f64, var: f64) -> f64 {
         return at(inventory);
     }
     let sd = mathx::sqrt(var);
-    let (mut total, mut mass) = (0.0, 0.0);
-    for i in -60..=60 {
-        let z = i as f64 / 10.0;
-        let w = mathx::exp(-0.5 * z * z);
+    // The trapezoid's weights and their sum depend on nothing passed in, so
+    // they are computed once, by the same expressions in the same order.
+    let (weights, mass) = oil_convenience_weights();
+    let mut total = 0.0;
+    for (k, &w) in weights.iter().enumerate() {
+        let z = (k as i64 - 60) as f64 / 10.0;
         total += w * at(inventory + z * sd);
-        mass += w;
     }
     total / mass
+}
+
+/// The weights `exp(-z^2 / 2)` of [`oil_convenience_factor`]'s trapezoid at
+/// `z` from -6 to 6 by a tenth, and their sum taken in that order.
+fn oil_convenience_weights() -> &'static ([f64; 121], f64) {
+    static WEIGHTS: std::sync::OnceLock<([f64; 121], f64)> = std::sync::OnceLock::new();
+    WEIGHTS.get_or_init(|| {
+        let mut weights = [0.0; 121];
+        let mut mass = 0.0;
+        for i in -60..=60 {
+            let z = i as f64 / 10.0;
+            let w = mathx::exp(-0.5 * z * z);
+            weights[(i + 60) as usize] = w;
+            mass += w;
+        }
+        (weights, mass)
+    })
 }
 
 /// The oil price at which inflation takes no oil term under
@@ -2026,7 +2133,19 @@ pub fn update_economy_daily(
     // The `+ 0.001` is a tolerance on a float accumulated by repeated
     // `+= 1/30`, not a spare margin: `months_in_current_phase` is never
     // exactly 1/30 after the first increment.
-    if economy.months_in_current_phase < 1.0 / cal.month_f64() + 0.001 {
+    //
+    // A transition sets the age to 0.0 and this step adds `1/m` below, so
+    // the legacy gate holds at 0.0 AND at exactly `1/m`: the block fires on
+    // a phase's first two sessions. Under `phase_entry_shock_once` the gate
+    // sits halfway to the first increment, so it holds on the first session
+    // alone and the second takes none of the block's draws. A BRANCH, so
+    // with the switch off the expression is the one that stood.
+    let entering = if inputs.phase_entry_shock_once != 0.0 {
+        economy.months_in_current_phase < 0.5 / cal.month_f64()
+    } else {
+        economy.months_in_current_phase < 1.0 / cal.month_f64() + 0.001
+    };
+    if entering {
         // DRAW SITE (uniform) — on EVERY phase-change day, in every phase.
         //
         // The original builds a `Record<EconomicCyclePhase, number>` object
@@ -5175,5 +5294,160 @@ mod macro_anchors {
         assert!(y(1.0) < y(0.0) - 0.1, "{} {}", y(1.0), y(0.0));
         // On, the curve's arithmetic is headline-off's at core.
         assert_eq!(y(1.0).to_bits(), y_core_headline.to_bits());
+    }
+}
+
+/// The growth shock on entering a phase, and how many sessions it fires on
+/// (`phase_entry_shock_once`).
+#[cfg(test)]
+mod phase_entry_gate {
+    use super::*;
+    use crate::economy::cycle::{check_cycle_transition_for, CycleSpec};
+    use crate::economy::state::{create_initial_economy_state, InitialEconomyOptions};
+    use crate::rng::GameRng;
+
+    /// Counts the draws it hands on.
+    struct Counting<'a> {
+        inner: &'a mut GameRng,
+        count: u64,
+    }
+    impl Rng for Counting<'_> {
+        fn next_f64(&mut self) -> f64 {
+            self.count += 1;
+            self.inner.next_f64()
+        }
+        fn next_normal(&mut self) -> f64 {
+            self.count += 1;
+            self.inner.next_normal()
+        }
+    }
+
+    fn draws(e: &EconomyState, inputs: &DailyInputs, rng: &GameRng) -> (u64, EconomyState) {
+        let mut r = rng.clone();
+        let mut c = Counting { inner: &mut r, count: 0 };
+        let next = update_economy_daily(e, inputs, &mut c);
+        (c.count, next)
+    }
+
+    /// One economy-only run of `days` sessions in the engine's order (the
+    /// step, then the transition roll), on the session calendar. For each
+    /// session it returns whether the phase changed at its close and
+    /// whether the entry block fired in its step: whether the step differs,
+    /// in its draw count or in what it wrote, from the same step on a twin
+    /// aged past the gate, from the same stream position. Nothing else in
+    /// the step reads the phase's age, and a block that fires takes a draw,
+    /// which moves every later draw of the step.
+    fn run(once: f64, range_draw: f64, days: i64) -> Vec<(bool, bool)> {
+        let cal = MacroCalendar::from_days_per_year(252.0);
+        // The daily reading (per_month 0.0) ends phases about thirty times
+        // sooner, so a short run sees many entries; the gate does not read
+        // the clock.
+        let spec = CycleSpec { month_days: cal.month_f64(), ..CycleSpec::shipped(0.0) };
+        let mut e = create_initial_economy_state(&InitialEconomyOptions::default());
+        let mut rng = GameRng::new(7, 3);
+        let mut out = Vec::new();
+        for day in 1..=days {
+            let inputs = DailyInputs {
+                game_day: day,
+                macro_calendar: cal,
+                macro_compound_days_per_year: 252.0,
+                phase_target_range_draw: range_draw,
+                phase_entry_shock_once: once,
+                ..Default::default()
+            };
+            let mut aged = e.clone();
+            aged.months_in_current_phase += 1.0;
+            let (base, twin) = draws(&aged, &inputs, &rng);
+            let mut c = Counting { inner: &mut rng, count: 0 };
+            e = update_economy_daily(&e, &inputs, &mut c);
+            let mut written = e.clone();
+            written.months_in_current_phase = twin.months_in_current_phase;
+            let fired = c.count != base || format!("{written:?}") != format!("{twin:?}");
+            let before = e.cycle_phase;
+            e = check_cycle_transition_for(&e, &mut rng, &spec);
+            out.push((e.cycle_phase != before, fired));
+        }
+        out
+    }
+
+    /// The legacy gate fires on a phase's first TWO sessions, after every
+    /// transition: documented, pinned, and the reason for the switch.
+    /// Switched on, it fires on the first alone. The run's own opening, at
+    /// age 0.0, follows the same rule.
+    #[test]
+    fn the_shock_fires_on_two_sessions_off_and_one_on() {
+        for (once, range_draw, sessions) in
+            [(0.0, 0.0, 2), (1.0, 0.0, 1), (0.0, 1.0, 2), (1.0, 1.0, 1)]
+        {
+            let steps = run(once, range_draw, 3000);
+            let fired: Vec<bool> = steps.iter().map(|s| s.1).collect();
+            // The opening: sessions 1 .. `sessions` fire, the next does not.
+            for (k, f) in fired.iter().enumerate().take(sessions + 1) {
+                assert_eq!(*f, k < sessions, "opening session {} once {once}", k + 1);
+            }
+            let mut entries = 0;
+            let mut expected = vec![false; fired.len()];
+            for e in expected.iter_mut().take(sessions) {
+                *e = true;
+            }
+            for (t, &(changed, _)) in steps.iter().enumerate() {
+                if !changed {
+                    continue;
+                }
+                entries += 1;
+                for k in 1..=sessions {
+                    if t + k < expected.len() {
+                        expected[t + k] = true;
+                    }
+                }
+            }
+            assert!(entries >= 5, "only {entries} transitions to check");
+            // Exactly the sessions after each transition, and nowhere else.
+            assert_eq!(fired, expected, "once {once} range draw {range_draw}");
+        }
+    }
+
+    /// The gate at each age, directly: off it holds at 0.0 and at exactly
+    /// one increment; on, at 0.0 alone. Two increments are outside both.
+    /// Each firing takes the shock's uniform, and the target's with
+    /// `phase_target_range_draw` set, so a phase entry takes two draws off
+    /// and one on (four and two with the target drawn). On a recovery on a
+    /// day with no quarterly or monthly step, nothing else the step draws
+    /// reads growth, so the counts are the block's alone.
+    #[test]
+    fn the_gate_reads_the_age_before_the_increment() {
+        let cal = MacroCalendar::from_days_per_year(252.0);
+        let step = 1.0 / cal.month_f64();
+        for (once, range_draw, want) in [(0.0, 0.0, [1u64, 1, 0]), (1.0, 0.0, [1, 0, 0]),
+                                         (0.0, 1.0, [2, 2, 0]), (1.0, 1.0, [2, 0, 0])] {
+            let inputs = DailyInputs {
+                game_day: 5, macro_calendar: cal, macro_compound_days_per_year: 252.0,
+                phase_target_range_draw: range_draw,
+                phase_entry_shock_once: once, ..Default::default()
+            };
+            let mut e = create_initial_economy_state(&InitialEconomyOptions {
+                cycle_phase: Some(CyclePhase::Recovery), ..Default::default() });
+            let rng = GameRng::new(11, 3);
+            let mut aged = e.clone();
+            aged.months_in_current_phase = 2.0;
+            let (base, base_state) = draws(&aged, &inputs, &rng);
+            for (k, w) in want.iter().enumerate() {
+                // The age the step reads on the phase's (k + 1)-th session:
+                // 0.0 plus k increments, accumulated as the step does.
+                let mut age = 0.0;
+                for _ in 0..k {
+                    age += step;
+                }
+                e.months_in_current_phase = age;
+                let (n, next) = draws(&e, &inputs, &rng);
+                assert_eq!(n - base, *w, "once {once} draw {range_draw} session {}", k + 1);
+                // A recovery's shock is a fixed +1.0 on the uniform it draws.
+                if *w > 0 {
+                    assert_eq!(next.gdp_growth, clamp(e.gdp_growth + 1.0, -10.0, 6.0));
+                } else {
+                    assert_eq!(next.gdp_growth, base_state.gdp_growth);
+                }
+            }
+        }
     }
 }
