@@ -1937,6 +1937,9 @@ pub fn simulate_market_tick(
                 ladder_tick_spacing: inputs.params.maker_ladder_tick_spacing != 0.0
                     || inputs.params.market_ladder_tick_spacing != 0.0,
                 vix_slope: inputs.params.quote_spread_vix_slope,
+                // Read only with agents' resting orders in the book; false
+                // on every preset (`book_settle_every_order`).
+                keep_every_resting_order: inputs.params.book_settle_every_order != 0.0,
             };
             // Agents' resting orders for this name, if any. With none, the
             // settlement is the shipped call, untouched.

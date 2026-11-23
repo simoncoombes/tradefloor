@@ -718,8 +718,12 @@ pub fn create_initial_economy_state(options: &InitialEconomyOptions) -> EconomyS
         // FIRST simulated day rather than at the first phase change: the
         // draw is gated on `months_in_current_phase < 1/30 + 0.001` and
         // the engine opens at zero months in phase, so the opening phase
-        // is drawn for like any other. This value is what the field holds
-        // between construction and that first day.
+        // is drawn for like any other. That gate also holds on the SECOND
+        // day (the age is then exactly one increment), so the target is
+        // drawn again there and the second draw is the one kept; under
+        // `phase_entry_shock_once` the gate is `< 0.5/30` and holds on the
+        // first day alone. This value is what the field holds between
+        // construction and that first day.
         phase_gdp_target: {
             let r = phase_characteristics(cycle_phase).gdp_growth_range;
             (r.0 + r.1) / 2.0

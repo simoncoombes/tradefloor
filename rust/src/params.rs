@@ -6653,6 +6653,30 @@ pub struct ModelParams {
     /// no trough at all and records 0 of 2121 rolls clamped under either
     /// reading.
     pub cycle_hazard_per_month: f64,
+    /// The cycle's daily transition probability read as the one that
+    /// compounds to the monthly hazard: a switch, 0.0 or 1.0. Off, the
+    /// monthly hazard `h` (after the ladder and the clamp) is divided by the
+    /// month's sessions `m`, which is the first-order approximation. On, the
+    /// daily probability is `1 - (1 - h)^(1/m)`, so `m` sessions survived at
+    /// it survive the month with probability `1 - h` exactly; `h` 0.0 reads
+    /// 0.0 and `h` 1.0 reads 1.0. Refused unless `cycle_hazard_per_month` is
+    /// 1.0, the reading under which the hazard is monthly at all.
+    ///
+    /// The approximation reads LOW, never high, since `(1 - h)^(1/m)` is
+    /// concave in `h` and lies under its tangent `1 - h/m`: at `m` 21 the
+    /// compound probability is 1.051 times `h/m` at `h` 0.1, 1.18 times at
+    /// 0.3 and 1.94 times at 0.8, and where the US table's cap of 1.0 binds
+    /// (a contraction whose ladder lifts the hazard past it) the transition
+    /// is certain on the next roll where `h/m` gave it one chance in 21.
+    /// Every reader of the cycle's law takes the same conversion: the
+    /// transition roll, the hazard-only law the stationary opening and the
+    /// sojourn statistics are walked on, and the forecast's cohorts.
+    ///
+    /// 0.0, on every shipped preset, is the conversion as it stood, a branch
+    /// in the conversion with no draw; a value of 0.0 is left out of the
+    /// model's digest. On, it takes no draw of its own, but it moves when
+    /// phases end, so which state-dependent draws are taken follows.
+    pub cycle_hazard_compound: f64,
     /// Raises the bottom of the trough phase's GDP growth range from -1.0
     /// (at 0.0) to 0.0 (at 1.0), moving proportionally in between; the top
     /// stays at 0.5. Every preset ships 0.0, the original `(-1.0, 0.5)`
@@ -6742,6 +6766,32 @@ pub struct ModelParams {
     /// either, because the pair eliminates shallow recessions. A preset
     /// that wants the wider spread has to measure the dials together.
     pub phase_target_range_draw: f64,
+    /// Fires the growth shock on entering a phase on the phase's first
+    /// session only: a switch, 0.0 or 1.0.
+    ///
+    /// The step gates the shock on `months_in_current_phase < 1/m + 0.001`
+    /// read before it adds `1/m`, and a transition sets the age to 0.0, so
+    /// the gate holds at 0.0 and again at exactly `1/m`: the shock, its
+    /// uniform and, under `phase_target_range_draw`, the target's redraw
+    /// are all taken on the phase's first TWO sessions. A contraction's
+    /// entry therefore costs about twice the `-(2 + u (1 + volatility))`
+    /// the table states, on two independent uniforms. On, the gate is
+    /// `months_in_current_phase < 0.5/m`, true on the first session alone,
+    /// and the second session takes none of the block's draws.
+    ///
+    /// The opening follows the same gate. A run that opens at age 0.0 (no
+    /// drawn opening, where the held burn-in resets the clock at its end,
+    /// and the burn-in's own first days before that) takes the shock on its
+    /// first session, and on its second too with the switch off; a drawn
+    /// opening older than one session takes none. The forecast's cohorts
+    /// (`oil_forecast_cycle_growth`) count the shock once per entry under
+    /// either setting, which is the simulation's count only with it on.
+    ///
+    /// 0.0, on every shipped preset, is the gate as it stood, a branch with
+    /// no draw of its own; a value of 0.0 is left out of the model's
+    /// digest. On, it draws one uniform fewer per phase entry (two with
+    /// `phase_target_range_draw` set).
+    pub phase_entry_shock_once: f64,
     /// The corporate bond yield at which the target multiple sits exactly on
     /// its sector anchor, as a fraction (0.04 is 4 per cent). pt-v1 through
     /// pt-v16 carry 0.04; pt-v18 onward carry 0.0482.
@@ -7948,6 +7998,30 @@ pub struct ModelParams {
     /// auction would fill it.
     /// pt-v21 ships 1.0.
     pub book_cross_at_limit: f64,
+    /// Keep every agent's resting order in each tick's settlement book: a
+    /// switch, 0.0 or 1.0.
+    ///
+    /// The book the model's flow settles through inside a tick is the
+    /// maker's ladder (two to ten levels a side) with every resting agent
+    /// order posted into it, and it keeps 32 orders a side
+    /// (`order_book::MAX_DEPTH_PER_SIDE`), trimming the worst-priced. More
+    /// than 32 orders at or inside the ladder's prices therefore push the
+    /// rest of them, and the maker's deeper levels, out of that tick's
+    /// book: a slice that would have reached them stops where the book
+    /// ran out, and the orders left out wait for a later tick though the
+    /// flow had the volume to fill them. On pt-v22, forty one-share bids a
+    /// cent inside the spread filled 32 and then 8 a tick later, where the
+    /// same 40 shares as 32 orders filled at once. The book an agent trades
+    /// against between ticks keeps 4096 (`agent_book::AGENT_BOOK_CAP`).
+    ///
+    /// 1.0 widens each settlement's cap by the number of resting orders, so
+    /// none is trimmed and the flow walks them all, still no further than
+    /// the deepest price the settlement's ladder quotes. 0.0, on every
+    /// shipped preset, is the cap as it stood, a branch in the settlement
+    /// with no draw; it is read only when agents have orders resting under
+    /// `book_resting`, carries no state, and a value of 0.0 is left out of
+    /// the model's digest.
+    pub book_settle_every_order: f64,
     /// Permanent impact of an agent's fills, linear in size: `gamma` in
     /// `ds = gamma * sigma * (bought - sold) / V`, applied to the name's
     /// mispricing `s` once, on the first tick after the fills. pt-v20
@@ -9304,8 +9378,10 @@ impl ModelParams {
             oil_opec_symmetry: 0.0,
             oil_seasonality_target: 0.0,
             cycle_hazard_per_month: 0.0,
+            cycle_hazard_compound: 0.0,
             trough_growth_floor: 0.0,
             phase_target_range_draw: 0.0,
+            phase_entry_shock_once: 0.0,
             neutral_discount_rate: crate::fair_value::NEUTRAL_DISCOUNT_RATE,
             macro_burn_in_days: 0.0,
             cycle_stationary_opening: 0.0,
@@ -9669,6 +9745,7 @@ impl ModelParams {
             book_resting: 0.0,
             book_arrival_shuffle: 0.0,
             book_cross_at_limit: 0.0,
+            book_settle_every_order: 0.0,
             fill_impact_coefficient: 0.0,
             impact_memory_coefficient: 0.0,
             impact_memory_half_life: 0.0,
@@ -12281,8 +12358,10 @@ impl ModelParams {
             "oil_opec_symmetry" => self.oil_opec_symmetry,
             "oil_seasonality_target" => self.oil_seasonality_target,
             "cycle_hazard_per_month" => self.cycle_hazard_per_month,
+            "cycle_hazard_compound" => self.cycle_hazard_compound,
             "trough_growth_floor" => self.trough_growth_floor,
             "phase_target_range_draw" => self.phase_target_range_draw,
+            "phase_entry_shock_once" => self.phase_entry_shock_once,
             "neutral_discount_rate" => self.neutral_discount_rate,
             "macro_burn_in_days" => self.macro_burn_in_days,
             "cycle_stationary_opening" => self.cycle_stationary_opening,
@@ -12627,6 +12706,7 @@ impl ModelParams {
             "book_resting" => self.book_resting,
             "book_arrival_shuffle" => self.book_arrival_shuffle,
             "book_cross_at_limit" => self.book_cross_at_limit,
+            "book_settle_every_order" => self.book_settle_every_order,
             "fill_impact_coefficient" => self.fill_impact_coefficient,
             "impact_memory_coefficient" => self.impact_memory_coefficient,
             "impact_memory_half_life" => self.impact_memory_half_life,
@@ -12771,8 +12851,10 @@ impl ModelParams {
             "oil_opec_symmetry" => out.oil_opec_symmetry = value,
             "oil_seasonality_target" => out.oil_seasonality_target = value,
             "cycle_hazard_per_month" => out.cycle_hazard_per_month = value,
+            "cycle_hazard_compound" => out.cycle_hazard_compound = value,
             "trough_growth_floor" => out.trough_growth_floor = value,
             "phase_target_range_draw" => out.phase_target_range_draw = value,
+            "phase_entry_shock_once" => out.phase_entry_shock_once = value,
             "neutral_discount_rate" => out.neutral_discount_rate = value,
             "macro_burn_in_days" => out.macro_burn_in_days = value,
             "cycle_stationary_opening" => out.cycle_stationary_opening = value,
@@ -13117,6 +13199,7 @@ impl ModelParams {
             "book_resting" => out.book_resting = value,
             "book_arrival_shuffle" => out.book_arrival_shuffle = value,
             "book_cross_at_limit" => out.book_cross_at_limit = value,
+            "book_settle_every_order" => out.book_settle_every_order = value,
             "fill_impact_coefficient" => out.fill_impact_coefficient = value,
             "impact_memory_coefficient" => out.impact_memory_coefficient = value,
             "impact_memory_half_life" => out.impact_memory_half_life = value,
@@ -13610,7 +13693,8 @@ impl ModelParams {
                           ("book_shared", self.book_shared),
                           ("book_resting", self.book_resting),
                           ("book_arrival_shuffle", self.book_arrival_shuffle),
-                          ("book_cross_at_limit", self.book_cross_at_limit)] {
+                          ("book_cross_at_limit", self.book_cross_at_limit),
+                          ("book_settle_every_order", self.book_settle_every_order)] {
             if !(v == 0.0 || v == 1.0) {
                 return Err(format!(
                     "{name} is {v}. It is a switch: 0.0 as shipped, 1.0 on."));
@@ -14733,6 +14817,27 @@ impl ModelParams {
                  lagged term reads the priced gap, which follows the gap at that half-life; set it too.",
                 self.corporate_spread_equity_lag_gain));
         }
+        if !(self.cycle_hazard_compound == 0.0 || self.cycle_hazard_compound == 1.0) {
+            return Err(format!(
+                "cycle_hazard_compound is {}. It is a switch, 0.0 or 1.0: 1.0 reads the \
+                 cycle's daily transition probability as the one that compounds to the \
+                 monthly hazard, 0.0 divides the hazard by the month.",
+                self.cycle_hazard_compound));
+        }
+        if self.cycle_hazard_compound != 0.0 && self.cycle_hazard_per_month != 1.0 {
+            return Err(format!(
+                "cycle_hazard_per_month is {} but cycle_hazard_compound is {}. The compound \
+                 reading is defined only for a hazard read wholly per month; set \
+                 cycle_hazard_per_month to 1.0, or cycle_hazard_compound to 0.0.",
+                self.cycle_hazard_per_month, self.cycle_hazard_compound));
+        }
+        if !(self.phase_entry_shock_once == 0.0 || self.phase_entry_shock_once == 1.0) {
+            return Err(format!(
+                "phase_entry_shock_once is {}. It is a switch, 0.0 or 1.0: 1.0 fires the \
+                 growth shock on entering a phase on its first session only, 0.0 on its \
+                 first two.",
+                self.phase_entry_shock_once));
+        }
         if !(self.treasury_equity_lag >= 0.0 && self.treasury_equity_lag <= 252.0) {
             return Err(format!(
                 "treasury_equity_lag is {}. It is a half-life in sessions, in [0, 252]; \
@@ -15775,6 +15880,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "book_arrival_shuffle",
     "book_cross_at_limit",
     "book_depth_nesting",
+    "book_settle_every_order",
     "buyback_accrual",
     "corporate_spread_cycle",
     "corporate_spread_equity_gain",
@@ -15783,6 +15889,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "cycle_equity_hazard",
     "cycle_equity_hazard_knee",
     "cycle_equity_hazard_opening",
+    "cycle_hazard_compound",
     "cycle_nowcast_accuracy",
     "cycle_publication_lag_draw",
     "dividend_buyback_substitution",
@@ -15860,6 +15967,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "overnight_idio_df",
     "overnight_idio_share",
     "overnight_market_share",
+    "phase_entry_shock_once",
     "pinned_vix_calm_knee",
     "pinned_vix_calm_share",
     "pinned_vix_feedback",
@@ -16145,8 +16253,10 @@ pub fn settable_names() -> Vec<&'static str> {
         "oil_opec_symmetry",
         "oil_seasonality_target",
         "cycle_hazard_per_month",
+        "cycle_hazard_compound",
         "trough_growth_floor",
         "phase_target_range_draw",
+        "phase_entry_shock_once",
         "neutral_discount_rate",
         "macro_burn_in_days",
         "cycle_stationary_opening",
@@ -16409,6 +16519,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "book_resting",
         "book_arrival_shuffle",
         "book_cross_at_limit",
+        "book_settle_every_order",
         "fill_impact_coefficient",
         "impact_memory_coefficient",
         "impact_memory_half_life",
