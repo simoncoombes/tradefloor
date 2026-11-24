@@ -1652,7 +1652,8 @@ impl Engine {
     /// run's sampling.
     fn cycle_age_law(&self, day: i64) -> Vec<Vec<(f64, f64)>> {
         type Key = (u64, String);
-        static MEMO: std::sync::Mutex<Vec<(Key, Vec<Vec<(f64, f64)>>)>> = std::sync::Mutex::new(Vec::new());
+        type Law = Vec<Vec<(f64, f64)>>;
+        static MEMO: std::sync::Mutex<Vec<(Key, Law)>> = std::sync::Mutex::new(Vec::new());
         let key: Key = (self.root_seed, self.model_fingerprint().to_string());
         if let Some(v) = MEMO.lock().ok().and_then(|m| m.iter().find(|(k, _)| *k == key).map(|(_, v)| v.clone())) {
             return v;
@@ -2036,6 +2037,7 @@ pub(crate) const OIL_FORECAST_PATHS: usize = 20;
 ///   among them); the earnings cycle's pull to its phase's level and the
 ///   volatility feedback's exposure; its central bank's meeting; and the
 ///   earnings anticipation on the path's belief and level.
+///
 /// Oil's block reads the paths' mean growth, which is oil's target's mean
 /// over the paths (the target is affine in growth). No value is set here:
 /// every part is the law's.

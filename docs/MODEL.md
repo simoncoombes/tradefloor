@@ -1592,7 +1592,11 @@ index on its fair value on the path's own economy plus a return at the
 forecast's index variance, its P/E, the economy's step, the cycle's transition
 on the path's own state, the earnings cycle, the volatility feedback, the
 meeting, the anticipation), so every threshold the ladder reads, the market's
-fall and its P/E among them, is read over the economy's spread. `usd_mean_reversion` and
+fall and its P/E among them, is read over the economy's spread. The paths are
+held for the four closes after the one that simulates them and are not in the
+snapshot, so an engine restored between simulations simulates afresh and its
+oil forecast differs from the original's by the paths' Monte Carlo error until
+the original's next simulation. `usd_mean_reversion` and
 `usd_noise_sd` set the dollar index's law (0.0 the standing 0.02 and 0.3): FRED's
 trade-weighted dollar (DTWEXM, 1987 to 2019) has an AR(1) half-life of 729
 sessions and a daily log change of 0.0043, so the dollar the oil curve carries
