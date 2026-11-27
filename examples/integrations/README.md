@@ -80,7 +80,7 @@ two adapters:
 | [`pydantic_ai/rate_shock.py`](pydantic_ai/rate_shock.py) | 20 | 12 | -4.87% | +0.38 bps |
 | [`langgraph/rate_shock.py`](langgraph/rate_shock.py) | 5 | 6 | +0.34% | +3.88 bps |
 
-These are the figures on pt-v21, the default from 0.10.0. The impact column is the end-of-run price
+These are the figures on pt-v22, the default from 0.11.0. The impact column is the end-of-run price
 against the untraded run, and at these sizes it is mostly which way the
 tape's noise fell. `tests/test_integration_examples.py` runs all five and
 fails when a row stops matching what the example prints. The rows moved
@@ -535,6 +535,10 @@ that looked at the market and declined.
 The scorecard rows above were re-measured each time the default preset
 moved. The old rows are kept here so a reader comparing against an older
 run can see what it printed.
+
+On pt-v21, the default in 0.10.x, callable and openai_agents read 13 trades
+-2.37% +0.08 bps, pydantic_ai 14 trades -2.43% -0.72 bps, and langgraph 8
+trades +0.24% +4.33 bps.
 
 On pt-v20, the default from 0.8.5 to 0.9.1, callable and openai_agents read
 9 trades -1.71% +0.04 bps, pydantic_ai 10 trades -3.33% +0.98 bps, and
