@@ -13,6 +13,10 @@ to three of them, and runs all four for 80 more days. It takes seven to
 twelve seconds of CPU, and it needs no keys, no network and no package beyond
 tradefloor.
 
+`fork_futures.ipynb` beside it imports the script and runs the same study,
+with the table and the light figure in its committed output. The script is
+the source of truth, and the notebook adds no computation of its own.
+
 | branch | what changes after the fork |
 |---|---|
 | `control` | nothing |
