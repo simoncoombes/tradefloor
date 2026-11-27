@@ -285,6 +285,26 @@ jobs:
           # nbclient is missing or the flag is unset. A skip here is a
           # notebook that did not run, so it fails the job.
           python tools/ci/no_skips.py examples.xml
+      # examples/rl-ppo trains a network, and Stable-Baselines3 brings torch.
+      # Both steps run on the nightly and on a manual run only, so a pull
+      # request never downloads torch. On a pull request the script still
+      # gets the syntax check in tests/test_examples.py.
+      - name: Install Stable-Baselines3 (nightly)
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          # The CPU index first, because the default Linux torch wheel carries
+          # CUDA libraries this job never loads.
+          python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install stable-baselines3
+      - name: Train and score the PPO study (nightly)
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        shell: bash
+        env:
+          TRADEFLOOR_SLOW_TESTS: "1"
+        run: |
+          python -m pytest -q -rs tests/test_rl_ppo_study.py --junitxml=rl-ppo.xml
+          python tools/ci/no_skips.py rl-ppo.xml
 
   install:
     name: a clean install runs

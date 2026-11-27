@@ -11,6 +11,7 @@ digest moves. Five of MODEL.md's known gaps are re-measured on pt-v22.
 - `book_settle_every_order` is a new switch, 0.0 on every preset and left out of the model's digest, so no preset or known-answer digest moves. Each tick's settlement book keeps 32 orders a side and trims the worst-priced, so past 32 agent orders at or inside the ladder's prices the rest, and the maker's deeper levels, were left out of that tick's settlement: on pt-v22 forty one-share bids a cent inside the spread filled 32 in one tick and 8 in the next. On, each settlement keeps every resting order. It takes no draw and carries no state.
 - MODEL.md's known gaps are re-measured on pt-v22. A pinned change of phase takes the entry growth shock on pt-v21 and pt-v22 (`macro_pins_hold`); only pt-v20 and earlier lack it. The buyback factor's price-reading and mid-run-listing credit are closed on pt-v21 and pt-v22 (`buyback_accrual`), but no preset retires shares. The frozen permanent corporate yield and the closing tick's fills at book prices still hold on pt-v22, with measurements.
 - MODEL.md's known gaps said `h/21` runs high against the compound form. It runs low: by about 5% at a monthly hazard of 0.1 and 15% at 0.3.
+- `examples/rl-ppo/` is a study that trains a Stable-Baselines3 PPO agent on `TradingEnv` for 8,192 steps and scores it on 20 held-out seeds beside cash, equal weight and the untrained network. Trained PPO beat cash on 4 of the 20 and equal weight on 5. It needs `stable-baselines3`, which no extra installs, and the nightly suite runs its test.
 
 ## 0.11.0
 

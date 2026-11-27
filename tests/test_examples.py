@@ -280,6 +280,9 @@ RUN_BY: dict[str, str] = {
     "rate-shock/counterfactual.py":
         "test_rate_shock_demo.py::"
         "test_the_demo_runs_end_to_end_and_writes_readable_artifacts",
+    "rl-ppo/ppo.py":
+        "test_rl_ppo_study.py::"
+        "test_the_ppo_study_trains_and_scores_on_held_out_seeds",
 }
 
 #: Scripts nothing executes on purpose, with the reason.
