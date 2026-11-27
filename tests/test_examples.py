@@ -269,6 +269,8 @@ RUN_BY: dict[str, str] = {
         "test_the_liquidity_crisis_study_replays_its_recording",
     "integrations/callable/five_days.py":
         "test_integration_examples.py::test_the_table_matches_a_real_run",
+    "integrations/claude/five_days.py":
+        "test_integration_examples.py::test_the_table_matches_a_real_run",
     "integrations/finrobot/rate_shock.py":
         "test_finrobot.py::test_the_recorded_run_replays_end_to_end",
     "integrations/langgraph/rate_shock.py":
