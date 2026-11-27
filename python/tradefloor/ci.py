@@ -36,6 +36,7 @@ from typing import Any, Callable, Iterable, Sequence
 
 from . import __version__
 from . import _core
+from ._arith import ordered_sum
 from .harness import evaluate
 from .ranking import _sign_test
 from .scenario import Scenario
@@ -100,9 +101,9 @@ class Report:
             "profitable_seeds": sum(1 for value in returns if value > 0),
             "worst_drawdown_pct": max(self._column(who, "max_drawdown_pct")),
             "median_impact_bps": statistics.median(self._column(who, "impact_bps")),
-            "trades": sum(self._column(who, "trades")),
-            "rejected": sum(self._column(who, "rejected")),
-            "errors": sum(self._column(who, "errors")),
+            "trades": ordered_sum(self._column(who, "trades")),
+            "rejected": ordered_sum(self._column(who, "rejected")),
+            "errors": ordered_sum(self._column(who, "errors")),
             "tampered_seeds": sum(1 for row in self.rows if row[who]["tampered"]),
         }
 
@@ -393,10 +394,10 @@ def run(args: argparse.Namespace) -> int:
     text = report.markdown(thresholds)
     print(text)
     if args.markdown:
-        with open(args.markdown, "a", encoding="utf-8") as handle:
+        with open(args.markdown, "a", encoding="utf-8", newline="") as handle:
             handle.write(text + "\n")
     if args.json:
-        with open(args.json, "w", encoding="utf-8") as handle:
+        with open(args.json, "w", encoding="utf-8", newline="") as handle:
             json.dump(report.as_dict(thresholds), handle, indent=2, sort_keys=True)
             handle.write("\n")
     return 1 if report.check(thresholds) else 0
