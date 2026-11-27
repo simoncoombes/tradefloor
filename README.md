@@ -109,7 +109,7 @@ The walkthrough is
 | `tf.rank` | many seeds, paired sign tests |
 | `RunManifest` | what a reader needs to replay a run, checked by `reproduce()` |
 | `World` / `compare` | fork a running experiment, change one variable, and measure where the two came apart |
-| scenarios | seven packaged shocks, and a file format for your own |
+| scenarios | eight packaged shocks, and a file format for your own |
 | MCP server | twenty-two tools for a coding agent, sixteen of them read-only, with scenarios, any shipped preset, a shipped population of background traders, and market sessions you step, fork and rewind |
 | more | a Gymnasium environment, Arrow output, checkpoints, SEC EDGAR data, simulated rate indices, a browser build |
 
@@ -168,7 +168,7 @@ days each event fired.
 
 tradefloor does not predict what a war, an election, an oil shock or a
 recession will do to markets. You state the assumptions and it measures how an
-agent behaves under them. `tradefloor scenario list` names the seven packaged
+agent behaves under them. `tradefloor scenario list` names the eight packaged
 scenarios, and `tradefloor scenario targets` lists every field a scenario can
 change.
 
