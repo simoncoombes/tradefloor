@@ -19,7 +19,7 @@ the same two files byte for byte. `figure/` holds the committed copy the
 project README shows. A run writes to `artifacts/`, which is git-ignored,
 and `--out figure` regenerates the committed copy.
 
-It takes about five seconds of CPU and needs no keys and no network.
+It takes seven to twelve seconds of CPU and needs no keys and no network.
 """
 
 from __future__ import annotations

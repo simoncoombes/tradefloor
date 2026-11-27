@@ -257,7 +257,7 @@ print(test["wins_a"], "wins in", test["paired_seeds"], "p =", test["p_value"])
 4 wins in 6 p = 0.6875
 ```
 
-That run takes about twelve seconds of CPU. `dip` beat buy-and-hold on four
+That run takes about twenty seconds of CPU. `dip` beat buy-and-hold on four
 of the six seeds, and the sign test gives that split a p-value of 0.69, so
 six seeds leave the two unseparated.
 
@@ -371,7 +371,7 @@ The twelve numbered [`examples/`](https://github.com/simoncoombes/tradefloor/tre
 | [`04-how-realistic-is-this`](https://github.com/simoncoombes/tradefloor/blob/main/examples/04-how-realistic-is-this.ipynb) | The realism panel and the limits |
 | [`05-training-an-agent`](https://github.com/simoncoombes/tradefloor/blob/main/examples/05-training-an-agent.ipynb) | The Gymnasium environment, and what size costs |
 | [`06-execution-and-impact`](https://github.com/simoncoombes/tradefloor/blob/main/examples/06-execution-and-impact.ipynb) | TCA and the counterfactual run |
-| [`07-research-workflow.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/07-research-workflow.py) | A whole study in one file. It takes about forty seconds of CPU and needs `tradefloor[arrow]` |
+| [`07-research-workflow.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/07-research-workflow.py) | A whole study in one file. It takes about 200 seconds of CPU across eight worker processes, under a minute of wall time on a ten-core laptop, and needs `tradefloor[arrow]` |
 | [`08-claude-agent.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/08-claude-agent.py) | An LLM agent trading the market through the harness |
 | [`09-a-pandemic-shaped-market`](https://github.com/simoncoombes/tradefloor/blob/main/examples/09-a-pandemic-shaped-market.ipynb) | A real 2020-21 macro path, and which fields transmit. Pinned to `pt-v12`, whose QE channel carries the valuation path, with the same path on `pt-v21`, the default until 0.10.2, at the end |
 | [`10-forking-a-market`](https://github.com/simoncoombes/tradefloor/blob/main/examples/10-forking-a-market.py) | Fork a market, raise the rate in one branch, and compare the futures |

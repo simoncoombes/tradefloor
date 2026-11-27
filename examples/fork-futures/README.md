@@ -9,8 +9,8 @@ python examples/fork-futures/fork_futures.py
 
 The script runs one seeded market for 40 days with a buy-and-hold portfolio
 in it. It forks that world into four branches, applies a packaged scenario
-to three of them, and runs all four for 80 more days. It takes about five
-seconds of CPU, and it needs no keys, no network and no package beyond
+to three of them, and runs all four for 80 more days. It takes seven to
+twelve seconds of CPU, and it needs no keys, no network and no package beyond
 tradefloor.
 
 | branch | what changes after the fork |

@@ -54,7 +54,7 @@ same experiment two ways, and writes its output to its own git-ignored
 | | what it asks |
 |---|---|
 | [`rate-shock/`](rate-shock/) | Does the agent actually react to macro conditions? Checkpoint, fork, +200bps in one arm, compare. Under five seconds of CPU, no keys |
-| [`fork-futures/`](fork-futures/) | What does one buy-and-hold portfolio do in four futures of one market? A fork into a control and the `rate_shock`, `recession` and `liquidity_crisis` scenarios, and the figure the project README shows. About five seconds of CPU, no keys |
+| [`fork-futures/`](fork-futures/) | What does one buy-and-hold portfolio do in four futures of one market? A fork into a control and the `rate_shock`, `recession` and `liquidity_crisis` scenarios, and the figure the project README shows. Seven to twelve seconds of CPU, no keys |
 | [`integrations/finrobot/`](integrations/finrobot/) | The same experiment with a real [FinRobot](https://github.com/AI4Finance-Foundation/FinRobot) agent in place of the native one. Replays a recorded run by default, so it needs no API key |
 | [`integrations/`](integrations/) | The same decision loop under a plain function, the OpenAI Agents SDK, PydanticAI and LangGraph. Offline, no keys |
 | [`experiments/liquidity-crisis/`](experiments/liquidity-crisis/) | Will a financial AI agent reduce risk in a market crisis? A checkpoint, a two-way fork, and the `liquidity_crisis` scenario on one arm. An executed notebook, replayed from a recording |
@@ -77,7 +77,7 @@ The times below are CPU time (user plus system), measured with
 `10-forking-a-market.py` and `11-scenario-fork.py` take under a second each
 and need nothing extra. `rate-shock/counterfactual.py` takes under five
 seconds of CPU. It writes a chart if `matplotlib` is installed and says so if
-it is not. `07-research-workflow.py` takes about forty seconds and prints its
+it is not. `07-research-workflow.py` takes about 200 seconds of CPU across eight worker processes and prints its
 own wall-clock total on the last line. It needs
 `tradefloor[arrow]`, because its realism step reads the daily bars table.
 `integrations/finrobot/rate_shock.py` takes about a second and also runs

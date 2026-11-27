@@ -1,7 +1,9 @@
-"""A complete research workflow, start to finish, in about forty seconds of CPU.
+"""A complete research workflow, start to finish.
 
-That is user plus system time, measured with /usr/bin/time at 0.8.5 and
-rounded up; the run prints its own wall-clock total on the last line. Step
+It takes about 200 seconds of CPU across eight worker processes, and under
+a minute of wall time on a ten-core laptop. That is user plus system time,
+measured with /usr/bin/time at 0.11.0 (206 s user and 1 s system, 47.6 s
+wall); the run prints its own wall-clock total on the last line. Step
 8, the realism panel, runs the 252 days its bands were derived at.
 
 Run it:
