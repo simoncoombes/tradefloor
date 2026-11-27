@@ -46,14 +46,16 @@ DEFAULT_OUT = Path(__file__).resolve().parent / "artifacts"
 
 #: Two palettes, one per page background, on a transparent canvas. The
 #: three scenario hues keep an OKLab distance of 12 or more from each
-#: other under simulated deuteranopia and protanopia in both themes. On
-#: the light page two of them are under 3:1 against white, so every line
-#: also ends in a text label and the script prints the table it plots.
+#: other under simulated deuteranopia and protanopia (Machado 2009,
+#: severity 1) in both themes. Every line is 3:1 or more against its page:
+#: 3.06 to 6.11 against white, and 5.51 to 6.50 against GitHub's dark
+#: background, #0d1117. Every line also ends in a text label, and the
+#: script prints the table it plots.
 THEMES = {
     "light": {
         "text": "#1f2328", "muted": "#59636e", "grid": "#d1d9e0",
         "control": "#59636e", "rate_shock": "#257de0",
-        "recession": "#f47230", "liquidity_crisis": "#00b894",
+        "recession": "#ea6924", "liquidity_crisis": "#00a784",
     },
     "dark": {
         "text": "#f0f6fc", "muted": "#9198a1", "grid": "#3d444d",
