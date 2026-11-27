@@ -267,6 +267,8 @@ RUN_BY: dict[str, str] = {
     "experiments/liquidity-crisis/experiment.py":
         "test_examples.py::"
         "test_the_liquidity_crisis_study_replays_its_recording",
+    "fork-futures/fork_futures.py":
+        "test_fork_futures.py::test_the_study_reruns_to_the_same_bytes",
     "integrations/callable/five_days.py":
         "test_integration_examples.py::test_the_table_matches_a_real_run",
     "integrations/finrobot/rate_shock.py":
