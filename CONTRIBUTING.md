@@ -33,6 +33,30 @@ constructor does with the state it is given is the other: say in the
 CHANGELOG which function changed and what to call for the old behaviour.
 RELEASING.md, "State shapes and widths", has the history behind both.
 
+## Scientific and benchmark changes
+
+A benchmark spec is treated the way a preset is. Its version is frozen when
+it is published, and every result cites that version.
+
+- **A change makes a new version.** Anything a score depends on is part of
+  the spec: the scenarios, the seeds, the instruments, the horizon, the
+  observation an agent is shown, the action schema and the scoring rule. A
+  change to any of them ships as a new spec version with its own identifier,
+  and the earlier version stays runnable beside it.
+- **Held-out seeds are for scoring only.** Tune a prompt, an agent or a
+  coefficient on the public seeds. A run that read a held-out seed before
+  its final scoring says so in its submission.
+- **A published result is never edited.** A correction is a new entry that
+  names the entry it corrects and says what was wrong. The original entry
+  stays readable.
+- **A claim carries its measurement.** A pull request that changes a
+  statement about the model or about a benchmark gives the version, preset,
+  seeds and command that produced the new figure.
+
+A result submitted by somebody else is listed as community submitted until
+a maintainer has reproduced it. The benchmark submission issue template
+lists what a reproduction needs.
+
 ## Setup
 
 ```bash
