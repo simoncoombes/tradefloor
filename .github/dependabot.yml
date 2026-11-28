@@ -19,6 +19,23 @@ updates:
     groups:
       rust:
         patterns: ["*"]
+    # pyo3, arrow and sha2 are each a deliberate port, never a weekly bump:
+    # pyo3 is the binding's API, arrow its columnar export, and sha2 computes
+    # the ModelParams fingerprint and the known-answer digests. A new major
+    # has to land behind the determinism gate as its own change. The group
+    # opened all three together as #343 (closed). Patch releases within the
+    # pinned line still come through. pyo3 and sha2 are below 1.0, where
+    # Cargo treats 0.x to 0.(x+1) as breaking, and Dependabot's documentation
+    # does not say how it classifies such a bump, so those two take an
+    # explicit range rather than `update-types`. Move the range when a port
+    # lands.
+    ignore:
+      - dependency-name: "pyo3"
+        versions: [">=0.23"]
+      - dependency-name: "sha2"
+        versions: [">=0.11"]
+      - dependency-name: "arrow"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: pip
     directory: /
@@ -28,6 +45,21 @@ updates:
     groups:
       python:
         patterns: ["*"]
+    # The finrobot extra's ceilings are compatibility limits, not stale pins
+    # (#339): pyautogen 0.3+ is the AutoGen rewrite with no `autogen` module,
+    # and autogen 0.2.35's Anthropic client needs the pre-1.0 SDK. The group
+    # proposed raising both as #344 (closed). An ignore names a dependency
+    # for this whole block, not one extra, so the anthropic rule also covers
+    # the claude extra's pin. That pin is `anthropic>=0.40`, a floor with no
+    # ceiling, which already admits every release, so there is nothing for
+    # Dependabot to raise there and the rule does not hold it back. If that
+    # pin ever gains a ceiling, this rule would stop Dependabot from moving
+    # it, and it would need revisiting.
+    ignore:
+      - dependency-name: "pyautogen"
+        versions: [">=0.3"]
+      - dependency-name: "anthropic"
+        versions: [">=1.0"]
 
   - package-ecosystem: github-actions
     directory: /
