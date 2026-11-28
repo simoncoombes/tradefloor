@@ -368,6 +368,17 @@ RETURNED_TO_BASELINE = {
 #: where it sits. Move the partner and this entry becomes false -- which is
 #: why each one names the partner rather than saying "inert".
 OUT_OF_SCOPE = {
+    # v23 step 3's switch (2026-11-28), inert on every shipped preset.
+    "pinned_vix_variance_map":
+        "inert at 0.0: a forced close on a pinned VIX takes the branch in "
+        "`Engine::close_day` that calls `MarketVarianceState::close_day_forced`, "
+        "as it stood, and `pinned_vix_mapped_variance` is not called; a free "
+        "close never reads it. No state is added, snapshotted or hashed. At 0.0 "
+        "it is also left out of the model's digest",
+    "pinned_vix_variance_map_exponent":
+        "unread while `pinned_vix_variance_map` is 0.0: only "
+        "`Engine::pinned_vix_mapped_variance` reads it, behind the map's branch. "
+        "At its default, 2.327, it is left out of the model's digest",
     # C4a round 2's two switches (2026-11-04), inert on every shipped preset.
     "maker_ladder_tick_spacing":
         "inert at 0.0: `fill_live_book` passes the legacy `level_step` 0.5 "
