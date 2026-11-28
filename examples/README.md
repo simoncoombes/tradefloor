@@ -22,7 +22,7 @@ a parameter -- swap it for your own and nothing else in the experiment moves.
 
 ## The reading order
 
-Eight notebooks and four scripts, numbered in reading order. The committed
+Nine notebooks and four scripts, numbered in reading order. The committed
 notebooks carry their output, so you can read them without running anything.
 Start at 00 if you have not used tradefloor before.
 
@@ -40,6 +40,7 @@ Start at 00 if you have not used tradefloor before.
 | [`08-claude-agent.py`](08-claude-agent.py) | An LLM agent scored against the baselines. Replays a recorded Claude run by default, so it needs no key |
 | [`10-forking-a-market.py`](10-forking-a-market.py) | Fork a market mid-flight, change the policy rate in one branch, compare |
 | [`11-scenario-fork.py`](11-scenario-fork.py) | Read a scenario from YAML, apply it to one branch of a fork, and price what it cost |
+| [`12-ai-vs-traditional.ipynb`](12-ai-vs-traditional.ipynb) | `08-claude-agent.py` run as a notebook: the recorded Claude agent beside the reference strategies on one market, offline by default |
 
 Notebooks 05 and 06 cover the two audiences the project is built for, RL
 researchers and execution developers.
