@@ -117,6 +117,9 @@ ASCII_PROSE = (
     # this list is how it widens, so a study that holds to it joins.
     "examples/rate-shock/README.md",
     "examples/integrations/finrobot/README.md",
+    # The two pages that took sections out of the README.
+    "docs/API.md",
+    "docs/MCP.md",
 )
 
 #: The five characters `CONTENT.md` names, plus four the writing standard at

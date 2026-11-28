@@ -56,11 +56,12 @@ def test_the_readme_counts_the_tools_the_server_registers():
     sessions arrived, and start_job was not."""
     import pathlib
     import re
+    # The Contents table moved from the README to docs/API.md.
     readme = (pathlib.Path(__file__).resolve().parent.parent
-              / "README.md").read_text(encoding="utf-8")
+              / "docs" / "API.md").read_text(encoding="utf-8")
     row = re.search(r"^\| MCP server \| ([\w-]+) tools for a coding agent, "
                     r"([\w-]+) of them read-only", readme, re.M)
-    assert row, "README.md's Contents table has no MCP server row"
+    assert row, "docs/API.md's Contents table has no MCP server row"
     words = ["zero", "one", "two", "three", "four", "five", "six", "seven",
              "eight", "nine", "ten", "eleven", "twelve", "thirteen",
              "fourteen", "fifteen", "sixteen", "seventeen", "eighteen",
@@ -73,10 +74,10 @@ def test_the_readme_counts_the_tools_the_server_registers():
     tools = asyncio.run(mcp.server.list_tools())
     read_only = [t.name for t in tools if t.annotations.read_only_hint]
     assert count(row.group(1)) == len(tools), (
-        f"README.md says {row.group(1)} tools and the server registers "
+        f"docs/API.md says {row.group(1)} tools and the server registers "
         f"{len(tools)}: {sorted(t.name for t in tools)}")
     assert count(row.group(2)) == len(read_only), (
-        f"README.md says {row.group(2)} are read-only and the server marks "
+        f"docs/API.md says {row.group(2)} are read-only and the server marks "
         f"{len(read_only)}: {sorted(read_only)}")
 
 
