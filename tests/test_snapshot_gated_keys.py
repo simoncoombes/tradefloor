@@ -80,7 +80,8 @@ from test_state_schema_r21 import EVERY_R21_DIAL  # noqa: E402
 #: name -> (overrides on pt-v20, top-level keys, economy keys, held keys,
 #: options). A held key is carried only while it holds something; its
 #: absence is a value, so it is checked for presence at the mid-session cut
-#: and refused on pt-v20 rather than refused when missing.
+#: and refused on pt-v20 rather than refused when missing. An option's
+#: `end_day` ends the run before that day instead of DAYS after the cut.
 CASES = {
     "pt-v20": ({}, ("vix_anchor_slow", "fair_value_offset", "opening_z"),
                ("vix_feedback", "cycle_history", "unemployment_impulse",
@@ -173,6 +174,17 @@ CASES = {
     "index_level": (dict(index_level_listed=1.0), ("index_divisor",), (), (), {}),
     "vix_live": (dict(vix_intraday_live=1.0), (), (), ("vix_live",), {}),
     "forecast": (dict(forecast_horizon_sessions=21.0), (), (), ("forecast",), {}),
+    # The oil forecast's held paths (`oil_forecast_path_law`), held between
+    # the closes that simulate them: simulated at day 0's close and read by
+    # days 1 to 4, so the run ends after day 4's close. Day 5's close
+    # simulates afresh on the start's law, which a process works out once
+    # from the state it first forecasts on, so a fresh process's forecast
+    # leaves the original's there by that law's sampling (docs/MODEL.md);
+    # prices do not move.
+    "oil_path_hold": (dict(forecast_horizon_sessions=130.0, cycle_nowcast_accuracy=0.4,
+                           oil_forecast_path_law=1.0),
+                      ("cycle_nowcast_rng",), ("cycle_nowcast",), ("forecast", "oil_path_hold"),
+                      {"end_day": 5}),
     # The index futures: their numbers and generator whenever the switch is
     # set; the night's path from a close to the next open.
     "index_futures": (dict(index_level_listed=1.0, futures_index_listed=1.0, basis_sd=3.7,
@@ -294,7 +306,7 @@ def play(engine, name, start, stop):
 
 
 def _end(name):
-    return STEPS * (_cut_day(name) + DAYS - CUT_DAY)
+    return STEPS * CASES[name][4].get("end_day", _cut_day(name) + DAYS - CUT_DAY)
 
 
 def _cut_day(name):

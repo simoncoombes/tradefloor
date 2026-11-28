@@ -1251,8 +1251,9 @@ pub struct Engine {
     /// the snapshot and the state hash while it is `Some`.
     forecast: Option<crate::derivatives::Forecast>,
     /// `oil_forecast_path_law`: the oil forecast's paths held between the
-    /// closes that simulate them. Not state: nothing snapshots, restores or
-    /// hashes it ([`foundations::OilPathHold`]).
+    /// closes that simulate them ([`foundations::OilPathHold`]). `None` with
+    /// the dial off. Carried in the snapshot and the state hash while it is
+    /// `Some`.
     oil_path_hold: Option<foundations::OilPathHold>,
     /// `futures_index_listed`: the index futures, their book, their
     /// settlements and their generator (`stream::DERIVATIVES`); the night's
@@ -11874,6 +11875,34 @@ impl Engine {
         })
     }
 
+    /// The oil forecast's held paths (`oil_forecast_path_law`) for a
+    /// snapshot and the state hash: `[the close that simulated them, then
+    /// their mean growth at the start of each session after it]`. `None`
+    /// with the dial off, and before a close has simulated them.
+    pub fn oil_path_hold_words(&self) -> Option<Vec<f64>> {
+        if self.params.oil_forecast_path_law == 0.0 {
+            return None;
+        }
+        self.oil_path_hold.as_ref().map(|h| h.words())
+    }
+
+    /// Put the oil forecast's held paths back from
+    /// [`Engine::oil_path_hold_words`]. `None` is a model without the path
+    /// law, or one no close has simulated them on.
+    pub fn set_oil_path_hold_state(&mut self, words: Option<&[f64]>) -> Result<(), String> {
+        let Some(w) = words else {
+            self.oil_path_hold = None;
+            return Ok(());
+        };
+        if self.params.oil_forecast_path_law == 0.0 {
+            return Err(
+                "this snapshot carries oil_path_hold and this model's oil_forecast_path_law is 0"
+                    .to_string());
+        }
+        self.oil_path_hold = Some(foundations::OilPathHold::from_words(w)?);
+        Ok(())
+    }
+
     /// Put the time-held fade's state back from [`Engine::cycle_hold_words`].
     /// `None` is a model without it, or one no close has started.
     pub fn set_cycle_hold_state(&mut self, words: Option<&[f64]>) -> Result<(), String> {
@@ -14630,6 +14659,16 @@ impl Engine {
         // clock, behind its own tag.
         if let Some(words) = self.cycle_hold_words() {
             hash_f64(&mut buf, 84.0);
+            for value in words {
+                hash_f64(&mut buf, value);
+            }
+        }
+        // The oil forecast's held paths, only while `oil_forecast_path_law`
+        // is set and a close has simulated them, behind their own tag,
+        // length-prefixed.
+        if let Some(words) = self.oil_path_hold_words() {
+            hash_f64(&mut buf, 85.0);
+            hash_u32(&mut buf, words.len() as u32);
             for value in words {
                 hash_f64(&mut buf, value);
             }

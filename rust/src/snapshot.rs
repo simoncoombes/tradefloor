@@ -1620,6 +1620,12 @@ impl Engine {
         if let Some(words) = self.cycle_hold_words() {
             out.put("cycle_hold", V::from_f64s(&words));
         }
+        // The oil forecast's held paths (`oil_forecast_path_law`), on the
+        // same rule: only with the switch set and once a close has
+        // simulated them.
+        if let Some(words) = self.oil_path_hold_words() {
+            out.put("oil_path_hold", V::from_f64s(&words));
+        }
         // The published VIX's stress memory, only where the hash covers it:
         // with `vix_stress_premium` non-zero.
         if self.carries_vix_stress_memory() {
@@ -2204,6 +2210,7 @@ impl Engine {
                         p.market_vol_leverage_fast),
             Gated::held("market_vol_cycle_log", "market_vol_cycle_ratio", p.market_vol_cycle_ratio),
             Gated::held("cycle_hold", "market_vol_cycle_hold_onset", p.market_vol_cycle_hold_onset),
+            Gated::held("oil_path_hold", "oil_forecast_path_law", p.oil_forecast_path_law),
             Gated::dial("vix_stress_memory", "vix_stress_premium", p.vix_stress_premium),
             Gated::dial("cycle_nowcast_rng", "cycle_nowcast_accuracy", p.cycle_nowcast_accuracy),
             Gated::dial("fed_stress_vix_max", "fed_stress_cut", p.fed_stress_cut),
@@ -2771,6 +2778,15 @@ impl Engine {
                 None => None,
             };
             inner.set_cycle_hold_state(words.as_deref()).map_err(core)?;
+        }
+        // The oil forecast's held paths (`oil_forecast_path_law`), none where
+        // the snapshot carries none: taken before a close simulated them.
+        {
+            let words = match snapshot.get("oil_path_hold") {
+                Some(_) => Some(read_buffer(snapshot, "", "oil_path_hold")?),
+                None => None,
+            };
+            inner.set_oil_path_hold_state(words.as_deref()).map_err(core)?;
         }
         if inner.carries_vix_stress_memory() {
             inner.set_vix_stress_memory(read_finite(snapshot, "", "vix_stress_memory")?);
