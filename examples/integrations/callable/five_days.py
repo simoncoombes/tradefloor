@@ -71,7 +71,7 @@ OFFLINE_DAYS = 20
 #: The model the live half of the notebook calls, the key variable it
 #: needs, and the output-token budget per decision. Replay -- the committed
 #: default -- needs none of them.
-LIVE_MODEL = "claude-opus-5"
+LIVE_MODEL = "claude-opus-5-5"
 LIVE_KEY_VAR = "ANTHROPIC_API_KEY"
 LIVE_MAX_TOKENS = 1500
 

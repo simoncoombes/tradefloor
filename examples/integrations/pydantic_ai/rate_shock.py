@@ -180,7 +180,7 @@ FIXTURE = (_repo_root()
            / "tests" / "fixtures" / "pydantic_ai" / "rate-shock.json")
 
 #: The model a live run calls, in PydanticAI's `provider:name` spelling.
-LIVE_MODEL = "anthropic:claude-opus-5"
+LIVE_MODEL = "anthropic:claude-opus-5-5"
 LIVE_KEY_VAR = "ANTHROPIC_API_KEY"
 
 #: The output-token ceiling one decision may cost. A constant rather than a

@@ -1,0 +1,333 @@
+{
+ "note": "The twenty-third registration's exam seeds (pt-v22's registration 23, after grade 22; owner decisions 8 and 10-16, registration 19's items 3 and 5). Every exam seed is its held-out counterpart plus 9420000, except the long run's pool (9421201-9421830,9423201-9423830) and the arrival-order pool (9424001-9424400), which take blocks of their own. No seed of this file had been run by any recorded run when it was registered (the registration's proof). The old exam seeds 101-190, 401-430 and 701-730 are refused always; the thirteenth to twenty-second grades' 13201-16030, 33201-37400, 85201-89400, 220201-224400, 240201-244400, 260201-264400, 280201-289270, 290201-299270, 5440201-5449270 and 8960201-8969270 are not used.",
+ "rule": "exam seed = held-out seed + 9420000, per protocol; longrunpool and aopool: blocks of their own",
+ "offset": 9420000,
+ "pooled": {
+  "aopool": "9424001",
+  "longrunpool": "9421201-9421230,9421501-9421530,9421801-9421830,9423201-9423230,9423501-9423530,9423801-9423830"
+ },
+ "span": "9420201-9429270",
+ "distinct_seeds": 1650,
+ "blocks": {
+  "A": "9420201-9420400",
+  "B": "9420431-9420590",
+  "C": "9420801-9420890",
+  "P1": "9421201-9421230,9421501-9421530,9421801-9421830",
+  "X": "9422001-9422270",
+  "Q": "9422501-9422534",
+  "E": "9423001-9423030",
+  "P2": "9423201-9423230,9423501-9423530,9423801-9423830",
+  "AO": "9424001-9424400",
+  "PT": "9429001-9429270"
+ },
+ "protocols": {
+  "longrun": {
+   "var": "LONGRUN_SEED_LIST",
+   "seeds": "9420201-9420230,9420501-9420530,9420801-9420830",
+   "n": 90,
+   "held_out": "201-230,501-530,801-830",
+   "reads": "long run 21y + gfc/covid replays (longrun-jobs.sh): A, B1-B9, C1, C2, C10, E1, L1, V1, ..., rule_cut, index exploit screens",
+   "also": "also: rule_cut and the seven levered macro rules against the exposure-matched position (rulecut_lr.py, lever_lr.py), the index-level exploit screens"
+  },
+  "truephase": {
+   "var": "GEN_SEEDS",
+   "seeds": "9420201-9420290,9420501-9420590,9420801-9420890",
+   "n": 270,
+   "held_out": "201-290,501-590,801-890",
+   "reads": "true-phase histories, 5292 sessions (r14gen.py), 270 since the eighteenth registration: B10-B12, DV, G, C10e, VC1, VC2, T1-T3, I-rate, R3 held, R3m, R4m, R4-lag, F-stress, F-bear",
+   "also": "also: the leak macro rules (leakmacro, its first 24)"
+  },
+  "leakmacro": {
+   "var": "EXPLOITS_LEAK_FIRST",
+   "seeds": "9420201-9420224",
+   "n": 24,
+   "held_out": "201-224",
+   "reads": "leak macro rules, read from truephase (exploits.py, desk): rule_peak, rule_cut, rule_unemp_floor, ..."
+  },
+  "cert": {
+   "var": "CERT_SEEDS",
+   "seeds": "9420201-9420230",
+   "n": 30,
+   "held_out": "201-230",
+   "reads": "certification panel_252 (with the lever) and panel_504: D1, VC3"
+  },
+  "heldseeds": {
+   "var": "HELDSEEDS_SEEDS",
+   "seeds": "9420501-9420530",
+   "n": 30,
+   "held_out": "501-530",
+   "reads": "certification heldout_seeds: D1"
+  },
+  "heldu": {
+   "var": "HELDU_SEEDS",
+   "seeds": "9420801-9420830",
+   "n": 30,
+   "held_out": "801-830",
+   "reads": "certification heldout_universe (60 names, roster 909): D1"
+  },
+  "crisisext": {
+   "var": "CRISISEXT_FIRST",
+   "seeds": "9422001-9422270",
+   "n": 270,
+   "held_out": "2001-2270",
+   "reads": "D1 crisis-dispersion extension, blocks of 30, nine at most (crisisext_box_hr.py; certgrade_box_hr.py)"
+  },
+  "edge": {
+   "var": "EDGE_FIRST_SEED",
+   "seeds": "9420201-9420210",
+   "n": 10,
+   "held_out": "201-210",
+   "reads": "edge.py, 10 seeds x 300 days: C3"
+  },
+  "c4a": {
+   "var": "C4A_FIRST_SEED",
+   "seeds": "9420201-9420208",
+   "n": 8,
+   "held_out": "201-208",
+   "reads": "c4.py part a, 8 seeds: C4a"
+  },
+  "xsec": {
+   "var": "XSEC_SEEDS",
+   "seeds": "9420201-9420230,9420501-9420530,9420801-9420830",
+   "n": 90,
+   "held_out": "201-230,501-530,801-830",
+   "reads": "grade_xsec.py, driven2020.py, driven2022.py: C5-C8, D2, F1, R5, R6"
+  },
+  "r7": {
+   "var": "R7_SEEDS",
+   "seeds": "9420201-9420230,9420501-9420530,9420801-9420830",
+   "n": 90,
+   "held_out": "201-230,501-530,801-830",
+   "reads": "r7_event.py: R7a (90 seeds, owner decision 13)"
+  },
+  "r7pre": {
+   "var": "R7PRE_SEEDS",
+   "seeds": "9420201-9420230,9420501-9420530,9420801-9420830",
+   "n": 90,
+   "held_out": "201-230,501-530,801-830",
+   "reads": "r7_event_pre.py: R7a with the last-close baseline (90 seeds, owner decision 13)"
+  },
+  "r7eval": {
+   "var": "R7EVAL_SEEDS",
+   "seeds": "9420201-9420230",
+   "n": 30,
+   "held_out": "201-230",
+   "reads": "r7_eval.py: R7b (30 histories, its 20-of-30 bound)"
+  },
+  "recession": {
+   "var": "REC_SEEDS",
+   "seeds": "9420201-9420380",
+   "n": 180,
+   "held_out": "201-380",
+   "reads": "recession_rows.py: S1a, S1b, S2 (180 seeds since the nineteenth registration)"
+  },
+  "sfrec": {
+   "var": "SF_REC_SEEDS",
+   "seeds": "9420201-9420230",
+   "n": 30,
+   "held_out": "201-230",
+   "reads": "desk_sf.py, packaged recession: SF1-SF5"
+  },
+  "sf": {
+   "var": "SF_SEEDS",
+   "seeds": "9420201-9420400,9420431-9420446",
+   "n": 216,
+   "held_out": "201-400,431-446",
+   "reads": "desk_sf.py, the other six files: SF1's ratio, SF2, SF3, SF5 (216 seeds since the nineteenth registration)"
+  },
+  "mcrun": {
+   "var": "MC_RUN_SEEDS",
+   "seeds": "9422501-9422530",
+   "n": 30,
+   "held_out": "2501-2530",
+   "reads": "metaorder_curve.py run: Q1-Q9"
+  },
+  "mctrips": {
+   "var": "MC_TRIP_SEEDS",
+   "seeds": "9422531-9422532,9422534",
+   "n": 3,
+   "held_out": "2531-2532,2534",
+   "reads": "metaorder_curve.py trips: G-rt"
+  },
+  "mcmark": {
+   "var": "MC_MARK_SEED",
+   "seeds": "9422533",
+   "n": 1,
+   "held_out": "2533",
+   "reads": "metaorder_curve.py mark: reported"
+  },
+  "ao": {
+   "var": "AO_FIRST_SEED",
+   "seeds": "9423001-9423030",
+   "n": 30,
+   "held_out": "3001-3030",
+   "reads": "e7_arm.py, 30 seeds: AO1-AO4"
+  },
+  "ph1": {
+   "var": "PH1_SEEDS",
+   "seeds": "9422001-9422005",
+   "n": 5,
+   "held_out": "2001-2005",
+   "reads": "ph_rows.py ph1: PH1"
+  },
+  "ph3": {
+   "var": "PH3_SEEDS",
+   "seeds": "9422001-9422030",
+   "n": 30,
+   "held_out": "2001-2030",
+   "reads": "ph_rows.py ph3: PH3"
+  },
+  "edgegen": {
+   "var": "EDGEGEN_SEEDS",
+   "seeds": "9422001-9422030",
+   "n": 30,
+   "held_out": "2001-2030",
+   "reads": "edgegen_arm.py gen: stock_screen, remark rules"
+  },
+  "edgeeval": {
+   "var": "EDGEEVAL_SEEDS",
+   "seeds": "9423001-9423020",
+   "n": 20,
+   "held_out": "3001-3020",
+   "reads": "edgegen_arm.py eval and evalem: fedcut63, pubpeakcon, fg40, unemp126 and their exposure-matched runs",
+   "also": "eval and evalem on the same seeds: each agent and its exposure-matched constant agent em_AGENT"
+  },
+  "regr_short": {
+   "var": "AUDIT_SEED_SHORT",
+   "seeds": "9422101-9422130",
+   "n": 30,
+   "held_out": "2101-2130",
+   "reads": "regr.tgz gen_all/strategies short, intraday",
+   "also": "also: vol_target_15 exposure-matched (regr_em.py)"
+  },
+  "regr_var": {
+   "var": "AUDIT_SEED_VAR",
+   "seeds": "9422201-9422230",
+   "n": 30,
+   "held_out": "2201-2230",
+   "reads": "regr.tgz gen_all/strategies var",
+   "also": "also: vol_target_15 exposure-matched (regr_em.py)"
+  },
+  "regr_long": {
+   "var": "AUDIT_SEED_LONG",
+   "seeds": "9422301-9422308",
+   "n": 8,
+   "held_out": "2301-2308",
+   "reads": "regr.tgz gen_all/strategies long, stale_open, big_days",
+   "also": "also: vol_target_15 against the exposure-matched position (regr_em.py) on the same 8 markets"
+  },
+  "regr_probe": {
+   "var": "AUDIT_SEED_PROBE",
+   "seeds": "9422401-9422408",
+   "n": 8,
+   "held_out": "2401-2408",
+   "reads": "regr.tgz probe_impact (3), run_mm_thin (8), probe_pins_paired (3), from the same first seed"
+  },
+  "stab": {
+   "var": "STAB_FIRST_SEED",
+   "seeds": "9420201-9420212",
+   "n": 12,
+   "held_out": "201-212",
+   "reads": "stab60.py, 12 x 100 years: H1-100y"
+  },
+  "probe": {
+   "var": "PROBE_SEEDS",
+   "seeds": "9420201-9420236",
+   "n": 36,
+   "held_out": "201-236",
+   "reads": "probe_all.py: L-rate (36 seeds since the eighteenth registration)"
+  },
+  "d1pool": {
+   "var": "D1POOL_SEEDS",
+   "seeds": "9420201-9420400,9420431-9420590",
+   "n": 360,
+   "held_out": "201-400,431-590",
+   "reads": "d1pool_box.py, the certification's varying-roster protocol, 360 seeds: D1's tail row as a pooled rate",
+   "also": "D1's index_tail_dn3_pct (pooled rate) and index_drift_pct (mean) over 360 seeds (owner decisions 11 and 12)"
+  },
+  "aopool": {
+   "var": "AOPOOL_FIRST",
+   "seeds": "9424001-9424400",
+   "n": 400,
+   "held_out": "43001-43400",
+   "reads": "e7_arm.py q2/q3 and ao_coin.py, 400 seeds: AO1 (the book coin), AO3 and AO4 (luck removed)",
+   "also": "e7_arm.py q2/q3 in blocks of 20 and ao_coin.py: AO1 (the book coin, 400 x 420 x 6 = 1,008,000 keys), AO3 and AO4 (owner decision 10)"
+  },
+  "longrunpool": {
+   "var": "LONGRUN_POOL_SEED_LIST",
+   "seeds": "9421201-9421230,9421501-9421530,9421801-9421830,9423201-9423230,9423501-9423530,9423801-9423830",
+   "n": 180,
+   "held_out": "50201-50230,50501-50530,50801-50830,60201-60230,60501-60530,60801-60830",
+   "reads": "longrun.py measure into longrun-pool/ (21y free histories and replays): with the long run's 90, the 270 histories C10c and PH5 are graded on",
+   "also": "with the long run's 90 (LONGRUN_SEED_LIST): the 270 histories C10c, PH5 and edge-c10_mirror are graded on (owner decisions 14-16)"
+  },
+  "ptv21": {
+   "var": "PTV21_SEEDS",
+   "seeds": "9420201-9420290",
+   "n": 90,
+   "held_out": "201-290",
+   "reads": "ptv21.py measure --parts free (the screen's ptv21 stage), 90 x 21 years since the eighteenth registration: ON1, U1-U4, O1-O4, SK1, SK2"
+  },
+  "ptv22": {
+   "var": "PTV22_SEEDS",
+   "seeds": "9429001-9429270",
+   "n": 270,
+   "held_out": "9001-9270",
+   "reads": "ptv22 stages, 270 x 21 years: futrows.py run (IF1-IF3, NS1, NS2, RF1-RF5, OF1-OF4, MG1), ptv22.py measure --parts chain (SS1-SS4, EV1-EV3), names (MG3, XD5, AX1, AX2) and traded (MG2, XD1, XD2)"
+  },
+  "ptv22mp": {
+   "var": "PTV22_MP_SEEDS",
+   "seeds": "9429001-9429030",
+   "n": 30,
+   "held_out": "9001-9030",
+   "reads": "ptv22traded stage, 30 x 21 years: ptv22.py measure --parts metaorder,push (IF4, XD3)"
+  }
+ },
+ "variables": {
+  "LONGRUN_SEED_LIST": "9420201-9420230,9420501-9420530,9420801-9420830",
+  "GEN_SEEDS": "9420201-9420290,9420501-9420590,9420801-9420890",
+  "EXPLOITS_LEAK_FIRST": "9420201",
+  "CERT_SEEDS": "9420201-9420230",
+  "HELDSEEDS_SEEDS": "9420501-9420530",
+  "HELDU_SEEDS": "9420801-9420830",
+  "CRISISEXT_FIRST": "9422001",
+  "EDGE_FIRST_SEED": "9420201",
+  "C4A_FIRST_SEED": "9420201",
+  "XSEC_SEEDS": "9420201-9420230,9420501-9420530,9420801-9420830",
+  "R7_SEEDS": "9420201-9420230,9420501-9420530,9420801-9420830",
+  "R7PRE_SEEDS": "9420201-9420230,9420501-9420530,9420801-9420830",
+  "R7EVAL_SEEDS": "9420201-9420230",
+  "REC_SEEDS": "9420201-9420380",
+  "SF_REC_SEEDS": "9420201-9420230",
+  "SF_SEEDS": "9420201-9420400,9420431-9420446",
+  "MC_RUN_SEEDS": "9422501-9422530",
+  "MC_TRIP_SEEDS": "9422531,9422532,9422534",
+  "MC_MARK_SEED": "9422533",
+  "AO_FIRST_SEED": "9423001",
+  "PH1_SEEDS": "9422001-9422005",
+  "PH3_SEEDS": "9422001-9422030",
+  "EDGEGEN_SEEDS": "9422001-9422030",
+  "EDGEEVAL_SEEDS": "9423001-9423020",
+  "AUDIT_SEED_SHORT": "9422101",
+  "AUDIT_SEED_VAR": "9422201",
+  "AUDIT_SEED_LONG": "9422301",
+  "AUDIT_SEED_PROBE": "9422401",
+  "STAB_FIRST_SEED": "9420201",
+  "PROBE_SEEDS": "9420201-9420236",
+  "D1POOL_SEEDS": "9420201-9420400,9420431-9420590",
+  "AOPOOL_FIRST": "9424001",
+  "LONGRUN_POOL_SEED_LIST": "9421201-9421230,9421501-9421530,9421801-9421830,9423201-9423230,9423501-9423530,9423801-9423830",
+  "PTV21_SEEDS": "9420201-9420290",
+  "PTV22_SEEDS": "9429001-9429270",
+  "PTV22_MP_SEEDS": "9429001-9429030"
+ },
+ "fixed": {
+  "c4b": "92001-92020, universes 93001-93020: the published suite, as held out",
+  "c9": "impact_curve.py's own seeds, as held out",
+  "scenario_size": "301-330, skipped under GRID=1; not a graded row",
+  "regr_fixed": "probe_bond_stale seed 17, probe_invariants seeds 7-17: construction checks",
+  "ao5": "ao5.py's paired run on held-out seed 3001: a construction check, not a seed block",
+  "rosters": "Universe.random(40, seed=111) certified roster, heldout_universe roster 909, e7_arm's Universe.random(20, seed=111), ph_rows' Universe.random(8, seed=111); a varying roster takes the market seed, so it moves with it"
+ },
+ "old_exam_seeds": "101-190,401-430,701-730"
+}

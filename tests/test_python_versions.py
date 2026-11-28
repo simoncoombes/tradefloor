@@ -38,11 +38,12 @@ PACKAGE = pathlib.Path(tf.__file__).resolve().parent
 #: tests/test_python_versions.py`` and the commit says why. A change on 3.12
 #: or later alone is the bug this file exists for.
 #:
-#: Regenerated on 3.11.16 at 0.10.0, when the run's default market moved
-#: from pt-v20 to pt-v21 (3.13 gives the same): was 537488a29c52a5d0 and
-#: c0638ba5e48738ca on pt-v20.
-ORDERS_SHA256 = "a67005c524a5cb33"
-SCORECARDS_SHA256 = "bcb8bf08c55961bb"
+#: Regenerated on 3.11.16 at 0.11.0, when the run's default market moved
+#: from pt-v21 to pt-v22 (3.13 gives the same, byte for byte): was
+#: a67005c524a5cb33 and bcb8bf08c55961bb on pt-v21, and 537488a29c52a5d0
+#: and c0638ba5e48738ca on pt-v20 before 0.10.0.
+ORDERS_SHA256 = "ee974a6ab4ba0d63"
+SCORECARDS_SHA256 = "78876e8bfd4cdb91"
 
 
 # --------------------------------------------------------------------------

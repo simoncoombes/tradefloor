@@ -71,7 +71,7 @@ use crate::market_maker::{
     quote_ladder_into, LadderParams, MakerInventory, QuoteParams, MARKET_MAKER_ID,
 };
 use crate::mathx;
-use crate::order_book::{Fill, OrderBook, Side, SubmitOptions};
+use crate::order_book::{Fill, OrderBook, Side, SubmitOptions, MAX_DEPTH_PER_SIDE};
 use crate::rng::Rng;
 use crate::types::Difficulty;
 
@@ -188,7 +188,7 @@ pub fn compute_spread_bps(
     vix: f64,
     difficulty: Option<Difficulty>,
 ) -> f64 {
-    compute_spread_bps_with(company, vix, difficulty, 0.0, SPREAD_SIZE_EXPONENT)
+    compute_spread_bps_with(company, vix, difficulty, 0.0, SPREAD_SIZE_EXPONENT, 0.0)
 }
 
 /// Full spread in basis points, with the size curve selectable.
@@ -214,6 +214,7 @@ pub fn compute_spread_bps_with(
     difficulty: Option<Difficulty>,
     size_smoothness: f64,
     size_exponent: f64,
+    vix_slope: f64,
 ) -> f64 {
     let mcap_billions = company.market_cap / 1e9;
     let stepped = if mcap_billions > 50.0 {
@@ -240,7 +241,7 @@ pub fn compute_spread_bps_with(
     let beta = company.beta.unwrap_or(1.0);
     let vol_multiplier = 0.7 + 0.3 * sector_vol * beta;
 
-    let mut vix_multiplier = vix_spread_multiplier(vix);
+    let mut vix_multiplier = vix_spread_multiplier_with(vix, vix_slope);
     // The reference implementation is `if (difficulty === 'hard' && vix > 25) … else if
     // (difficulty === 'expert' && vix > 25)`. A hard run below VIX 25 falls
     // through BOTH arms, which the guards reproduce.
@@ -288,6 +289,21 @@ pub fn compute_spread_bps_with(
 /// equity spread is bit-identical.
 pub fn vix_spread_multiplier(vix: f64) -> f64 {
     1.0 + mathx::max(0.0, (vix - 15.0) / 30.0)
+}
+
+/// [`vix_spread_multiplier`] with the stock quote's VIX slope as a dial
+/// (`ModelParams::quote_spread_vix_slope`): `1 + max(0, (vix - 15) x slope)`.
+///
+/// A slope of 0.0 is the shipped rule, and it is that function itself, so
+/// every equity spread is bit-identical at 0.0 (the shipped 1/30 is computed
+/// as `/ 30.0`, which `x (1.0 / 30.0)` would not reproduce to the bit). The
+/// rate indices and the option dealer keep [`vix_spread_multiplier`].
+pub fn vix_spread_multiplier_with(vix: f64, slope: f64) -> f64 {
+    if slope == 0.0 {
+        vix_spread_multiplier(vix)
+    } else {
+        1.0 + mathx::max(0.0, (vix - 15.0) * slope)
+    }
 }
 
 /// Baseline quote size per level — the legacy display-book size, minus the RNG.
@@ -342,6 +358,15 @@ pub struct LiveBookOptions {
     /// A JS `number`, not an integer — see `market_maker::LadderParams::levels`.
     pub levels: f64,
     pub resting_orders: Vec<RestingOrder>,
+    /// The maker's ladder one tick apart after the touch
+    /// (`ModelParams::maker_ladder_tick_spacing`); `false`, what ships,
+    /// keeps the legacy spacing of half a spread. See
+    /// [`SettleOptions::ladder_tick_spacing`].
+    pub ladder_tick_spacing: bool,
+    /// The stock quote's VIX slope (`ModelParams::quote_spread_vix_slope`);
+    /// 0.0, what ships, is the shipped `1 / 30` through
+    /// [`vix_spread_multiplier_with`].
+    pub vix_slope: f64,
 }
 
 impl Default for LiveBookOptions {
@@ -353,6 +378,8 @@ impl Default for LiveBookOptions {
             spread_size_exponent: SPREAD_SIZE_EXPONENT,
             levels: BOOK_LEVELS,
             resting_orders: Vec::new(),
+            ladder_tick_spacing: false,
+            vix_slope: 0.0,
         }
     }
 }
@@ -382,7 +409,7 @@ fn fill_live_book(company: &CompanyMicrostructure, options: &LiveBookOptions, bo
 
     let spread_bps = compute_spread_bps_with(
         company, options.vix, options.difficulty,
-        options.spread_size_smoothness, options.spread_size_exponent);
+        options.spread_size_smoothness, options.spread_size_exponent, options.vix_slope);
     let base_size = base_quote_size(company);
     LADDER.with(|cell| {
         // The ladder, quoted into this thread's two reused buffers.
@@ -403,8 +430,9 @@ fn fill_live_book(company: &CompanyMicrostructure, options: &LiveBookOptions, bo
                 ..QuoteParams::default()
             },
             levels: options.levels,
-            // `levelStep` is likewise omitted upstream, defaulting to 0.5.
-            level_step: 0.5,
+            // `levelStep` is likewise omitted upstream, defaulting to 0.5. A
+            // tick-spaced ladder passes 0.0, so the step is its one-cent floor.
+            level_step: if options.ladder_tick_spacing { 0.0 } else { 0.5 },
         }, bids, asks);
 
         // `quote_ladder_into` emits both sides best-first, so append straight on
@@ -548,6 +576,32 @@ pub struct SettleOptions {
     /// the unbounded-depth arm. Values between the two are arithmetic that
     /// works and nothing measures.
     pub depth_multiplier: f64,
+    /// Space the maker's ladder one tick apart after the touch
+    /// (`ModelParams::maker_ladder_tick_spacing`). `false`, what ships, keeps
+    /// the legacy spacing of half a spread (`level_step` 0.5) and quotes the
+    /// book exactly as before. `true` passes `level_step` 0.0, so
+    /// `quote_ladder_into`'s step is its one-cent floor: the touch, the sizes
+    /// and the number of levels are unchanged, only the gaps behind it.
+    /// The tick sets it from either `maker_ladder_tick_spacing` or
+    /// `market_ladder_tick_spacing`; only the first reaches the agent book.
+    pub ladder_tick_spacing: bool,
+    /// The stock quote's VIX slope (`ModelParams::quote_spread_vix_slope`),
+    /// passed to the settlement's book. 0.0, what ships, is the shipped
+    /// `1 / 30`.
+    pub vix_slope: f64,
+    /// Keep every agent's resting order in the settlement book
+    /// (`ModelParams::book_settle_every_order`).
+    ///
+    /// The settlement book keeps [`MAX_DEPTH_PER_SIDE`] orders a side and
+    /// trims the worst-priced. The ladder alone never reaches that, but
+    /// agents' resting orders can: more than 32 at or inside the ladder's
+    /// prices push the rest, and the maker's deeper levels, out of the book
+    /// for the tick, so a slice that would have filled them stops short.
+    /// True widens this settlement's cap by the number of resting orders,
+    /// so nothing posted is trimmed. Read only when there are resting
+    /// orders; `false`, the default and every preset, is the cap as it
+    /// stood. No draw either way.
+    pub keep_every_resting_order: bool,
 }
 
 impl Default for SettleOptions {
@@ -559,6 +613,9 @@ impl Default for SettleOptions {
             spread_size_smoothness: 0.0,
             spread_size_exponent: SPREAD_SIZE_EXPONENT,
             depth_multiplier: 1.0,
+            ladder_tick_spacing: false,
+            vix_slope: 0.0,
+            keep_every_resting_order: false,
         }
     }
 }
@@ -764,6 +821,8 @@ fn settle_inner(
             spread_size_exponent: options.spread_size_exponent,
             levels: levels_needed,
             resting_orders: Vec::new(),
+            ladder_tick_spacing: options.ladder_tick_spacing,
+            vix_slope: options.vix_slope,
         },
         book,
     );
@@ -790,6 +849,14 @@ fn settle_inner(
             book.asks.last().map(|o| o.price),
         ))
     };
+
+    // `book_settle_every_order`: room for every resting order beside the
+    // ladder, which is at most `BOOK_LEVELS` a side, so posting them trims
+    // nothing. A branch, off on every preset; `reset` puts the cap back for
+    // the next settlement on this thread.
+    if options.keep_every_resting_order && !resting.is_empty() {
+        book.cap = MAX_DEPTH_PER_SIDE + resting.len();
+    }
 
     // Agents' resting orders, after the guard so no guard reads them. A
     // crossed order trades here, at the ladder's prices, before any flow.
@@ -935,6 +1002,57 @@ fn settle_inner(
 mod tests {
     use super::*;
     use crate::rng::GameRng;
+
+    /// `maker_ladder_tick_spacing`: on, the maker's levels behind the touch
+    /// sit one cent apart; the touch, the sizes and the number of levels are
+    /// as the shipped ladder has them. Off is the default and quotes as before.
+    #[test]
+    fn the_quote_vix_slope_is_the_shipped_rule_at_zero_and_scales_off_it() {
+        for vix in [5.0, 15.0, 15.0001, 22.7, 30.88325108, 45.0, 82.69] {
+            assert_eq!(vix_spread_multiplier_with(vix, 0.0).to_bits(), vix_spread_multiplier(vix).to_bits(),
+                       "slope 0 is the shipped rule to the bit at VIX {vix}");
+            let on = vix_spread_multiplier_with(vix, 0.05);
+            assert_eq!(on.to_bits(), (1.0 + mathx::max(0.0, (vix - 15.0) * 0.05)).to_bits());
+            assert!(on >= vix_spread_multiplier(vix) || vix <= 15.0);
+        }
+        assert_eq!(vix_spread_multiplier_with(10.0, 0.05), 1.0, "no widening below VIX 15");
+        assert!((vix_spread_multiplier_with(35.0, 0.05) - 2.0).abs() < 1e-12);
+        let c = company();
+        for vix in [12.0, 25.0, 40.0] {
+            assert_eq!(compute_spread_bps_with(&c, vix, None, 0.0, SPREAD_SIZE_EXPONENT, 0.0).to_bits(),
+                       compute_spread_bps(&c, vix, None).to_bits(), "slope 0 leaves the spread unchanged");
+        }
+        assert!(compute_spread_bps_with(&c, 40.0, None, 0.0, SPREAD_SIZE_EXPONENT, 0.06)
+                > compute_spread_bps(&c, 40.0, None));
+    }
+
+    #[test]
+    fn a_tick_spaced_ladder_moves_only_the_gaps_behind_the_touch() {
+        let legacy = build_live_book(&company(), &LiveBookOptions::default());
+        let ticked = build_live_book(&company(), &LiveBookOptions {
+            ladder_tick_spacing: true,
+            ..Default::default()
+        });
+        assert_eq!(legacy.asks.len(), ticked.asks.len());
+        assert_eq!(legacy.bids.len(), ticked.bids.len());
+        assert_eq!(legacy.best_ask(), ticked.best_ask());
+        assert_eq!(legacy.best_bid(), ticked.best_bid());
+        for (side_l, side_t) in [(&legacy.asks, &ticked.asks), (&legacy.bids, &ticked.bids)] {
+            for (l, t) in side_l.iter().zip(side_t.iter()) {
+                assert_eq!(l.quantity, t.quantity, "sizes are the shipped ladder's");
+            }
+            for w in side_t.windows(2) {
+                let gap = ((w[1].price - w[0].price).abs() * 100.0).round() / 100.0;
+                assert_eq!(gap, 0.01, "one tick between levels: {:?} {:?}", w[0].price, w[1].price);
+            }
+            // The legacy ladder's gaps are half a spread, wider than a tick here.
+            let legacy_gap = (side_l[1].price - side_l[0].price).abs();
+            assert!(legacy_gap > 0.011, "the legacy gap {legacy_gap} should exceed a tick on this name");
+        }
+        // The settlement's option carries the switch to the same book.
+        assert!(!SettleOptions::default().ladder_tick_spacing);
+        assert!(!LiveBookOptions::default().ladder_tick_spacing);
+    }
 
     fn company() -> CompanyMicrostructure {
         CompanyMicrostructure {
@@ -1551,6 +1669,51 @@ mod tests {
         settle_price_through_book_with_orders(
             &company(), 99.0, 20_000.0, &SettleOptions::default(), &orders, &mut rng);
         assert_eq!(draws_consumed(&before, &rng), 4);
+    }
+
+    /// Forty bids of 100 a cent inside the spread, with every slice selling
+    /// 5,000: the settlement book keeps 32 orders a side, so off, the last
+    /// eight are trimmed with the maker's levels and the flow stops after
+    /// 32; `keep_every_resting_order` fills all forty in the same order, on
+    /// the same four draws.
+    #[test]
+    fn more_than_32_resting_orders_are_trimmed_unless_every_order_is_kept() {
+        let bid = build_live_book(&company(), &LiveBookOptions::default())
+            .best_bid()
+            .unwrap();
+        let orders: Vec<RestingOrder> = (0..40)
+            .map(|k| resting(&format!("a{k}-0"), Side::Buy, bid + 0.01, 100.0))
+            .collect();
+        let filled = |keep: bool| {
+            let (_, fills) = settle_price_through_book_with_orders(
+                &company(), 99.0, 20_000.0,
+                &SettleOptions { keep_every_resting_order: keep, ..SettleOptions::default() },
+                &orders, &mut Fixed([0.9, 0.9, 0.9, 0.9], 0));
+            fills.iter().map(|f| f.agent.clone()).collect::<Vec<_>>()
+        };
+        let off = filled(false);
+        assert_eq!(off.len(), MAX_DEPTH_PER_SIDE);
+        let on = filled(true);
+        assert_eq!(on, (0..40).map(|k| format!("a{k}")).collect::<Vec<_>>());
+        assert_eq!(off[..], on[..MAX_DEPTH_PER_SIDE]);
+        for keep in [false, true] {
+            let mut rng = GameRng::from_seed(42);
+            let before = rng.clone();
+            settle_price_through_book_with_orders(
+                &company(), 99.0, 20_000.0,
+                &SettleOptions { keep_every_resting_order: keep, ..SettleOptions::default() },
+                &orders, &mut rng);
+            assert_eq!(draws_consumed(&before, &rng), 4);
+        }
+        // Off with no orders, the switch reads nothing.
+        let mut a = GameRng::from_seed(3);
+        let mut b = GameRng::from_seed(3);
+        let x = settle_price_through_book(&company(), 101.0, 10_000.0, &SettleOptions::default(), &mut a);
+        let y = settle_price_through_book(
+            &company(), 101.0, 10_000.0,
+            &SettleOptions { keep_every_resting_order: true, ..SettleOptions::default() }, &mut b);
+        assert_eq!(x, y);
+        assert_eq!(a, b);
     }
 
     /// A slice smaller than the order fills it in part; the next slice

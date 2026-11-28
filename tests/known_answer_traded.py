@@ -67,13 +67,14 @@ HERE = Path(__file__).resolve().parent
 #: own values, an agent or the scoring re-bases the baseline without bumping
 #: it (see the module text). 2 at 0.10.0, when the run moved from pt-v20 to
 #: pt-v21 with the default, so the traded path the default ships (its
-#: impact memory and order-flow laws) is in the cross-target comparison.
-TRADED_KAT_VERSION = 2
+#: impact memory and order-flow laws) is in the cross-target comparison. 3
+#: at 0.11.0, when it moved to pt-v22 with the default.
+TRADED_KAT_VERSION = 3
 
 SEED = 20260930
 #: Seeds the random baseline only (see `reference_agents`).
 AGENT_SEED = 5
-PRESET = "pt-v21"
+PRESET = "pt-v22"
 DAYS = 10
 STEPS_PER_DAY = 6
 TICKS_PER_STEP = 65

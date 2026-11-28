@@ -35,6 +35,8 @@ _OPS = frozenset({
     "list_instrument", "delist",
     # The host's input to the VIX target.
     "set_vix_target_premium", "set_vix_target_floor",
+    # A market-wide earnings write's common factor, for the look-through.
+    "note_market_earnings",
     "draw_uniform", "draw_normal", "record",
     # Agents' orders against the book, and the collection of what they
     # produced.
@@ -42,6 +44,9 @@ _OPS = frozenset({
     # The night session for index futures, between a close and the next
     # open (`night_session_steps`).
     "run_night",
+    # An agent's instruction to exercise a single-name option at the close,
+    # and its withdrawal (`options_names_listed`).
+    "exercise", "cancel_exercise",
 })
 
 
@@ -201,6 +206,8 @@ def apply_log(
             engine.set_vix_target_premium(entry["points"], entry["half_life_sessions"])
         elif op == "set_vix_target_floor":
             engine.set_vix_target_floor(entry["floor"])
+        elif op == "note_market_earnings":
+            engine.note_market_earnings(entry["log_factor"])
         elif op == "tick":
             engine.tick(
                 entry["hour"], entry["minute"], entry["day_of_week"],
@@ -236,6 +243,10 @@ def apply_log(
             engine.take_impacts(entry.get("agent"))
         elif op == "run_night":
             engine.run_night(entry.get("steps"))
+        elif op == "exercise":
+            engine.exercise(entry["agent"], entry["symbol"], entry["quantity"])
+        elif op == "cancel_exercise":
+            engine.cancel_exercise(entry["agent"], entry["symbol"])
 
     return engine
 

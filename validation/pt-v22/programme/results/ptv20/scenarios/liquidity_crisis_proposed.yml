@@ -1,0 +1,42 @@
+# PROPOSED recalibration of the packaged liquidity crisis (pt-v20 work, design
+# repository programme/ptv20-scenario-size.md). Not shipped: the owner decides.
+# Against the packaged file: the VIX goes x3.5 rather than x2.0 (March 2020
+# took it from 14 to 83, x5.8, from a calmer start), and earnings fall 15 per cent over two months
+# and recover over four (S&P 2020 earnings fell further, but the market looked through them). Depth and credit as packaged.
+version: 1
+scenario:
+  name: liquidity_crisis_proposed
+  description: >
+    A funding event with an earnings shock: quoted depth collapses to 40 per
+    cent and the VIX goes three-and-a-half-fold for twenty-five days, credit
+    widens 50 basis points, and earnings fall 15 per cent over two months and
+    recover over the next four.
+  shocks:
+    - target: market.liquidity
+      operation: multiply
+      value: 0.40
+      at: 50
+      duration: 25
+    - target: macro.vix
+      operation: multiply
+      value: 3.5
+      at: 50
+      duration: 25
+    - target: market.earnings
+      operation: multiply
+      value: 0.85
+      at: 50
+      shape: ramp
+      duration: 42
+    - target: market.earnings
+      operation: multiply
+      value: 1.1764706
+      at: 92
+      shape: ramp
+      duration: 84
+  transmission:
+    - target: macro.corporate_yield
+      operation: add
+      value: 0.005
+      at: 50
+      duration: 25

@@ -1,6 +1,7 @@
 # tradefloor
 
-The Rust core of [tradefloor](https://github.com/simoncoombes/tradefloor): a
+The Rust core of [tradefloor](https://github.com/simoncoombes/tradefloor), a
+reproducible evaluation environment for financial AI agents. The crate is a
 deterministic market simulator with a real limit order book.
 
 A seed and a starting state run forward into prices, an order book with
@@ -20,14 +21,15 @@ libm.
   consumed levels, not because a slippage coefficient said so.
 - **Ground truth.** The simulator knows the fair value it computed and the
   macro regime it is in, so both are readable. No real dataset has labels.
-- **Named, frozen model presets.** Coefficients ship as twenty presets,
-  `pt-v1` through `pt-v21` with no `pt-v17`, all selectable and all
-  bit-reproducing. `pt-v21` is the default (`params::DEFAULT_PRESET_NAME`). A
+- **Named, frozen model presets.** Coefficients ship as twenty-one presets,
+  `pt-v1` through `pt-v22` with no `pt-v17`, all selectable and all
+  bit-reproducing. `pt-v22` is the default (`params::DEFAULT_PRESET_NAME`). A
   modified coefficient set fingerprints as `custom-XXXXXXXX` and can never
   present as a shipped one.
 - **A published realism envelope.** A one-year realism table of 19 statistics
-  graded against real-market bands (18 in band for `pt-v21`), and a long-run
-  check of 40 registered rows (all met by `pt-v21` and by `pt-v20`), with the
+  graded against real-market bands (19 in band for `pt-v22`), and a long-run
+  check: 190 gated rows for `pt-v22`, all met, and the 40 registered rows of
+  `pt-v21` and `pt-v20`, all met by both, with the
   misses named as gaps rather than omitted.
   See <https://docs.tradefloor.dev/how-its-measured.html>.
 
@@ -389,6 +391,18 @@ with the parity corpus, `cargo clippy` with warnings as errors, a build on
 the declared minimum Rust (1.83) and `cargo doc` with warnings as errors.
 Before it publishes, `release.yml` packages the crate and runs
 `cargo test --offline` on the package.
+
+The minimum Rust is 1.83. A default build needs nothing more. The `python`
+feature brings in `arrow`, and on Rust 1.83 or 1.84 a fresh resolve of its
+dependencies reaches a `getrandom` that needs Rust 1.85. Resolve with a
+Cargo of 1.84 or later, told to prefer releases your Rust can build, and
+hold two crates back, as the workflow does:
+
+```sh
+CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS=fallback cargo generate-lockfile
+cargo update -p const-random --precise 0.1.18
+cargo update -p const-random-macro --precise 0.1.16
+```
 
 ## Licence
 

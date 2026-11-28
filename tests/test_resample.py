@@ -401,3 +401,52 @@ def test_resample_is_reachable_beside_compare():
     assert tf.resample is resample
     assert tf.Resample is Resample
     assert "resample" in tf.__all__ and "Resample" in tf.__all__
+
+
+# --------------------------------------------------------------------------
+# A market that lists contracts (pt-v22, by name)
+# --------------------------------------------------------------------------
+
+def test_on_pt_v22_the_contracts_reprice_with_the_intervention_and_resample_runs():
+    """pt-v22 lists index, rate and oil futures, options on the names and a
+    margin block. A rate intervention reprices every future the same day (a
+    future prices off the policy rate, and a rate future's underlying IS the
+    rate), so those lines are the intervention's own consequence and the
+    resample is still a controlled one."""
+    fn = Answers()
+    world = World(seed=SEED, universe=universe(), model="pt-v22",
+                  agent=CallableAgentAdapter(fn, mode="live", every=STEPS_PER_DAY),
+                  cash=1_000_000.0, steps_per_day=STEPS_PER_DAY, ticks_per_step=30,
+                  pins={"federal_funds_rate": BASE_RATE, "corporate_bond_yield": 0.055})
+    world.run(days=1)
+    control, shock = world.fork("control", "shock")
+    shock.intervene(federal_funds_rate=SHOCK_RATE)
+    control.run(days=2)
+    shock.run(days=2)
+    probe = resample(control, shock, at=control.fork_step, n=8)
+    assert probe.noise["shock"]["distinct"] == 1
+    assert probe.separation["net"] is not None
+    joined = json.dumps(probe.differing_lines)
+    assert "federal_funds_rate" in joined and "underlying" in joined
+
+
+def test_a_contract_line_is_owned_and_any_other_line_is_not():
+    from tradefloor.counterfactual import _diff  # noqa: PLC0415
+
+    def prompt(price, future, extra=""):
+        return ('{\n  "assets": [\n    {\n      "price": %s\n    }\n  ],\n'
+                '  "futures": [\n    {\n      "price": %s\n    }\n  ],\n'
+                '  "macro": {\n    "federal_funds_rate": 0.04\n  }\n}%s' % (price, future, extra))
+    # The future moved: owned while an intervention touched something.
+    rows = _diff({"prompt": prompt(10, 100)}, {"prompt": prompt(10, 101)}, ["federal_funds_rate"])
+    assert len(rows) == 1
+    # Nothing intervened: the same line is a second difference.
+    with pytest.raises(tf.ValidationError, match="inputs differ"):
+        _diff({"prompt": prompt(10, 100)}, {"prompt": prompt(10, 101)}, [])
+    # A stock's price moved: never owned by a contract section.
+    with pytest.raises(tf.ValidationError, match="inputs differ"):
+        _diff({"prompt": prompt(10, 100)}, {"prompt": prompt(11, 100)}, ["federal_funds_rate"])
+    # Text after the payload belongs to no section.
+    with pytest.raises(tf.ValidationError, match="inputs differ"):
+        _diff({"prompt": prompt(10, 100, "\nnote: a")}, {"prompt": prompt(10, 100, "\nnote: b")},
+              ["federal_funds_rate"])

@@ -1,0 +1,67 @@
+# Runs `evaluate.yml` on this repository, so the reusable workflow is tested
+# where it is written. Two free baselines in examples/ci-selftest/ stand in for
+# a user's agent. One job sets a threshold that holds; the other sets one that
+# fails, with fail-on-threshold off, and a third job checks that it did fail.
+#
+# install-from-source builds tradefloor from this commit: the command under
+# test, `tradefloor ci compare`, is not in a release yet.
+
+name: evaluate self-test
+
+on:
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - python/tradefloor/ci.py
+      - .github/workflows/evaluate.yml
+      - .github/workflows/evaluate-selftest.yml
+      - examples/ci-selftest/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  holds:
+    uses: ./.github/workflows/evaluate.yml
+    with:
+      agent: examples/ci-selftest/candidate.py:make_agent
+      baseline-agent: examples/ci-selftest/baseline.py:make_agent
+      # Both files are new, so the baseline is this commit too.
+      baseline-ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      seeds: "1-3"
+      days: 10
+      companies: 8
+      max-errors: "0"
+      install-from-source: true
+
+  breaches:
+    uses: ./.github/workflows/evaluate.yml
+    with:
+      agent: examples/ci-selftest/candidate.py:make_agent
+      baseline-agent: examples/ci-selftest/baseline.py:make_agent
+      baseline-ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      seeds: "1-3"
+      days: 10
+      companies: 8
+      # Every run draws down, so a limit of zero fails.
+      max-drawdown: "0"
+      install-from-source: true
+      fail-on-threshold: false
+
+  check:
+    needs: [holds, breaches]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: The holding threshold passed and the breached one failed
+        env:
+          HOLDS_RESULT: ${{ needs.holds.result }}
+          HOLDS_PASSED: ${{ needs.holds.outputs.passed }}
+          BREACH_RESULT: ${{ needs.breaches.result }}
+          BREACH_PASSED: ${{ needs.breaches.outputs.passed }}
+        run: |
+          echo "holds: result=$HOLDS_RESULT passed=$HOLDS_PASSED"
+          echo "breaches: result=$BREACH_RESULT passed=$BREACH_PASSED"
+          [ "$HOLDS_RESULT" = "success" ] && [ "$HOLDS_PASSED" = "true" ] \
+            && [ "$BREACH_RESULT" = "success" ] && [ "$BREACH_PASSED" = "false" ]

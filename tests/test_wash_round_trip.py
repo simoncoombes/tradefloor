@@ -92,7 +92,8 @@ def wash_fills(over):
 
 # pt-v21, the default from 0.10.0, sets these; the test after this one
 # holds its values.
-@pytest.mark.parametrize("preset", [p for p in tf.preset_names() if p != "pt-v21"])
+# pt-v22 ships its arm's values, which tests/test_validation.py holds.
+@pytest.mark.parametrize("preset", [p for p in tf.preset_names() if p not in ("pt-v21", "pt-v22")])
 def test_off_on_every_shipped_preset(preset):
     p = tf.ModelParams.from_preset(preset).to_dict()
     assert p["book_cross_at_limit"] == 0.0

@@ -1,0 +1,87 @@
+{
+ "arm": "R22-fixd2RWPD",
+ "rows": {
+  "R3": {
+   "value": -0.13760163784455978,
+   "band": [
+    -0.36,
+    0.03
+   ],
+   "pass": true,
+   "source": "R3 held (restated 2026-10-14)",
+   "last_print": -0.37182431693287427
+  },
+  "SF1": {
+   "value": 1.030659051293843,
+   "band": [
+    0.75,
+    null
+   ],
+   "pass": true,
+   "n": 216,
+   "source": "ratio of medians (gate amended 2026-10-14)",
+   "per_seed_median": 1.043449007639455
+  },
+  "DV1c": {
+   "value": 6.399923976085777,
+   "band": [
+    3.7,
+    7.7
+   ],
+   "pass": true,
+   "n": 270,
+   "source": "median over the gen histories of DV1 less rho_rep, the change in ln(index / TTM reported EPS with v) (item 25, amendments A and E)",
+   "DV1c_agg": 6.311438994852246,
+   "DV1c_chain": 6.010559747695202
+  },
+  "E1": {
+   "value": -0.09143668380356129,
+   "band": [
+    -0.4,
+    -0.046
+   ],
+   "pass": true,
+   "n": 809,
+   "histories": 270,
+   "free_files": 270,
+   "real": -0.17,
+   "source": "pooled median over the gen histories' contractions of the TTM reported EPS's fall (item 25, amendments A and E)",
+   "registered_form_cycle": -0.11216418974749681
+  },
+  "DV1": {
+   "value": 6.025009291520897,
+   "superseded_by": "DV1c (item 7)",
+   "pass": null
+  },
+  "E1 registered": {
+   "value": -0.11307105910784843,
+   "superseded_by": "E1 (item 25)",
+   "pass": null
+  },
+  "PH4": {
+   "value": 0.6678104120056167,
+   "band": [
+    0.574,
+    0.79
+   ],
+   "pass": true,
+   "n": 270,
+   "source": "every seam offset averaged (item 20), on the long run's 270 (grade_all.load_pool)",
+   "offset0": 0.6662391935961779,
+   "grade_all": 0.6662391935961767
+  },
+  "PH4b": {
+   "value": 0.6091258896824869,
+   "band": [
+    0.514,
+    0.781
+   ],
+   "pass": true,
+   "n": 270,
+   "source": "every seam offset averaged (item 20), on the long run's 270 (grade_all.load_pool)",
+   "offset0": 0.6108394332919341,
+   "grade_all": 0.6108394332919341
+  }
+ },
+ "failing": []
+}

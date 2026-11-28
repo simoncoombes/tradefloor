@@ -1,0 +1,18 @@
+{
+ "row": "PH2",
+ "pass": true,
+ "digests": {
+  "sim": {
+   "value": "3a063f0d207bc37b5ade3b23c60f5e358b275507550b7f75f172a8d7cafb075c",
+   "expected": "3a063f0d207bc37b5ade3b23c60f5e358b275507550b7f75f172a8d7cafb075c"
+  },
+  "presets": {
+   "value": "abdfc2bc7a60b74f9412152c5a70598f4b271af9911f3b9497595c9ef124e1e4",
+   "expected": "abdfc2bc7a60b74f9412152c5a70598f4b271af9911f3b9497595c9ef124e1e4"
+  },
+  "pt-v20": {
+   "value": "07ab6e0c1cea8fe42eb5e801afa0c725f7c6e8e6e1e56ba622eaa1efa9577520",
+   "expected": "07ab6e0c1cea8fe42eb5e801afa0c725f7c6e8e6e1e56ba622eaa1efa9577520"
+  }
+ }
+}

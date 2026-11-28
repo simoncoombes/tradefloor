@@ -427,12 +427,14 @@ baseline to regenerate. The combined `sha256` in that file moves with the
 new row.
 
 `tests/known_answer_traded.json` runs the reference agents through
-`evaluate` on the default preset by name, pt-v21 from 0.10.0
-(`TRADED_KAT_VERSION` 2) and pt-v20 before it, so adding a preset leaves it
-where it was until that preset becomes the default. It moves when the
-default preset changes before it ships, when a reference agent changes, or
-when `evaluate` scores differently, and `test_known_answer.py` names the
-agent and the part (orders, fills or scorecard). Re-base it by bumping
+`evaluate` on the default preset by name: pt-v21 from 0.10.0
+(`TRADED_KAT_VERSION` 2), as the script's `PRESET` and the JSON's
+`preset` say, and pt-v20 only in 0.8.5 to 0.9.1 (version 1). So adding a
+preset leaves it where it was until that preset becomes the default. It
+moves when the default preset changes before it ships, when a reference
+agent changes, or when `evaluate` scores differently, and
+`test_known_answer.py` names the agent and the part (orders, fills or
+scorecard). Re-base it by bumping
 `TRADED_KAT_VERSION`, running `python tests/known_answer_traded.py --write`
 and adding a sentence to its note saying what moved. Its `presetRow` must
 equal the default preset's row in `known_answer_presets.json`, so re-basing
@@ -539,6 +541,21 @@ lives at pypi.org, so a relative link like `examples/01-first-simulation.ipynb`
 resolves to `pypi.org/project/tradefloor/examples/...` and 404s. It renders
 correctly on GitHub, so it survived two releases. The test fails on
 any relative link and on any absolute link naming a file that is not there.
+
+The figure at the top of the README is
+`examples/fork-futures/figure/fork-futures-light.svg` and `-dark.svg`, drawn
+from engine output, and each one's caption names the version that drew it.
+After the version bump, regenerate both and commit them:
+
+```
+python examples/fork-futures/fork_futures.py --out examples/fork-futures/figure
+```
+
+`tests/test_fork_futures.py` compares the committed files with a new run only
+when the caption names the installed version, and skips otherwise, so a
+release that forgets this step shows a skip and not a failure. The README
+loads the files from `main` on raw.githubusercontent.com, so the page shows
+the new figure once the release reaches `main`.
 
 ### 7. Determinism gate
 

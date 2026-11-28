@@ -54,7 +54,9 @@ def test_the_statistics_summary_row_counts_what_the_record_holds():
                    if line.startswith("| [The long-run criteria]"))
     assert f"{of} registered rows" in summary, summary
     assert f"{passed} of {of} met" in summary, summary
-    assert f"fails 16 of the {of}" in summary, summary
+    # pt-v19's cell is history: it was scored on the 40 rows pt-v20 and
+    # pt-v21 were graded on, not on the default's set.
+    assert "fails 16 of the 40" in summary, summary
     assert "28" not in summary, summary
     assert f'"{of} of {of}"' in text
 
@@ -69,8 +71,13 @@ def test_the_readme_counts_the_long_run_rows_the_record_holds():
 
 
 def test_model_md_quotes_c9_as_the_record_reads_it():
-    """MODEL.md gave C9 as 0.487 and 0.468; the record reads 0.4836, 0.4239."""
-    exponent, coefficient = row(long_run(), "C9")["value"]
+    """MODEL.md gave C9 as 0.487 and 0.468; the record reads 0.4836, 0.4239.
+    A record written from the grade's verdict holds the pair as the verdict
+    prints it, "exponent / coefficient"."""
+    value = row(long_run(), "C9")["value"]
+    if isinstance(value, str):
+        value = [float(v) for v in value.split("/")]
+    exponent, coefficient = value
     text = flat(read("docs/MODEL.md"))
     quoted = (f"row C9 reads exponent {exponent:.3f} and coefficient "
               f"{coefficient:.3f}")
@@ -99,7 +106,7 @@ def test_the_readme_counts_the_mcp_tools_the_server_registers():
     read_only = source.count("annotations=_READ_ONLY,")
     words = {12: "twelve", 13: "thirteen", 14: "fourteen", 15: "fifteen",
              16: "sixteen", 17: "seventeen", 18: "eighteen", 19: "nineteen",
-             20: "twenty"}
+             20: "twenty", 21: "twenty-one", 22: "twenty-two"}
     text = read("README.md")
     assert (f"| MCP server | {words[count]} tools for a coding agent, "
             f"{words[read_only]} of them read-only") in text
@@ -222,7 +229,7 @@ def test_the_readme_states_cpu_time_as_the_examples_pages_do():
                   "about two minutes", "0.7 seconds"):
         assert stale not in text, stale
     assert "The run takes under five seconds of CPU" in text
-    assert "about forty seconds of CPU" in text
+    assert "about 200 seconds of CPU" in text
 
 
 # ---------------------------------------------------------------------------

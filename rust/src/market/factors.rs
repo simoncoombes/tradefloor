@@ -554,18 +554,27 @@ pub const NEWS_SESSION_TICKS: f64 = 390.0;
 /// complete at the close whatever the half-life: the profile moves WHEN the
 /// move lands, never how much of it lands.
 fn absorbed_component(n: f64, half_life: f64) -> f64 {
+    absorbed_component_over(n, half_life, NEWS_SESSION_TICKS)
+}
+
+/// [`absorbed_component`] over `horizon` ticks rather than the session's
+/// 390: 0 at its start and exactly 1 after `horizon`. An event released
+/// during the session (`news_session_release_share`) is absorbed over what
+/// is left of the session, so it too is complete at the close. At a horizon
+/// of 390 it is the same operations in the same order.
+fn absorbed_component_over(n: f64, half_life: f64, horizon: f64) -> f64 {
     if n <= 0.0 {
         return 0.0;
     }
-    if n >= NEWS_SESSION_TICKS {
+    if n >= horizon {
         return 1.0;
     }
     if half_life == 0.0 {
-        return n / NEWS_SESSION_TICKS;
+        return n / horizon;
     }
     let ln2 = core::f64::consts::LN_2;
     let at = 1.0 - mathx::exp(-ln2 * n / half_life);
-    let full = 1.0 - mathx::exp(-ln2 * NEWS_SESSION_TICKS / half_life);
+    let full = 1.0 - mathx::exp(-ln2 * horizon / half_life);
     at / full
 }
 
@@ -606,6 +615,58 @@ pub fn news_absorption_weight(params: &crate::params::ModelParams,
     let m = minutes_since_open as f64;
     NEWS_SESSION_TICKS
         * (news_absorbed_share(params, m + 1.0) - news_absorbed_share(params, m))
+}
+
+/// When the session's company news is released, as it is on the tape: the
+/// EDGAR acceptance times of the certified forty's 8-Ks without item 2.02
+/// (results of operations), 2014-2025, accepted between 09:30 and 16:00 New
+/// York on a full trading day, counted by half hour of the session. 1,372
+/// filings. 0.6% of them land in the first minute and 4.7% in the first half
+/// hour; the mean is minute 223. Read by `news_session_release_share`.
+pub const NEWS_RELEASE_PROFILE_COUNTS: [f64; 13] =
+    [65.0, 103.0, 85.0, 93.0, 65.0, 79.0, 71.0, 96.0, 110.0, 129.0, 125.0, 235.0, 116.0];
+
+/// The session minute, in [0, 390), at which an event whose release uniform
+/// is `v` in [0, 1) is released under [`NEWS_RELEASE_PROFILE_COUNTS`]: the
+/// profile's inverse, linear within each half hour.
+pub fn news_release_minute(v: f64) -> f64 {
+    let total: f64 = NEWS_RELEASE_PROFILE_COUNTS.iter().sum();
+    let width = NEWS_SESSION_TICKS / NEWS_RELEASE_PROFILE_COUNTS.len() as f64;
+    let target = v.clamp(0.0, 1.0) * total;
+    let mut below = 0.0;
+    for (k, c) in NEWS_RELEASE_PROFILE_COUNTS.iter().enumerate() {
+        if target < below + c {
+            return (k as f64 + (target - below) / c) * width;
+        }
+        below += c;
+    }
+    NEWS_SESSION_TICKS - 1e-9
+}
+
+/// The multiple of `price_impact / 390` the tick at `minutes_since_open`
+/// applies for an endogenous news event released at session minute
+/// `release` (`news_session_release_share`): `390 * (A(m + 1 - r) - A(m -
+/// r))`, with `A` [`news_absorbed_share`] over the `390 - r` minutes left, so
+/// the event prices nothing before its release and all of it by the close.
+/// A release at 0.0 is [`news_absorption_weight`]'s profile. Off the regular
+/// session it is 0.0.
+pub fn news_release_weight(params: &crate::params::ModelParams,
+                           minutes_since_open: i64, release: f64) -> f64 {
+    if !(0..390).contains(&minutes_since_open) {
+        return 0.0;
+    }
+    let m = minutes_since_open as f64;
+    let horizon = NEWS_SESSION_TICKS - release;
+    let share = |n: f64| {
+        let fast = absorbed_component_over(n, params.news_absorption_half_life, horizon);
+        let d = params.news_absorption_drift_share;
+        if d == 0.0 {
+            return fast;
+        }
+        let drift = absorbed_component_over(n, params.news_absorption_drift_half_life, horizon);
+        (1.0 - d) * fast + d * drift
+    };
+    NEWS_SESSION_TICKS * (share(m + 1.0 - release) - share(m - release))
 }
 
 /// The company fields the live factor subset reads.
@@ -773,43 +834,27 @@ pub fn cap_size_multiplier(market_cap: f64) -> f64 {
     }
 }
 
-/// Compute the live factor subset.
-///
-/// `shared_factors` is required rather than optional. The fallback branch in
-/// the original exists for callers that predate shared factors, and the live
-/// tick is not one of them — it always supplies them. Both branches take one
-/// normal draw, so this narrowing cannot change the draw COUNT; it removes a
-/// path the live model never takes.
-///
-/// `params` carries the coefficients that used to be read as consts here
-/// (the runtime seam). Passing
-/// [`crate::params::PT_V1`] reproduces the const build bit for bit: same
-/// values, same operations, same order.
-pub fn calculate_live_factors(
-    company: &FactorCompany,
+/// The news one name takes from a set of events, as `(company_news,
+/// company_news_market)`: an event naming it at full weight, a sector peer's
+/// at the transfer weight, a sector-wide one at `news_sector_weight` and a
+/// market-wide one at `news_market_weight` (the second figure is that last
+/// part alone). The tick's composition ([`calculate_live_factors`]), and the
+/// open's for the news released before it (`news_preopen_share`).
+pub fn news_terms(
+    id: &str,
+    sector: &str,
     news: &[NewsEvent],
-    order_imbalance: f64,
-    volatility_multiplier: f64,
-    shared: &SharedFactors,
+    crisis_spike: f64,
     params: &crate::params::ModelParams,
-    rng: &mut impl crate::rng::Rng,
-) -> LiveFactors {
-    // ── News ──────────────────────────────────────────────────────────────
-    // Company-specific at full weight, a sector PEER's news at the transfer
-    // weight, sector-wide at half, market-wide at 0.3. The branches are
-    // exclusive and ORDERED, and the order carries the meaning: an event
-    // naming this company counts once, as company news, whatever sector it
-    // also carries. The same event reaches OTHER names in that sector
-    // through the peer arm, which is off in every shipped preset — so
-    // before pt-v4 an event with a companyId moved exactly one name.
+) -> (f64, f64) {
     let mut company_news = 0.0;
     let mut company_news_market = 0.0;
     for event in news {
         let impact = truthy(event.price_impact);
-        if event.company_id.as_deref() == Some(company.id.as_str()) {
+        if event.company_id.as_deref() == Some(id) {
             company_news += impact;
         } else if event.company_id.is_some()
-            && event.sector.as_deref() == Some(company.sector.as_str())
+            && event.sector.as_deref() == Some(sector)
         {
             // Information transfer: a surprise at a PEER, not at this name.
             // Before this branch existed the chain fell straight through
@@ -842,7 +887,7 @@ pub fn calculate_live_factors(
             let weight = if params.news_peer_vix_coupling == 0.0 {
                 base
             } else {
-                base * (1.0 + params.news_peer_vix_coupling * shared.crisis_spike)
+                base * (1.0 + params.news_peer_vix_coupling * crisis_spike)
             };
             // Guarded rather than multiplied through: at zero weight this
             // adds nothing at all, so the accumulator is untouched and the
@@ -851,7 +896,7 @@ pub fn calculate_live_factors(
             if weight != 0.0 {
                 company_news += impact * weight;
             }
-        } else if event.sector.as_deref() == Some(company.sector.as_str())
+        } else if event.sector.as_deref() == Some(sector)
             && event.company_id.is_none()
         {
             company_news += impact * params.news_sector_weight;
@@ -860,6 +905,40 @@ pub fn calculate_live_factors(
             company_news_market += impact * params.news_market_weight;
         }
     }
+    (company_news, company_news_market)
+}
+
+/// Compute the live factor subset.
+///
+/// `shared_factors` is required rather than optional. The fallback branch in
+/// the original exists for callers that predate shared factors, and the live
+/// tick is not one of them — it always supplies them. Both branches take one
+/// normal draw, so this narrowing cannot change the draw COUNT; it removes a
+/// path the live model never takes.
+///
+/// `params` carries the coefficients that used to be read as consts here
+/// (the runtime seam). Passing
+/// [`crate::params::PT_V1`] reproduces the const build bit for bit: same
+/// values, same operations, same order.
+pub fn calculate_live_factors(
+    company: &FactorCompany,
+    news: &[NewsEvent],
+    order_imbalance: f64,
+    volatility_multiplier: f64,
+    shared: &SharedFactors,
+    params: &crate::params::ModelParams,
+    rng: &mut impl crate::rng::Rng,
+) -> LiveFactors {
+    // ── News ──────────────────────────────────────────────────────────────
+    // Company-specific at full weight, a sector PEER's news at the transfer
+    // weight, sector-wide at half, market-wide at 0.3. The branches are
+    // exclusive and ORDERED, and the order carries the meaning: an event
+    // naming this company counts once, as company news, whatever sector it
+    // also carries. The same event reaches OTHER names in that sector
+    // through the peer arm, which is off in every shipped preset — so
+    // before pt-v4 an event with a companyId moved exactly one name.
+    let (company_news, company_news_market) = news_terms(
+        company.id.as_str(), company.sector.as_str(), news, shared.crisis_spike, params);
 
     // ── Order flow ────────────────────────────────────────────────────────
     // `order_imbalance` is already participation: flow over this name's
@@ -1792,6 +1871,11 @@ mod tests {
             // pt-v18 switched the recentring on; pt-v19 is built on pt-v18
             // and pt-v20 on pt-v19, and both inherit it. Every preset before
             // pt-v18 must read 0.0. pt-v21 (0.10.0) is built on pt-v20.
+            // pt-v22's values are its arm's, which `PT_V22_DIGEST_PREFIX`
+            // and tests/test_validation.py hold as a whole.
+            if *name == "pt-v22" {
+                continue;
+            }
             if matches!(*name, "pt-v18" | "pt-v19" | "pt-v20" | "pt-v21") {
                 assert_eq!(p.market_beta_down_asym_recentre, 1.0, "{name}");
                 continue;
@@ -2321,6 +2405,11 @@ mod tests {
         // still runs the clamped linear law.
         for name in crate::params::ModelParams::preset_names() {
             let p = crate::params::ModelParams::preset(name).expect("named");
+            // pt-v22's values are its arm's, which `PT_V22_DIGEST_PREFIX`
+            // and tests/test_validation.py hold as a whole.
+            if *name == "pt-v22" {
+                continue;
+            }
             let want = if *name == "pt-v21" { 1.0 } else { 0.0 };
             assert_eq!(p.order_flow_impact_law, want, "{name}");
         }
@@ -2742,6 +2831,11 @@ mod tests {
         // preset before it divides twice.
         for name in crate::params::ModelParams::preset_names() {
             let p = crate::params::ModelParams::preset(name).expect("named");
+            // pt-v22's values are its arm's, which `PT_V22_DIGEST_PREFIX`
+            // and tests/test_validation.py hold as a whole.
+            if *name == "pt-v22" {
+                continue;
+            }
             let want = if *name == "pt-v21" { 1.0 } else { 0.0 };
             assert_eq!(p.order_flow_depth_law, want, "{name}");
         }

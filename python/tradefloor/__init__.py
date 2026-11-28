@@ -17,7 +17,7 @@ import json
 from typing import Any, Iterable, Sequence
 
 from . import _core
-from .portfolio import Cancel, Limit, Portfolio, Position
+from .portfolio import Cancel, Exercise, Limit, Portfolio, Position
 from . import harness as _harness
 from . import universe_util as _universe_util
 from .harness import Agent, History, Observation, Scorecard, evaluate, leaderboard
@@ -31,6 +31,7 @@ from .records import preset_record, available as preset_records
 from . import atlas
 from . import baselines
 from . import tca
+from . import contracts
 from . import scenario as _scenario_mod
 from . import facts
 from . import loss
@@ -161,7 +162,7 @@ __all__ = [
     "MatchResult", "ModelParams", "News", "NewsImpact", "OrderBook",
     "OrderError", "PriceLevel",
     "SweepCost", "TickResult", "Universe", "ValidationError", "FlowImpact",
-    "flow_impact", "Portfolio", "Position", "Limit", "Cancel", "Agent", "History", "Observation",
+    "flow_impact", "Portfolio", "Position", "Limit", "Cancel", "Exercise", "Agent", "History", "Observation",
     "sandbox", "MarketView", "HiddenState", "PortfolioView", "SandboxError",
     "Scorecard", "evaluate", "leaderboard", "replay", "edgar",
     "baselines", "reference_agents", "capture_ratio", "capture_withheld",

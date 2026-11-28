@@ -1,0 +1,6 @@
+# The registration's own files, from the design repository at its commit, bce2dbb8. Columns: the
+# file's sha256, the commit it was read from, and its path in this folder.
+88230b8d9ba75c85a921d2bfd63e9a60d5b31222e1b9957718956e315ad772cd  bce2dbb8  programme/ptv22-registration-23-DRAFT.md
+56ef4093b1620d5a2a650730edf523cecea1631a0ccc379ea80d9e2929687e4e  bce2dbb8  programme/r13reg/arms/arm-R22-fixd2RWPD.txt
+1959f640da1116ceefbf1ade9d9591b5c7a2efd9f69b2928326ba552516df4ef  bce2dbb8  programme/r13reg/grade-seeds.json
+c49f477ebaaa2e02d7ad8646d35d15bdf16f2df849c873ae868c3eda579a0b38  bce2dbb8  programme/r13reg/grade19/MANIFEST19.json

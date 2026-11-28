@@ -37,7 +37,7 @@ def engine(gain, **extra):
 # which the test below holds. Was parametrized over every preset.
 # pt-v21 (0.10.0) inherits pt-v20's value, so it leaves this list too.
 @pytest.mark.parametrize("preset", [p for p in tf.preset_names()
-                                    if p not in ("pt-v20", "pt-v21")])
+                                    if p not in ("pt-v20", "pt-v21", "pt-v22")])
 def test_off_on_every_shipped_preset(preset):
     assert tf.ModelParams.from_preset(preset).to_dict()["fair_value_vix_discount"] == 0.0
 
@@ -151,7 +151,8 @@ def test_the_smoothed_discount_moves_prices_less_on_the_day_than_the_direct_one(
 
 # pt-v21, the default from 0.10.0, sets these; the test after this one
 # holds its values.
-@pytest.mark.parametrize("preset", [p for p in tf.preset_names() if p != "pt-v21"])
+# pt-v22 ships its arm's values, which tests/test_validation.py holds.
+@pytest.mark.parametrize("preset", [p for p in tf.preset_names() if p not in ("pt-v21", "pt-v22")])
 def test_the_release_half_life_is_off_on_every_shipped_preset(preset):
     assert tf.ModelParams.from_preset(preset).to_dict()["fair_value_vix_release_half_life"] == 0.0
 

@@ -1,0 +1,9 @@
+  R3     -0.137602  pass  (R3 held (restated 2026-10-14))
+  SF1      1.03066  pass  (ratio of medians (gate amended 2026-10-14))
+  DV1c     6.39992  pass  (median over the gen histories of DV1 less rho_rep, the change in ln(index / TTM reported EPS with v) (item 25, amendments A and E))
+  E1    -0.0914367  pass  (pooled median over the gen histories' contractions of the TTM reported EPS's fall (item 25, amendments A and E))
+  DV1      6.02501  superseded, reported  ()
+  E1 registered  -0.113071  superseded, reported  ()
+  PH4      0.66781  pass  (every seam offset averaged (item 20), on the long run's 270 (grade_all.load_pool))
+  PH4b    0.609126  pass  (every seam offset averaged (item 20), on the long run's 270 (grade_all.load_pool))
+PASS: the amended rows; failing none

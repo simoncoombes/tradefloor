@@ -1,0 +1,55 @@
+# PROPOSED recalibration of the packaged recession scenario (pt-v20 work,
+# design repository programme/ptv20-scenario-size.md). Not shipped: the owner
+# decides. Against the packaged file: the growth shock is a level rather than
+# a shift (a shift refused 3 seeds of 30 when the chain was already near the
+# floor), the VIX response is x3.0 rather than x1.5 (2008-09 took the VIX from
+# 26 to 81, x3.2), and earnings fall 40 per cent over four quarters, stay down
+# two, and recover over four (S&P operating earnings, 2008-09).
+version: 1
+scenario:
+  name: recession_proposed
+  description: >
+    A downturn with an earnings recession: the cycle turns to contraction on
+    day 50, growth is held at -2 per cent, the VIX triples for sixty days,
+    credit widens 150 basis points, and every company's earnings fall 40 per
+    cent over four quarters, stay there two, and recover over four.
+  shocks:
+    - target: macro.cycle
+      operation: set
+      value: contraction
+      at: 50
+      shape: permanent
+    - target: macro.growth
+      operation: set
+      value: -0.02
+      at: 50
+      shape: permanent
+    - target: market.earnings
+      operation: multiply
+      value: 0.60
+      at: 50
+      shape: ramp
+      duration: 252
+    - target: market.earnings
+      operation: multiply
+      value: 1.0
+      at: 302
+      shape: hold
+      duration: 126
+    - target: market.earnings
+      operation: multiply
+      value: 1.6666667
+      at: 428
+      shape: ramp
+      duration: 252
+  transmission:
+    - target: macro.vix
+      operation: multiply
+      value: 3.0
+      at: 50
+      duration: 60
+    - target: macro.corporate_yield
+      operation: add
+      value: 0.015
+      at: 50
+      shape: permanent

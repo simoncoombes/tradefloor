@@ -220,9 +220,112 @@ pub fn accrual_for(p: &ModelParams, state: &DividendState, close: f64, k: i64) -
     d * k as f64 / DIVIDEND_PERIOD as f64
 }
 
+/// One ex-date ahead of a session, as [`lookahead`] sees it.
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
+pub struct Upcoming {
+    /// The session whose open the amount goes ex at.
+    pub ex_day: i64,
+    /// The amount per share.
+    pub amount: f64,
+    /// Whether the amount has been declared. A declared amount is what will
+    /// be paid; an undeclared one is the rule's projection.
+    pub declared: bool,
+}
+
+/// The name's ex-dates after session `day`, up to and including session
+/// `through_day`, with their amounts: what an American option's pricer reads
+/// (`derivatives::american`).
+///
+/// The next amount is the declared one once the declaration session has
+/// passed (inside [`DECLARATION_LEAD`] sessions of the ex-date), and
+/// otherwise the amount the rule would declare at a close of `close` on
+/// today's state, as [`accrual_for`] reads it. Each later amount is the
+/// rule applied again to the one before, the EMA of closes and the close
+/// held where they are today: the Lintner path toward the target yield on
+/// today's EMA. So the projection reads only the name's past closes and its
+/// public target yield, as the declaration does, and takes no draw.
+///
+/// `day` is the session being priced at, after its open has applied the
+/// ex-dates: an amount that went ex at `day`'s own open is gone from the
+/// price and is not in the list. Empty for a name without a state or with
+/// a zero target yield (a non-payer).
+pub fn lookahead(
+    p: &ModelParams,
+    ticker: &str,
+    state: Option<&DividendState>,
+    day: i64,
+    close: f64,
+    through_day: i64,
+) -> Vec<Upcoming> {
+    let state = match state {
+        Some(s) if s.target_yield > 0.0 => *s,
+        _ => return Vec::new(),
+    };
+    let mut out = Vec::new();
+    let mut ex_day = day + DIVIDEND_PERIOD - sessions_since_ex(ticker, day);
+    let mut declared = state.declared;
+    let mut amount = if declared { state.amount } else { declare(p, &state, close) };
+    while ex_day <= through_day {
+        out.push(Upcoming { ex_day, amount, declared });
+        let next = DividendState { amount, ..state };
+        amount = declare(p, &next, close);
+        declared = false;
+        ex_day += DIVIDEND_PERIOD;
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_lookahead_reads_the_declared_amount_then_projects() {
+        let mut p = ModelParams::pt_v1();
+        p.dividend_payout_share = 1.0;
+        let ticker = "ACME";
+        let ph = phase_for(ticker);
+        let s = DividendState {
+            payout: 0.5,
+            target_yield: 0.02,
+            price_ema: 100.0,
+            amount: 0.3,
+            declared: true,
+            accrual: 0.0,
+            paid_today: 0.0,
+        };
+        // Ten sessions before an ex-date, inside the declaration lead.
+        let day = ph + 63 * 4 - 10;
+        let ahead = lookahead(&p, ticker, Some(&s), day, 100.0, day + 140);
+        assert_eq!(ahead.len(), 3);
+        assert_eq!(ahead[0], Upcoming { ex_day: day + 10, amount: 0.3, declared: true });
+        // The projection moves toward the target of 0.5 a quarter.
+        let second = declare(&p, &DividendState { amount: 0.3, ..s }, 100.0);
+        assert_eq!(ahead[1], Upcoming { ex_day: day + 73, amount: second, declared: false });
+        assert!(ahead[1].amount > 0.3 && ahead[2].amount > ahead[1].amount && ahead[2].amount < 0.5);
+        // Before the declaration, the first amount is the rule's on today's
+        // state, which is what fair value accrues.
+        let early = DividendState { declared: false, ..s };
+        let day = ph + 63 * 4 - 40;
+        let ahead = lookahead(&p, ticker, Some(&early), day, 100.0, day + 40);
+        assert_eq!(ahead.len(), 1);
+        assert_eq!(ahead[0].amount, declare(&p, &early, 100.0));
+        assert!(!ahead[0].declared);
+        // On an ex-date the amount paid at the open is gone; the next is a
+        // quarter away.
+        let day = ph + 63 * 4;
+        let ahead = lookahead(&p, ticker, Some(&early), day, 100.0, day + 63);
+        assert_eq!(ahead.len(), 1);
+        assert_eq!(ahead[0].ex_day, day + 63);
+        // The window is inclusive of `through_day`, and empty before the
+        // next ex-date.
+        assert!(lookahead(&p, ticker, Some(&early), day, 100.0, day + 62).is_empty());
+        // A non-payer and a name without a state have no dividends.
+        let none = DividendState { target_yield: 0.0, ..s };
+        assert!(lookahead(&p, ticker, Some(&none), day, 100.0, day + 500).is_empty());
+        assert!(lookahead(&p, ticker, None, day, 100.0, day + 500).is_empty());
+    }
 
     #[test]
     fn the_phase_is_in_range_and_follows_the_ticker() {

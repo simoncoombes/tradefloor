@@ -349,7 +349,9 @@ def test_every_packaged_scenario_moves_the_indices_the_way_it_says(name):
     scenario = tf.Scenario.load(name)
     corporate = [i for i in scenario.interventions
                  if i.target == "macro.corporate_yield"]
-    first = min(i.at for i in (corporate or scenario.interventions))
+    spread = [i for i in scenario.interventions
+              if i.target == "macro.corporate_spread"]
+    first = min(i.at for i in (corporate or spread or scenario.interventions))
     shocked = _scenario_run(scenario, first + 2)
     base = _scenario_run(None, first + 2)
     for closes in (shocked, base):
@@ -371,6 +373,18 @@ def test_every_packaged_scenario_moves_the_indices_the_way_it_says(name):
         expected = -7.0 * dy + 50.0 * dy * dy
         assert expected - 0.01 < move("IGCORP") < expected + 0.005, (name, move("IGCORP"))
         assert abs(move("UST10Y")) < 1e-3 and abs(move("UST2Y")) < 1e-3
+    elif spread:
+        # A scenario that widens credit on the spread over the 10-year: on
+        # the first day of its first spread write the corporate yield rises
+        # by that day's step (a ramp's value over its duration), the
+        # corporate index falls by about D * dy, and the treasuries, which
+        # the spread sits on, don't move.
+        w = spread[0]
+        dy = w.value / w.duration if w.shape == "ramp" else w.value
+        assert dy > 0, name
+        expected = -7.0 * dy + 50.0 * dy * dy
+        assert abs(move("IGCORP") - expected) < 0.1 * abs(expected), (name, move("IGCORP"))
+        assert abs(move("UST10Y")) < 1e-5 and abs(move("UST2Y")) < 1e-5
     else:
         pytest.fail(f"{name} writes no rate; say what it does to the indices")
 
@@ -711,3 +725,17 @@ def test_accrue_is_one_days_interest_at_the_policy_rate():
     assert p.accrue(e) == pytest.approx(1000.0 * rate)
     assert p.interest == pytest.approx(1000.0 * rate)
     assert tf.Portfolio(cash=252_000.0).accrue(e) == 0.0
+
+
+def test_a_pt_v22_snapshot_with_the_bonds_restores_and_hashes_like_its_twin():
+    """test_a_snapshot_restores_the_bonds_and_hashes_like_its_twin on pt-v22
+    by name, whose economy carries two fields more."""
+    u = universe()
+    a = _driven(tf.Engine(seed=6, universe=u, model="pt-v22"), days=2)
+    a.open_market()
+    a.run_session(9, 30, 3, 50, fills={"UST10Y": (30_000.0, 0.0)})
+    snap = a.state_snapshot()
+    assert manifest.state_hash(snap) == a.state_hash()
+    b = tf.Engine(seed=6, universe=u, model="pt-v22")
+    b.restore_state(snap)
+    assert b.state_hash() == a.state_hash()

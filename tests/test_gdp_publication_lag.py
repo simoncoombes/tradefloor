@@ -90,7 +90,7 @@ def expected(true, q, lag):
 # which the test below holds. Was parametrized over every preset.
 # pt-v21 (0.10.0) inherits pt-v20's value, so it leaves this list too.
 @pytest.mark.parametrize("preset", [p for p in tf.preset_names()
-                                    if p not in ("pt-v20", "pt-v21")])
+                                    if p not in ("pt-v20", "pt-v21", "pt-v22")])
 def test_off_on_every_shipped_preset(preset):
     """0.0 on every preset: the growth reported is the growth the economy
     runs at, a pin reads straight back, and the snapshot carries no state."""

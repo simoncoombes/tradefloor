@@ -1,0 +1,787 @@
+{
+ "arm": "R22-fixd2RWPD",
+ "histories": {
+  "ptv22fut": 270,
+  "ptv22traded": 270,
+  "ptv22mp metaorder": 30,
+  "ptv22mp push": 30,
+  "ptv22chain": 270,
+  "ptv22names": 270
+ },
+ "rf5": "63,126",
+ "stages_on": [
+  "ptv22chain",
+  "ptv22fut",
+  "ptv22names",
+  "ptv22traded"
+ ],
+ "rows": {
+  "IF1": {
+   "value": 3.7183188603459607,
+   "low": 1.209256369040696,
+   "high": 6.267280393713019,
+   "rule": "fixed",
+   "pass": true,
+   "gated": true
+  },
+  "IF2": {
+   "value": 0.4154337249734389,
+   "low": 0.12666979481012236,
+   "high": 0.7158637407060751,
+   "rule": "fixed",
+   "pass": true,
+   "gated": true
+  },
+  "IF3": {
+   "value": 0.0,
+   "low": 0.0,
+   "high": 1e-12,
+   "rule": "construction",
+   "pass": true,
+   "gated": true
+  },
+  "NS1": {
+   "value": 0.4695905020824342,
+   "low": 0.3,
+   "high": 0.6,
+   "rule": "adopted G1c",
+   "pass": true,
+   "gated": true
+  },
+  "NS2": {
+   "value": 3.6460631943807553,
+   "low": 0.0,
+   "high": 6.267280393713019,
+   "rule": "construction, IF1's ceiling",
+   "pass": true,
+   "gated": true
+  },
+  "RF1_m1": {
+   "value": 1.4162412844792966,
+   "low": -0.06952594939365819,
+   "high": 2.623654510985814,
+   "rule": "2se",
+   "pass": true,
+   "gated": true
+  },
+  "RF1_m3": {
+   "value": 11.206099461109279,
+   "low": 3.5,
+   "high": 17.5,
+   "rule": "literature",
+   "pass": true,
+   "gated": true
+  },
+  "RF1_m6": {
+   "value": 31.223174120238994,
+   "low": 7.959259259259259,
+   "high": 53.440740740740736,
+   "rule": "literature",
+   "pass": true,
+   "gated": true
+  },
+  "RF2": {
+   "value": 1.3861252360072425,
+   "low": 1.0640643500043467,
+   "high": 3.3203847393738597,
+   "rule": "2se",
+   "pass": true,
+   "gated": true
+  },
+  "RF3": {
+   "value": 0.0,
+   "low": 0.0,
+   "high": 1e-09,
+   "rule": "construction",
+   "pass": true,
+   "gated": true
+  },
+  "RF4": {
+   "value": 18.286937803961607,
+   "low": -160.28077163006793,
+   "high": 70.61151080236596,
+   "rule": "fixed",
+   "pass": true,
+   "gated": true
+  },
+  "RF5": {
+   "value": 0.6874775366109966,
+   "low": 0.0,
+   "high": 2.0,
+   "rule": "construction",
+   "pass": true,
+   "gated": true
+  },
+  "OF1": {
+   "value": 0.440027189888301,
+   "low": 0.3959271859672713,
+   "high": 0.6384679881252253,
+   "rule": "2se",
+   "pass": true,
+   "gated": true
+  },
+  "OF2": {
+   "value": 0.5879865635784399,
+   "low": 0.4429930694932701,
+   "high": 0.6647925684296406,
+   "rule": "2se",
+   "pass": true,
+   "gated": true
+  },
+  "OF3": {
+   "value": 0.8482281891065542,
+   "low": 0.4846874482893982,
+   "high": 1.0629803280985424,
+   "rule": "fixed",
+   "pass": true,
+   "gated": true
+  },
+  "MG1": {
+   "value": 0.010001859822519794,
+   "low": 0.005,
+   "high": 0.015,
+   "rule": "construction (99% scan)",
+   "pass": true,
+   "gated": true
+  },
+  "MG2": {
+   "value": 0.0,
+   "low": 0,
+   "high": 0,
+   "rule": "construction, traded stage",
+   "pass": true,
+   "gated": true
+  },
+  "XD1": {
+   "value": 0.0,
+   "low": null,
+   "high": null,
+   "rule": "C10a bound, traded stage",
+   "pass": true,
+   "gated": true
+  },
+  "XD2": {
+   "value": 0.0,
+   "low": null,
+   "high": null,
+   "rule": "C10a bound, traded stage",
+   "pass": true,
+   "gated": true
+  },
+  "IF4": {
+   "value": 0.16428152432315263,
+   "low": 0.1,
+   "high": 0.21,
+   "rule": "adopted Q6",
+   "pass": true,
+   "gated": true
+  },
+  "XD3": {
+   "value": -625071.5649277072,
+   "low": null,
+   "high": 0.0,
+   "rule": "construction, traded stage",
+   "pass": true,
+   "gated": true
+  },
+  "SS1": {
+   "value": 1.3503620157648148,
+   "low": 1.083418788426055,
+   "high": 1.4069293836624692,
+   "rule": "fixed",
+   "pass": true,
+   "gated": true
+  },
+  "SS2": {
+   "value": 41.615189012372355,
+   "low": 34.124028035683935,
+   "high": 47.655971964316066,
+   "rule": "2se",
+   "pass": true,
+   "gated": true
+  },
+  "SS3": {
+   "value": 0.10892307389469259,
+   "low": -0.07829733333649955,
+   "high": 0.18472002168112248,
+   "rule": "fixed",
+   "pass": true,
+   "gated": true
+  },
+  "SS4": {
+   "value": 8.56895502120668,
+   "low": null,
+   "high": null,
+   "rule": "directional",
+   "pass": true,
+   "gated": true
+  },
+  "EV1": {
+   "value": -0.15114766037842275,
+   "low": -0.39041655541266046,
+   "high": -0.1365739935011931,
+   "rule": "fixed",
+   "pass": true,
+   "gated": true
+  },
+  "EV2": {
+   "value": -0.011418526370954467,
+   "low": -0.062229742638824824,
+   "high": 0.16406715982413414,
+   "rule": "fixed",
+   "pass": true,
+   "gated": true
+  },
+  "EV3": {
+   "value": 1.2918190873246673,
+   "low": 0.7192153275039348,
+   "high": 1.3053076865826405,
+   "rule": "fixed",
+   "pass": true,
+   "gated": true
+  },
+  "MG3": {
+   "value": 4.786829157282651e-05,
+   "low": 0.0,
+   "high": 0.00112,
+   "rule": "2se (tape: the forty, 2015-2025, moves past +-15%), traded stage",
+   "pass": true,
+   "gated": true
+  },
+  "XD5": {
+   "value": 0,
+   "low": null,
+   "high": null,
+   "rule": "as XD4, traded stage",
+   "pass": true,
+   "gated": true
+  },
+  "AX1": {
+   "value": 0,
+   "low": 0,
+   "high": 0,
+   "rule": "construction",
+   "pass": true,
+   "gated": true
+  },
+  "AX2": {
+   "value": 3.725290298461914e-09,
+   "low": 0.0,
+   "high": 0.005,
+   "rule": "construction, traded stage",
+   "pass": true,
+   "gated": true
+  },
+  "OF4": {
+   "value": 2.002697346451327,
+   "low": 0.0,
+   "high": 2.0,
+   "rule": "construction",
+   "pass": false,
+   "gated": false
+  },
+  "SV1": {
+   "value": 1.5006662579253316e-11,
+   "low": 0.0,
+   "high": 0.1,
+   "rule": "construction",
+   "pass": true,
+   "gated": false
+  },
+  "SV2": {
+   "value": 0,
+   "low": 0,
+   "high": 0,
+   "rule": "construction",
+   "pass": true,
+   "gated": false
+  },
+  "SV3": {
+   "value": 1.1208439238906578,
+   "low": 1.1119349770509113,
+   "high": 1.150042679222002,
+   "rule": "2se",
+   "pass": true,
+   "gated": false
+  },
+  "SV4": {
+   "value": 0.10960758377425044,
+   "low": 0.04223044458060209,
+   "high": 0.10888895840447252,
+   "rule": "2se",
+   "pass": false,
+   "gated": false
+  },
+  "SV5_9D": {
+   "value": 0.9367888389890605,
+   "low": 0.9237664912825676,
+   "high": 0.9592299607452444,
+   "rule": "2se",
+   "pass": true,
+   "gated": false
+  },
+  "SV5_6M": {
+   "value": 1.2336736136114386,
+   "low": 1.1804219104501739,
+   "high": 1.2646628485427227,
+   "rule": "2se",
+   "pass": true,
+   "gated": false
+  },
+  "SV5_1Y": {
+   "value": 1.3486099300223113,
+   "low": 1.2219767534914145,
+   "high": 1.3657479830243948,
+   "rule": "2se",
+   "pass": true,
+   "gated": false
+  },
+  "SV6_median": {
+   "value": 119.75747950203163,
+   "low": 117.23878262484884,
+   "high": 122.63121737515117,
+   "rule": "2se",
+   "pass": true,
+   "gated": false
+  },
+  "SV6_sd": {
+   "value": 10.01161164789053,
+   "low": 9.256971596248516,
+   "high": 14.212814682229347,
+   "rule": "2se",
+   "pass": true,
+   "gated": false
+  },
+  "SV7": {
+   "value": -0.36798260644365427,
+   "low": -0.7702911492240678,
+   "high": 0.3735378224974626,
+   "rule": "fixed",
+   "pass": true,
+   "gated": false
+  },
+  "SV8": {
+   "value": 1.2951546122004403,
+   "low": 1.3264348387868303,
+   "high": 1.4286622382624687,
+   "rule": "2se",
+   "pass": false,
+   "gated": false
+  },
+  "SV9": {
+   "value": -4.448522217334986,
+   "low": -5.091868014695722,
+   "high": -3.5101361025506717,
+   "rule": "2se",
+   "pass": true,
+   "gated": false
+  },
+  "OB1r": {
+   "value": -0.09609936746861092,
+   "low": -0.17983131540525282,
+   "high": 0.0891628439374808,
+   "rule": "fixed",
+   "pass": true,
+   "gated": false
+  },
+  "OB1v": {
+   "value": 0.0,
+   "low": 0.4798484845340991,
+   "high": 0.8941669756973236,
+   "rule": "fixed",
+   "pass": false,
+   "gated": false
+  },
+  "OB1d": {
+   "value": 0.0,
+   "low": 0.42634167322491323,
+   "high": 0.9778033434218769,
+   "rule": "fixed",
+   "pass": false,
+   "gated": false
+  },
+  "OB2r": {
+   "value": -0.09609936746861092,
+   "low": -0.17457578540378393,
+   "high": 0.08351267761015645,
+   "rule": "fixed",
+   "pass": true,
+   "gated": false
+  },
+  "OB2v": {
+   "value": 0.0,
+   "low": 0.5465682086013922,
+   "high": 0.8608621114053846,
+   "rule": "fixed",
+   "pass": false,
+   "gated": false
+  },
+  "OB2d": {
+   "value": 0.0,
+   "low": 0.4664910803222973,
+   "high": 0.973090040154942,
+   "rule": "fixed",
+   "pass": false,
+   "gated": false
+  },
+  "OB3r": {
+   "value": -0.09609936746861092,
+   "low": -0.3366083001877864,
+   "high": 0.17504257612260388,
+   "rule": "fixed",
+   "pass": true,
+   "gated": false
+  },
+  "OB3v": {
+   "value": 0.0,
+   "low": 0.1926536179129349,
+   "high": 0.7478503846665557,
+   "rule": "fixed",
+   "pass": false,
+   "gated": false
+  },
+  "OB3d": {
+   "value": 0.0,
+   "low": 0.041722565330268524,
+   "high": 0.9504196336863853,
+   "rule": "fixed",
+   "pass": false,
+   "gated": false
+  },
+  "OB4r": {
+   "value": -0.09609936746861092,
+   "low": -0.38764913328945516,
+   "high": 0.2574463002571552,
+   "rule": "fixed",
+   "pass": true,
+   "gated": false
+  },
+  "OB4v": {
+   "value": 0.0,
+   "low": 0.3897115766958382,
+   "high": 1.1508675812896705,
+   "rule": "fixed",
+   "pass": false,
+   "gated": false
+  },
+  "OB4d": {
+   "value": 0.0,
+   "low": 0.058342549173640124,
+   "high": 1.694050609892213,
+   "rule": "fixed",
+   "pass": false,
+   "gated": false
+  },
+  "OB5": {
+   "value": null,
+   "low": -0.06,
+   "high": -0.015,
+   "rule": "literature",
+   "pass": null,
+   "gated": false
+  },
+  "OB6": {
+   "value": null,
+   "low": null,
+   "high": 0.0,
+   "rule": "signed",
+   "pass": null,
+   "gated": false
+  },
+  "XD4": {
+   "value": null,
+   "low": null,
+   "high": null,
+   "rule": "C10a bound and construction, traded stage",
+   "pass": null,
+   "gated": false
+  },
+  "VF1": {
+   "value": null,
+   "low": 0.7787583552861578,
+   "high": 0.8882714195867544,
+   "rule": "2se",
+   "pass": null,
+   "gated": false
+  },
+  "VF2": {
+   "value": null,
+   "low": 0.6007153456452341,
+   "high": 0.8683928008272288,
+   "rule": "2se",
+   "pass": null,
+   "gated": false
+  },
+  "VF3": {
+   "value": null,
+   "low": 0.6763555505172418,
+   "high": 0.9049362089482371,
+   "rule": "2se",
+   "pass": null,
+   "gated": false
+  },
+  "VF4_F1": {
+   "value": null,
+   "low": 0.5822703853045272,
+   "high": 0.6466837515125627,
+   "rule": "2se",
+   "pass": null,
+   "gated": false
+  },
+  "VF4_F2": {
+   "value": null,
+   "low": 0.36799804516984624,
+   "high": 0.4576279055712781,
+   "rule": "2se",
+   "pass": null,
+   "gated": false
+  },
+  "VF4_F4": {
+   "value": null,
+   "low": 0.23406197833938408,
+   "high": 0.27167832244195217,
+   "rule": "2se",
+   "pass": null,
+   "gated": false
+  },
+  "VF5": {
+   "value": null,
+   "low": -1.6320541510052942,
+   "high": 0.5775469501961309,
+   "rule": "fixed",
+   "pass": null,
+   "gated": false
+  },
+  "VF6_h21": {
+   "value": null,
+   "low": 0.31759253807354126,
+   "high": 1.797961249805247,
+   "rule": "2se",
+   "pass": null,
+   "gated": false
+  },
+  "VF6_h63": {
+   "value": null,
+   "low": 0.5255408449043948,
+   "high": 3.6624454454181867,
+   "rule": "2se",
+   "pass": null,
+   "gated": false
+  },
+  "VF6_h126": {
+   "value": null,
+   "low": 0.8783175386027171,
+   "high": 4.912345122341488,
+   "rule": "2se",
+   "pass": null,
+   "gated": false
+  },
+  "VF7": {
+   "value": null,
+   "low": 0.0,
+   "high": 1e-12,
+   "rule": "construction",
+   "pass": null,
+   "gated": false
+  },
+  "VF8": {
+   "value": 6.941070683296917,
+   "low": 0.0,
+   "high": 2.0,
+   "rule": "construction",
+   "pass": false,
+   "gated": false
+  }
+ },
+ "failing": [],
+ "not_read": [],
+ "verdict": "PASS",
+ "reported": {
+  "XD1": {
+   "idx_basis_rich_out": [
+    -0.16081583934258112,
+    0.45185185185185184
+   ],
+   "idx_basis_long_short": [
+    -4.780635769359311,
+    0.16296296296296298
+   ],
+   "vix_short_contango": 0.0,
+   "vix_calendar_contango": [
+    0.0,
+    0.0
+   ],
+   "oil_long_backwardation": [
+    3.0165376551511063,
+    0.6259259259259259
+   ],
+   "oil_calendar_backwardation": [
+    0.07716150749903766,
+    0.5111111111111111
+   ],
+   "ff_meeting_long": [
+    -0.1923441537249514,
+    0.011111111111111112
+   ],
+   "ff_meeting_short": [
+    -0.19893884596559586,
+    0.022222222222222223
+   ]
+  },
+  "XD3": [
+   "IDX",
+   "hour",
+   0.03
+  ],
+  "EV_events": 860055,
+  "EV_years": 20,
+  "EV_pooled": {
+   "EV1": -0.15118663580550062,
+   "EV2": -0.011548404455112932,
+   "EV3": 1.2895003214415772
+  },
+  "XD5": {
+   "earnings_straddle": {
+    "kind": "c10",
+    "median_excess_pts": -49.8521064802765,
+    "share_ahead": 0.0,
+    "breaks": false
+   },
+   "covered_call": {
+    "kind": "c10",
+    "median_excess_pts": -8.1820949382776,
+    "share_ahead": 0.003703703703703704,
+    "breaks": false
+   },
+   "conversion": {
+    "kind": "lose",
+    "mean_pnl": -306.357575090083,
+    "breaks": false
+   },
+   "reversal": {
+    "kind": "lose",
+    "mean_pnl": -24.854884049048177,
+    "breaks": false
+   },
+   "box": {
+    "kind": "lose",
+    "mean_pnl": -103.6359338873899,
+    "breaks": false
+   },
+   "dividend_capture": {
+    "kind": "lose",
+    "mean_pnl": -713.0260658264995,
+    "breaks": false
+   },
+   "expiry_pin": {
+    "kind": "lose",
+    "mean_pnl": -1275379.7027944827,
+    "breaks": false
+   }
+  },
+  "MG2_options": {
+   "calls": 937,
+   "met": 10,
+   "unmet": 927,
+   "liquidations": 8213,
+   "below_zero": 2,
+   "registered_count": 227,
+   "no_bid_left": 113,
+   "failures": [],
+   "no_bid": [
+    [
+     9429001,
+     "earnings_straddle",
+     610,
+     "AAK.O0623.C7.00 140"
+    ],
+    [
+     9429002,
+     "earnings_straddle",
+     656,
+     "AAF.O0665.C6.00 180"
+    ],
+    [
+     9429006,
+     "earnings_straddle",
+     707,
+     "AAN.O0707.C5.00 167"
+    ],
+    [
+     9429006,
+     "earnings_straddle",
+     981,
+     "AAS.O1001.C2.50 12"
+    ],
+    [
+     9429008,
+     "earnings_straddle",
+     749,
+     "ABL.O0749.C100.00 17"
+    ],
+    [
+     9429016,
+     "earnings_straddle",
+     656,
+     "AAF.O0665.C5.00 180,AAR.O0665.C6.00 200"
+    ],
+    [
+     9429017,
+     "earnings_straddle",
+     978,
+     "AAB.O0980.C9.00 19,ABB.O0980.C4.50 99"
+    ],
+    [
+     9429019,
+     "earnings_straddle",
+     974,
+     "AAR.O0980.C5.00 48,AAH.O0980.P7.00 39,AAC.O0980.C15.00 36"
+    ],
+    [
+     9429020,
+     "earnings_straddle",
+     908,
+     "AAO.O0917.P5.00 5"
+    ],
+    [
+     9429022,
+     "earnings_straddle",
+     719,
+     "AAH.O0728.P5.00 160,AAR.O0728.C3.00 120,AAD.O0728.C5.00 100,AAQ.O0728.P6.00 200,AAI.O0728.C6.00 200,AAK.O0728.P5.00 180"
+    ]
+   ],
+   "read": "item 23 (no risk left)"
+  },
+  "AX1": {
+   "examples": [],
+   "dealer": 0,
+   "agents": {
+    "violations": 0,
+    "early_exercises": 863535,
+    "quotes": 2863594,
+    "max_boundary_gap": 571.2891189382538,
+    "max_euro_shortfall": 0.009227963793364324,
+    "examples": [],
+    "legal_early_reported": 93874,
+    "legal_early_examples": [
+     "271 dividend_capture:AAM:271 exercised AAM.O0287.C70.00: off the boundary: intrinsic 55.7391 under the tree's 55.8302",
+     "281 dividend_capture:AAL:281 exercised AAL.O0287.C28.00: off the boundary: intrinsic 11.6000 under the tree's 11.6136",
+     "283 dividend_capture:AAU:283 exercised AAU.O0287.C100.00: off the boundary: intrinsic 109.4121 under the tree's 109.4446",
+     "287 dividend_capture:ABI:287 exercised ABI.O0308.C27.50: off the boundary: intrinsic 39.4525 under the tree's 39.4980",
+     "334 dividend_capture:AAM:334 exercised AAM.O0350.C75.00: off the boundary: intrinsic 83.1580 under the tree's 83.2674",
+     "344 dividend_capture:AAL:344 exercised AAL.O0350.C29.00: off the boundary: intrinsic 22.2816 under the tree's 22.2975",
+     "346 dividend_capture:AAU:346 exercised AAU.O0350.C100.00: off the boundary: intrinsic 142.9751 under the tree's 143.0116",
+     "350 dividend_capture:ABI:350 exercised ABI.O0371.C27.50: off the boundary: intrinsic 46.1808 under the tree's 46.2335",
+     "397 dividend_capture:AAM:397 exercised AAM.O0413.C115.00: off the boundary: intrinsic 57.5135 under the tree's 57.6820",
+     "407 dividend_capture:AAL:407 exercised AAL.O0413.C25.00: off the boundary: intrinsic 27.2559 under the tree's 27.2696"
+    ]
+   }
+  },
+  "names": {
+   "pins": 129600,
+   "conversions": 129059,
+   "dividend_captures": 862997,
+   "deliveries": 1208739
+  }
+ }
+}

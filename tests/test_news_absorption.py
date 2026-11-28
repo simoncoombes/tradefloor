@@ -162,6 +162,8 @@ NEWS_PRICED = {"pt-v19": dict(news_absorption_half_life=0.6,
 NEWS_PRICED["pt-v20"] = dict(NEWS_PRICED["pt-v19"])
 # pt-v21 (0.10.0) is built on pt-v20 and inherits the same.
 NEWS_PRICED["pt-v21"] = dict(NEWS_PRICED["pt-v19"])
+# pt-v22 is built on pt-v20 and its arm sets none of them.
+NEWS_PRICED["pt-v22"] = dict(NEWS_PRICED["pt-v19"])
 
 
 def test_it_ships_inert_on_every_preset_but_pt_v19():

@@ -78,7 +78,7 @@ from .facts import (CERTIFIED_HORIZON_DAYS, REAL_MARKETS, SEED_SD,
 #: constants below (DECAY_252, DECAY_SLOPE, MEMORY_VALID_TO_LAG, the
 #: structural rows, ROSTER_MEASUREMENT) and the GAPS prose were measured on
 #: pt-v21 on 2026-10-05.
-PRESET = "pt-v21"
+PRESET = "pt-v22"
 
 #: The measurement horizon the envelope certifies, in trading days.
 #: Not a soft preference, and not a band count either. What holds the
@@ -195,10 +195,11 @@ PRESET = "pt-v21"
 #: The row needs `facts.CRISIS_DISPERSION_MIN_SESSIONS` (30) sessions above
 #: `facts.CRISIS_VIX_THRESHOLD` (30.88) inside the window it is read over,
 #: and most 252-day runs of this preset on the certified roster do not hold
-#: them. On the fifth composition (2026-09-23) 4 of the 30 seeds read the
-#: row and 1.2029 is their median; the record's `dispersion["panel_252"]`
-#: carries that count and why each other seed did not read. Four seeds is
-#: thin, so read the count beside the value. On the vector before it the
+#: them. On pt-v22 (the paired run of 2026-11-01) 3 of the 30 seeds read
+#: the row and 1.3177 is their median; the record's `dispersion["panel_252"]`
+#: carries that count and why each other seed did not read. Three seeds is
+#: thin, so read the count beside the value. On the fifth composition
+#: (2026-09-23) 4 of the 30 read it, at a median of 1.2029. On the vector before it the
 #: entry was `None`: the four seeds measured on 2026-09-22 held 0, 1, 0 and
 #: 10 crisis sessions. A preset with no seed that reads the row has NO
 #: certified reading at 252 and the honest entry is
@@ -214,30 +215,30 @@ PRESET = "pt-v21"
 #: is what every caller that GRADES this table reads. `band_distance(None,
 #: ...)` is a TypeError, and a row with no reading has no verdict to give.
 CERTIFIED: dict[str, float | None] = {
-    "annualised_vol_pct": 19.1661,
-    "excess_kurtosis": 6.0075,
-    "return_acf1": -0.0013,
-    "abs_return_acf1": 0.0948,
-    "abs_return_acf5": 0.0204,
-    "abs_return_acf20": 0.0012,
-    "cross_sectional_corr": 0.2798,
+    "annualised_vol_pct": 19.9402,
+    "excess_kurtosis": 6.7198,
+    "return_acf1": -0.0049,
+    "abs_return_acf1": 0.1052,
+    "abs_return_acf5": 0.0281,
+    "abs_return_acf20": 0.0044,
+    "cross_sectional_corr": 0.3115,
     # The two volume rows were re-measured on 2026-10-01 at `ada871e`, after
     # owner decision 1 fixed bar volume (a day bar had read the sum of the
     # day's running totals). Same protocol, roster and seeds; every other
     # row reproduced to the last digit. Before the fix they read 0.5084 and
     # -0.2540. Artefact: tools/presets/results/volume-remeasure-2026-10-01/.
-    "volume_abs_return_corr": 0.5933,
-    "leverage_effect": -0.0410,
-    "volume_change_acf1": -0.2456,
-    "corr_asymmetry": 0.0853,
-    "corr_asymmetry_lagged": 0.1067,
-    "sector_excess_corr": 0.1118,
-    "corr_persistence_acf1": 0.1386,
-    # Read on 4 of the 30 seeds at this preset, with the reason above.
+    "volume_abs_return_corr": 0.5928,
+    "leverage_effect": -0.0434,
+    "volume_change_acf1": -0.2414,
+    "corr_asymmetry": 0.0646,
+    "corr_asymmetry_lagged": 0.0734,
+    "sector_excess_corr": 0.1264,
+    "corr_persistence_acf1": 0.0505,
+    # Read on 3 of the 30 seeds at this preset, with the reason above.
     # Written by `envelope_tables.py` from the record's `panel_252`, which
     # carries the row only when a seed read it; `dispersion["panel_252"]` on
     # the record carries how many of the thirty did and why the rest did not.
-    "crisis_sector_dispersion": 1.2677,
+    "crisis_sector_dispersion": 1.3177,
 }
 
 
@@ -326,10 +327,11 @@ CERTIFIED_LEVEL: dict[str, float] = {
     # spread is wide against the band, so a single seed's first year says
     # almost nothing about the row.
     #
-    # pt-v21, over the 360 seeds of `facts.LEVEL_POOL`: a mean of 7.0047 on
-    # an across-seed standard error of 0.6677, inside the ruled band of 1.1
-    # to 10.3 (the thirty certification seeds read 8.8202).
-    "index_drift_pct": 7.0047,
+    # pt-v22, over the 360 seeds of `facts.LEVEL_POOL`: a mean of 7.3319 on
+    # an across-seed standard error of 0.7100, inside the ruled band of 1.1
+    # to 10.3 (the thirty certification seeds read 10.5009). pt-v21 read
+    # 7.0047 on 0.6677 (its thirty seeds 8.8202).
+    "index_drift_pct": 7.3319,
 }
 
 #: The CRISIS rows, reserved for the fear gauge and the index tail, measured
@@ -382,8 +384,8 @@ CERTIFIED_CRISIS: dict[str, float] = {
     # 7,530), all inside their 2015-2025 bands; before its graded arm it
     # read 1.7201, 5.1188 and 0.8234. The comments above and below describe
     # pt-v19's fifth composition.
-    "fear_gauge_dn1": 1.9980,
-    "fear_gauge_dn3": 5.2968,
+    "fear_gauge_dn1": 1.9803,
+    "fear_gauge_dn3": 5.7468,
     # The index tail row on the same thirty seeds, fifth composition: 86
     # sessions at or below -3 per cent in 7,530, a pooled rate of 1.1421 per
     # cent against the 2015-2025 band of 0.47 to 1.96 (position 0.45) and
@@ -417,7 +419,7 @@ CERTIFIED_CRISIS: dict[str, float] = {
     # error of 0.1080, inside the ruled band of 0.64 to 2.34 and below the
     # tape centre of 1.2132. The record's `certified_crisis` keeps the
     # thirty certification seeds' 0.5976 (45 in 7,530) beside it.
-    "index_tail_dn3_pct": 0.9827,
+    "index_tail_dn3_pct": 1.2450,
 }
 
 #: THE STRUCTURAL ROWS: the fourth certification block, and the only one
@@ -446,12 +448,14 @@ CERTIFIED_CRISIS: dict[str, float] = {
 #: is new is that a verdict is now taken on it and refused on.
 #:
 #: THE VALUE IS THE DEFAULT PRESET'S READING, like the three tables above.
-#: pt-v21, the default from 0.10.0, reads 0.955667 as the median of thirty
-#: seeds at 252 days (box ptv21c1, `presets/pt-v21.json`), 0.0257 above the
-#: tape's centre, and is REFUSED on both panels: k = 25 of 30 at 252 and 25
-#: held out against a cut of 21. The VIX is more persistent day to day than
-#: the tape's. The row is reported and does not gate a preset (the ruling
-#: below), and pt-v21 passes the long-run criteria.
+#: pt-v22, the default from 0.11.0, reads 0.956265 as the median of thirty
+#: seeds at 252 days (the record's panel at e96d64d6, `presets/pt-v22.json`),
+#: 0.0263 above the tape's centre, and is REFUSED on both panels: k = 26 of
+#: 30 at 252 and 28 held out against a cut of 21. The VIX is more persistent
+#: day to day than the tape's. The row is reported and does not gate a preset
+#: (the ruling below), and pt-v22 passes the long-run criteria.
+#: pt-v21, the default from 0.10.0 to 0.10.2, read 0.955667 (box ptv21c1,
+#: `presets/pt-v21.json`), REFUSED at k = 25 and 25.
 #: pt-v20, the default from 0.8.5 to 0.9.1, reads 0.930223 on its graded arm as the
 #: median of thirty seeds at 252 days (box ptv20g6, `presets/pt-v20.json`)
 #: and PASSES on both panels, k = 15 of 30 at 252 and 15 held out against a
@@ -471,19 +475,22 @@ CERTIFIED_CRISIS: dict[str, float] = {
 #: does not gate a preset; the pass bar is the long-run criteria and every
 #: ruled band.
 CERTIFIED_STRUCTURE: dict[str, float] = {
-    "vix_ar1_debiased": 0.955667,  # pt-v20: 0.930223; pt-v19: 0.933726
+    "vix_ar1_debiased": 0.956265,  # pt-v21: 0.955667; pt-v20: 0.930223; pt-v19: 0.933726
 }
 
 #: The default preset's RISE in each structural row from 252 to 504 days,
 #: the second gate's one verdict since 2026-09-21 (`facts.REAL_VIX_AR1_RISE`,
 #: `facts.structure_rise_verdict`). None until the record carries the block;
-#: `test_structure_gate` binds it to the record once it does. pt-v21 reads
-#: +0.003709, 90% interval -0.0024 to +0.0129, which matches the tape's
-#: +0.0120 (box ptv21c1): its 252-day reading is high and rises less. pt-v20's
+#: `test_structure_gate` binds it to the record once it does. pt-v22 reads
+#: +0.001691, 90% interval -0.0033 to +0.0074, BELOW the tape's +0.0120 (the
+#: record's panel at e96d64d6): about a seventh of the tape's rise, from a
+#: 252-day reading that is already high. Reported and not gated, by the
+#: owner's ruling of 2026-09-23. pt-v21 read +0.003709, 90% interval -0.0024
+#: to +0.0129, which matched the tape's (box ptv21c1). pt-v20's
 #: graded arm reads +0.014582, 90% interval +0.0032 to +0.0241, against the
 #: tape's +0.0120 (box ptv20g6); before the arm, +0.015596 [+0.0041, +0.0270].
 CERTIFIED_STRUCTURE_RISE: dict[str, float | None] = {
-    "vix_ar1_debiased": 0.003709,  # pt-v20: 0.014582; pt-v19: 0.014322
+    "vix_ar1_debiased": 0.001691,  # pt-v21: 0.003709; pt-v20: 0.014582; pt-v19: 0.014322
 }
 
 #: Bands re-derived at a 504-day window, from the same reference roster and
@@ -679,27 +686,27 @@ BAR_BAND_BASIS = "ruled"
 #: dispersion row is graded on `facts.REAL_MARKETS_RULED_504` and is not in
 #: `BANDS_504`, and the count is over the rows this table can be graded by.
 MEASURED_504: dict[str, float | None] = {
-    "annualised_vol_pct": 20.4445,
-    "excess_kurtosis": 6.6373,
-    "return_acf1": -0.0003,
-    "abs_return_acf1": 0.1057,
-    "abs_return_acf5": 0.0504,
-    "abs_return_acf20": 0.0295,
-    "cross_sectional_corr": 0.3078,
+    "annualised_vol_pct": 20.9822,
+    "excess_kurtosis": 6.8414,
+    "return_acf1": 0.0035,
+    "abs_return_acf1": 0.1171,
+    "abs_return_acf5": 0.0551,
+    "abs_return_acf20": 0.0293,
+    "cross_sectional_corr": 0.3210,
     # Re-measured on the fixed bars on 2026-10-01, as in `CERTIFIED`. Before
-    # the fix they read 0.5614 and -0.2415. 0.6266 is 0.0034 under the ruled
-    # ceiling of 0.63 (`facts.REAL_MARKETS_RULED_504`), about 0.4 of a
-    # 504-day seed sd, and 13 of the 30 seeds read above 0.63.
-    "volume_abs_return_corr": 0.5935,
-    "leverage_effect": -0.0485,
-    "volume_change_acf1": -0.2431,
-    "corr_asymmetry": 0.0776,
-    "corr_asymmetry_lagged": 0.1119,
-    "sector_excess_corr": 0.1152,
-    "corr_persistence_acf1": 0.3411,
+    # the fix they read 0.5614 and -0.2415. On pt-v22 0.5863 is 0.0437 under
+    # the ruled ceiling of 0.63 (`facts.REAL_MARKETS_RULED_504`), about one
+    # 504-day seed sd (0.0439), and 2 of the 30 seeds read above 0.63.
+    "volume_abs_return_corr": 0.5863,
+    "leverage_effect": -0.0495,
+    "volume_change_acf1": -0.2406,
+    "corr_asymmetry": 0.0780,
+    "corr_asymmetry_lagged": 0.0878,
+    "sector_excess_corr": 0.1221,
+    "corr_persistence_acf1": 0.3458,
     # Read on 9 of the 30 seeds at this preset, and the value is their
     # median. See the note above and `CERTIFIED`'s.
-    "crisis_sector_dispersion": 1.3921,
+    "crisis_sector_dispersion": 1.1903,
 }
 
 #: |return| autocorrelation at the certified horizon, against real markets.
@@ -1883,6 +1890,7 @@ def external_flow(
     off_session_ticks: int = 0,
     vix_target_premiums: Iterable[float] = (),
     vix_target_floor_sessions: int = 0,
+    cycle_phases: Iterable[str] = (),
     preset: str | None = None,
 ) -> Verdict:
     """Is the news and shock flow a caller adds inside the flow the preset
@@ -1909,7 +1917,15 @@ def external_flow(
     `Engine.set_vix_target_premium` made to the premium standing, and
     `vix_target_floor_sessions` counts the sessions closed with a floor set
     by `Engine.set_vix_target_floor`; the preset is fitted with neither, so
-    any is outside.
+    any is outside. `cycle_phases` is the cycle phase each session traded
+    in, in order, one name a session (`"expansion"`, `"peak"`,
+    `"contraction"`, `"trough"` or `"recovery"`): a run of one phase longer
+    than 99 in 100 of the preset's own sojourns in it, or a contraction and
+    trough together longer than 99 in 100 of the preset's own, is outside.
+    The share of sessions in each phase is reported against the preset's own
+    share (`CALIBRATED_FLOW`'s `<phase>_share`) and not judged, since a run
+    of a few years holds one or two cycles and its share is mostly where it
+    opened.
 
     Each move list is signed. Its squares give the channel's variance and
     its sum the drift it adds to fair value: the fitted news has mean zero,
@@ -1962,13 +1978,14 @@ def external_flow(
     if any(not math.isfinite(x) for x in premiums):
         raise ValidationError("vix_target_premiums holds a value that is not finite")
     premiums = [x for x in premiums if x != 0.0]
+    phases = [str(x) for x in cycle_phases]
     loads =[abs(float(x)) for x in macro_shock_loads]
     steps = sessions if macro_steps is None else int(macro_steps)
     if steps < len(loads):
         raise ValidationError(
             f"macro_shock_loads has {len(loads)} entries and macro_steps is "
             f"{steps}; each entry is one step that carried shocks")
-    a = assess_external_flow({
+    tally: dict[str, Any] = {
         "names": int(names), "sessions": int(sessions),
         "company_events": c_n, "company_sum_sq": c_sq,
         "sector_events": s_n, "sector_sum_sq": s_sq,
@@ -1983,7 +2000,10 @@ def external_flow(
         "vix_target_writes": len(premiums),
         "vix_target_write_abs": ordered_sum(premiums),
         "vix_target_floor_sessions": int(vix_target_floor_sessions),
-    }, preset)
+    }
+    if phases:
+        tally["cycle_phases"] = phases
+    a = assess_external_flow(tally, preset)
     fit = CALIBRATED_FLOW[preset]
     summary = (
         f"{preset} is fitted with company news at {fit['company_news_rate']:g} "
@@ -2008,6 +2028,16 @@ def external_flow(
             f"target premium a session and closed "
             f"{100 * a['vix_target_floor_share']:.0f}% of its sessions under a "
             f"VIX target floor")
+    if phases:
+        summary += (
+            f"; {100 * a['downturn_share']:.0f}% of its {len(phases)} sessions "
+            f"with a phase were in a contraction or trough, against "
+            f"{100 * fit['downturn_share']:.0f}% on the preset's own cycle, and "
+            f"its longest contraction ran {a['contraction_longest']} sessions, "
+            f"its longest trough {a['trough_longest']} and its longest "
+            f"recovery {a['recovery_longest']}, where 99 in 100 of the "
+            f"preset's own end by {fit['contraction_run_limit']}, "
+            f"{fit['trough_run_limit']} and {fit['recovery_run_limit']}")
     findings = tuple(a["findings"])
     if findings:
         reasons = tuple(findings) + (

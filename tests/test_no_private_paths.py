@@ -40,7 +40,7 @@ import pytest
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 PATTERNS = {
-    "programme/": re.compile(r"(?<!validation/pt-v2[01]/)programme/"),
+    "programme/": re.compile(r"(?<!validation/pt-v2[012]/)programme/"),
     "tradefloor-design": re.compile(r"tradefloor-design", re.I),
     "/private/tmp": re.compile(r"/private/tmp"),
     "scratchpad": re.compile(r"scratchpad", re.I),

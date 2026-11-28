@@ -1,0 +1,448 @@
+# Example experimental assumptions. This scenario is not a forecast, and not
+# a claim about how a real market behaves in a real recession.
+#
+# The 2007-09 recession, the scenario the registered recession rows are read
+# on. The older `recession` scenario is kept as it was.
+#
+# DATED ON 2007-09 ON THE NBER'S PHASES. Day 50 is December 2007, the NBER
+# peak, and a month is 21 sessions.
+# - The cycle is held at peak from day 50 and in contraction from day 71 to
+#   364, with growth held at -2 per cent through it; trough on day 365;
+#   recovery on day 428 (June 2009, the NBER's trough), then the model's own
+#   cycle. Under `macro_pins_hold` the held phase holds through every close.
+# - Earnings x0.93 by day 249 and x0.70 by day 364, held to day 490
+#   (September 2009), back to x0.96 by day 742 and to x1 by day 994.
+#   S&P 500 operating earnings, four quarters trailing, fell 57 per cent
+#   from 2007Q2 to 2009Q3 and were 0.92 of the 2007 peak over 2010.
+# - The VIX follows the real 2008-09 path from day 250 (Lehman, 2008-09-15)
+#   to day 427 and is released on day 428: the Cboe VIX over its August 2008
+#   mean, in five-session centred means, one model session per real
+#   session, as a multiple of the model's own VIX on day 250. That is
+#   x3.4-3.5 at the October-November 2008 peaks, about x2.3 at the S&P 500's
+#   low (day 370, 2009-03-09), and x1.48 by day 427.
+# - Credit moves on the SPREAD over the 10-year (macro.corporate_spread), so
+#   the 10-year's own noise and the policy rate still move the corporate
+#   yield: +70 basis points by day 249, +150 by day 289, held to day 364,
+#   back to +35 by day 616 and to 0 by day 805, then released. Moody's Baa
+#   yield (FRED DBAA) was 35 basis points wider by March 2008, peaked in
+#   November 2008, and was back by late 2009.
+#
+# Each leg is dated to its real month, so no single morning carries the
+# whole shock: the contraction starts in December 2007 and the VIX's rise
+# on Lehman.
+
+version: 1
+
+scenario:
+  name: recession_2008
+
+  description: >
+    A downturn with an earnings recession, dated on 2007-09 on the NBER's
+    phases. The cycle is held at its peak from day 50 (December 2007), in
+    contraction from day 71 to day 364 with growth held at -2 per cent, is
+    set to trough on day 365 and to recovery on day 428 (June 2009), and is
+    then left to the model's own cycle. Every company's earnings fall to 93
+    per cent by day 249 and to 70 by day 364, stay there to September 2009,
+    and come back to 96 per cent over the next year and the rest over the
+    year after. From day 250 (Lehman) the VIX follows the real 2008-09
+    path, as a multiple of its own day-250 level, to day 427, and is
+    released on day 428. The credit spread over the 10-year widens 70 basis
+    points by day 249 and 150 by day 289, holds to the trough, comes back
+    to 35 over a year and to nothing over the next nine months, and is
+    released. Example experimental assumptions, not a forecast.
+
+  shocks:
+
+    - target: macro.cycle
+      operation: set
+      value: 'peak'
+      at: 50
+      shape: hold
+      duration: 21
+
+    - target: macro.cycle
+      operation: set
+      value: 'contraction'
+      at: 71
+      shape: hold
+      duration: 294
+
+    - target: macro.cycle
+      operation: set
+      value: 'trough'
+      at: 365
+      shape: impulse
+
+    - target: macro.cycle
+      operation: set
+      value: 'recovery'
+      at: 428
+      shape: impulse
+
+    - target: macro.growth
+      operation: set
+      value: -0.02
+      at: 71
+      shape: hold
+      duration: 294
+
+    - target: market.earnings
+      operation: multiply
+      value: 0.93
+      at: 50
+      shape: ramp
+      duration: 200
+
+    - target: market.earnings
+      operation: multiply
+      value: 0.7526881720430106
+      at: 250
+      shape: ramp
+      duration: 115
+
+    - target: market.earnings
+      operation: multiply
+      value: 1.0
+      at: 365
+      shape: hold
+      duration: 126
+
+    - target: market.earnings
+      operation: multiply
+      value: 1.3714285714285714
+      at: 491
+      shape: ramp
+      duration: 252
+
+    - target: market.earnings
+      operation: multiply
+      value: 1.0416666666666667
+      at: 743
+      shape: ramp
+      duration: 252
+
+  transmission:
+
+    # 2008-09-15 to 2008-09-19: x1.652 of the day-250 VIX (34.2 on the tape)
+    - target: macro.vix
+      operation: multiply
+      value: 1.6521294954096777
+      at: 250
+      shape: ramp
+      duration: 5
+
+    # 2008-09-22 to 2008-09-26: x1.825 of the day-250 VIX (37.8 on the tape)
+    - target: macro.vix
+      operation: multiply
+      value: 1.1047028544688817
+      at: 255
+      shape: ramp
+      duration: 5
+
+    # 2008-09-29 to 2008-10-03: x2.280 of the day-250 VIX (47.2 on the tape)
+    - target: macro.vix
+      operation: multiply
+      value: 1.2492851847929682
+      at: 260
+      shape: ramp
+      duration: 5
+
+    # 2008-10-06 to 2008-10-10: x2.914 of the day-250 VIX (60.3 on the tape)
+    - target: macro.vix
+      operation: multiply
+      value: 1.277952021700432
+      at: 265
+      shape: ramp
+      duration: 5
+
+    # 2008-10-13 to 2008-10-17: x3.027 of the day-250 VIX (62.7 on the tape)
+    - target: macro.vix
+      operation: multiply
+      value: 1.0389692226054656
+      at: 270
+      shape: ramp
+      duration: 5
+
+    # 2008-10-20 to 2008-10-24: x3.514 of the day-250 VIX (72.7 on the tape)
+    - target: macro.vix
+      operation: multiply
+      value: 1.1606601334312254
+      at: 275
+      shape: ramp
+      duration: 5
+
+    # 2008-10-27 to 2008-10-31: x2.843 of the day-250 VIX (58.8 on the tape)
+    - target: macro.vix
+      operation: multiply
+      value: 0.8090209020902088
+      at: 280
+      shape: ramp
+      duration: 5
+
+    # 2008-11-03 to 2008-11-07: x2.858 of the day-250 VIX (59.2 on the tape)
+    - target: macro.vix
+      operation: multiply
+      value: 1.0054392167527877
+      at: 285
+      shape: ramp
+      duration: 5
+
+    # 2008-11-10 to 2008-11-14: x3.183 of the day-250 VIX (65.9 on the tape)
+    - target: macro.vix
+      operation: multiply
+      value: 1.1137070597781986
+      at: 290
+      shape: ramp
+      duration: 5
+
+    # 2008-11-17 to 2008-11-21: x3.415 of the day-250 VIX (70.7 on the tape)
+    - target: macro.vix
+      operation: multiply
+      value: 1.0728619569507272
+      at: 295
+      shape: ramp
+      duration: 5
+
+    # 2008-11-24 to 2008-12-01: x2.928 of the day-250 VIX (60.6 on the tape)
+    - target: macro.vix
+      operation: multiply
+      value: 0.857324768669176
+      at: 300
+      shape: ramp
+      duration: 5
+
+    # 2008-12-02 to 2008-12-08: x2.867 of the day-250 VIX (59.3 on the tape)
+    - target: macro.vix
+      operation: multiply
+      value: 0.9793048816714524
+      at: 305
+      shape: ramp
+      duration: 5
+
+    # 2008-12-09 to 2008-12-15: x2.600 of the day-250 VIX (53.8 on the tape)
+    - target: macro.vix
+      operation: multiply
+      value: 0.9067408156386922
+      at: 310
+      shape: ramp
+      duration: 5
+
+    # 2008-12-16 to 2008-12-22: x2.185 of the day-250 VIX (45.2 on the tape)
+    - target: macro.vix
+      operation: multiply
+      value: 0.8402780359067764
+      at: 315
+      shape: ramp
+      duration: 5
+
+    # 2008-12-23 to 2008-12-30: x2.011 of the day-250 VIX (41.6 on the tape)
+    - target: macro.vix
+      operation: multiply
+      value: 0.9205520658232327
+      at: 320
+      shape: ramp
+      duration: 5
+
+    # 2008-12-31 to 2009-01-07: x1.995 of the day-250 VIX (41.3 on the tape)
+    - target: macro.vix
+      operation: multiply
+      value: 0.9918789043728975
+      at: 325
+      shape: ramp
+      duration: 5
+
+    # 2009-01-08 to 2009-01-14: x2.274 of the day-250 VIX (47.1 on the tape)
+    - target: macro.vix
+      operation: multiply
+      value: 1.140254832614699
+      at: 330
+      shape: ramp
+      duration: 5
+
+    # 2009-01-15 to 2009-01-22: x2.351 of the day-250 VIX (48.7 on the tape)
+    - target: macro.vix
+      operation: multiply
+      value: 1.0338205302515295
+      at: 335
+      shape: ramp
+      duration: 5
+
+    # 2009-01-23 to 2009-01-29: x2.077 of the day-250 VIX (43.0 on the tape)
+    - target: macro.vix
+      operation: multiply
+      value: 0.8831990794016111
+      at: 340
+      shape: ramp
+      duration: 5
+
+    # 2009-01-30 to 2009-02-05: x2.103 of the day-250 VIX (43.5 on the tape)
+    - target: macro.vix
+      operation: multiply
+      value: 1.0127966496044671
+      at: 345
+      shape: ramp
+      duration: 5
+
+    # 2009-02-06 to 2009-02-12: x2.165 of the day-250 VIX (44.8 on the tape)
+    - target: macro.vix
+      operation: multiply
+      value: 1.0293590627153686
+      at: 350
+      shape: ramp
+      duration: 5
+
+    # 2009-02-13 to 2009-02-20: x2.348 of the day-250 VIX (48.6 on the tape)
+    - target: macro.vix
+      operation: multiply
+      value: 1.0844045706123906
+      at: 355
+      shape: ramp
+      duration: 5
+
+    # 2009-02-23 to 2009-02-27: x2.312 of the day-250 VIX (47.9 on the tape)
+    - target: macro.vix
+      operation: multiply
+      value: 0.9848116896480757
+      at: 360
+      shape: ramp
+      duration: 5
+
+    # 2009-03-02 to 2009-03-06: x2.330 of the day-250 VIX (48.2 on the tape)
+    - target: macro.vix
+      operation: multiply
+      value: 1.0077321742037952
+      at: 365
+      shape: ramp
+      duration: 5
+
+    # 2009-03-09 to 2009-03-13: x2.046 of the day-250 VIX (42.3 on the tape)
+    - target: macro.vix
+      operation: multiply
+      value: 0.8779810045207581
+      at: 370
+      shape: ramp
+      duration: 5
+
+    # 2009-03-16 to 2009-03-20: x2.085 of the day-250 VIX (43.2 on the tape)
+    - target: macro.vix
+      operation: multiply
+      value: 1.0193679436912466
+      at: 375
+      shape: ramp
+      duration: 5
+
+    # 2009-03-23 to 2009-03-27: x2.062 of the day-250 VIX (42.7 on the tape)
+    - target: macro.vix
+      operation: multiply
+      value: 0.98860002780481
+      at: 380
+      shape: ramp
+      duration: 5
+
+    # 2009-03-30 to 2009-04-03: x1.984 of the day-250 VIX (41.1 on the tape)
+    - target: macro.vix
+      operation: multiply
+      value: 0.9625462897857779
+      at: 385
+      shape: ramp
+      duration: 5
+
+    # 2009-04-06 to 2009-04-13: x1.807 of the day-250 VIX (37.4 on the tape)
+    - target: macro.vix
+      operation: multiply
+      value: 0.9108308171812605
+      at: 390
+      shape: ramp
+      duration: 5
+
+    # 2009-04-14 to 2009-04-20: x1.780 of the day-250 VIX (36.8 on the tape)
+    - target: macro.vix
+      operation: multiply
+      value: 0.9846014008447842
+      at: 395
+      shape: ramp
+      duration: 5
+
+    # 2009-04-21 to 2009-04-27: x1.801 of the day-250 VIX (37.3 on the tape)
+    - target: macro.vix
+      operation: multiply
+      value: 1.0117838718436056
+      at: 400
+      shape: ramp
+      duration: 5
+
+    # 2009-04-28 to 2009-05-04: x1.664 of the day-250 VIX (34.4 on the tape)
+    - target: macro.vix
+      operation: multiply
+      value: 0.9238943752683555
+      at: 405
+      shape: ramp
+      duration: 5
+
+    # 2009-05-05 to 2009-05-11: x1.583 of the day-250 VIX (32.8 on the tape)
+    - target: macro.vix
+      operation: multiply
+      value: 0.9516091553386778
+      at: 410
+      shape: ramp
+      duration: 5
+
+    # 2009-05-12 to 2009-05-18: x1.474 of the day-250 VIX (30.5 on the tape)
+    - target: macro.vix
+      operation: multiply
+      value: 0.9313228740614127
+      at: 415
+      shape: ramp
+      duration: 5
+
+    # 2009-05-19 to 2009-05-26: x1.533 of the day-250 VIX (31.7 on the tape)
+    - target: macro.vix
+      operation: multiply
+      value: 1.0397876245411641
+      at: 420
+      shape: ramp
+      duration: 5
+
+    # 2009-05-27 to 2009-05-29: x1.475 of the day-250 VIX (30.5 on the tape)
+    - target: macro.vix
+      operation: multiply
+      value: 0.9621130933619114
+      at: 425
+      shape: ramp
+      duration: 3
+
+    - target: macro.corporate_spread
+      operation: add
+      value: 0.007
+      at: 50
+      shape: ramp
+      duration: 200
+
+    - target: macro.corporate_spread
+      operation: add
+      value: 0.008
+      at: 250
+      shape: ramp
+      duration: 40
+
+    - target: macro.corporate_spread
+      operation: add
+      value: 0.0
+      at: 290
+      shape: hold
+      duration: 75
+
+    - target: macro.corporate_spread
+      operation: add
+      value: -0.0115
+      at: 365
+      shape: ramp
+      duration: 252
+
+    - target: macro.corporate_spread
+      operation: add
+      value: -0.0035
+      at: 617
+      shape: ramp
+      duration: 189
+

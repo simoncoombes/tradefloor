@@ -482,7 +482,7 @@ def test_the_payload_is_recoverable_from_the_call():
     adapter = OpenAIAgentsAdapter(agent=user_agent(), mode="live", model=model)
     contract.make_world(adapter).run(days=1)
 
-    assert seen and set(seen[0]) == contract.PAYLOAD_KEYS
+    assert seen and set(seen[0]) == contract.default_payload_keys()
     assert payload_of(model.last_call) == seen[0]
     assert payload_of(model.last_call.input) == seen[0], (
         "the input list alone must work too; that is what a caller building "
@@ -1404,9 +1404,14 @@ def test_the_committed_recording_replays_end_to_end():
     # schema 2): trades 2, pnl 21509.93, turnover 1565500.0, rejected 1.
     # A recording on an earlier pt-v21 vector, before its opening hazard
     # moved, read trades 5, pnl 23972.2, turnover 1644990.6, rejected 0.
-    assert card.trades == 4, card.trades
-    assert card.pnl == pytest.approx(58712.16, abs=0.5), card.pnl
-    assert card.turnover == pytest.approx(2630686.0, abs=0.5), card.turnover
+    #
+    # And RE-RECORDED for 0.11.0, when pt-v22 became the default and the
+    # payload carries its contracts (version 3). The values that recording
+    # replaced (pt-v21): trades 4, pnl 58712.16, turnover 2630686.0,
+    # rejected 1.
+    assert card.trades == 1, card.trades
+    assert card.pnl == pytest.approx(-292.96, abs=0.5), card.pnl
+    assert card.turnover == pytest.approx(307600.0, abs=0.5), card.turnover
 
     # Refusals are a fact about each recording, not a guarantee. gpt-5.2 sized inside the limits on pt-v18's market; on
     # pt-v19 as first composed it asked for 2.06x against a 2.00x cap on day
@@ -1426,11 +1431,11 @@ def test_the_committed_recording_replays_end_to_end():
     # TECH_B on day 2, held on day 3 and bought BANK_A on day 4, peaking at
     # 1.20x, and nothing was refused. On pt-v21 as shipped it asked for
     # 20,000 TECH_B and 20,000 STAPLE_A on day 1, 2.86x together; TECH_B
-    # filled and the market refused STAPLE_A.
-    assert card.rejected == 1, card.errors
-    assert card.errors == [
-        "step 6: trade would take leverage to 2.86x, above the 2.00x limit"
-    ], card.errors
+    # filled and the market refused STAPLE_A (rejected 1). On pt-v22 it held
+    # for four days and bought 5,000 BANK_A on day 4, and nothing was
+    # refused.
+    assert card.rejected == 0, card.errors
+    assert card.errors == [], card.errors
 
 
 @needs_fixture

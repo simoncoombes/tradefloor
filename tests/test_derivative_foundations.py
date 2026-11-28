@@ -51,6 +51,8 @@ def floats(buf):
 
 def test_every_switch_is_off_on_every_shipped_preset():
     for name in tf.preset_names():
+        if name == "pt-v22":
+            continue  # pt-v22 ships its arm's values, which tests/test_validation.py holds
         params = tf.ModelParams.from_preset(name)
         for dial in SWITCHES + tuple(k for k in DERIVED if k != "forecast_policy_neutral"):
             assert getattr(params, dial) == 0.0, (name, dial)
@@ -220,6 +222,23 @@ def test_the_forecast_runs_its_horizon_from_public_state():
     # A pin re-reads it on the pinned state.
     engine.pin_macro(vix=45.0)
     assert engine.forecast()["vix"][0] > f["vix"][0]
+
+
+def test_the_policy_shadows_are_a_read_on_the_forecasts_close():
+    assert tf.Engine(seed=9, universe=SMALL, model="pt-v21").policy_shadows() is None
+    engine = tf.Engine(seed=9, universe=SMALL, model=model(**ON))
+    assert engine.policy_shadows() is None
+    engine.run_days(30)
+    hashed = engine.state_hash()
+    published, own = engine.policy_shadows()
+    # Each is a meeting's change: whole quarter points, unless the rate's
+    # bounds cut it short.
+    rate = engine.economy()["federal_funds_rate"]
+    for change in (published, own):
+        assert math.isfinite(change)
+        assert change * 4 == pytest.approx(round(change * 4), abs=1e-9) or rate + change in (0.0, 8.0)
+    assert engine.policy_shadows() == (published, own)
+    assert engine.state_hash() == hashed
 
 
 # ── Snapshot and state hash ─────────────────────────────────────────────────

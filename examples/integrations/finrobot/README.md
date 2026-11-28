@@ -53,6 +53,14 @@ and no FinRobot install. The market is deterministic, so re-executing it
 against the recorded agent responses reproduces the experiment exactly. The
 replay takes about a second of CPU.
 
+The committed recording, made on pt-v22 with `claude-sonnet-5-5`, is a null
+result, kept as one: after the fork the agent sent no order in either arm,
+twenty decisions each finding "no clear edge", so the two arms differ only by
+what the shock did to prices. Earlier recordings of the same experiment
+traded after the fork and disagreed with each other about which names to
+move; the notebook sets them out. Re-recording until the agent tells a
+better story would be choosing the result.
+
 The recording is in the repository's `tests/fixtures/finrobot/` and is not
 installed with the package, so the replay needs a clone. A copy of
 `rate_shock.py` outside one stops before the market runs and says where the
@@ -67,7 +75,8 @@ python examples/integrations/finrobot/rate_shock.py --live
 That calls the real thing. Sixty decisions -- twenty days of shared history
 plus twenty in each arm, one decision a day -- so it costs sixty API calls and
 takes a few minutes. Add `--record` to overwrite the replay fixture with the
-run you just did.
+run you just did. FinRobot's `autogen` client sends a `temperature` the
+Messages API no longer accepts, so the live path takes it out of the request.
 
 ## The replay key
 

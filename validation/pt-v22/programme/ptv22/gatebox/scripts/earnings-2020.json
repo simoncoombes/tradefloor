@@ -1,0 +1,122 @@
+{
+ "what": "the 2020 replay's earnings leg: every company's EPS (and book) as a multiple of its own figure, S&P 500 operating EPS each 2020 quarter over the same quarter of 2019 at the quarter's centre",
+ "clock": "one session per real session, day 0 = 2020-01-02 (data/covid-2020-2021.json's dates)",
+ "knots": [
+  [
+   40,
+   1.0
+  ],
+  [
+   93,
+   0.6674140508221226
+  ],
+  [
+   156,
+   0.952022104998744
+  ],
+  [
+   220,
+   0.9744767738642164
+  ],
+  [
+   281,
+   1.0
+  ]
+ ],
+ "knot_dates": [
+  "2020-03-02",
+  "2020-05-15",
+  "2020-08-14",
+  "2020-11-13",
+  "2021-02-12"
+ ],
+ "windows": [
+  {
+   "target": "market.earnings",
+   "operation": "multiply",
+   "value": 0.6674140508221226,
+   "at": 41,
+   "duration": 53,
+   "shape": "ramp"
+  },
+  {
+   "target": "market.earnings",
+   "operation": "multiply",
+   "value": 1.4264340162243219,
+   "at": 94,
+   "duration": 63,
+   "shape": "ramp"
+  },
+  {
+   "target": "market.earnings",
+   "operation": "multiply",
+   "value": 1.0235862893808565,
+   "at": 157,
+   "duration": 64,
+   "shape": "ramp"
+  },
+  {
+   "target": "market.earnings",
+   "operation": "multiply",
+   "value": 1.0261917234154008,
+   "at": 221,
+   "duration": 61,
+   "shape": "ramp"
+  }
+ ],
+ "released_after_day": 281,
+ "real": {
+  "sp_operating_eps": {
+   "2019": [
+    37.99,
+    40.14,
+    39.81,
+    39.18
+   ],
+   "2020": [
+    19.5,
+    26.79,
+    37.9,
+    38.18
+   ],
+   "2021": [
+    47.41,
+    52.05,
+    52.02,
+    56.73
+   ]
+  },
+  "sp_operating_yoy_2020": {
+   "2020Q1": 0.5132929718346934,
+   "2020Q2": 0.6674140508221226,
+   "2020Q3": 0.952022104998744,
+   "2020Q4": 0.9744767738642164
+  },
+  "shiller_reported_ttm": {
+   "2019Q4": 139.47,
+   "2020Q1": 116.33,
+   "2020Q2": 99.23,
+   "2020Q3": 98.22,
+   "2020Q4": 94.13,
+   "2021Q1": 128.2,
+   "2021Q2": 158.76,
+   "2021Q3": 175.43,
+   "2021Q4": 197.87
+  },
+  "shiller_reported_change_on_year_before": {
+   "2020Q1": -23.14,
+   "2020Q2": -17.099999999999994,
+   "2020Q3": -1.0100000000000051,
+   "2020Q4": -4.090000000000003,
+   "2021Q1": 34.06999999999999,
+   "2021Q2": 30.560000000000002,
+   "2021Q3": 16.670000000000016,
+   "2021Q4": 22.439999999999998
+  },
+  "factset_bottom_up_yoy": {
+   "2020Q1": -0.146,
+   "2020Q2": -0.316,
+   "2020Q3": -0.071
+  }
+ }
+}

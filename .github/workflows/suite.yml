@@ -41,6 +41,12 @@ on:
     - cron: "17 4 * * *"
   workflow_dispatch:
 
+# The token every job gets. No job here writes to the repository, comments,
+# publishes or requests an OIDC token; checkout and the artifact and cache
+# services need nothing beyond reading the contents.
+permissions:
+  contents: read
+
 jobs:
   wheel:
     name: build the wheel
@@ -133,9 +139,26 @@ jobs:
         working-directory: rust
         # No --locked: Cargo.lock is not committed (this is a library crate,
         # and .gitignore lists it), so --locked has no lock file to hold the
-        # build to and stops at once. This resolves fresh, as a user's build
-        # does.
-        run: cargo check --all-targets --all-features
+        # build to and stops at once.
+        #
+        # The resolve is one a user on this Rust can reach, not the newest
+        # of everything. Cargo 1.83 picks the newest release of each
+        # dependency whatever Rust it needs, and since 2026-11-24 that is
+        # `getrandom` 0.4 (edition 2024, Rust 1.85), which arrow's `ahash`
+        # reaches through `const-random`. So the current Cargo resolves
+        # first, preferring releases whose `rust-version` this floor meets
+        # (Cargo 1.84's setting, which 1.83 does not have), and two that
+        # declare no `rust-version` but need 1.85 are held one back. The
+        # check itself runs on the declared toolchain. Only the `python`
+        # feature reaches arrow, so a default build on 1.83 needs none of
+        # this; one with `python` holds the same two back, as
+        # rust/README.md says.
+        run: |
+          rustup toolchain install stable --profile minimal --no-self-update
+          CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS=fallback cargo +stable generate-lockfile
+          cargo +stable update -p const-random --precise 0.1.18
+          cargo +stable update -p const-random-macro --precise 0.1.16
+          cargo check --all-targets --all-features
 
   batch:
     name: tests ${{ matrix.batch }} on ${{ matrix.interpreter }}
@@ -310,6 +333,26 @@ jobs:
           # nbclient is missing or the flag is unset. A skip here is a
           # notebook that did not run, so it fails the job.
           python tools/ci/no_skips.py examples.xml
+      # examples/rl-ppo trains a network, and Stable-Baselines3 brings torch.
+      # Both steps run on the nightly and on a manual run only, so a pull
+      # request never downloads torch. On a pull request the script still
+      # gets the syntax check in tests/test_examples.py.
+      - name: Install Stable-Baselines3 (nightly)
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          # The CPU index first, because the default Linux torch wheel carries
+          # CUDA libraries this job never loads.
+          python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install stable-baselines3
+      - name: Train and score the PPO study (nightly)
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        shell: bash
+        env:
+          TRADEFLOOR_SLOW_TESTS: "1"
+        run: |
+          python -m pytest -q -rs tests/test_rl_ppo_study.py --junitxml=rl-ppo.xml
+          python tools/ci/no_skips.py rl-ppo.xml
 
   install:
     name: a clean install runs

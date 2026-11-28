@@ -1,0 +1,10 @@
+grade_all rc=0 130s
+exploits rc=0 110s
+exploits_sum rc=0 0s
+ptv21 rc=0 7s
+verdict16 rc=0 0s
+amend19 rc=0 7s
+ptv22_switch rc=0 0s
+ptv22grade rc=0 14s
+ph2 rc=0 0s
+== verdict: PASS, all 9 steps ran and pass

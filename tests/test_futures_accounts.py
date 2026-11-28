@@ -174,6 +174,39 @@ def test_mg2_a_call_not_met_by_the_next_open_liquidates_the_futures():
     assert d.p.futures == {}
 
 
+def test_mg2_a_liquidation_is_not_refused_by_the_leverage_limit():
+    # An insolvent account, and a solvent one whose stock keeps it over
+    # its limit after the futures close: the limit refuses opening risk,
+    # never the liquidation that takes it off.
+    import math
+    d = Day(seed=11, max_leverage=2.0)
+    d.run(3)
+    d.open()
+    sym = _vix(d.e)
+    d.p.execute(d.e, sym, 40.0)
+    d.p.cash -= d.p.net_worth(d.e) + 2_000_000.0
+    d.close()
+    d.open()
+    assert d.p.margin_calls[-1]["met"] is False
+    assert d.p.liquidations[-1]["filled"] == -40.0
+    assert sym not in d.p.futures
+
+    d = Day(seed=11, max_leverage=2.0)
+    d.run(3)
+    d.open()
+    sym = _vix(d.e)
+    d.p.execute(d.e, sym, 10.0)
+    marks = d.p.marks(d.e)
+    for t in d.e.tickers[:4]:
+        d.p.execute(d.e, t, math.floor(200_000 / marks[t]))
+    d.p.cash -= d.p.net_worth(d.e) - 0.25 * d.p.margin_requirement(d.e, maintenance=True)
+    d.close()
+    d.open()
+    assert d.p.margin_calls[-1]["met"] is False
+    assert d.p.liquidations[-1]["filled"] == -10.0
+    assert sym not in d.p.futures
+
+
 # ── Each harness runs the hooks ─────────────────────────────────────────────
 
 class Hold:
@@ -214,3 +247,54 @@ def test_a_world_marks_and_settles_a_futures_position():
     world.run(20)
     assert any(s["symbol"] == symbol for s in world.portfolio.settled)
     assert symbol not in world.portfolio.futures
+
+
+def test_settling_reads_each_contracts_own_expiry_not_the_whole_history():
+    """A held future is settled from the rows of its own expiry session and
+    after (one settled a session late included), never from the whole
+    history, which grows by hundreds of rows an expiry once the index
+    options are listed."""
+    from tradefloor.portfolio import FuturesPosition
+
+    rows = {56: [{"symbol": "IDX.F0056", "value": 1010.0}, {"symbol": "IDX.O0056.C1000.00", "value": 10.0}],
+            36: [{"symbol": "FF.F0035", "value": 97.5}]}
+    asked = []
+
+    class Stand:
+        def settlements(self, day=None):
+            asked.append(day)
+            return rows.get(day, []) if day is not None else [r for v in rows.values() for r in v]
+
+    p = Portfolio(cash=1e6)
+    for sym, mult, mark in (("IDX.F0056", 250.0, 1000.0), ("FF.F0035", 4167.0, 97.0), ("VIX.F0077", 1000.0, 15.0)):
+        f = FuturesPosition(sym, mult, mark)
+        f.quantity = 3.0
+        p.futures[sym] = f
+    p._settle_expired(Stand(), 56)
+    assert None not in asked
+    assert sorted(p.futures) == ["VIX.F0077"]
+    assert p.cash == pytest.approx(1e6 + 3 * 250.0 * 10.0 + 3 * 4167.0 * 0.5, rel=1e-15)
+    assert sorted((s["symbol"], s["price"]) for s in p.settled) == [("FF.F0035", 97.5), ("IDX.F0056", 1010.0)]
+
+
+def _vix(engine):
+    return [c["symbol"] for c in engine.contracts() if c["root"] == "VIX"][2]
+
+
+def test_a_stock_order_counts_the_futures_held_against_the_leverage_limit():
+    # Futures to 1.9x first; every stock buy after them would take the
+    # account past its 2x limit and is refused, as it is in the other order.
+    import math
+    d = Day(cash=100_000.0, max_leverage=2.0)
+    d.run(3)
+    d.open()
+    sym = _vix(d.e)
+    q = d.e.quote(sym)
+    n = math.floor(1.9 * d.p.net_worth(d.e) / (q["multiplier"] * q["price"]))
+    assert n >= 1
+    d.p.execute(d.e, sym, float(n))
+    marks = d.p.marks(d.e)
+    for t in d.e.tickers[:4]:
+        with pytest.raises(LeverageError):
+            d.p.execute(d.e, t, math.floor(0.45 * 100_000 / marks[t]))
+    assert d.p.leverage(d.e) <= 2.0

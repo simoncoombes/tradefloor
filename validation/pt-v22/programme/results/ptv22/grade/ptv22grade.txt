@@ -1,0 +1,74 @@
+pt-v22 rows of R22-fixd2RWPD on <merged> (histories: {'ptv22fut': 270, 'ptv22traded': 270, 'ptv22mp metaorder': 30, 'ptv22mp push': 30, 'ptv22chain': 270, 'ptv22names': 270}); RF5 at 63,126; switched on: ['ptv22chain', 'ptv22fut', 'ptv22names', 'ptv22traded']
+  IF1             3.718  [1.209256369040696, 6.267280393713019]  pass
+  IF2            0.4154  [0.12666979481012236, 0.7158637407060751]  pass
+  IF3                 0  [0.0, 1e-12]  pass
+  NS1            0.4696  [0.3, 0.6]  pass
+  NS2             3.646  [0.0, 6.267280393713019]  pass
+  RF1_m1          1.416  [-0.06952594939365819, 2.623654510985814]  pass
+  RF1_m3          11.21  [3.5, 17.5]  pass
+  RF1_m6          31.22  [7.959259259259259, 53.440740740740736]  pass
+  RF2             1.386  [1.0640643500043467, 3.3203847393738597]  pass
+  RF3                 0  [0.0, 1e-09]  pass
+  RF4             18.29  [-160.28077163006793, 70.61151080236596]  pass
+  RF5            0.6875  [0.0, 2.0]  pass
+  OF1              0.44  [0.3959271859672713, 0.6384679881252253]  pass
+  OF2             0.588  [0.4429930694932701, 0.6647925684296406]  pass
+  OF3            0.8482  [0.4846874482893982, 1.0629803280985424]  pass
+  MG1              0.01  [0.005, 0.015]  pass
+  MG2                 0  [0, 0]  pass
+  XD1                 0  [None, None]  pass
+  XD2                 0  [None, None]  pass
+  IF4            0.1643  [0.1, 0.21]  pass
+  XD3        -6.251e+05  [None, 0.0]  pass
+  SS1              1.35  [1.083418788426055, 1.4069293836624692]  pass
+  SS2             41.62  [34.124028035683935, 47.655971964316066]  pass
+  SS3            0.1089  [-0.07829733333649955, 0.18472002168112248]  pass
+  SS4             8.569  [None, None]  pass
+  EV1           -0.1511  [-0.39041655541266046, -0.1365739935011931]  pass
+  EV2          -0.01142  [-0.062229742638824824, 0.16406715982413414]  pass
+  EV3             1.292  [0.7192153275039348, 1.3053076865826405]  pass
+  MG3         4.787e-05  [0.0, 0.00112]  pass
+  XD5                 0  [None, None]  pass
+  AX1                 0  [0, 0]  pass
+  AX2         3.725e-09  [0.0, 0.005]  pass
+  OF4             2.003  [0.0, 2.0]  FAIL  (reported, not gated (draft item 21))
+  SV1         1.501e-11  [0.0, 0.1]  pass  (reported, not graded)
+  SV2                 0  [0, 0]  pass  (reported, not graded)
+  SV3             1.121  [1.1119349770509113, 1.150042679222002]  pass  (reported, not graded)
+  SV4            0.1096  [0.04223044458060209, 0.10888895840447252]  FAIL  (reported, not graded)
+  SV5_9D         0.9368  [0.9237664912825676, 0.9592299607452444]  pass  (reported, not graded)
+  SV5_6M          1.234  [1.1804219104501739, 1.2646628485427227]  pass  (reported, not graded)
+  SV5_1Y          1.349  [1.2219767534914145, 1.3657479830243948]  pass  (reported, not graded)
+  SV6_median      119.8  [117.23878262484884, 122.63121737515117]  pass  (reported, not graded)
+  SV6_sd          10.01  [9.256971596248516, 14.212814682229347]  pass  (reported, not graded)
+  SV7            -0.368  [-0.7702911492240678, 0.3735378224974626]  pass  (reported, not graded)
+  SV8             1.295  [1.3264348387868303, 1.4286622382624687]  FAIL  (reported, not graded)
+  SV9            -4.449  [-5.091868014695722, -3.5101361025506717]  pass  (reported, not graded)
+  OB1r          -0.0961  [-0.17983131540525282, 0.0891628439374808]  pass  (reported, not graded)
+  OB1v                0  [0.4798484845340991, 0.8941669756973236]  FAIL  (reported, not graded)
+  OB1d                0  [0.42634167322491323, 0.9778033434218769]  FAIL  (reported, not graded)
+  OB2r          -0.0961  [-0.17457578540378393, 0.08351267761015645]  pass  (reported, not graded)
+  OB2v                0  [0.5465682086013922, 0.8608621114053846]  FAIL  (reported, not graded)
+  OB2d                0  [0.4664910803222973, 0.973090040154942]  FAIL  (reported, not graded)
+  OB3r          -0.0961  [-0.3366083001877864, 0.17504257612260388]  pass  (reported, not graded)
+  OB3v                0  [0.1926536179129349, 0.7478503846665557]  FAIL  (reported, not graded)
+  OB3d                0  [0.041722565330268524, 0.9504196336863853]  FAIL  (reported, not graded)
+  OB4r          -0.0961  [-0.38764913328945516, 0.2574463002571552]  pass  (reported, not graded)
+  OB4v                0  [0.3897115766958382, 1.1508675812896705]  FAIL  (reported, not graded)
+  OB4d                0  [0.058342549173640124, 1.694050609892213]  FAIL  (reported, not graded)
+  OB5          not read  [-0.06, -0.015]  -  (reported, not graded)
+  OB6          not read  [None, 0.0]  -  (reported, not graded)
+  XD4          not read  [None, None]  -  (reported, not graded)
+  VF1          not read  [0.7787583552861578, 0.8882714195867544]  -  (reported, not graded)
+  VF2          not read  [0.6007153456452341, 0.8683928008272288]  -  (reported, not graded)
+  VF3          not read  [0.6763555505172418, 0.9049362089482371]  -  (reported, not graded)
+  VF4_F1       not read  [0.5822703853045272, 0.6466837515125627]  -  (reported, not graded)
+  VF4_F2       not read  [0.36799804516984624, 0.4576279055712781]  -  (reported, not graded)
+  VF4_F4       not read  [0.23406197833938408, 0.27167832244195217]  -  (reported, not graded)
+  VF5          not read  [-1.6320541510052942, 0.5775469501961309]  -  (reported, not graded)
+  VF6_h21      not read  [0.31759253807354126, 1.797961249805247]  -  (reported, not graded)
+  VF6_h63      not read  [0.5255408449043948, 3.6624454454181867]  -  (reported, not graded)
+  VF6_h126     not read  [0.8783175386027171, 4.912345122341488]  -  (reported, not graded)
+  VF7          not read  [0.0, 1e-12]  -  (reported, not graded)
+  VF8             6.941  [0.0, 2.0]  FAIL  (reported, not graded)
+PASS: 33 gated rows; failing on their reading: none; not read, so failing: none
