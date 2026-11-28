@@ -312,8 +312,8 @@ def number(text: str) -> int | None:
 #: release after the eighth shipped.
 COUNTS = {
     "scenarios": (
-        Location("README.md", r"\b([\w-]+) packaged\s+(?:shocks|scenarios)\b",
-                 "the README's table of what the package holds, and its "
+        Location("docs/API.md", r"\b([\w-]+) packaged\s+(?:shocks|scenarios)\b",
+                 "docs/API.md's table of what the package holds, and its "
                  "scenario section", count=2),
         Location("docs/MODEL.md", r"(?m)^([\w-]+) scenarios ship:",
                  "the model document's list of packaged scenarios"),
@@ -323,12 +323,12 @@ COUNTS = {
                  "the crate page"),
     ),
     "MCP tools": (
-        Location("README.md", r"\b([\w-]+) tools for a coding agent\b",
-                 "the README's table of what the package holds"),
+        Location("docs/API.md", r"\b([\w-]+) tools for a coding agent\b",
+                 "docs/API.md's table of what the package holds"),
     ),
     "read-only MCP tools": (
-        Location("README.md", r"\b([\w-]+) of them read-only\b",
-                 "the README's table of what the package holds"),
+        Location("docs/API.md", r"\b([\w-]+) of them read-only\b",
+                 "docs/API.md's table of what the package holds"),
     ),
 }
 

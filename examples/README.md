@@ -31,16 +31,16 @@ Start at 00 if you have not used tradefloor before.
 | [`00-a-year-in-one-market.ipynb`](00-a-year-in-one-market.ipynb) | The shortest useful thing: one year, one company, two crises, and why the price moved |
 | [`01-first-simulation.ipynb`](01-first-simulation.ipynb) | Universe, engine, order book, determinism, provenance |
 | [`02-evaluating-a-strategy.ipynb`](02-evaluating-a-strategy.ipynb) | Strategy specs, baselines, scores against buy-and-hold, ranking across seeds |
-| [`03-why-did-the-price-move.ipynb`](03-why-did-the-price-move.ipynb) | The factor contributions that sum to every move |
+| [`03-why-did-the-price-move.ipynb`](03-why-did-the-price-move.ipynb) | The twelve factors that sum to the mispricing's move |
 | [`04-how-realistic-is-this.ipynb`](04-how-realistic-is-this.ipynb) | The realism panel, the gaps, choosing a preset |
 | [`05-training-an-agent.ipynb`](05-training-an-agent.ipynb) | The Gymnasium environment, episodes, what size costs |
 | [`06-execution-and-impact.ipynb`](06-execution-and-impact.ipynb) | TCA, the counterfactual run, partial fills, and the same orders in a book a scenario has thinned |
-| [`09-a-pandemic-shaped-market.ipynb`](09-a-pandemic-shaped-market.ipynb) | Driving a real 2020-21 macro path, and diagnosing why the first attempt missed. Pinned to `pt-v12`, with the same path run on the default at the end |
+| [`09-a-pandemic-shaped-market.ipynb`](09-a-pandemic-shaped-market.ipynb) | Driving a real 2020-21 macro path, and diagnosing why the first attempt missed, and which fields transmit. Pinned to `pt-v12`, whose QE channel carries the valuation path, with the same path on `pt-v21`, the default until 0.10.2, at the end |
 | [`07-research-workflow.py`](07-research-workflow.py) | A whole study in one file: sweep, evaluation, TCA, replay |
 | [`08-claude-agent.py`](08-claude-agent.py) | An LLM agent scored against the baselines. Replays a recorded Claude run by default, so it needs no key |
 | [`10-forking-a-market.py`](10-forking-a-market.py) | Fork a market mid-flight, change the policy rate in one branch, compare |
 | [`11-scenario-fork.py`](11-scenario-fork.py) | Read a scenario from YAML, apply it to one branch of a fork, and price what it cost |
-| [`12-ai-vs-traditional.ipynb`](12-ai-vs-traditional.ipynb) | `08-claude-agent.py` run as a notebook: the recorded Claude agent beside the reference strategies on one market, offline by default |
+| [`12-ai-vs-traditional.ipynb`](12-ai-vs-traditional.ipynb) | `08-claude-agent.py` run as a notebook: the recorded Claude agent beside the reference strategies (buy-and-hold, momentum, mean reversion, random and the Oracle) on one market, offline by default |
 
 Notebooks 05 and 06 cover the two audiences the project is built for, RL
 researchers and execution developers.
@@ -93,8 +93,9 @@ The times below are CPU time (user plus system), measured with
 `10-forking-a-market.py` and `11-scenario-fork.py` take under a second each
 and need nothing extra. `rate-shock/counterfactual.py` takes under five
 seconds of CPU. It writes a chart if `matplotlib` is installed and says so if
-it is not. `07-research-workflow.py` takes about 200 seconds of CPU across eight worker processes and prints its
-own wall-clock total on the last line. It needs
+it is not. `07-research-workflow.py` takes about 200 seconds of CPU across eight worker processes, under a
+minute of wall time on a ten-core laptop, and prints its own wall-clock
+total on the last line. It needs
 `tradefloor[arrow]`, because its realism step reads the daily bars table.
 `integrations/finrobot/rate_shock.py` takes about a second and also runs
 on the core library alone in its default replay mode; `--live` is the one

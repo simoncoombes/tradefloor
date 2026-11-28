@@ -24,6 +24,11 @@ from tradefloor.__main__ import main
 REPO = pathlib.Path(__file__).resolve().parent.parent
 README = REPO / "README.md"
 
+#: The scenario section, with its `tradefloor scenario show` block, moved
+#: from the README to docs/API.md. Both pages are read, so a command that
+#: comes back to the README is run too.
+COMMAND_PAGES = (README, REPO / "docs" / "API.md")
+
 
 def _blocks(text: str) -> list[list[str]]:
     """Every fenced block, line by line, without its fences."""
@@ -48,7 +53,9 @@ def test_every_scenario_command_in_the_readme_runs(capsys):
     """Each `tradefloor scenario ...` line runs, and the lines the README
     prints under it are lines it prints."""
     found = 0
-    for block in _blocks(README.read_text(encoding="utf-8")):
+    blocks = [block for page in COMMAND_PAGES
+              for block in _blocks(page.read_text(encoding="utf-8"))]
+    for block in blocks:
         for index, line in enumerate(block):
             if not line.startswith("tradefloor scenario "):
                 continue
@@ -61,16 +68,17 @@ def test_every_scenario_command_in_the_readme_runs(capsys):
                      if row.strip() and not row.startswith("tradefloor ")]
             stale = [row for row in shown if row not in printed]
             assert not stale, (
-                f"README.md shows these lines under `{line}` and the "
+                f"the page shows these lines under `{line}` and the "
                 f"command does not print them: {stale}")
-    assert found, "the README no longer shows a scenario command"
+    assert found, "neither README.md nor docs/API.md shows a scenario command"
 
 
 def test_every_scenario_the_readme_names_ships():
     """A scenario named by `Scenario.load("...")` is one the package carries,
     and a scenario named as a file names one that exists from the root of
     a checkout."""
-    text = README.read_text(encoding="utf-8")
+    text = "\n".join(page.read_text(encoding="utf-8")
+                     for page in COMMAND_PAGES)
     for name in re.findall(r"""Scenario\.load\(["']([A-Za-z0-9_]+)["']\)""",
                            text):
         assert name in tf.Scenario.available(), name
@@ -82,7 +90,8 @@ def test_every_scenario_the_readme_names_ships():
 
 
 #: The pages whose inline code a reader copies into Python.
-PAGES = ("README.md", "CHANGELOG.md", "docs/MODEL.md")
+PAGES = ("README.md", "CHANGELOG.md", "docs/MODEL.md", "docs/API.md",
+         "docs/MCP.md")
 
 #: An inline code span shaped like a call: `f(...)`, `tf.a.b(...)`.
 CALL_SPAN = re.compile(r"`((?:tf\.)?[A-Za-z_][\w.]*\([^`\n]*\))`")
