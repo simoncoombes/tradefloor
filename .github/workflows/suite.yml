@@ -38,6 +38,12 @@ on:
     - cron: "17 4 * * *"
   workflow_dispatch:
 
+# The token every job gets. No job here writes to the repository, comments,
+# publishes or requests an OIDC token; checkout and the artifact and cache
+# services need nothing beyond reading the contents.
+permissions:
+  contents: read
+
 jobs:
   wheel:
     name: build the wheel

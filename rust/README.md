@@ -1,6 +1,7 @@
 # tradefloor
 
-The Rust core of [tradefloor](https://github.com/simoncoombes/tradefloor): a
+The Rust core of [tradefloor](https://github.com/simoncoombes/tradefloor), a
+reproducible evaluation environment for financial AI agents. The crate is a
 deterministic market simulator with a real limit order book.
 
 A seed and a starting state run forward into prices, an order book with
