@@ -92,6 +92,16 @@ on:
         required: false
         type: string
         default: "3.12"
+      install-from-source:
+        description: "Build tradefloor from the checked-out repository instead of installing a release. For this repository's own self-test; a caller elsewhere leaves it off."
+        required: false
+        type: boolean
+        default: false
+      fail-on-threshold:
+        description: "Fail the job when a threshold fails. Off, a failed threshold is reported through the `passed` output and the summary, and the job stays green; a run that cannot start still fails."
+        required: false
+        type: boolean
+        default: true
       comment:
         description: "Post the summary on the pull request. The calling job must grant pull-requests: write. Skipped for forks."
         required: false
@@ -132,12 +142,22 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: ${{ inputs.python-version }}
+      # Only for a build from source: the released wheel needs no compiler.
+      - uses: dtolnay/rust-toolchain@stable
+        if: ${{ inputs.install-from-source }}
       - name: Install
         env:
           TF_VERSION: ${{ inputs.tradefloor-version }}
           TF_REQUIREMENTS: ${{ inputs.requirements }}
+          TF_FROM_SOURCE: ${{ inputs.install-from-source }}
         run: |
-          if [ -n "$TF_VERSION" ]; then
+          if [ "$TF_FROM_SOURCE" = "true" ]; then
+            # The candidate checkout is this repository at the head being
+            # tested, so the command under test is the one in this commit.
+            python -m pip install --quiet maturin
+            (cd candidate && maturin build --release --out ../dist)
+            python -m pip install --quiet dist/*.whl
+          elif [ -n "$TF_VERSION" ]; then
             python -m pip install --quiet "tradefloor==$TF_VERSION"
           else
             python -m pip install --quiet tradefloor
@@ -160,6 +180,7 @@ jobs:
           TF_MAX_DRAWDOWN_INCREASE: ${{ inputs.max-drawdown-increase }}
           TF_MIN_MEDIAN_RETURN_DELTA: ${{ inputs.min-median-return-delta }}
           TF_MAX_ERRORS: ${{ inputs.max-errors }}
+          TF_FAIL_ON_THRESHOLD: ${{ inputs.fail-on-threshold }}
         run: |
           set -- --baseline "baseline/$TF_BASELINE_AGENT" \
                  --candidate "candidate/$TF_AGENT" \
@@ -180,6 +201,12 @@ jobs:
           tradefloor ci compare "$@" > /dev/null || status=$?
           [ -f evaluation.md ] && cat evaluation.md >> "$GITHUB_STEP_SUMMARY"
           if [ "$status" -eq 0 ]; then echo "passed=true" >> "$GITHUB_OUTPUT"; else echo "passed=false" >> "$GITHUB_OUTPUT"; fi
+          # Exit 1 is a failed threshold, and only that is softened. Exit 2
+          # (arguments that cannot be read) and anything else still fail.
+          if [ "$status" -eq 1 ] && [ "$TF_FAIL_ON_THRESHOLD" = "false" ]; then
+            echo "A threshold failed; fail-on-threshold is off, so the job passes. See passed=false." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           exit "$status"
       - uses: actions/upload-artifact@v7
         if: ${{ always() }}
