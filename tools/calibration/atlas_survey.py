@@ -813,7 +813,6 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     # Every pin sets the variance: a switch.
     "pinned_vix_sets_variance": (0.0, 1.0),
     "pinned_vix_variance_map": (0.0, 4.0),
-    "pinned_vix_variance_map_exponent": (1.0, 6.0),
     "pinned_vix_return": (0.0, 0.05),
     "corporate_spread_noise_half_life": (0.0, 252.0),
     # The 10-year's own term premium: off to twice the measured sd; half-life
