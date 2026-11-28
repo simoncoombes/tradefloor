@@ -37,3 +37,11 @@ updates:
     groups:
       actions:
         patterns: ["*"]
+    # suite.yml's MSRV job pins `dtolnay/rust-toolchain@1.83`: the ref names
+    # the toolchain, 1.83 is the crate's declared rust-version, and the job
+    # exists to build on exactly that. The group once rewrote it to @1.120
+    # (#266, closed), which would have tested a toolchain the crate does not
+    # promise. The other uses of this action are @stable, which Dependabot
+    # does not move.
+    ignore:
+      - dependency-name: "dtolnay/rust-toolchain"
