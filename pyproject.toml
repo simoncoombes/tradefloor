@@ -142,7 +142,7 @@ finrobot = [
   # Python 3.11 resolved pyautogen 0.10.0, and `import autogen` and FinRobot's
   # `SingleAssistant` both failed; with `<0.3` it resolves 0.2.35 and both
   # import.
-  "pyautogen[retrievechat]>=0.2.19,<0.3",
+  "pyautogen[retrievechat]>=0.2.19,<0.11",
   # `<1.0`: autogen 0.2.35's Anthropic client imports
   # `anthropic.types.Completion`, removed in the 1.0 SDK, and the shipped
   # example's default provider is Anthropic. Under the `<2.0` this said until
@@ -152,7 +152,7 @@ finrobot = [
   # The `claude` extra is a separate pin (`anthropic>=0.40`, for
   # ClaudeAdapter and examples/08). Installed together the two resolve to the
   # intersection, [0.40, 1.0).
-  "anthropic>=0.30,<1.0",
+  "anthropic>=0.30,<3.0",
   # mplfinance imports `six` and does not declare it, so without this
   # `finrobot.agents.workflow` fails on `No module named 'six'` (2026-11-28,
   # clean Python 3.11 install).
