@@ -264,6 +264,10 @@ RUN_BY: dict[str, str] = {
         "test_examples.py::test_the_forking_demo_runs_end_to_end",
     "11-scenario-fork.py":
         "test_examples.py::test_the_scenario_fork_runs_end_to_end",
+    "ci-selftest/baseline.py":
+        "test_ci.py::test_the_self_test_agents_hold_one_threshold_and_breach_the_other",
+    "ci-selftest/candidate.py":
+        "test_ci.py::test_the_self_test_agents_hold_one_threshold_and_breach_the_other",
     "experiments/liquidity-crisis/experiment.py":
         "test_examples.py::"
         "test_the_liquidity_crisis_study_replays_its_recording",

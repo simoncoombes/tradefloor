@@ -167,3 +167,28 @@ def test_cli_runs_a_packaged_scenario(agents, tmp_path):
                  "--scenario", "rate_shock", "--json", str(out)])
     assert code == 0
     assert json.loads(out.read_text(encoding="utf-8"))["scenario"] == "rate_shock"
+
+
+def test_the_self_test_agents_hold_one_threshold_and_breach_the_other(tmp_path):
+    """The two runs `.github/workflows/evaluate-selftest.yml` makes, locally.
+
+    `examples/ci-selftest/baseline.py` and `candidate.py` on seeds 1-3, ten
+    days, eight companies: `--max-errors 0` holds (exit 0) and
+    `--max-drawdown 0` fails (exit 1), which is what the workflow's `check`
+    job asserts on GitHub.
+    """
+    import pathlib
+    import warnings
+    study = pathlib.Path(__file__).resolve().parent.parent / "examples" / "ci-selftest"
+    common = ["ci", "compare",
+              "--baseline", f"{study / 'baseline.py'}:make_agent",
+              "--candidate", f"{study / 'candidate.py'}:make_agent",
+              "--seeds", "1-3", "--days", "10", "--companies", "8"]
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        assert main(common + ["--max-errors", "0",
+                              "--json", str(tmp_path / "holds.json")]) == 0
+        assert main(common + ["--max-drawdown", "0",
+                              "--json", str(tmp_path / "breaches.json")]) == 1
+    breached = json.loads((tmp_path / "breaches.json").read_text(encoding="utf-8"))
+    assert breached["passed"] is False
