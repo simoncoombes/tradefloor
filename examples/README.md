@@ -57,6 +57,7 @@ same experiment two ways, and writes its output to its own git-ignored
 | [`fork-futures/`](fork-futures/) | What does one buy-and-hold portfolio do in four futures of one market? A fork into a control and the `rate_shock`, `recession` and `liquidity_crisis` scenarios, and the figure the project README shows. Seven to twelve seconds of CPU, no keys |
 | [`integrations/finrobot/`](integrations/finrobot/) | The same experiment with a real [FinRobot](https://github.com/AI4Finance-Foundation/FinRobot) agent in place of the native one. Replays a recorded run by default, so it needs no API key |
 | [`integrations/`](integrations/) | The same decision loop under a plain function, the OpenAI Agents SDK, PydanticAI and LangGraph. Offline, no keys |
+| [`rl-ppo/`](rl-ppo/) | What does a Stable-Baselines3 PPO agent learn on `TradingEnv` in 8,192 steps? Scored against cash, equal weight and the untrained network on 20 held-out seeds. Needs `stable-baselines3` |
 | [`experiments/liquidity-crisis/`](experiments/liquidity-crisis/) | Will a financial AI agent reduce risk in a market crisis? A checkpoint, a two-way fork, and the `liquidity_crisis` scenario on one arm. An executed notebook, replayed from a recording |
 
 ## Running them
