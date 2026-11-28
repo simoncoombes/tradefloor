@@ -24,9 +24,14 @@ cargo build --manifest-path rust/Cargo.toml --features wasm \
 mkdir -p "$OUT"
 wasm-bindgen --target nodejs --out-dir "$OUT" \
       rust/target/wasm32-unknown-unknown/release/tradefloor.wasm
+# The same .wasm for a page: an ES module with an init function in place of
+# node's require. Nothing in the crate differs between the two targets.
+wasm-bindgen --target web --out-dir "$OUT/web" \
+      rust/target/wasm32-unknown-unknown/release/tradefloor.wasm
 
 W=rust/target/wasm32-unknown-unknown/release/tradefloor.wasm
 echo "raw     $(wc -c < "$W") bytes"
 echo "gzip    $(gzip -9 -c "$W" | wc -c) bytes"
 
 node tools/wasm/check.mjs "$OUT"
+node tools/wasm/check_web.mjs "$OUT/web"

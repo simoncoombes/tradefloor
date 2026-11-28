@@ -87,11 +87,18 @@ def test_linked_repository_paths_exist(target: str) -> None:
 CLONE = "git clone https://github.com/simoncoombes/tradefloor"
 
 
+#: The rate-shock demo's commands moved from the README to docs/API.md. A
+#: reader arrives there from the PyPI page, so the same rule holds.
+CLONE_PAGES = (README, REPO / "docs" / "API.md")
+
+
 def _sections() -> list[tuple[str, list[str]]]:
     """Each `## ` section's heading and the lines inside its code fences."""
     out: list[tuple[str, list[str]]] = []
     fenced = False
-    for line in README.read_text(encoding="utf-8").splitlines():
+    lines = [line for page in CLONE_PAGES
+             for line in page.read_text(encoding="utf-8").splitlines()]
+    for line in lines:
         if line.startswith("## "):
             out.append((line[3:].strip(), []))
             fenced = False
@@ -122,7 +129,7 @@ def test_every_example_the_readme_runs_follows_a_clone() -> None:
         if not clones or clones[0] > runs[0]:
             missing.append(f"{heading}: {lines[runs[0]]}")
     assert not missing, (
-        "these README sections run a file from examples/ without cloning "
+        "these README or docs/API.md sections run a file from examples/ without cloning "
         f"the repository first, and pip does not install examples/. Add "
         f"`{CLONE}` and `cd tradefloor` before the command:\n  "
         + "\n  ".join(missing))

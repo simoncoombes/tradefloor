@@ -26,10 +26,11 @@ cff-version: 1.2.0
 message: "If you use this software, please cite it using these metadata, and name the model preset you used (for example pt-v22)."
 title: tradefloor
 abstract: >-
-  A deterministic market simulator with a real limit order book. A Rust core
-  with a Python API. The same seed produces the same market on every platform,
-  every price move carries a labelled factor decomposition, and orders match
-  against depth so trading moves the price.
+  A reproducible evaluation environment for financial AI agents, built on a
+  deterministic market simulator with a real limit order book. It has a Rust
+  core and a Python API. The same seed produces the same market on every
+  platform, every price move carries a labelled factor decomposition, and
+  orders match against depth so trading moves the price.
 type: software
 authors:
   - family-names: Coombes

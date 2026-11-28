@@ -262,6 +262,21 @@ impl Sim {
         }
         Ok(())
     }
+
+    /// An independent copy of this market as it stands, for a branch.
+    ///
+    /// A clone of the core [`Engine`], as `PyEngine::fork` is: `derive(Clone)`
+    /// carries every field, so nothing here keeps a list of what a fork
+    /// needs. The copy and the original then advance on their own, and with
+    /// nothing applied to either they produce the same prices to the bit.
+    pub fn fork(&self) -> Sim {
+        Sim {
+            inner: self.inner.clone(),
+            buffer: self.buffer.clone(),
+            tickers: self.tickers.clone(),
+            day_count: self.day_count,
+        }
+    }
 }
 
 /// One front future's quote, as `Sim.frontFutures` lists it: a read of
@@ -717,6 +732,28 @@ mod tests {
         }
         assert!(sim.name_option_expiries("IDX").is_empty());
         assert_eq!(sim.inner.state_hash(2, false), before);
+    }
+
+    /// A fork taken mid-run and the run it came from produce the same
+    /// market from there on, and both match one run straight through. With
+    /// nothing applied to either branch, any difference is state the clone
+    /// failed to carry.
+    #[test]
+    fn a_fork_continues_as_its_parent_would() {
+        let mut straight = Sim::build(12, 7, 3, "pt-v22").unwrap();
+        straight.run_days(7, 65).unwrap();
+        let mut parent = Sim::build(12, 7, 3, "pt-v22").unwrap();
+        parent.run_days(3, 65).unwrap();
+        let mut branch = parent.fork();
+        assert_eq!(branch.day(), 3);
+        parent.run_days(4, 65).unwrap();
+        branch.run_days(4, 65).unwrap();
+        assert_eq!(branch.day(), 7);
+        for sim in [&parent, &branch] {
+            assert_eq!(sim.prices(), straight.prices());
+            assert_eq!(sim.inner.state_hash(7, false),
+                       straight.inner.state_hash(7, false));
+        }
     }
 
     /// The day the core numbers is the one the digest probe numbers, so the

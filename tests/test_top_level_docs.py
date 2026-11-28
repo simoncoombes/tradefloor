@@ -64,7 +64,8 @@ def test_the_statistics_summary_row_counts_what_the_record_holds():
 def test_the_readme_counts_the_long_run_rows_the_record_holds():
     """The README said 'meets all 17, and the 23 more'."""
     record = long_run()
-    text = flat(read("README.md"))
+    # The sentences moved from the README to docs/REALISM.md.
+    text = flat(read("docs/REALISM.md"))
     assert f"are {record['of']} rows over 21 years" in text
     assert f"{tf.preset_record()['preset']} meets all {record['of']}," in text
     assert "meets all 17" not in text
@@ -107,13 +108,15 @@ def test_the_readme_counts_the_mcp_tools_the_server_registers():
     words = {12: "twelve", 13: "thirteen", 14: "fourteen", 15: "fifteen",
              16: "sixteen", 17: "seventeen", 18: "eighteen", 19: "nineteen",
              20: "twenty", 21: "twenty-one", 22: "twenty-two"}
-    text = read("README.md")
+    # The Contents table moved from the README to docs/API.md.
+    text = read("docs/API.md")
     assert (f"| MCP server | {words[count]} tools for a coding agent, "
             f"{words[read_only]} of them read-only") in text
 
 
 def test_the_examples_table_says_what_the_factors_sum_to():
-    text = read("README.md")
+    # The examples table moved from the README to examples/README.md.
+    text = read("examples/README.md")
     assert "sum to every move" not in text
     assert "The twelve factors that sum to the mispricing's move" in text
 
@@ -170,7 +173,8 @@ def test_the_roster_limit_names_the_preset_it_was_measured_on():
 
 def test_the_readme_states_the_per_seed_pass_rate():
     """19 of 19 is a verdict on 30-seed medians, not on one seed's year."""
-    text = flat(read("README.md"))
+    # The per-seed rate moved from the README to docs/REALISM.md.
+    text = flat(read("docs/REALISM.md"))
     assert "tf.envelope.intervals()" in text
     assert "all 14 were in range on 8 of the 16" in text
     assert "tf.envelope.intervals()" in flat(read("docs/STATISTICS.md"))
@@ -184,7 +188,8 @@ def test_the_clustering_shortfall_is_stated_beside_the_certificate():
     lag5 = certified["abs_return_acf5"]["measured"]
     windows = tf.facts.REAL_MARKETS_WINDOWS["values"]
     assert lag5 < min(windows["abs_return_acf5"])
-    readme = flat(read("README.md"))
+    # The clustering figure moved from the README to docs/REALISM.md.
+    readme = flat(read("docs/REALISM.md"))
     assert f"`abs_return_acf5` reads {lag5:.3f}" in readme
     stats = flat(read("docs/STATISTICS.md"))
     assert f"{lag1:.4f} for `abs_return_acf1`" in stats
@@ -197,7 +202,11 @@ def test_the_clustering_shortfall_is_stated_beside_the_certificate():
 
 def test_the_readme_promises_only_what_a_digest_checks():
     """'Results will not [change]' covered traded runs no digest pins."""
-    text = flat(read("README.md"))
+    # The promise moved from the README to docs/REPRODUCIBILITY.md, and
+    # the README must not grow a wider one back.
+    assert "Results will not" not in flat(read("README.md"))
+    assert "replays the same way this month" not in flat(read("README.md"))
+    text = flat(read("docs/REPRODUCIBILITY.md"))
     assert "Results will not" not in text
     assert "replays the same way this month" not in text
     assert "a market with no agent orders in it replays exactly" in text
@@ -224,12 +233,19 @@ def test_support_says_what_each_digest_covers():
 
 def test_the_readme_states_cpu_time_as_the_examples_pages_do():
     """'About two seconds' and 'ten to twenty seconds' were a third of it."""
-    text = flat(read("README.md"))
-    for stale in ("about two seconds", "ten to twenty seconds",
-                  "about two minutes", "0.7 seconds"):
-        assert stale not in text, stale
-    assert "The run takes under five seconds of CPU" in text
-    assert "about forty seconds of CPU" in text
+    # The demo's timing moved from the README to docs/API.md, and example
+    # 07's to examples/README.md. The README carries neither now, and must
+    # not grow a stale one back.
+    demo = flat(read("docs/API.md"))
+    examples = flat(read("examples/README.md"))
+    for name, text in (("README.md", flat(read("README.md"))),
+                       ("docs/API.md", demo),
+                       ("examples/README.md", examples)):
+        for stale in ("about two seconds", "ten to twenty seconds",
+                      "about two minutes", "0.7 seconds"):
+            assert stale not in text, (name, stale)
+    assert "The run takes under five seconds of CPU" in demo
+    assert "about 200 seconds of CPU" in examples
 
 
 # ---------------------------------------------------------------------------
@@ -263,7 +279,9 @@ def test_the_manifest_docs_name_the_result_block_it_writes():
     engine.run_days(1)
     keys = set(tf.RunManifest.of(engine, seed=1, universe=universe).result)
     assert "pnl" not in keys
-    for name in ("README.md", "docs/SUPPORT.md"):
+    # The README's manifest paragraph moved to docs/REPRODUCIBILITY.md.
+    assert "`pnl`" not in flat(read("README.md"))
+    for name in ("docs/REPRODUCIBILITY.md", "docs/SUPPORT.md"):
         text = flat(read(name))
         assert "`pnl`" not in text, name
         assert "`result` block holds" in text, name
@@ -369,7 +387,9 @@ def test_history_says_its_close_is_not_where_the_next_day_starts():
     text = flat(History.__doc__)
     assert "not the price the next session starts from" in text
     assert "On presets through pt-v19 the close re-marks nothing" in text
-    assert "A bar's close is the day's last print" in flat(read("README.md"))
+    # The sentence moved from the README to docs/AGENTS.md.
+    assert "A bar's close is the day's last print" in flat(
+        read("docs/AGENTS.md"))
     assert min(_close_gaps("pt-v20")) > 0
     assert max(_close_gaps("pt-v19")) == 0
 
@@ -380,7 +400,8 @@ def test_the_sandbox_limits_name_the_seed_on_the_call_stack():
     from tradefloor import sandbox
 
     for name, text in (("sandbox", flat(sandbox.__doc__)),
-                       ("README.md", flat(read("README.md"))),
+                       # Moved from the README to docs/AGENTS.md.
+                       ("docs/AGENTS.md", flat(read("docs/AGENTS.md"))),
                        ("CHANGELOG.md", flat(read("CHANGELOG.md")))):
         assert "guessed seed" not in text, name
         assert "sys._getframe" in text, name

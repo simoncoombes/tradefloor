@@ -1,6 +1,7 @@
 # tradefloor
 
-The Rust core of [tradefloor](https://github.com/simoncoombes/tradefloor): a
+The Rust core of [tradefloor](https://github.com/simoncoombes/tradefloor), a
+reproducible evaluation environment for financial AI agents. The crate is a
 deterministic market simulator with a real limit order book.
 
 A seed and a starting state run forward into prices, an order book with
@@ -390,6 +391,18 @@ with the parity corpus, `cargo clippy` with warnings as errors, a build on
 the declared minimum Rust (1.83) and `cargo doc` with warnings as errors.
 Before it publishes, `release.yml` packages the crate and runs
 `cargo test --offline` on the package.
+
+The minimum Rust is 1.83. A default build needs nothing more. The `python`
+feature brings in `arrow`, and on Rust 1.83 or 1.84 a fresh resolve of its
+dependencies reaches a `getrandom` that needs Rust 1.85. Resolve with a
+Cargo of 1.84 or later, told to prefer releases your Rust can build, and
+hold two crates back, as the workflow does:
+
+```sh
+CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS=fallback cargo generate-lockfile
+cargo update -p const-random --precise 0.1.18
+cargo update -p const-random-macro --precise 0.1.16
+```
 
 ## Licence
 
