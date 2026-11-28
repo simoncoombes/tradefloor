@@ -609,6 +609,12 @@ OUT_OF_SCOPE = {
         "to oil's block); it reads the forecast only, so the law moves no "
         "price at any value, and at 0.0 it is also left out of the model's "
         "digest",
+    "oil_forecast_path_law":
+        "inert at 0.0: oil's forecast reads growth as "
+        "`oil_forecast_cycle_growth` sets (a branch on `== 0.0`, and no path "
+        "is simulated); the paths draw from a generator of their own and "
+        "the switch reads the forecast only, so the law moves no price at any "
+        "value, and at 0.0 it is also left out of the model's digest",
     "oil_target_drift_reversion":
         "inert at 0.0: no pull on the oil target's long factor (a branch on "
         "the dial), the arithmetic that stood. Read only with "

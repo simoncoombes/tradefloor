@@ -1139,6 +1139,14 @@ def _nothing_dormant():
                    oil_forecast_clamp=1.0,
                    oil_forecast_opec_spread=1.0,
                    oil_forecast_cycle_growth=1.0,
+                   # The path law's switch is held off: the paths it holds
+                   # between the closes that simulate them are not in the
+                   # snapshot, so with it on a restored engine simulates
+                   # afresh and its forecast and oil futures leave the
+                   # copy's until the next simulation. That gap is pinned by
+                   # tests/test_oil_forecast_cycle.py::test_a_restored_
+                   # engine_reads_the_path_laws_held_paths (a strict xfail).
+                   oil_forecast_path_law=0.0,
                    # The bank's and the curve's core inflation: switches,
                    # and both on so the oil part of headline is carried.
                    fed_core_inflation=1.0,
