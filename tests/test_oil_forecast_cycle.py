@@ -109,7 +109,7 @@ def test_the_held_paths_are_carried_only_with_the_switch_on():
 
 #: The path law's start fixes (v23 step 4c): each a switch that needs the path
 #: law and changes only the start law its paths draw on.
-START_FIXES = ("oil_path_law_zero_return",)
+START_FIXES = ("oil_path_law_zero_return", "oil_path_law_belief_start")
 
 
 @pytest.mark.parametrize("name", START_FIXES)

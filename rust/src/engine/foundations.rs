@@ -2040,6 +2040,69 @@ impl OilPathHold {
     }
 }
 
+/// The start's law by the believed phase (`oil_path_law_belief_start`): per
+/// believed phase, `phase_cycle` order, every close of the long run the
+/// market's belief calls that phase (the nowcast's largest weight, as
+/// [`Engine::forecast_belief`] reads it), as (its true phase's place, its age
+/// in completed days, its growth less the published figure), sorted.
+type OilBeliefLaw = Vec<Vec<(usize, f64, f64)>>;
+
+impl Engine {
+    /// [`OilBeliefLaw`] on the start law's long run
+    /// ([`Engine::age_law_engine`], [`OIL_PATHS_AGE_LAW_DAYS`] after the warm
+    /// days). A path's start is then drawn jointly from the closes believed
+    /// to be in the close's believed phase, so its true phase, its age and
+    /// its growth's gap to the published figure keep the long run's joint
+    /// law under that belief, where the standing start takes the phase from
+    /// the belief and the age and gap from the true phase's law. Kept for
+    /// the process as the start law is.
+    fn oil_paths_belief_law(&self, day: i64) -> std::sync::Arc<OilBeliefLaw> {
+        type Key = (u64, String);
+        static MEMO: std::sync::Mutex<Vec<(Key, std::sync::Arc<OilBeliefLaw>)>> = std::sync::Mutex::new(Vec::new());
+        let key: Key = (self.root_seed, self.model_fingerprint().to_string());
+        if let Some(v) = MEMO.lock().ok().and_then(|m| m.iter().find(|(k, _)| *k == key).map(|(_, v)| v.clone())) {
+            return v;
+        }
+        let mut e = self.age_law_engine(day);
+        let spec = self.cycle_spec();
+        let phases = crate::economy::cycle::phase_cycle();
+        let mut out: OilBeliefLaw = vec![Vec::new(); 5];
+        for j in 1..=CYCLE_AGE_LAW_WARM_DAYS + OIL_PATHS_AGE_LAW_DAYS {
+            let d = CYCLE_AGE_LAW_ORIGIN + j;
+            e.advance_day(&DayAdvanceRequest {
+                volatility: 1.0,
+                active_shocks: &[],
+                market_return_pct: 0.0,
+                game_day: d,
+                timestamp: d * 24 * 60,
+            });
+            if j > CYCLE_AGE_LAW_WARM_DAYS {
+                let belief = e.forecast_belief();
+                let mut best = 0;
+                for i in 1..5 {
+                    if belief[i] > belief[best] {
+                        best = i;
+                    }
+                }
+                let k = phases.iter().position(|ph| *ph == e.economy.cycle_phase).unwrap_or(0);
+                let a = crate::mathx::max(0.0, (e.economy.months_in_current_phase * spec.month_days).round());
+                out[best].push((k, a, e.economy.gdp_growth - e.published_gdp_growth()));
+            }
+        }
+        for l in out.iter_mut() {
+            l.sort_by(|x, y| x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal));
+        }
+        let out = std::sync::Arc::new(out);
+        if let Ok(mut m) = MEMO.lock() {
+            if m.len() > 8 {
+                m.clear();
+            }
+            m.push((key, out.clone()));
+        }
+        out
+    }
+}
+
 /// The paths the oil forecast simulates at a close
 /// (`oil_forecast_path_law`). Precision, not a value of the model: the
 /// cost of a traded history, and the Monte Carlo error that leaves.
@@ -2124,6 +2187,19 @@ impl OilPaths {
         let phases = crate::economy::cycle::phase_cycle();
         let spec = engine.cycle_spec();
         let law = engine.oil_paths_start_law(day);
+        // `oil_path_law_belief_start`: the start drawn jointly from the long
+        // run's closes of the close's believed phase.
+        let belief_law = if p.oil_path_law_belief_start != 0.0 {
+            Some(engine.oil_paths_belief_law(day))
+        } else {
+            None
+        };
+        let mut believed = 0;
+        for j in 1..5 {
+            if belief[j] > belief[believed] {
+                believed = j;
+            }
+        }
         let mut rng = crate::rng::oil_paths_rng(engine.root_seed, day);
         let n = OIL_FORECAST_PATHS;
         // The start's law as one list: each phase's share of the belief
@@ -2160,7 +2236,18 @@ impl OilPaths {
             let v = (o as f64 + rng.next_f64()) / n as f64;
             let mut economy = econ.clone();
             economy.cycle_phase = phases[k];
-            if let Some(bin) = law.get(k).and_then(|l| l.get(b)) {
+            // Under `oil_path_law_belief_start` the stratified draw indexes the
+            // believed phase's sorted closes, and one draw is taken in place of
+            // the bin's growth draw, so the generator keeps its place.
+            let by_belief = belief_law.as_ref().and_then(|l| l.get(believed)).filter(|l| !l.is_empty());
+            if let Some(list) = by_belief {
+                let i = crate::mathx::min((u * list.len() as f64).floor(), (list.len() - 1) as f64) as usize;
+                let _ = rng.next_f64();
+                let (kk, age, diff) = list[i];
+                economy.cycle_phase = phases[kk];
+                economy.months_in_current_phase = age / spec.month_days;
+                economy.gdp_growth += diff;
+            } else if let Some(bin) = law.get(k).and_then(|l| l.get(b)) {
                 economy.months_in_current_phase = bin.0 / spec.month_days;
                 let m = bin.2.len();
                 if m > 0 {

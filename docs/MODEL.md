@@ -1603,7 +1603,13 @@ run plays a copy of the engine taken at the first forecast close, whose
 companies keep that close's day return, so every close of the long run reads
 that one market return; `oil_path_law_zero_return` (0.0 on every shipped
 preset, refused without the path law) stands them at their close, so the
-long run reads a return of zero. `usd_mean_reversion` and
+long run reads a return of zero. `oil_path_law_belief_start` (0.0 on every
+shipped preset, refused without the path law) draws each path's start, its
+true phase, age and growth less the published figure, jointly from the long
+run's closes whose believed phase is the close's own, in place of a phase
+from the belief with the age and growth of that phase's law. On step 4c's
+desk seeds it moved trough's error at 126 sessions the wrong way, by -0.69
+(0.36) $. `usd_mean_reversion` and
 `usd_noise_sd` set the dollar index's law (0.0 the standing 0.02 and 0.3): FRED's
 trade-weighted dollar (DTWEXM, 1987 to 2019) has an AR(1) half-life of 729
 sessions and a daily log change of 0.0043, so the dollar the oil curve carries

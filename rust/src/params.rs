@@ -1128,6 +1128,16 @@ pub struct ModelParams {
     /// day zero. A switch; refused without `oil_forecast_path_law`. It moves
     /// only what the forecast publishes.
     pub oil_path_law_zero_return: f64,
+    /// `oil_forecast_path_law`'s start drawn by the believed phase. 0.0, on
+    /// every shipped preset and left out of the model's digest, is a phase
+    /// drawn from the belief, an age from that phase's stationary law and
+    /// growth from the law's spread at that phase and age. At 1.0 each path's
+    /// start (its true phase, its age and its growth less the published
+    /// figure) is drawn jointly from the long run's closes whose believed
+    /// phase, the nowcast's largest weight, is the close's own. A switch;
+    /// refused without `oil_forecast_path_law`. It moves only what the
+    /// forecast publishes.
+    pub oil_path_law_belief_start: f64,
     /// The share of the dollar index's gap to its target closed each
     /// session. 0.0, on every shipped preset, is the standing 0.02, and a
     /// value of 0.0 is left out of the model's digest.
@@ -9557,6 +9567,7 @@ impl ModelParams {
             oil_forecast_cycle_growth: 0.0,
             oil_forecast_path_law: 0.0,
             oil_path_law_zero_return: 0.0,
+            oil_path_law_belief_start: 0.0,
             usd_mean_reversion: 0.0,
             usd_noise_sd: 0.0,
             usd_safe_haven_gain: 0.0,
@@ -12520,6 +12531,7 @@ impl ModelParams {
             "oil_forecast_cycle_growth" => self.oil_forecast_cycle_growth,
             "oil_forecast_path_law" => self.oil_forecast_path_law,
             "oil_path_law_zero_return" => self.oil_path_law_zero_return,
+            "oil_path_law_belief_start" => self.oil_path_law_belief_start,
             "usd_mean_reversion" => self.usd_mean_reversion,
             "usd_noise_sd" => self.usd_noise_sd,
             "usd_safe_haven_gain" => self.usd_safe_haven_gain,
@@ -13015,6 +13027,7 @@ impl ModelParams {
             "oil_forecast_cycle_growth" => out.oil_forecast_cycle_growth = value,
             "oil_forecast_path_law" => out.oil_forecast_path_law = value,
             "oil_path_law_zero_return" => out.oil_path_law_zero_return = value,
+            "oil_path_law_belief_start" => out.oil_path_law_belief_start = value,
             "usd_mean_reversion" => out.usd_mean_reversion = value,
             "usd_noise_sd" => out.usd_noise_sd = value,
             "usd_safe_haven_gain" => out.usd_safe_haven_gain = value,
@@ -14952,6 +14965,19 @@ impl ModelParams {
                  law's start, so it needs oil_forecast_path_law at 1."
                     .to_string());
         }
+        if !(self.oil_path_law_belief_start == 0.0 || self.oil_path_law_belief_start == 1.0) {
+            return Err(format!(
+                "oil_path_law_belief_start is {}. It is a switch: 0 (the start's phase from the \
+                 belief, its age and growth from that phase's law) or 1 (the start drawn jointly \
+                 from the long run's closes of the believed phase).",
+                self.oil_path_law_belief_start));
+        }
+        if self.oil_path_law_belief_start != 0.0 && self.oil_forecast_path_law == 0.0 {
+            return Err(
+                "oil_path_law_belief_start is 1 and oil_forecast_path_law is 0. It changes the path \
+                 law's start, so it needs oil_forecast_path_law at 1."
+                    .to_string());
+        }
         if !(0.0..=5.0).contains(&self.oil_inventory_noise_sd) {
             return Err(format!(
                 "oil_inventory_noise_sd is {}. It is the sd of oil inventory's daily noise, in \
@@ -16065,6 +16091,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "oil_forecast_cycle_growth",
     "oil_forecast_path_law",
     "oil_path_law_zero_return",
+    "oil_path_law_belief_start",
     "usd_mean_reversion",
     "usd_noise_sd",
     "usd_safe_haven_gain",
@@ -16358,6 +16385,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "oil_forecast_cycle_growth",
         "oil_forecast_path_law",
         "oil_path_law_zero_return",
+        "oil_path_law_belief_start",
         "usd_mean_reversion",
         "usd_noise_sd",
         "usd_safe_haven_gain",

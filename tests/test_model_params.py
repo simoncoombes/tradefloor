@@ -1276,6 +1276,7 @@ PERTURBATIONS = [
     # The path law's start (step 4c's construction fixes): INERT for the
     # same reason, with the path law as its companion.
     ("oil_path_law_zero_return", 1.0, False),
+    ("oil_path_law_belief_start", 1.0, False),
     # The forecast's derived dials: INERT for the same reason, and read only
     # with the horizon set.
     ("forecast_vix_dispersion", 0.3, False),
@@ -2340,6 +2341,7 @@ COMPANIONS: dict[str, dict[str, float]] = {
     "rate_intraday_live": {"rate_close_remark": 1.0},
     # The path law's start fixes change the path law, which they require.
     "oil_path_law_zero_return": {"oil_forecast_path_law": 1.0},
+    "oil_path_law_belief_start": {"oil_forecast_path_law": 1.0},
     # An index future settles on the price index, and the night walks the
     # futures: each is refused without the switch it reads.
     "futures_index_listed": {"index_level_listed": 1.0},
