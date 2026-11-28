@@ -14,28 +14,14 @@ with a frozen spec is planned after the pilot.
 ## Browser playground
 
 A page that runs a small market in the browser, with no install, is planned.
-The engine has a WebAssembly build (`rust/src/wasm.rs`) that runs days and
-reads prices. The playground needs orders, forks and scenarios added to that
-build.
+The engine has a WebAssembly build (`rust/src/wasm.rs`) that runs days, reads
+prices and quotes, and forks a market. The playground needs orders and
+scenarios added to that build.
 
 ## Research notes
 
 Short write-ups of experiments run on the engine are planned. Each one will
 carry the version, preset, seeds and code that reproduce its figures.
-
-## Reusable CI evaluation workflow
-
-A GitHub Actions workflow that scores an agent on fixed seeds and compares
-the result with a baseline is planned. A draft is open as
-[pull request 330](https://github.com/simoncoombes/tradefloor/pull/330),
-with a `tradefloor ci compare` command beside it.
-
-## Integration examples
-
-Adapters ship today for a plain callable, the OpenAI Agents SDK, PydanticAI,
-LangGraph and FinRobot, and the package has a Gymnasium environment. Two
-more examples are planned: training with Stable-Baselines3 on that
-environment, and an agent built on the Anthropic SDK.
 
 ## Suggestions
 
