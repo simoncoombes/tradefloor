@@ -1,0 +1,33 @@
+# Posts the summary `evaluate.yml` wrote as a comment on the pull request.
+#
+# Call it as a second job, after the job that calls `evaluate.yml`, and grant
+# it `pull-requests: write` there. Skip it for a fork's pull request; that
+# run's summary is still on the run page. See the header of `evaluate.yml`.
+#
+# It runs no code from the pull request: it downloads the report artifact
+# the evaluation job uploaded in the same run and posts it.
+
+name: evaluate comment
+
+on:
+  workflow_call:
+
+permissions:
+  pull-requests: write
+
+jobs:
+  comment:
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: tradefloor-evaluation
+      - name: Comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: gh pr comment "$PR" --repo "$REPO" --body-file evaluation.md

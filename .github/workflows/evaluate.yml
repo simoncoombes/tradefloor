@@ -13,6 +13,22 @@
 # The baseline is the same file at the pull request's base commit, so the
 # report reads "what this pull request did to the agent".
 #
+# To post the summary as a pull request comment, add a second job that calls
+# `evaluate-comment.yml` and grants it `pull-requests: write`:
+#
+#     comment:
+#       needs: evaluate
+#       if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+#       permissions:
+#         pull-requests: write
+#       uses: simoncoombes/tradefloor/.github/workflows/evaluate-comment.yml@v0.12.0
+#
+# It is a separate workflow because a called workflow may not ask for more
+# than its caller grants, even in a job it skips: a comment job in here made
+# every read-only caller fail at startup ("The nested job 'comment' is
+# requesting 'pull-requests: write', but is only allowed 'pull-requests:
+# none'"), whether it commented or not.
+#
 # The job imports the agent file, which runs it. It therefore runs with a
 # read-only token, takes no secrets, and never uses `pull_request_target`.
 # An agent that calls a paid model needs a key, and a key must not reach a
@@ -102,11 +118,6 @@ on:
         required: false
         type: boolean
         default: true
-      comment:
-        description: "Post the summary on the pull request. The calling job must grant pull-requests: write. Skipped for forks."
-        required: false
-        type: boolean
-        default: false
     outputs:
       passed:
         description: "'true' when every threshold held"
@@ -216,23 +227,3 @@ jobs:
             evaluation.json
             evaluation.md
           if-no-files-found: ignore
-
-  comment:
-    # A separate job, so the token that can write a comment never exists in
-    # the job that ran the agent's code. A fork's pull request is skipped:
-    # its summary is still on the run.
-    needs: compare
-    if: ${{ always() && inputs.comment && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
-    runs-on: ubuntu-latest
-    permissions:
-      pull-requests: write
-    steps:
-      - uses: actions/download-artifact@v8
-        with:
-          name: tradefloor-evaluation
-      - name: Comment
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR: ${{ github.event.pull_request.number }}
-          REPO: ${{ github.repository }}
-        run: gh pr comment "$PR" --repo "$REPO" --body-file evaluation.md
