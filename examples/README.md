@@ -22,7 +22,7 @@ a parameter -- swap it for your own and nothing else in the experiment moves.
 
 ## The reading order
 
-Eight notebooks and four scripts, numbered in reading order. The committed
+Nine notebooks and four scripts, numbered in reading order. The committed
 notebooks carry their output, so you can read them without running anything.
 Start at 00 if you have not used tradefloor before.
 
@@ -40,6 +40,7 @@ Start at 00 if you have not used tradefloor before.
 | [`08-claude-agent.py`](08-claude-agent.py) | An LLM agent scored against the baselines. Replays a recorded Claude run by default, so it needs no key |
 | [`10-forking-a-market.py`](10-forking-a-market.py) | Fork a market mid-flight, change the policy rate in one branch, compare |
 | [`11-scenario-fork.py`](11-scenario-fork.py) | Read a scenario from YAML, apply it to one branch of a fork, and price what it cost |
+| [`12-ai-vs-traditional.ipynb`](12-ai-vs-traditional.ipynb) | `08-claude-agent.py` run as a notebook: the recorded Claude agent beside the reference strategies on one market, offline by default |
 
 Notebooks 05 and 06 cover the two audiences the project is built for, RL
 researchers and execution developers.
@@ -67,9 +68,11 @@ same experiment two ways, and writes its output to its own git-ignored
 | | what it asks |
 |---|---|
 | [`rate-shock/`](rate-shock/) | Does the agent actually react to macro conditions? Checkpoint, fork, +200bps in one arm, compare. Under five seconds of CPU, no keys |
+| [`fork-futures/`](fork-futures/) | What does one buy-and-hold portfolio do in four futures of one market? A fork into a control and the `rate_shock`, `recession` and `liquidity_crisis` scenarios, and the figure the project README shows. Seven to twelve seconds of CPU, no keys |
 | [`integrations/finrobot/`](integrations/finrobot/) | The same experiment with a real [FinRobot](https://github.com/AI4Finance-Foundation/FinRobot) agent in place of the native one. Replays a recorded run by default, so it needs no API key |
 | [`integrations/`](integrations/) | The same decision loop under a plain function, the OpenAI Agents SDK, PydanticAI and LangGraph. Offline, no keys |
 | [`mcp-client/`](mcp-client/) | Does the MCP server answer a plain Python client? Opens a seeded session, forks it, sends one order in one branch, and compares. Needs `tradefloor[mcp]`, no keys |
+| [`rl-ppo/`](rl-ppo/) | What does a Stable-Baselines3 PPO agent learn on `TradingEnv` in 8,192 steps? Scored against cash, equal weight and the untrained network on 20 held-out seeds. Needs `stable-baselines3` |
 | [`experiments/liquidity-crisis/`](experiments/liquidity-crisis/) | Will a financial AI agent reduce risk in a market crisis? A checkpoint, a two-way fork, and the `liquidity_crisis` scenario on one arm. An executed notebook, replayed from a recording |
 
 ## Running them
@@ -90,7 +93,7 @@ The times below are CPU time (user plus system), measured with
 `10-forking-a-market.py` and `11-scenario-fork.py` take under a second each
 and need nothing extra. `rate-shock/counterfactual.py` takes under five
 seconds of CPU. It writes a chart if `matplotlib` is installed and says so if
-it is not. `07-research-workflow.py` takes about forty seconds and prints its
+it is not. `07-research-workflow.py` takes about 200 seconds of CPU across eight worker processes and prints its
 own wall-clock total on the last line. It needs
 `tradefloor[arrow]`, because its realism step reads the daily bars table.
 `integrations/finrobot/rate_shock.py` takes about a second and also runs
@@ -119,6 +122,8 @@ reachable, rather than print a traceback, and a recording it makes with a
 stand-in client must replay to the same scorecard. The four scripts in
 `integrations/` run when their framework is installed, and what they print
 is read back against the table in their README.
+`tests/test_fork_futures.py` runs `fork-futures/fork_futures.py` twice and
+requires the same figure both times.
 `tests/test_rate_shock_demo.py` runs `rate-shock/counterfactual.py` and
 checks its claims, not only its exit code: that the arms started identical,
 that nothing diverged before the intervention, that the experiment reruns to

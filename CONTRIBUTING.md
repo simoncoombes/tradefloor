@@ -33,6 +33,30 @@ constructor does with the state it is given is the other: say in the
 CHANGELOG which function changed and what to call for the old behaviour.
 RELEASING.md, "State shapes and widths", has the history behind both.
 
+## Scientific and benchmark changes
+
+A benchmark spec is treated the way a preset is. Its version is frozen when
+it is published, and every result cites that version.
+
+- **A change makes a new version.** Anything a score depends on is part of
+  the spec: the scenarios, the seeds, the instruments, the horizon, the
+  observation an agent is shown, the action schema and the scoring rule. A
+  change to any of them ships as a new spec version with its own identifier,
+  and the earlier version stays runnable beside it.
+- **Held-out seeds are for scoring only.** Tune a prompt, an agent or a
+  coefficient on the public seeds. A run that read a held-out seed before
+  its final scoring says so in its submission.
+- **A published result is never edited.** A correction is a new entry that
+  names the entry it corrects and says what was wrong. The original entry
+  stays readable.
+- **A claim carries its measurement.** A pull request that changes a
+  statement about the model or about a benchmark gives the version, preset,
+  seeds and command that produced the new figure.
+
+A result submitted by somebody else is listed as community submitted until
+a maintainer has reproduced it. The benchmark submission issue template
+lists what a reproduction needs.
+
 ## Setup
 
 ```bash
@@ -58,35 +82,32 @@ it those tests skip, and a skip and a pass are the same colour.
 ## Tests
 
 ```bash
-pytest tests/                                   # Python, ~3000 tests
+pytest tests/                                   # Python
 cargo test --manifest-path rust/Cargo.toml      # Rust, including parity
 python tests/known_answer.py                    # the determinism digest
 ```
 
-The count is there so you can tell a finished run from one that quietly
-collected half of itself, so a stale reference count defeats its own purpose:
-a reader comparing a healthy run against it concludes something is wrong, and
-a reader whose run collected half of a much larger suite sees a number that
-looks right.
+The count of collected tests tells a finished run from one that quietly
+collected half of itself. A reference count printed here goes stale within
+weeks: the suite collected 1,358 tests at `ca4fa6a`, 2,989 at `5fa94c6` and
+more than 7,000 at `7c749a05`. A reader comparing a healthy run against an
+old figure concludes something is wrong, so this file gives no figure to
+compare against.
 
 RE-DERIVE IT RATHER THAN TRUSTING THIS PARAGRAPH. `pytest tests/ --collect-only
 -q | tail -1` gives the count for the tree in front of you in seconds, and that
-is the number to compare against.
+is the number to compare against. Wall time grows with the count, so time a
+run on your own machine before budgeting for one.
 
-Two readings, both from clean checkouts on a sixteen-core box: at `ca4fa6a`
-the suite collected 1,358 and ran 1,321 passed with 37 skipped in 204s; at
-`5fa94c6` it collects 2,989 and runs 2,801 passed, 187 skipped and 1 xfailed
-in about 590s. So the suite has more than doubled and the wall time has
-roughly tripled, and neither figure is wrong for its own commit. On a
-contended four-core machine the same run has taken over 1,000 seconds of CPU.
-
-Two things move the count without anything being wrong. `tests/test_tool_help.py` parametrises over
-`tools/calibration/*.py`, so adding a tool adds a test: one landed after
-`ca4fa6a` and the tree now collects 1,359. And `tests/test_mcp.py` and
+Three things move the count without anything being wrong.
+`tests/test_tool_help.py` parametrises over `tools/calibration/*.py`, so
+adding a tool adds a test. `tests/test_mcp.py` and
 `tests/test_mcp_integration.py` call `pytest.importorskip("mcp")` at module
-level, so without the `mcp` extra their 93 tests never enter the count at all
-and collection reports 1,266 -- a missing extra shows up as a smaller total,
-not as a column of skips.
+level, so without the `mcp` extra their tests never enter the count at all:
+a missing extra shows up as a smaller total with no column of skips. And
+some test modules import `numpy` or `pyarrow` on their first lines, so
+without those two packages the same last line reports collection errors
+beside the count.
 
 Some suites are opt-in and skip cleanly rather than failing. Three different
 reasons put a test in the skip column, and they read identically in the

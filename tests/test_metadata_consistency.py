@@ -2,7 +2,8 @@
 
 `tools/release/metadata.py` names the source of each fact (the version, the
 release date, the default preset, the documentation and home URLs, the
-supported Pythons) and lists the copies `tools/release/bump.py` rewrites.
+supported Pythons, the description, and the scenario, preset and MCP tool
+counts) and lists the copies `tools/release/bump.py` rewrites.
 These tests check every copy against its source, so a copy that a release
 forgot fails the suite on the pull request rather than reaching PyPI, the
 crate page or somebody's bibliography. Two releases shipped that way:
@@ -308,3 +309,96 @@ def test_the_supported_pythons_are_one_list():
     served = re.search(r"serves ([0-9., and]+?) from one build", doc)
     assert served is not None
     assert re.findall(r"3\.\d+", served.group(1)) == versions
+
+
+# --------------------------------------------------------------------------
+# Description and counts
+# --------------------------------------------------------------------------
+
+def test_every_description_states_the_same_purpose():
+    """`[project] description` is the source. The crate repeats it, and the
+    citation file, the Zenodo record, the crate page and both MCP listings
+    each carry its phrase inside a longer sentence. Five of them described
+    a simulator and named no purpose after pyproject.toml had moved."""
+    crate = _toml("rust/Cargo.toml")["package"]["description"]
+    assert md.description() == crate
+    drift = md.purpose_drift()
+    assert not drift, "\n  ".join(drift)
+    listed = _json("server.json")["description"]
+    assert listed == _json("mcpb/manifest.json")["description"]
+    assert len(listed) <= md.REGISTRY_DESCRIPTION_LIMIT, len(listed)
+
+
+def test_every_count_in_prose_is_the_count_in_the_code():
+    """The packaged scenarios, the shipped presets and the MCP server's
+    tools are each counted in a sentence somewhere. The scenario files, the
+    engine's preset list and the `@server.tool` registrations are the
+    sources, read as files."""
+    drift = md.count_drift()
+    assert not drift, "\n  ".join(drift)
+
+
+def test_the_counted_sources_are_what_the_package_serves():
+    """The file readers in metadata.py agree with the built package, so a
+    count read from source is the count a user gets."""
+    assert tuple(md.scenario_names()) == tuple(sorted(tf.Scenario.available()))
+    assert list(md.preset_names()) == list(tf.preset_names())
+    tools = md.mcp_tools()
+    manifest = [t["name"] for t in _json("mcpb/manifest.json")["tools"]]
+    assert sorted(manifest) == sorted(tools)
+    assert 0 < sum(tools.values()) < len(tools)
+
+
+def test_a_count_reads_as_digits_or_words():
+    assert [md.number(s) for s in ("8", "eight", "Eight", "twenty-two",
+                                   "thirty", "ninety-nine")] == \
+        [8, 8, 8, 22, 30, 99]
+    assert md.number("several") is None and md.number("twenty-zero") is None
+
+
+def test_a_stale_count_or_description_is_reported(tmp_path):
+    """Each check fails on a copy of the tree with one fact moved: a ninth
+    scenario file, a crate page that drops the purpose, and a security
+    policy left on the previous release line."""
+    files = sorted({loc.path for locs in md.COUNTS.values() for loc in locs}
+                   | set(md.PURPOSE)
+                   | {"pyproject.toml", "rust/Cargo.toml", "SECURITY.md",
+                      "rust/src/params.rs", "python/tradefloor/mcp.py"})
+    for name in files:
+        (tmp_path / name).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(ROOT / name, tmp_path / name)
+    scenarios = tmp_path / "python" / "tradefloor" / "scenarios"
+    scenarios.mkdir()
+    for name in md.scenario_names():
+        (scenarios / f"{name}.yml").write_text("", encoding="utf-8")
+    before = md.ROOT
+    md.ROOT = tmp_path
+    try:
+        assert md.count_drift() == md.purpose_drift() == []
+        assert md.support_drift() == []
+
+        (scenarios / "ninth.yml").write_text("", encoding="utf-8")
+        assert len(md.count_drift()) == 3
+        (scenarios / "ninth.yml").unlink()
+
+        page = tmp_path / "rust" / "README.md"
+        text = page.read_text(encoding="utf-8")
+        page.write_text(text.replace("evaluation environment", "sandbox"),
+                        encoding="utf-8")
+        assert md.purpose_drift() == [
+            f"rust/README.md: does not say {md.purpose()!r}"]
+
+        policy = tmp_path / "SECURITY.md"
+        line = ".".join(md.package_version().split(".")[:2])
+        policy.write_text(policy.read_text(encoding="utf-8").replace(
+            f"| {line}.x | yes", "| 0.1.x | yes"), encoding="utf-8")
+        assert len(md.support_drift()) == 1
+    finally:
+        md.ROOT = before
+
+
+def test_the_security_policy_names_the_current_release_line():
+    """SECURITY.md's table called 0.9.x the latest line through four later
+    releases. The line is the version's first two parts."""
+    drift = md.support_drift()
+    assert not drift, drift

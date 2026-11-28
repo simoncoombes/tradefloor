@@ -199,12 +199,13 @@ scored. So two frameworks can be compared on the same market.
 |---|---|
 | [Plain Python](https://github.com/simoncoombes/tradefloor/blob/main/examples/integrations/callable/five_days.py) | Generic callable |
 | [OpenAI Agents SDK](https://github.com/simoncoombes/tradefloor/blob/main/examples/integrations/openai_agents/five_days.py) | Adapter |
+| [Anthropic SDK (Claude)](https://github.com/simoncoombes/tradefloor/blob/main/examples/integrations/claude/five_days.py) | Adapter |
 | [PydanticAI](https://github.com/simoncoombes/tradefloor/blob/main/examples/integrations/pydantic_ai/rate_shock.py) | Adapter |
 | [LangGraph](https://github.com/simoncoombes/tradefloor/blob/main/examples/integrations/langgraph/rate_shock.py) | Adapter |
 | [FinRobot](https://github.com/simoncoombes/tradefloor/tree/main/examples/integrations/finrobot) | Existing integration |
 
 ```
-pip install "tradefloor[openai-agents]"   # or [pydantic-ai], or [langgraph]
+pip install "tradefloor[openai-agents]"   # or [claude], [pydantic-ai], or [langgraph]
 ```
 
 A plain Python function needs no extra. FinRobot keeps the `finrobot` extra

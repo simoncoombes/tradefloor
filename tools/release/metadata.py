@@ -14,6 +14,11 @@ suite. The table:
     supported Pythons     pyproject.toml requires-python and the
                           `Programming Language :: Python :: 3.N`
                           classifiers
+    description           pyproject.toml [project] description    PURPOSE
+    scenario count        python/tradefloor/scenarios/*.yml       COUNTS
+    preset count          preset_names(), rust/src/params.rs      COUNTS
+    MCP tool counts       `@server.tool` in tradefloor/mcp.py     COUNTS
+    latest release line   pyproject.toml [project] version        LATEST_LINE
 
 The version locations used to be listed in RELEASING.md and in
 `check.py` separately, and the README citation was in neither list, so
@@ -105,6 +110,44 @@ def python_versions() -> list[str]:
     found = [c[len(prefix):] for c in pyproject()["project"]["classifiers"]
              if re.fullmatch(re.escape(prefix) + r"3\.\d+", c)]
     return sorted(found, key=lambda v: int(v.split(".")[1]))
+
+
+def description() -> str:
+    """`[project] description` in pyproject.toml: PyPI's one-line summary."""
+    return pyproject()["project"]["description"]
+
+
+def purpose() -> str:
+    """What the description says the project is for, as a phrase a longer
+    sentence can carry: the description without its article and full stop."""
+    return re.sub(r"^(?:An?|The) ", "", description()).rstrip(".")
+
+
+def scenario_names() -> list[str]:
+    """The packaged scenarios: one `.yml` file each, shipped in the wheel."""
+    return sorted(p.stem for p in
+                  (ROOT / "python" / "tradefloor" / "scenarios").glob("*.yml"))
+
+
+def preset_names() -> list[str]:
+    """The shipped presets, from `preset_names()` in rust/src/params.rs."""
+    m = re.search(r"pub fn preset_names\(\)[^{]*\{\s*&\[([^\]]+)\]",
+                  read("rust/src/params.rs"))
+    if m is None:
+        raise SystemExit("rust/src/params.rs has no preset_names() list")
+    return re.findall(r'"([^"]+)"', m.group(1))
+
+
+def mcp_tools() -> dict[str, bool]:
+    """Every tool the MCP server registers, in order, and whether its
+    annotations mark it read-only. Read from the `@server.tool(...)`
+    decorators in python/tradefloor/mcp.py without importing it, because
+    the import needs the `mcp` extra and a built extension."""
+    blocks = re.findall(r"(?ms)^@server\.tool\((.*?)^(?:async )?def (\w+)\(",
+                        read("python/tradefloor/mcp.py"))
+    return {name: bool(re.search(r"annotations=_READ_ONLY\b"
+                                 r"|readOnlyHint=True", head))
+            for head, name in blocks}
 
 
 # --------------------------------------------------------------------------
@@ -208,6 +251,136 @@ def preset_prose() -> list[tuple[str, str]]:
             for m in re.finditer(pattern, read(path))]
 
 
+#: Files that state what the project is for. Each carries `purpose()` word
+#: for word, whatever else its sentence says. Checked, never rewritten: the
+#: sentence around the phrase differs in every file.
+PURPOSE = (
+    "CITATION.cff", ".zenodo.json", "rust/README.md", "server.json",
+    "mcpb/manifest.json",
+)
+
+#: The registry's limit on `description` in server.json, in characters.
+REGISTRY_DESCRIPTION_LIMIT = 100
+
+
+def purpose_drift() -> list[str]:
+    """Every description that has stopped saying what pyproject.toml says."""
+    want = purpose()
+    out = []
+    crate = re.findall(r'(?m)^description = "([^"]+)"$',
+                       read("rust/Cargo.toml"))
+    if crate != [description()]:
+        out.append(f"rust/Cargo.toml: description is {crate}, pyproject.toml "
+                   f"says {description()!r}")
+    for path in PURPOSE:
+        if want not in " ".join(read(path).split()):
+            out.append(f"{path}: does not say {want!r}")
+    m = re.search(r'(?m)^  "description": "([^"]*)",$', read("server.json"))
+    if m is None:
+        out.append("server.json: no top-level description")
+    elif len(m.group(1)) > REGISTRY_DESCRIPTION_LIMIT:
+        out.append(f"server.json: description is {len(m.group(1))} "
+                   f"characters, the registry allows "
+                   f"{REGISTRY_DESCRIPTION_LIMIT}")
+    return out
+
+
+_UNITS = ("zero one two three four five six seven eight nine ten eleven "
+          "twelve thirteen fourteen fifteen sixteen seventeen eighteen "
+          "nineteen").split()
+_TENS = "twenty thirty forty fifty sixty seventy eighty ninety".split()
+
+
+def number(text: str) -> int | None:
+    """A count as prose writes it, `22` or `twenty-two`, below a hundred."""
+    text = text.lower()
+    if text.isdigit():
+        return int(text)
+    if text in _UNITS:
+        return _UNITS.index(text)
+    tens, _, unit = text.partition("-")
+    if tens in _TENS and (not unit or unit in _UNITS[1:10]):
+        return (20 + 10 * _TENS.index(tens)
+                + (_UNITS.index(unit) if unit else 0))
+    return None
+
+
+#: Every sentence that states a count the code decides, by fact. The one
+#: group is the number, in digits or words. Checked, never rewritten: a
+#: count moves when a scenario, a preset or a tool is added, which is no
+#: release step. The README and docs/MODEL.md said seven scenarios for a
+#: release after the eighth shipped.
+COUNTS = {
+    "scenarios": (
+        Location("README.md", r"\b([\w-]+) packaged\s+(?:shocks|scenarios)\b",
+                 "the README's table of what the package holds, and its "
+                 "scenario section", count=2),
+        Location("docs/MODEL.md", r"(?m)^([\w-]+) scenarios ship:",
+                 "the model document's list of packaged scenarios"),
+    ),
+    "presets": (
+        Location("rust/README.md", r"\bship as ([\w-]+) presets\b",
+                 "the crate page"),
+    ),
+    "MCP tools": (
+        Location("README.md", r"\b([\w-]+) tools for a coding agent\b",
+                 "the README's table of what the package holds"),
+    ),
+    "read-only MCP tools": (
+        Location("README.md", r"\b([\w-]+) of them read-only\b",
+                 "the README's table of what the package holds"),
+    ),
+}
+
+
+def counts() -> dict[str, int]:
+    """Each counted fact, from the code."""
+    tools = mcp_tools()
+    return {"scenarios": len(scenario_names()),
+            "presets": len(preset_names()),
+            "MCP tools": len(tools),
+            "read-only MCP tools": sum(tools.values())}
+
+
+def count_drift() -> list[str]:
+    """Every sentence whose count disagrees with the code, and every
+    pattern that has stopped matching its sentence."""
+    out = []
+    for fact, want in counts().items():
+        for loc in COUNTS[fact]:
+            found = loc.values()
+            if len(found) != loc.count:
+                out.append(f"{loc.path}: {loc.reader}: expected {loc.count} "
+                           f"sentence(s) counting the {fact}, found "
+                           f"{len(found)}")
+            for said in found:
+                if number(said) != want:
+                    out.append(f"{loc.path}: {loc.reader}: says {said} "
+                               f"{fact}, the code has {want}")
+    return out
+
+
+#: The row of SECURITY.md's table that names the latest release line, as
+#: `0.11.x`. Checked, never rewritten: a minor release also moves the line
+#: it replaces into the rows below, which no pattern can do. The row said
+#: 0.9.x through 0.10.0, 0.10.1, 0.10.2 and 0.11.0.
+LATEST_LINE = Location(
+    "SECURITY.md",
+    r"(?m)^\| (\d+\.\d+)\.x \| yes, the latest release line \|$",
+    "the security policy's table of supported versions")
+
+
+def support_drift() -> list[str]:
+    """The security policy's latest line, if it is another release's."""
+    want = ".".join(package_version().split(".")[:2])
+    found = LATEST_LINE.values()
+    if found != [want]:
+        return [f"{LATEST_LINE.path}: {LATEST_LINE.reader}: names "
+                f"{found or 'no line'} as the latest, the version is on "
+                f"{want}.x"]
+    return []
+
+
 def expected() -> list[tuple[Location, str]]:
     """Every copy paired with the value its source gives it."""
     version, year, preset = (package_version(), release_date()[:4],
@@ -257,7 +430,14 @@ def main() -> int:
         mark = "ok  " if all(v == want for v in loc.values()) and \
             len(loc.values()) == loc.count else "FAIL"
         print(f"  {mark}  {loc.path:<20} {found:<12} {loc.reader}")
-    return 1 if drift() else 0
+    print()
+    print(f"description       {description()}")
+    for fact, want in counts().items():
+        print(f"{fact:<22}{want}")
+    problems = purpose_drift() + count_drift() + support_drift()
+    for line in problems:
+        print(f"  FAIL  {line}")
+    return 1 if drift() or problems else 0
 
 
 if __name__ == "__main__":
