@@ -229,7 +229,7 @@ def test_the_readme_states_cpu_time_as_the_examples_pages_do():
                   "about two minutes", "0.7 seconds"):
         assert stale not in text, stale
     assert "The run takes under five seconds of CPU" in text
-    assert "about forty seconds of CPU" in text
+    assert "about 200 seconds of CPU" in text
 
 
 # ---------------------------------------------------------------------------

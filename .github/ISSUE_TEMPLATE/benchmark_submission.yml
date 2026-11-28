@@ -1,0 +1,111 @@
+name: Benchmark submission
+description: Results from a benchmark run, offered for the public record
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A submission is listed as "community submitted" until a maintainer
+        has reproduced it from the artifacts below. Hashes show that the
+        files you link are the files you hashed. They do not prove a run was
+        honest, so a result is marked reproduced only after an independent
+        rerun.
+
+        **Never paste an API key, a token or a provider credential here.**
+        This issue is public. Remove keys and authorization headers from
+        configs, logs and transcripts before you attach or link them, and
+        revoke any key that has already been posted.
+
+  - type: input
+    id: benchmark_version
+    attributes:
+      label: Benchmark version
+      description: >-
+        The identifier of the frozen benchmark spec the run used, exactly as
+        the spec states it.
+    validations:
+      required: true
+
+  - type: input
+    id: engine_version
+    attributes:
+      label: Engine version and preset
+      description: "`tradefloor.version()` and `tradefloor.model_preset()['name']`"
+      placeholder: "0.11.0, pt-v22"
+    validations:
+      required: true
+
+  - type: input
+    id: model
+    attributes:
+      label: Model id
+      description: >-
+        The provider and the exact model identifier the API was called with,
+        including any dated suffix. A marketing name does not identify a
+        model snapshot.
+    validations:
+      required: true
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Run configuration
+      description: >-
+        The full configuration of the run with every credential removed:
+        sampling settings, prompt or agent version, tools, memory, retries,
+        seeds and anything else that differs from the benchmark's defaults.
+      render: yaml
+    validations:
+      required: true
+
+  - type: input
+    id: artifacts
+    attributes:
+      label: Artifact link
+      description: >-
+        A public link to the complete run output: results, decision logs and
+        the configuration file. A link that needs an account cannot be
+        reproduced from.
+    validations:
+      required: true
+
+  - type: textarea
+    id: hashes
+    attributes:
+      label: Hashes
+      description: >-
+        The SHA-256 of each artifact file and of the benchmark spec the run
+        used, one per line as `sha256  filename`.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: results
+    attributes:
+      label: Headline results
+      description: >-
+        The scores as the benchmark tooling printed them. Please copy them
+        unedited and include failed, refused and incomplete runs.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: deviations
+    attributes:
+      label: Deviations from the spec
+      description: >-
+        Anything the run did that the spec does not describe, such as a
+        restart, a changed limit or a seed that was run twice.
+
+  - type: checkboxes
+    id: declarations
+    attributes:
+      label: Declarations
+      options:
+        - label: No API key, token or credential appears in this issue or in the linked artifacts
+          required: true
+        - label: The model was not tuned on the benchmark's held-out seeds
+          required: true
+        - label: I understand the result is listed as community submitted until it is reproduced
+          required: true
