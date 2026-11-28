@@ -70,6 +70,12 @@ on:
       - "pyproject.toml"
       - ".github/workflows/determinism.yml"
 
+# The token every job gets. No job here writes to the repository, comments,
+# publishes or requests an OIDC token; checkout and the artifact and cache
+# services need nothing beyond reading the contents.
+permissions:
+  contents: read
+
 jobs:
   setup:
     name: choose targets

@@ -1,0 +1,67 @@
+name: Feature request
+description: A capability the library, the CLI or the MCP server lacks
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A request that changes the simulated market is a request for a new
+        preset, because a shipped preset never changes (CONTRIBUTING.md). A
+        request for an API, an adapter, a scenario target, a tool or an
+        output format changes no market and is easier to accept. Please say
+        which of the two this is.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The task you cannot do today
+      description: >-
+        What you were trying to measure or build, and where the library
+        stopped you. A concrete experiment is easier to act on than a general
+        capability.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: The change you propose
+      description: >-
+        The call, command or file you would like to write. A sketch of the
+        signature and one example of its output is enough.
+      render: python
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Workarounds you tried
+      description: >-
+        What you did instead and what it cost you, including code outside
+        the library.
+
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Surface
+      options:
+        - Python API
+        - Rust crate
+        - Command line
+        - MCP server
+        - Scenario files
+        - Agent integration or adapter
+        - Model or preset
+        - Documentation or examples
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: trajectory
+    attributes:
+      label: Effect on existing results
+      options:
+        - label: It leaves every shipped preset's market unchanged
+        - label: It needs a new preset or changes what a seed produces
+        - label: I do not know which of these applies

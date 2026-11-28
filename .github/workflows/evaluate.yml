@@ -1,0 +1,229 @@
+# A reusable workflow: two versions of a trading agent on the same simulated
+# markets, with a summary on the run and an optional failing threshold.
+#
+# Call it from another repository:
+#
+#   jobs:
+#     evaluate:
+#       uses: simoncoombes/tradefloor/.github/workflows/evaluate.yml@v0.12.0
+#       with:
+#         agent: bot.py:make_agent
+#         max-drawdown: "15"
+#
+# The baseline is the same file at the pull request's base commit, so the
+# report reads "what this pull request did to the agent".
+#
+# To post the summary as a pull request comment, add a second job that calls
+# `evaluate-comment.yml` and grants it `pull-requests: write`:
+#
+#     comment:
+#       needs: evaluate
+#       if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+#       permissions:
+#         pull-requests: write
+#       uses: simoncoombes/tradefloor/.github/workflows/evaluate-comment.yml@v0.12.0
+#
+# It is a separate workflow because a called workflow may not ask for more
+# than its caller grants, even in a job it skips: a comment job in here made
+# every read-only caller fail at startup ("The nested job 'comment' is
+# requesting 'pull-requests: write', but is only allowed 'pull-requests:
+# none'"), whether it commented or not.
+#
+# The job imports the agent file, which runs it. It therefore runs with a
+# read-only token, takes no secrets, and never uses `pull_request_target`.
+# An agent that calls a paid model needs a key, and a key must not reach a
+# fork's code: run such an agent from a workflow of your own, on branches
+# you trust, and call `tradefloor ci compare` there.
+
+name: evaluate
+
+on:
+  workflow_call:
+    inputs:
+      agent:
+        description: "FILE.py:NAME, a zero-argument callable that returns the agent"
+        required: true
+        type: string
+      baseline-agent:
+        description: "FILE.py:NAME at the baseline ref, when it differs from `agent`"
+        required: false
+        type: string
+        default: ""
+      baseline-ref:
+        description: "Commit or branch holding the baseline; default is the pull request's base, else the previous commit"
+        required: false
+        type: string
+        default: ""
+      seeds:
+        description: "Market seeds, as 1-12 or 3,5,8"
+        required: false
+        type: string
+        default: "1-12"
+      days:
+        description: "Trading days per seed"
+        required: false
+        type: number
+        default: 20
+      companies:
+        description: "Generated companies in the market"
+        required: false
+        type: number
+        default: 20
+      scenario:
+        description: "A packaged scenario name, or a path in the repository"
+        required: false
+        type: string
+        default: ""
+      max-drawdown:
+        description: "Fail when the candidate's worst drawdown, in percent, is above this"
+        required: false
+        type: string
+        default: ""
+      max-drawdown-increase:
+        description: "Fail when the worst drawdown rose by more than this many points"
+        required: false
+        type: string
+        default: ""
+      min-median-return-delta:
+        description: "Fail when the median return fell by more than this many points (give a negative number)"
+        required: false
+        type: string
+        default: ""
+      max-errors:
+        description: "Fail when the candidate's errors and refused orders exceed this"
+        required: false
+        type: string
+        default: ""
+      tradefloor-version:
+        description: "The tradefloor release to install, pinned so two runs compare"
+        required: false
+        type: string
+        default: ""
+      requirements:
+        description: "A requirements file the agent needs, relative to the repository"
+        required: false
+        type: string
+        default: ""
+      python-version:
+        required: false
+        type: string
+        default: "3.12"
+      install-from-source:
+        description: "Build tradefloor from the checked-out repository instead of installing a release. For this repository's own self-test; a caller elsewhere leaves it off."
+        required: false
+        type: boolean
+        default: false
+      fail-on-threshold:
+        description: "Fail the job when a threshold fails. Off, a failed threshold is reported through the `passed` output and the summary, and the job stays green; a run that cannot start still fails."
+        required: false
+        type: boolean
+        default: true
+    outputs:
+      passed:
+        description: "'true' when every threshold held"
+        value: ${{ jobs.compare.outputs.passed }}
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    outputs:
+      passed: ${{ steps.run.outputs.passed }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: candidate
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          path: baseline
+          persist-credentials: false
+          fetch-depth: 2
+          ref: ${{ inputs.baseline-ref || github.event.pull_request.base.sha || '' }}
+      # With no pull request and no ref given, the baseline is the commit
+      # before this one.
+      - name: Baseline for a push
+        if: ${{ inputs.baseline-ref == '' && github.event.pull_request.base.sha == '' }}
+        run: git -C baseline checkout --quiet HEAD~1
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ inputs.python-version }}
+      # Only for a build from source: the released wheel needs no compiler.
+      - uses: dtolnay/rust-toolchain@stable
+        if: ${{ inputs.install-from-source }}
+      - name: Install
+        env:
+          TF_VERSION: ${{ inputs.tradefloor-version }}
+          TF_REQUIREMENTS: ${{ inputs.requirements }}
+          TF_FROM_SOURCE: ${{ inputs.install-from-source }}
+        run: |
+          if [ "$TF_FROM_SOURCE" = "true" ]; then
+            # The candidate checkout is this repository at the head being
+            # tested, so the command under test is the one in this commit.
+            python -m pip install --quiet maturin
+            (cd candidate && maturin build --release --out ../dist)
+            python -m pip install --quiet dist/*.whl
+          elif [ -n "$TF_VERSION" ]; then
+            python -m pip install --quiet "tradefloor==$TF_VERSION"
+          else
+            python -m pip install --quiet tradefloor
+          fi
+          if [ -n "$TF_REQUIREMENTS" ]; then
+            python -m pip install --quiet -r "candidate/$TF_REQUIREMENTS"
+          fi
+      # Inputs reach the shell through the environment, never by
+      # interpolation into the script, so an input cannot add a command.
+      - name: Compare
+        id: run
+        env:
+          TF_AGENT: ${{ inputs.agent }}
+          TF_BASELINE_AGENT: ${{ inputs.baseline-agent || inputs.agent }}
+          TF_SEEDS: ${{ inputs.seeds }}
+          TF_DAYS: ${{ inputs.days }}
+          TF_COMPANIES: ${{ inputs.companies }}
+          TF_SCENARIO: ${{ inputs.scenario }}
+          TF_MAX_DRAWDOWN: ${{ inputs.max-drawdown }}
+          TF_MAX_DRAWDOWN_INCREASE: ${{ inputs.max-drawdown-increase }}
+          TF_MIN_MEDIAN_RETURN_DELTA: ${{ inputs.min-median-return-delta }}
+          TF_MAX_ERRORS: ${{ inputs.max-errors }}
+          TF_FAIL_ON_THRESHOLD: ${{ inputs.fail-on-threshold }}
+        run: |
+          set -- --baseline "baseline/$TF_BASELINE_AGENT" \
+                 --candidate "candidate/$TF_AGENT" \
+                 --seeds "$TF_SEEDS" --days "$TF_DAYS" --companies "$TF_COMPANIES" \
+                 --json evaluation.json --markdown evaluation.md
+          if [ -n "$TF_SCENARIO" ]; then
+            if [ -f "candidate/$TF_SCENARIO" ]; then
+              set -- "$@" --scenario "candidate/$TF_SCENARIO"
+            else
+              set -- "$@" --scenario "$TF_SCENARIO"
+            fi
+          fi
+          [ -n "$TF_MAX_DRAWDOWN" ] && set -- "$@" --max-drawdown "$TF_MAX_DRAWDOWN"
+          [ -n "$TF_MAX_DRAWDOWN_INCREASE" ] && set -- "$@" --max-drawdown-increase "$TF_MAX_DRAWDOWN_INCREASE"
+          [ -n "$TF_MIN_MEDIAN_RETURN_DELTA" ] && set -- "$@" --min-median-return-delta "$TF_MIN_MEDIAN_RETURN_DELTA"
+          [ -n "$TF_MAX_ERRORS" ] && set -- "$@" --max-errors "$TF_MAX_ERRORS"
+          status=0
+          tradefloor ci compare "$@" > /dev/null || status=$?
+          [ -f evaluation.md ] && cat evaluation.md >> "$GITHUB_STEP_SUMMARY"
+          if [ "$status" -eq 0 ]; then echo "passed=true" >> "$GITHUB_OUTPUT"; else echo "passed=false" >> "$GITHUB_OUTPUT"; fi
+          # Exit 1 is a failed threshold, and only that is softened. Exit 2
+          # (arguments that cannot be read) and anything else still fail.
+          if [ "$status" -eq 1 ] && [ "$TF_FAIL_ON_THRESHOLD" = "false" ]; then
+            echo "A threshold failed; fail-on-threshold is off, so the job passes. See passed=false." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          exit "$status"
+      - uses: actions/upload-artifact@v7
+        if: ${{ always() }}
+        with:
+          name: tradefloor-evaluation
+          path: |
+            evaluation.json
+            evaluation.md
+          if-no-files-found: ignore

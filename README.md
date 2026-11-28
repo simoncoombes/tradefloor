@@ -1,5 +1,8 @@
 # tradefloor
 
+tradefloor is a reproducible evaluation environment for financial AI agents.
+It is a deterministic market simulator with a Rust core and a Python API.
+
 [![determinism](https://github.com/simoncoombes/tradefloor/actions/workflows/determinism.yml/badge.svg)](https://github.com/simoncoombes/tradefloor/actions/workflows/determinism.yml)
 [![PyPI](https://img.shields.io/pypi/v/tradefloor.svg)](https://pypi.org/project/tradefloor/)
 [![PyPI Downloads](https://static.pepy.tech/personalized-badge/tradefloor?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads)](https://pepy.tech/projects/tradefloor)
@@ -7,14 +10,30 @@
 [![license: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 [![python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 
-<a href="https://tradefloor.dev"><img src="https://tradefloor.dev/multiverse.gif" width="900" alt="One simulated market, forked on six days into seven futures: a rate cut, a stimulus, an oil spike, a rate shock, a liquidity crisis and a recession, each run on from the same past."></a>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/simoncoombes/tradefloor/main/examples/fork-futures/figure/fork-futures-dark.svg">
+  <img src="https://raw.githubusercontent.com/simoncoombes/tradefloor/main/examples/fork-futures/figure/fork-futures-light.svg" width="900" alt="One simulated market run for 40 days and then forked into four branches that run for 80 more days. A buy-and-hold portfolio ends at 109.8 on the control branch, 102.6 under the rate shock scenario, 85.3 under the liquidity crisis scenario and 76.9 under the recession scenario, with the starting capital as 100.">
+</picture>
 
-tradefloor is a market simulator you can run a strategy against. It has a
-Rust core and a Python API.
+The figure is engine output on one seed, drawn by
+[`examples/fork-futures/fork_futures.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/fork-futures/fork_futures.py).
 
-Give it a seed and a list of companies. It runs a market forward: prices, a
-limit order book, fills, and an economy that moves each day. Your orders match
-against the book's depth, so your trades move the price.
+Give tradefloor a seed and a list of companies. It runs a market forward: prices, a
+limit order book, fills, and an economy that moves each day. An agent or a
+strategy trades in that market, and its orders match against the book's
+depth, so its trades move the price. `tf.evaluate` scores an agent on one
+seeded market, and `tf.rank` compares agents across many seeds with a paired
+sign test.
+
+Documentation is at https://docs.tradefloor.dev.
+
+## Purpose
+
+A backtest replays one history. A language model may have read that history
+during training, and an order placed in a backtest leaves the replayed price
+where it was. tradefloor computes every price from a seed. So an agent meets
+a market that no dataset holds, its orders move the price, and a running
+market forks into branches that share one past.
 
 Real market data can't tell you what would have happened if you had traded
 differently, or what caused a move. tradefloor can, because it computed every
@@ -25,7 +44,9 @@ price and the model's fair value into twelve factors, and
 `engine.explain(ticker, day)` breaks down the move in the traded price, two
 records no historical dataset carries.
 
-Documentation is at https://docs.tradefloor.dev.
+The prices are simulated, and a result here says how an agent behaved in the
+model. [Method and limitations](#method-and-limitations) gives the measured
+gaps between this market and real ones.
 
 ## Install
 
@@ -68,19 +89,65 @@ a paired sign test. Add `tf.baselines.reference_agents()` to the entrants and
 `tf.versus_buy_and_hold(scores)` reads each score against buy-and-hold on
 the same market.
 
-A Python agent is any object with `act(obs)` that returns orders: a number
-of shares for a market order, `tf.Limit(quantity, price)` or `tf.Cancel()`.
-It sees a read-only view of the market and its own portfolio, and
-`obs.history` holds a daily bar per name. A bar's close is the day's last
-print. On pt-v21 the close then re-marks every name and the next session
-opens after an overnight move, so the next day starts away from that print:
-the close sits 11 bp from it at the median on a 20-name roster, and the open
-25 bp from the close.
-[docs/AGENTS.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/AGENTS.md)
-covers what the view holds, how trades are charged, the framework adapters
-(OpenAI Agents SDK, PydanticAI, LangGraph, FinRobot) and how scoring works.
+## Forking a market
 
-## The demo
+A `tf.World` holds a market, an agent and its portfolio. `world.run` advances
+it, `world.fork` returns independent branches that share its history, and
+`tf.compare` reads two branches side by side. This block runs the market in
+the figure above and applies the packaged `rate_shock` scenario to one
+branch:
+
+```python
+import tradefloor as tf
+
+universe = tf.Universe.random(20, seed=11)
+world = tf.World(seed=7, universe=universe,
+                 agent=tf.baselines.BuyAndHold())
+world.run(days=40)                          # a shared history
+
+control, shock = world.fork("control", "rate_shock")
+same = tf.agree(control, shock)             # checked before any change
+shock.apply(tf.Scenario.load("rate_shock"), at=0)
+
+control.run(days=80)
+shock.run(days=80)
+print(same)
+print(tf.compare(control, shock, agreement=same).render())
+```
+
+```
+Agreement(identical=True, 9 checks)
+                                    control       rate_shock
+  ----------------------------------------------------------
+  --- agent behaviour ---
+  final gross exposure                1.00x            1.00x
+  steps it traded on                      0                0
+  orders sent                             0                0
+  unusable responses                      0                0
+  turnover                               $0               $0
+  --- execution ---
+  trades filled                           0                0
+  partial fills                           0                0
+  refused trades                          0                0
+  cost against arrival                   $0               $0
+  the same, in bps                +0.00 bps        +0.00 bps
+  --- portfolio ---
+  cash                                $-577            $-580
+  final value                    $1,097,613       $1,025,667
+  P&L since the fork               $+52,652         $-19,293
+  return since the fork              +5.04%           -1.85%
+  max drawdown since                  3.05%            8.76%
+  P&L since inception              $+97,613         $+25,667
+  return since inception             +9.76%           +2.57%
+```
+
+`tf.agree` runs nine checks that two branches hold the same state, and its
+verdict travels with the comparison. `at=0` fires the scenario on the first
+day after the fork. To set macro fields by hand, call
+`shock.intervene(federal_funds_rate=0.06, corporate_bond_yield=0.075)` in
+place of `shock.apply`.
+
+### The demo
 
 The examples are in this repository and not in the package, so clone it
 first:
@@ -99,48 +166,16 @@ side. The run takes under five seconds of CPU and needs no keys and no network.
 The walkthrough is
 [Your first counterfactual experiment](https://github.com/simoncoombes/tradefloor/blob/main/examples/rate-shock/README.md).
 
-## Contents
+### Fork figure
 
-| | |
-|---|---|
-| `engine.truth()` | why each price moved: twelve factors that sum to the mispricing's move, to 1e-16 |
-| `engine.prints()` | how each trade price came about: the shock, and the order book depth that absorbed it |
-| counterfactual TCA | your trading cost, from the same seed run with your orders and without them |
-| `tf.rank` | many seeds, paired sign tests |
-| `RunManifest` | what a reader needs to replay a run, checked by `reproduce()` |
-| `World` / `compare` | fork a running experiment, change one variable, and measure where the two came apart |
-| scenarios | seven packaged shocks, and a file format for your own |
-| MCP server | twenty-two tools for a coding agent, sixteen of them read-only, with scenarios, any shipped preset, a shipped population of background traders, and market sessions you step, fork and rewind |
-| more | a Gymnasium environment, Arrow output, checkpoints, SEC EDGAR data, simulated rate indices, a browser build |
+[`examples/fork-futures/`](https://github.com/simoncoombes/tradefloor/tree/main/examples/fork-futures)
+is the study behind the figure at the top of this page: the same fork with a
+control and three scenario branches. The animation below is hosted on
+tradefloor.dev.
 
-## Drive it from an agent
+<a href="https://tradefloor.dev"><img src="https://tradefloor.dev/multiverse.gif" width="900" alt="One simulated market, forked on six days into seven futures: a rate cut, a stimulus, an oil spike, a rate shock, a liquidity crisis and a recession, each run on from the same past."></a>
 
-```
-pip install "tradefloor[mcp]"
-claude mcp add tradefloor -- tradefloor-mcp
-```
-
-<!-- mcp-name: io.github.simoncoombes/tradefloor -->
-
-`tradefloor-mcp` speaks MCP over stdio, and `tradefloor mcp` starts the same
-server. Strategies, universes and scenarios are data, so a tool argument
-cannot reach code. Each result carries its own caveats. A session keeps one
-market in the server between calls, so an agent can place orders a step at a
-time, fork the market to try two actions, and rewind. See
-[the MCP page](https://docs.tradefloor.dev/mcp-local.html).
-
-## Scenarios
-
-```python
-engine = tf.Engine(seed=42, universe=universe)
-engine.run_days(20)                                # a shared history first
-scenario = tf.Scenario.load("liquidity_crisis")    # ships with the package
-
-control, stress = tf.branch(engine, 2)
-for day in range(80):
-    scenario.apply(stress, day)
-    ...                                  # run both branches
-```
+### Scenarios
 
 A scenario is a file of changes to the market and the assumptions behind
 them. Each change targets a field the engine reads, and the file keeps the
@@ -168,11 +203,222 @@ days each event fired.
 
 tradefloor does not predict what a war, an election, an oil shock or a
 recession will do to markets. You state the assumptions and it measures how an
-agent behaves under them. `tradefloor scenario list` names the seven packaged
+agent behaves under them. `tradefloor scenario list` names the eight packaged
 scenarios, and `tradefloor scenario targets` lists every field a scenario can
 change.
 
-## Reproducibility
+## AI agent evaluation
+
+`tf.evaluate` runs every entrant on one seeded market and returns a scorecard
+for each. `tf.rank` repeats that on many seeds. Every entrant meets the same
+market on each seed, so `ranking.separation` compares two of them seed by
+seed with an exact paired sign test:
+
+```python
+import tradefloor as tf
+
+universe = tf.Universe.random(20, seed=11)
+
+
+class BuyTheDip:
+    """Once a day, buy 100 shares of each name down 2% over five days."""
+
+    def act(self, obs):
+        if not obs.is_first_step_of_day:
+            return {}
+        orders = {}
+        for ticker in obs.tickers:
+            bars = obs.history.bars(ticker, last=6)
+            if len(bars) == 6 and bars[-1]["close"] < 0.98 * bars[0]["close"]:
+                orders[ticker] = 100
+        return orders
+
+
+def entrants():                      # called once per seed
+    return {
+        "dip": BuyTheDip(),
+        "momentum": tf.StrategySpec.momentum(lookback_days=1.0, top_k=5),
+        "buy_and_hold": tf.baselines.BuyAndHold(),
+    }
+
+
+ranking = tf.rank(entrants, seeds=range(6), universe=universe, days=10,
+                  history_days=5)
+print(ranking.report())
+test = ranking.separation("dip", "buy_and_hold")
+print(test["wins_a"], "wins in", test["paired_seeds"], "p =", test["p_value"])
+```
+
+```
+6 seeds on universe 8fe0af0e183f... under model pt-v22
+  buy_and_hold      the benchmark  median pnl       +6,073  wins 2/6
+  dip               vs buy_and_hold       -3,341 a seed  ahead 4/6  wins 4/6
+  momentum          vs buy_and_hold      -47,334 a seed  ahead 1/6  wins 0/6
+4 wins in 6 p = 0.6875
+```
+
+That run takes about twenty seconds of CPU. `dip` beat buy-and-hold on four
+of the six seeds, and the sign test gives that split a p-value of 0.69, so
+six seeds leave the two unseparated.
+
+A Python agent is any object with `act(obs)` that returns orders: a number
+of shares for a market order, `tf.Limit(quantity, price)` or `tf.Cancel()`.
+It sees a read-only view of the market and its own portfolio, and
+`obs.history` holds a daily bar per name. A bar's close is the day's last
+print. On pt-v21 the close then re-marks every name and the next session
+opens after an overnight move, so the next day starts away from that print:
+the close sits 11 bp from it at the median on a 20-name roster, and the open
+25 bp from the close.
+[docs/AGENTS.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/AGENTS.md)
+covers what the view holds, how trades are charged, the framework adapters
+(OpenAI Agents SDK, PydanticAI, LangGraph, FinRobot) and how scoring works.
+
+An agent connects in one of these ways. The table links an example for each
+framework adapter and for the Gymnasium environment, and the five framework
+examples run offline with no API key:
+
+| | |
+|---|---|
+| Python callable | [`examples/integrations/callable/five_days.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/integrations/callable/five_days.py) |
+| OpenAI Agents SDK | [`examples/integrations/openai_agents/five_days.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/integrations/openai_agents/five_days.py) |
+| PydanticAI | [`examples/integrations/pydantic_ai/rate_shock.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/integrations/pydantic_ai/rate_shock.py) |
+| LangGraph | [`examples/integrations/langgraph/rate_shock.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/integrations/langgraph/rate_shock.py) |
+| FinRobot | [`examples/integrations/finrobot/rate_shock.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/integrations/finrobot/rate_shock.py) |
+| Gymnasium environment | [`examples/05-training-an-agent.ipynb`](https://github.com/simoncoombes/tradefloor/blob/main/examples/05-training-an-agent.ipynb) |
+| MCP server | [Integrations](#integrations) below, and [`python/tradefloor/mcp.py`](https://github.com/simoncoombes/tradefloor/blob/main/python/tradefloor/mcp.py) |
+
+The read-only market view guards only against accidents, and agents in one
+call share one Python process.
+[Before you publish a result](#before-you-publish-a-result) lists what that
+allows and what to do about it.
+
+## Tradefloor Bench
+
+Tradefloor Bench, a benchmark for financial AI agents built on this engine,
+is in preparation. So far only baseline strategies have been run on it. No
+language model has been scored, so no model results exist yet.
+[ROADMAP.md](https://github.com/simoncoombes/tradefloor/blob/main/ROADMAP.md)
+lists the planned pilot and the public version after it.
+
+## Integrations
+
+```
+pip install "tradefloor[mcp]"
+claude mcp add tradefloor -- tradefloor-mcp
+```
+
+<!-- mcp-name: io.github.simoncoombes/tradefloor -->
+
+`tradefloor-mcp` speaks MCP over stdio, and `tradefloor mcp` starts the same
+server. Strategies, universes and scenarios are data, so a tool argument
+cannot reach code. Each result carries its own caveats. A session keeps one
+market in the server between calls, so an agent can place orders a step at a
+time, fork the market to try two actions, and rewind. See
+[the MCP page](https://docs.tradefloor.dev/mcp-local.html).
+
+### Other MCP clients
+
+Each client below starts the server from a JSON entry under `mcpServers`. Use the
+full path that `which tradefloor-mcp` prints, because an application started from the
+desktop does not always see your shell's `PATH`.
+
+| client | file | from |
+|---|---|---|
+| Claude Desktop | `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS), `%APPDATA%\Claude\claude_desktop_config.json` (Windows), `~/.config/Claude/claude_desktop_config.json` (Linux) | [Connect to local MCP servers](https://modelcontextprotocol.io/docs/develop/connect-local-servers) |
+| Cursor | `.cursor/mcp.json` in a project, or `~/.cursor/mcp.json` for every project | [Cursor: Model Context Protocol](https://cursor.com/docs/context/mcp) |
+| VS Code (Copilot) | `.mcp.json` at the workspace root, with `"type": "stdio"` in the entry | [VS Code: MCP configuration reference](https://code.visualstudio.com/docs/agents/reference/mcp-configuration) |
+
+```json
+{
+  "mcpServers": {
+    "tradefloor": {
+      "command": "/full/path/to/tradefloor-mcp",
+      "args": []
+    }
+  }
+}
+```
+
+VS Code's older `.vscode/mcp.json` uses a top-level `servers` key instead of
+`mcpServers`. Restart the client after editing the file.
+
+The framework adapters are optional extras: `tradefloor[openai-agents]`,
+`tradefloor[pydantic-ai]`, `tradefloor[langgraph]` and `tradefloor[finrobot]`.
+A plain Python function needs no extra, and the Gymnasium environment is
+`tradefloor[rl]`.
+
+## Documentation
+
+https://docs.tradefloor.dev covers install, the API, the guides and how the
+model is measured. These pages in this repository have the detail behind the
+sections above:
+
+- [docs/MODEL.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/MODEL.md):
+  the model as equations, with every coefficient's value on the default
+  preset and where it came from
+- [docs/STATISTICS.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/STATISTICS.md):
+  the named sets of realism statistics
+- [docs/REALISM.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/REALISM.md):
+  the realism results and every measured limit
+- [docs/REPRODUCIBILITY.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/REPRODUCIBILITY.md):
+  what replays exactly, across platforms, releases and restored state
+- [docs/AGENTS.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/AGENTS.md):
+  writing, scoring and comparing agents
+- [docs/SUPPORT.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/SUPPORT.md):
+  which release lines get fixes, and for how long
+- [docs/EMBEDDING.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/EMBEDDING.md):
+  driving the Rust engine from a game or another host, and how much flow
+  of its own the model takes
+
+### Package contents
+
+| | |
+|---|---|
+| `engine.truth()` | why each price moved: twelve factors that sum to the mispricing's move, to 1e-16 |
+| `engine.prints()` | how each trade price came about: the shock, and the order book depth that absorbed it |
+| counterfactual TCA | your trading cost, from the same seed run with your orders and without them |
+| `tf.rank` | many seeds, paired sign tests |
+| `RunManifest` | what a reader needs to replay a run, checked by `reproduce()` |
+| `World` / `compare` | fork a running experiment, change one variable, and measure where the two came apart |
+| scenarios | eight packaged shocks, and a file format for your own |
+| MCP server | twenty-two tools for a coding agent, sixteen of them read-only, with scenarios, any shipped preset, a shipped population of background traders, and market sessions you step, fork and rewind |
+| more | a Gymnasium environment, Arrow output, checkpoints, SEC EDGAR data, simulated rate indices, a browser build |
+
+### Examples
+
+The thirteen numbered [`examples/`](https://github.com/simoncoombes/tradefloor/tree/main/examples) are in reading order, and the test suite runs them:
+
+| | |
+|---|---|
+| [`00-a-year-in-one-market`](https://github.com/simoncoombes/tradefloor/blob/main/examples/00-a-year-in-one-market.ipynb) | Start here: one company, one year, two crises, one chart |
+| [`01-first-simulation`](https://github.com/simoncoombes/tradefloor/blob/main/examples/01-first-simulation.ipynb) | Universe, engine, order book, determinism |
+| [`02-evaluating-a-strategy`](https://github.com/simoncoombes/tradefloor/blob/main/examples/02-evaluating-a-strategy.ipynb) | Specs, baselines, ranking across seeds |
+| [`03-why-did-the-price-move`](https://github.com/simoncoombes/tradefloor/blob/main/examples/03-why-did-the-price-move.ipynb) | The twelve factors that sum to the mispricing's move |
+| [`04-how-realistic-is-this`](https://github.com/simoncoombes/tradefloor/blob/main/examples/04-how-realistic-is-this.ipynb) | The realism panel and the limits |
+| [`05-training-an-agent`](https://github.com/simoncoombes/tradefloor/blob/main/examples/05-training-an-agent.ipynb) | The Gymnasium environment, and what size costs |
+| [`06-execution-and-impact`](https://github.com/simoncoombes/tradefloor/blob/main/examples/06-execution-and-impact.ipynb) | TCA and the counterfactual run |
+| [`07-research-workflow.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/07-research-workflow.py) | A whole study in one file. It takes about 200 seconds of CPU across eight worker processes, under a minute of wall time on a ten-core laptop, and needs `tradefloor[arrow]` |
+| [`08-claude-agent.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/08-claude-agent.py) | An LLM agent trading the market through the harness |
+| [`09-a-pandemic-shaped-market`](https://github.com/simoncoombes/tradefloor/blob/main/examples/09-a-pandemic-shaped-market.ipynb) | A real 2020-21 macro path, and which fields transmit. Pinned to `pt-v12`, whose QE channel carries the valuation path, with the same path on `pt-v21`, the default until 0.10.2, at the end |
+| [`10-forking-a-market`](https://github.com/simoncoombes/tradefloor/blob/main/examples/10-forking-a-market.py) | Fork a market, raise the rate in one branch, and compare the futures |
+| [`11-scenario-fork.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/11-scenario-fork.py) | A scenario file applied to one branch of a fork, and what it cost |
+| [`12-ai-vs-traditional`](https://github.com/simoncoombes/tradefloor/blob/main/examples/12-ai-vs-traditional.ipynb) | A recorded Claude run beside buy-and-hold, momentum, mean reversion, random and the Oracle on one market, from `08-claude-agent.py` |
+
+The [`rate-shock/`](https://github.com/simoncoombes/tradefloor/tree/main/examples/rate-shock)
+study is the demo under Forking a market, and
+[`integrations/`](https://github.com/simoncoombes/tradefloor/tree/main/examples/integrations)
+runs the same kind of experiment through each agent framework, offline and
+without an API key. The
+[`fork-futures/`](https://github.com/simoncoombes/tradefloor/tree/main/examples/fork-futures)
+study draws the figure at the top of this page.
+
+## Method and limitations
+
+A result from tradefloor is a measurement on a model market. This section
+says what replays exactly, how the model is checked against real markets,
+where it falls short, and what to check before a score is published.
+
+### Reproducibility
 
 The same seed gives the same market on every platform. tradefloor ships its
 own `exp`, `log`, `pow`, `sin` and `cos`, so the system's math library cannot
@@ -208,7 +454,7 @@ is restored, and
 [docs/SUPPORT.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/SUPPORT.md)
 says which release to pin for a long study.
 
-## Realism
+### Realism
 
 tradefloor checks its market against real ones with three named sets of
 statistics, listed in
@@ -269,7 +515,7 @@ a measured limit.
 [docs/REALISM.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/REALISM.md)
 has every number behind these claims and the full table of limits.
 
-## Before you publish a result
+### Before you publish a result
 
 - An agent scored on naming the factor behind each day's move gets an
   `explanation_accuracy`. On pt-v21 a constant answer scores 0.70 to 0.95, so
@@ -297,54 +543,6 @@ has every number behind these claims and the full table of limits.
 [docs/AGENTS.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/AGENTS.md)
 has the measurements behind each of these.
 
-## Examples
-
-The twelve numbered [`examples/`](https://github.com/simoncoombes/tradefloor/tree/main/examples) are in reading order, and the test suite runs them:
-
-| | |
-|---|---|
-| [`00-a-year-in-one-market`](https://github.com/simoncoombes/tradefloor/blob/main/examples/00-a-year-in-one-market.ipynb) | Start here: one company, one year, two crises, one chart |
-| [`01-first-simulation`](https://github.com/simoncoombes/tradefloor/blob/main/examples/01-first-simulation.ipynb) | Universe, engine, order book, determinism |
-| [`02-evaluating-a-strategy`](https://github.com/simoncoombes/tradefloor/blob/main/examples/02-evaluating-a-strategy.ipynb) | Specs, baselines, ranking across seeds |
-| [`03-why-did-the-price-move`](https://github.com/simoncoombes/tradefloor/blob/main/examples/03-why-did-the-price-move.ipynb) | The twelve factors that sum to the mispricing's move |
-| [`04-how-realistic-is-this`](https://github.com/simoncoombes/tradefloor/blob/main/examples/04-how-realistic-is-this.ipynb) | The realism panel and the limits |
-| [`05-training-an-agent`](https://github.com/simoncoombes/tradefloor/blob/main/examples/05-training-an-agent.ipynb) | The Gymnasium environment, and what size costs |
-| [`06-execution-and-impact`](https://github.com/simoncoombes/tradefloor/blob/main/examples/06-execution-and-impact.ipynb) | TCA and the counterfactual run |
-| [`07-research-workflow.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/07-research-workflow.py) | A whole study in one file. It takes about forty seconds of CPU and needs `tradefloor[arrow]` |
-| [`08-claude-agent.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/08-claude-agent.py) | An LLM agent trading the market through the harness |
-| [`09-a-pandemic-shaped-market`](https://github.com/simoncoombes/tradefloor/blob/main/examples/09-a-pandemic-shaped-market.ipynb) | A real 2020-21 macro path, and which fields transmit. Pinned to `pt-v12`, whose QE channel carries the valuation path, with the same path on `pt-v21`, the default until 0.10.2, at the end |
-| [`10-forking-a-market`](https://github.com/simoncoombes/tradefloor/blob/main/examples/10-forking-a-market.py) | Fork a market, raise the rate in one branch, and compare the futures |
-| [`11-scenario-fork.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/11-scenario-fork.py) | A scenario file applied to one branch of a fork, and what it cost |
-
-The [`rate-shock/`](https://github.com/simoncoombes/tradefloor/tree/main/examples/rate-shock)
-study is the demo above, and
-[`integrations/`](https://github.com/simoncoombes/tradefloor/tree/main/examples/integrations)
-runs the same kind of experiment through each agent framework, offline and
-without an API key.
-
-## Documentation
-
-https://docs.tradefloor.dev covers install, the API, the guides and how the
-model is measured. These pages in this repository have the detail behind the
-sections above:
-
-- [docs/MODEL.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/MODEL.md):
-  the model as equations, with every coefficient's value on the default
-  preset and where it came from
-- [docs/STATISTICS.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/STATISTICS.md):
-  the named sets of realism statistics
-- [docs/REALISM.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/REALISM.md):
-  the realism results and every measured limit
-- [docs/REPRODUCIBILITY.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/REPRODUCIBILITY.md):
-  what replays exactly, across platforms, releases and restored state
-- [docs/AGENTS.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/AGENTS.md):
-  writing, scoring and comparing agents
-- [docs/SUPPORT.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/SUPPORT.md):
-  which release lines get fixes, and for how long
-- [docs/EMBEDDING.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/EMBEDDING.md):
-  driving the Rust engine from a game or another host, and how much flow
-  of its own the model takes
-
 ## Contributing and support
 
 [CONTRIBUTING.md](https://github.com/simoncoombes/tradefloor/blob/main/CONTRIBUTING.md)
@@ -352,6 +550,10 @@ explains how to build and test the project. Its main rule is that any change to
 the simulated trajectory is a breaking change, however small, so a model
 change ships as a new preset. [RELEASING.md](https://github.com/simoncoombes/tradefloor/blob/main/RELEASING.md)
 is the release checklist.
+[CODE_OF_CONDUCT.md](https://github.com/simoncoombes/tradefloor/blob/main/CODE_OF_CONDUCT.md)
+sets the conduct expected in the project's spaces, and
+[ROADMAP.md](https://github.com/simoncoombes/tradefloor/blob/main/ROADMAP.md)
+lists planned work.
 
 Report a vulnerability through GitHub's
 [security advisory form](https://github.com/simoncoombes/tradefloor/security/advisories/new),
