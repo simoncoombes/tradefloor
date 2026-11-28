@@ -275,6 +275,8 @@ RUN_BY: dict[str, str] = {
         "test_fork_futures.py::test_the_study_reruns_to_the_same_bytes",
     "integrations/callable/five_days.py":
         "test_integration_examples.py::test_the_table_matches_a_real_run",
+    "integrations/claude/five_days.py":
+        "test_integration_examples.py::test_the_table_matches_a_real_run",
     "integrations/finrobot/rate_shock.py":
         "test_finrobot.py::test_the_recorded_run_replays_end_to_end",
     "integrations/langgraph/rate_shock.py":
