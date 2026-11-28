@@ -762,6 +762,8 @@ ZERO_SHIPPED_RANGES: dict[str, tuple[float, float]] = {
     "oil_forecast_opec_spread": (0.0, 1.0),
     "oil_forecast_cycle_growth": (0.0, 1.0),
     "oil_forecast_path_law": (0.0, 1.0),
+    "oil_path_law_zero_return": (0.0, 1.0),
+    "oil_path_law_belief_start": (0.0, 1.0),
     # Switches: the bank's and the curve's inflation, headline or core.
     "fed_core_inflation": (0.0, 1.0),
     "treasury_core_inflation": (0.0, 1.0),
