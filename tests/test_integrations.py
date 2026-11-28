@@ -699,6 +699,9 @@ FIXTURE_KINDS = {
     #: the adapters' decision schema, so the recordings checks below would
     #: refuse every one of them.
     "claude": "example-08-recording",
+    #: ClaudeAdapter's recording, read by `tests/test_claude_adapter.py`.
+    #: Written by a stand-in client, not a model, and its meta says so.
+    "claude_adapter": "recordings",
     #: Four `b4fix7` certification panels, thirty seeds each, read by
     #: `tests/test_scoring_conformance.py`. Per-seed scoring rows, not a
     #: transcript.
@@ -2029,6 +2032,7 @@ def test_preset_of_reads_the_engine_the_observation_carries():
 #: models (claude-opus-5-5, claude-sonnet-5-5 for FinRobot; gpt-5.2 kept).
 FIXTURE_PRESETS = {
     "callable/five-days.json": "pt-v22",
+    "claude_adapter/stand-in-two-days.json": "pt-v22",
     "finrobot/liquidity-crisis.json": "pt-v21",
     "finrobot/rate-ladder.json": "pt-v16",
     "finrobot/rate-shock.json": "pt-v22",

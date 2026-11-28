@@ -10,7 +10,8 @@ against them replay under those exact versions, and they receive no fixes.
 
 | version | supported |
 |---|---|
-| 0.9.x | yes, the latest release line |
+| 0.11.x | yes, the latest release line |
+| 0.9.x and 0.10.x | no, and published forever |
 | 0.8.5 and the 0.8 patches after it | yes, the first LTS line, with pt-v20 as the default |
 | 0.8.0 to 0.8.4 | no, and published forever |
 | 0.7.x and earlier | no, and published forever |

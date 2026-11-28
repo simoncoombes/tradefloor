@@ -542,6 +542,21 @@ resolves to `pypi.org/project/tradefloor/examples/...` and 404s. It renders
 correctly on GitHub, so it survived two releases. The test fails on
 any relative link and on any absolute link naming a file that is not there.
 
+The figure at the top of the README is
+`examples/fork-futures/figure/fork-futures-light.svg` and `-dark.svg`, drawn
+from engine output, and each one's caption names the version that drew it.
+After the version bump, regenerate both and commit them:
+
+```
+python examples/fork-futures/fork_futures.py --out examples/fork-futures/figure
+```
+
+`tests/test_fork_futures.py` compares the committed files with a new run only
+when the caption names the installed version, and skips otherwise, so a
+release that forgets this step shows a skip and not a failure. The README
+loads the files from `main` on raw.githubusercontent.com, so the page shows
+the new figure once the release reaches `main`.
+
 ### 7. Determinism gate
 
 ```

@@ -38,7 +38,8 @@ from .scenario import Scenario, _wrap
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="tradefloor",
-        description="Inspect tradefloor scenario files, or run the MCP server.",
+        description="Inspect tradefloor scenario files, compare two versions of an "
+                    "agent, or run the MCP server.",
     )
     parser.add_argument("--version", action="version",
                         version=f"tradefloor {__version__}")
@@ -78,7 +79,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     top.add_parser(
         "mcp", help="run the MCP server over stdio (needs tradefloor[mcp])")
 
+    # Two versions of an agent on the same seeds, for a pull request. The
+    # module is imported here and not at the top so that `scenario` commands,
+    # which promise milliseconds, do not pay for the harness.
+    from . import ci as _ci
+    _ci.add_parser(top)
+
     args = parser.parse_args(argv)
+    if args.group == "ci":
+        return _ci.run(args)
     if args.group == "mcp":
         mcp_main()
         return 0

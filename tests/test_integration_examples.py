@@ -42,6 +42,7 @@ README = EXAMPLES / "README.md"
 NEEDS: dict[str, str | None] = {
     "callable/five_days.py": None,
     "openai_agents/five_days.py": "agents",
+    "claude/five_days.py": "anthropic",
     "pydantic_ai/rate_shock.py": "pydantic_ai",
     "langgraph/rate_shock.py": "langgraph",
 }
