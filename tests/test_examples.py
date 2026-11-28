@@ -277,6 +277,9 @@ RUN_BY: dict[str, str] = {
         "test_integration_examples.py::test_the_table_matches_a_real_run",
     "integrations/pydantic_ai/rate_shock.py":
         "test_integration_examples.py::test_the_table_matches_a_real_run",
+    "mcp-client/client.py":
+        "test_mcp_client_example.py::"
+        "test_the_mcp_client_example_reads_two_branches_of_one_fork",
     "rate-shock/counterfactual.py":
         "test_rate_shock_demo.py::"
         "test_the_demo_runs_end_to_end_and_writes_readable_artifacts",

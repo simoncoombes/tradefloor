@@ -44,6 +44,19 @@ Start at 00 if you have not used tradefloor before.
 Notebooks 05 and 06 cover the two audiences the project is built for, RL
 researchers and execution developers.
 
+## Starter projects
+
+Five places to start from, by what you want to build. Each is an example in this
+directory that runs offline and has a test.
+
+| to build | start from |
+|---|---|
+| a Python strategy | [`integrations/callable/five_days.py`](integrations/callable/five_days.py): a plain function as the strategy, scored by `tf.evaluate` |
+| an AI agent | [`integrations/`](integrations/): the same loop under the OpenAI Agents SDK, PydanticAI and LangGraph, offline by default |
+| an RL environment | [`05-training-an-agent.ipynb`](05-training-an-agent.ipynb): the Gymnasium environment |
+| an MCP client | [`mcp-client/`](mcp-client/): a Python client for the MCP server over stdio |
+| a benchmark entry | not yet: the benchmark has no public submission route |
+
 ## The studies
 
 One directory each, self-contained, in no particular order. A study asks one
@@ -56,6 +69,7 @@ same experiment two ways, and writes its output to its own git-ignored
 | [`rate-shock/`](rate-shock/) | Does the agent actually react to macro conditions? Checkpoint, fork, +200bps in one arm, compare. Under five seconds of CPU, no keys |
 | [`integrations/finrobot/`](integrations/finrobot/) | The same experiment with a real [FinRobot](https://github.com/AI4Finance-Foundation/FinRobot) agent in place of the native one. Replays a recorded run by default, so it needs no API key |
 | [`integrations/`](integrations/) | The same decision loop under a plain function, the OpenAI Agents SDK, PydanticAI and LangGraph. Offline, no keys |
+| [`mcp-client/`](mcp-client/) | Does the MCP server answer a plain Python client? Opens a seeded session, forks it, sends one order in one branch, and compares. Needs `tradefloor[mcp]`, no keys |
 | [`experiments/liquidity-crisis/`](experiments/liquidity-crisis/) | Will a financial AI agent reduce risk in a market crisis? A checkpoint, a two-way fork, and the `liquidity_crisis` scenario on one arm. An executed notebook, replayed from a recording |
 
 ## Running them

@@ -11,6 +11,7 @@ digest moves. Five of MODEL.md's known gaps are re-measured on pt-v22.
 - `book_settle_every_order` is a new switch, 0.0 on every preset and left out of the model's digest, so no preset or known-answer digest moves. Each tick's settlement book keeps 32 orders a side and trims the worst-priced, so past 32 agent orders at or inside the ladder's prices the rest, and the maker's deeper levels, were left out of that tick's settlement: on pt-v22 forty one-share bids a cent inside the spread filled 32 in one tick and 8 in the next. On, each settlement keeps every resting order. It takes no draw and carries no state.
 - MODEL.md's known gaps are re-measured on pt-v22. A pinned change of phase takes the entry growth shock on pt-v21 and pt-v22 (`macro_pins_hold`); only pt-v20 and earlier lack it. The buyback factor's price-reading and mid-run-listing credit are closed on pt-v21 and pt-v22 (`buyback_accrual`), but no preset retires shares. The frozen permanent corporate yield and the closing tick's fills at book prices still hold on pt-v22, with measurements.
 - MODEL.md's known gaps said `h/21` runs high against the compound form. It runs low: by about 5% at a monthly hazard of 0.1 and 15% at 0.3.
+- `examples/mcp-client/` is a Python MCP client for the MCP server over stdio. It opens a seeded session, forks it, sends one order in one branch and prints the difference, with no key. `examples/README.md` gains a "Starter projects" table that points each of five starting points at an existing example.
 
 ## 0.11.0
 
