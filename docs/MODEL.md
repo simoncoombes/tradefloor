@@ -1582,7 +1582,21 @@ growth's expectation over the cycle's phases, in place of the believed phase
 held for the whole horizon: each phase's mass leaves on the law's own
 transitions, read on that phase's own economy (its central bank's meetings
 and the market's gap over its spread included), from the phase's stationary
-age under the full law. `usd_mean_reversion` and
+age under the full law. `oil_forecast_path_law` has oil's forecast read
+growth's mean over the law's own paths instead: once a week the forecast
+simulates paths from the close's public state (a phase from the belief, an age
+from that phase's stationary law under the full law, growth spread about the
+published figure as the law spreads it at that phase and age), each taking the
+law's close at every session with draws of its own (the nowcast's report, the
+index on its fair value on the path's own economy plus a return at the
+forecast's index variance, its P/E, the economy's step, the cycle's transition
+on the path's own state, the earnings cycle, the volatility feedback, the
+meeting, the anticipation), so every threshold the ladder reads, the market's
+fall and its P/E among them, is read over the economy's spread. The paths are
+held for the four closes after the one that simulates them and are not in the
+snapshot, so an engine restored between simulations simulates afresh and its
+oil forecast differs from the original's by the paths' Monte Carlo error until
+the original's next simulation. `usd_mean_reversion` and
 `usd_noise_sd` set the dollar index's law (0.0 the standing 0.02 and 0.3): FRED's
 trade-weighted dollar (DTWEXM, 1987 to 2019) has an AR(1) half-life of 729
 sessions and a daily log change of 0.0043, so the dollar the oil curve carries
@@ -1658,6 +1672,7 @@ centre of 81 is 16.4 and 279.
 | `oil_forecast_clamp` | 0 (unclamped); 1 | same | 1 | not set | none: the clamps are in the law |
 | `oil_forecast_opec_spread` | 0 (the short factor's spread, normal); 1 (the price's whole spread, lognormal) | same | 1 | not set | none: OPEC's rule is in the law |
 | `oil_forecast_cycle_growth` | 0 (growth in the believed phase held); 1 (growth's expectation over the phases) | same | same | not set | none: the cycle and its shocks are in the law |
+| `oil_forecast_path_law` | 0 (as `oil_forecast_cycle_growth` sets); 1 (growth's mean over the law's own paths) | same | same | not set | none: the paths are the law's |
 | `oil_dollar_elasticity` $\varepsilon$ | 0 (the daily drag); up to 5 | same | 0.69 | not set | EIA RCLC1 and RCLC4 on FRED DTWEXM, 1987 to 2019: 0.69 on daily changes, 1.2 over 21 sessions; DTWEXBGS 2006 on: 2.3 |
 | `oil_noise_log_sd` $s$ | 0 (dollar noise); up to 0.1 | same | 0.006 | not set | EIA's contracts 1 and 4 at a reversion of 0.006: the short factor's daily sd, 0.017 (median of seven windows); Schwartz and Smith (2000) 0.018 |
 | `oil_target_drift_reversion` $r$ | 0 (no pull); up to 1 | same | same | not set | none: a stated guard against the clamps |

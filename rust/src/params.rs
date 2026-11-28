@@ -1098,6 +1098,27 @@ pub struct ModelParams {
     /// construction with no free parameter. It reads the forecast only; the
     /// law is unchanged.
     pub oil_forecast_cycle_growth: f64,
+    /// The growth oil's forecast reads, as the law's own expectation: 0.0,
+    /// on every shipped preset, is `oil_forecast_cycle_growth`'s reading,
+    /// and a value of 0.0 is left out of the model's digest. At 1.0 the
+    /// forecast simulates the law forward from the close's public state over
+    /// paths of its own (a phase from the belief, an age from the phase's
+    /// stationary law under the full law, growth at the published figure
+    /// plus the law's own spread about it at that phase and age, the
+    /// market's belief and the close's index), each path taking the law's
+    /// close at every forecast close: the nowcast's report and the belief's
+    /// update, the session's index on the move in its fair value on the
+    /// path's own economy plus a return at the forecast's variance of the
+    /// index, the market's P/E on that index, the economy's step, the
+    /// cycle's roll on the hazard and the ladder from the path's own state,
+    /// the earnings cycle, the volatility feedback, its central bank's
+    /// meeting and the earnings anticipation. Oil's block reads the paths'
+    /// mean growth, oil's target's mean over them. The paths are simulated
+    /// at one close and held for the four after it. It takes the place of
+    /// `oil_forecast_cycle_growth` where both are set. The paths draw from a
+    /// generator of their own, so the law moves nothing. A construction with
+    /// no free parameter; the number of paths and the hold are cost.
+    pub oil_forecast_path_law: f64,
     /// The share of the dollar index's gap to its target closed each
     /// session. 0.0, on every shipped preset, is the standing 0.02, and a
     /// value of 0.0 is left out of the model's digest.
@@ -9525,6 +9546,7 @@ impl ModelParams {
             oil_forecast_clamp: 0.0,
             oil_forecast_opec_spread: 0.0,
             oil_forecast_cycle_growth: 0.0,
+            oil_forecast_path_law: 0.0,
             usd_mean_reversion: 0.0,
             usd_noise_sd: 0.0,
             usd_safe_haven_gain: 0.0,
@@ -12486,6 +12508,7 @@ impl ModelParams {
             "oil_forecast_clamp" => self.oil_forecast_clamp,
             "oil_forecast_opec_spread" => self.oil_forecast_opec_spread,
             "oil_forecast_cycle_growth" => self.oil_forecast_cycle_growth,
+            "oil_forecast_path_law" => self.oil_forecast_path_law,
             "usd_mean_reversion" => self.usd_mean_reversion,
             "usd_noise_sd" => self.usd_noise_sd,
             "usd_safe_haven_gain" => self.usd_safe_haven_gain,
@@ -12979,6 +13002,7 @@ impl ModelParams {
             "oil_forecast_clamp" => out.oil_forecast_clamp = value,
             "oil_forecast_opec_spread" => out.oil_forecast_opec_spread = value,
             "oil_forecast_cycle_growth" => out.oil_forecast_cycle_growth = value,
+            "oil_forecast_path_law" => out.oil_forecast_path_law = value,
             "usd_mean_reversion" => out.usd_mean_reversion = value,
             "usd_noise_sd" => out.usd_noise_sd = value,
             "usd_safe_haven_gain" => out.usd_safe_haven_gain = value,
@@ -14898,6 +14922,12 @@ impl ModelParams {
                  in the believed phase held) or 1 (growth's expectation over the cycle's phases).",
                 self.oil_forecast_cycle_growth));
         }
+        if !(self.oil_forecast_path_law == 0.0 || self.oil_forecast_path_law == 1.0) {
+            return Err(format!(
+                "oil_forecast_path_law is {}. It is a switch: 0 (oil's forecast reads growth as \
+                 oil_forecast_cycle_growth sets) or 1 (growth's mean over the law's own paths).",
+                self.oil_forecast_path_law));
+        }
         if !(0.0..=5.0).contains(&self.oil_inventory_noise_sd) {
             return Err(format!(
                 "oil_inventory_noise_sd is {}. It is the sd of oil inventory's daily noise, in \
@@ -16009,6 +16039,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "oil_forecast_clamp",
     "oil_forecast_opec_spread",
     "oil_forecast_cycle_growth",
+    "oil_forecast_path_law",
     "usd_mean_reversion",
     "usd_noise_sd",
     "usd_safe_haven_gain",
@@ -16300,6 +16331,7 @@ pub fn settable_names() -> Vec<&'static str> {
         "oil_forecast_clamp",
         "oil_forecast_opec_spread",
         "oil_forecast_cycle_growth",
+        "oil_forecast_path_law",
         "usd_mean_reversion",
         "usd_noise_sd",
         "usd_safe_haven_gain",

@@ -8,6 +8,8 @@ at the forecast, are what move.
 """
 from __future__ import annotations
 
+import pytest
+
 import tradefloor as tf
 
 UNIVERSE = tf.Universe.random(8, seed=5)
@@ -51,3 +53,43 @@ def test_it_moves_no_price_and_no_economy_and_only_the_forecasts_oil():
         for c in (x for x in on.contracts() if x["root"] == "OIL"):
             assert on.quote(c["symbol"])["mark"] > 0.0
     assert moved > 0.0
+
+
+def test_the_path_law_is_off_on_every_shipped_preset_and_silent_in_the_digest():
+    for name in tf.preset_names():
+        assert tf.ModelParams.from_preset(name).oil_forecast_path_law == 0.0, name
+    assert "oil_forecast_path_law" in set(tf.ModelParams.digest_silent_at_zero())
+    assert model(oil_forecast_path_law=0.0).fingerprint == "pt-v21"
+
+
+def test_the_path_law_moves_no_price_and_no_economy_and_only_the_forecasts_oil():
+    off = tf.Engine(seed=11, universe=UNIVERSE, model=model(**ON))
+    on = tf.Engine(seed=11, universe=UNIVERSE, model=model(**ON, oil_forecast_path_law=1.0))
+    moved = 0.0
+    for _ in range(20):
+        day(off)
+        day(on)
+        assert on.prices() == off.prices()
+        assert repr(on.economy()) == repr(off.economy())
+        a, b = off.forecast(), on.forecast()
+        for k in ("index_variance", "policy_rate"):
+            assert a[k] == b[k], k
+        moved = max(moved, abs(a["oil"][-1] - b["oil"][-1]))
+    assert moved > 0.0
+
+
+@pytest.mark.xfail(strict=True, reason="the path law's held paths are not snapshot state: a restored engine "
+                                       "simulates afresh at its first close, so its oil forecast differs from "
+                                       "the original's by the paths' Monte Carlo error until the original's "
+                                       "next simulation")
+def test_a_restored_engine_reads_the_path_laws_held_paths():
+    m = model(**ON, oil_forecast_path_law=1.0)
+    parent = tf.Engine(seed=11, universe=UNIVERSE, model=m)
+    for _ in range(7):
+        day(parent)
+    target = tf.Engine(seed=11, universe=UNIVERSE, model=m)
+    target.restore_state(parent.state_snapshot())
+    day(parent)
+    day(target)
+    assert target.prices() == parent.prices()
+    assert target.forecast()["oil"] == parent.forecast()["oil"]
