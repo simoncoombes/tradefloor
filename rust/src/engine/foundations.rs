@@ -1997,14 +1997,39 @@ pub(crate) const OIL_FORECAST_PATHS_HELD: i64 = 5;
 
 /// The oil forecast's paths held between the closes that simulate them
 /// (`oil_forecast_path_law`): the close that simulated them and their mean
-/// growth at the start of each session after it. Not state: nothing
-/// snapshots, restores or hashes it, so a restored engine simulates afresh
-/// at its first close and its forecast can differ from the original's by
-/// the paths' Monte Carlo error until the original's next simulation.
+/// growth at the start of each session after it. Carried in the snapshot
+/// and the state hash (`oil_path_hold`) while it is `Some`, so a restored
+/// engine reads the same held paths as the original until the next close
+/// that simulates them.
 #[derive(Clone)]
 pub(crate) struct OilPathHold {
     day: i64,
     growth: Vec<f64>,
+}
+
+impl OilPathHold {
+    /// The hold as the snapshot and the state hash carry it: the close that
+    /// simulated the paths, then their mean growth at the start of each
+    /// session after it.
+    pub(crate) fn words(&self) -> Vec<f64> {
+        let mut w = Vec::with_capacity(1 + self.growth.len());
+        w.push(self.day as f64);
+        w.extend_from_slice(&self.growth);
+        w
+    }
+
+    /// The hold back from [`OilPathHold::words`].
+    pub(crate) fn from_words(w: &[f64]) -> Result<Self, String> {
+        let whole_day = |v: f64| (0.0..=9.0e15).contains(&v) && v.fract() == 0.0;
+        if w.len() < 2 || !whole_day(w[0]) || w[1..].iter().any(|g| !g.is_finite()) {
+            return Err(format!(
+                "this snapshot's oil_path_hold has {} numbers: it is the close that simulated \
+                 the oil forecast's paths (a whole day, 0 or more), then their mean growth at \
+                 the start of each session after it (one or more finite numbers)",
+                w.len()));
+        }
+        Ok(OilPathHold { day: w[0] as i64, growth: w[1..].to_vec() })
+    }
 }
 
 /// The paths the oil forecast simulates at a close

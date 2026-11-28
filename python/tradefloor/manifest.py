@@ -623,6 +623,9 @@ def state_hash(snapshot: dict[str, Any]) -> str:
          # The time-held fade's clock and the held VIX, only while
          # `market_vol_cycle_hold_onset` is set and a close has started it.
          "cycle_hold",
+         # The oil forecast's held paths, only while `oil_forecast_path_law`
+         # is set and a close has simulated them.
+         "oil_path_hold",
          # The index options and the surface's clock, only while
          # `surface_ssvi` is set, and the options' book once an agent has
          # traded one.
@@ -1139,6 +1142,20 @@ def state_hash(snapshot: dict[str, Any]) -> str:
             _f64(buf, tag)
             for value in _column(snapshot[name], width, name):
                 _f64(buf, value)
+    # The oil forecast's held paths (85), only while `oil_forecast_path_law`
+    # is set and a close has simulated them, behind their own tag,
+    # length-prefixed.
+    if "oil_path_hold" in snapshot:
+        raw = snapshot["oil_path_hold"]
+        if len(raw) % 8:
+            raise ValidationError(
+                f"snapshot field 'oil_path_hold' carries {len(raw)} bytes, which "
+                "is not a whole number of f64s.")
+        values = _column(raw, len(raw) // 8, "oil_path_hold")
+        _f64(buf, 85.0)
+        _u32(buf, len(values))
+        for value in values:
+            _f64(buf, value)
     # The index options and the surface's clock, only while `surface_ssvi` is
     # set, behind their own tag, length-prefixed; their book behind another
     # once an agent has traded an option.
@@ -1882,7 +1899,8 @@ _LEDGER_OPTIONAL_BUFFERS = ("fair_value_offset", "opening_z", "pending_fair_valu
                             "oil_target_drift", "core_trend", "eve_decision",
                             "spread_noise", "term_premium", "aggregate_level",
                             "aggregate_variance", "earnings_lookthrough",
-                            "cycle_hold", "options", "skew_noise", "name_options")
+                            "cycle_hold", "oil_path_hold", "options", "skew_noise",
+                            "name_options")
 
 #: The ``fundamentals`` block's buffers, one per company each.
 _LEDGER_FUNDAMENTALS = ("eps", "book_value_per_share", "revenue_growth")
