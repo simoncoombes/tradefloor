@@ -27,6 +27,11 @@ the default preset (`pt-v22` from this release, `pt-v21` from 0.10.0,
 [docs/SUPPORT.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/SUPPORT.md)
 lists what each digest covers.
 
+`pt-v22` lists index, rate and oil futures and options on every name. It is
+the default from this release, so a run that left `model` out on an earlier
+release gives a different market here. pt-v21 or any other shipped preset
+can be named:
+
 ```python
 eng = tf.Engine(seed=42, universe=u, model="pt-v10")
 ```
