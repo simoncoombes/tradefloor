@@ -1,8 +1,8 @@
 # Agents
 
 How an agent sees the market, how it is scored, and what the sandbox does
-and does not stop. The README has the short version; this page has the
-detail behind each warning there.
+and does not stop. The README links here for each of its warnings about
+agents, and this page has the measurement behind each one.
 
 ## The agent's view
 
@@ -144,6 +144,60 @@ it can reach the engine by walking the interpreter, and a read made that way
 leaves no trace. Run code you do not trust in a separate process, through the
 MCP server.
 
+## Evaluation across seeds
+
+`tf.evaluate` runs every entrant on one seeded market and returns a scorecard
+for each. `tf.rank` repeats that on many seeds. Every entrant meets the same
+market on each seed, so `ranking.separation` compares two of them seed by
+seed with an exact paired sign test:
+
+```python
+import tradefloor as tf
+
+universe = tf.Universe.random(20, seed=11)
+
+
+class BuyTheDip:
+    """Once a day, buy 100 shares of each name down 2% over five days."""
+
+    def act(self, obs):
+        if not obs.is_first_step_of_day:
+            return {}
+        orders = {}
+        for ticker in obs.tickers:
+            bars = obs.history.bars(ticker, last=6)
+            if len(bars) == 6 and bars[-1]["close"] < 0.98 * bars[0]["close"]:
+                orders[ticker] = 100
+        return orders
+
+
+def entrants():                      # called once per seed
+    return {
+        "dip": BuyTheDip(),
+        "momentum": tf.StrategySpec.momentum(lookback_days=1.0, top_k=5),
+        "buy_and_hold": tf.baselines.BuyAndHold(),
+    }
+
+
+ranking = tf.rank(entrants, seeds=range(6), universe=universe, days=10,
+                  history_days=5)
+print(ranking.report())
+test = ranking.separation("dip", "buy_and_hold")
+print(test["wins_a"], "wins in", test["paired_seeds"], "p =", test["p_value"])
+```
+
+```
+6 seeds on universe 8fe0af0e183f... under model pt-v22
+  buy_and_hold      the benchmark  median pnl       +6,073  wins 2/6
+  dip               vs buy_and_hold       -3,341 a seed  ahead 4/6  wins 4/6
+  momentum          vs buy_and_hold      -47,334 a seed  ahead 1/6  wins 0/6
+4 wins in 6 p = 0.6875
+```
+
+That run takes about twenty seconds of CPU. `dip` beat buy-and-hold on four
+of the six seeds, and the sign test gives that split a p-value of 0.69, so
+six seeds leave the two unseparated.
+
 ## Scoring
 
 Every `evaluate` and `rank` run starts at day 0, so a rule that needs 20
@@ -199,13 +253,21 @@ scored. So two frameworks can be compared on the same market.
 |---|---|
 | [Plain Python](https://github.com/simoncoombes/tradefloor/blob/main/examples/integrations/callable/five_days.py) | Generic callable |
 | [OpenAI Agents SDK](https://github.com/simoncoombes/tradefloor/blob/main/examples/integrations/openai_agents/five_days.py) | Adapter |
+| [Anthropic SDK (Claude)](https://github.com/simoncoombes/tradefloor/blob/main/examples/integrations/claude/five_days.py) | Adapter |
 | [PydanticAI](https://github.com/simoncoombes/tradefloor/blob/main/examples/integrations/pydantic_ai/rate_shock.py) | Adapter |
 | [LangGraph](https://github.com/simoncoombes/tradefloor/blob/main/examples/integrations/langgraph/rate_shock.py) | Adapter |
 | [FinRobot](https://github.com/simoncoombes/tradefloor/tree/main/examples/integrations/finrobot) | Existing integration |
 
 ```
-pip install "tradefloor[openai-agents]"   # or [pydantic-ai], or [langgraph]
+pip install "tradefloor[openai-agents]"   # or [claude], [pydantic-ai], or [langgraph]
 ```
+
+An agent also connects through the Gymnasium environment, shown in
+[`examples/05-training-an-agent.ipynb`](https://github.com/simoncoombes/tradefloor/blob/main/examples/05-training-an-agent.ipynb)
+and installed as `tradefloor[rl]`, and through the MCP server, described in
+[docs/MCP.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/MCP.md)
+and written in
+[`python/tradefloor/mcp.py`](https://github.com/simoncoombes/tradefloor/blob/main/python/tradefloor/mcp.py).
 
 A plain Python function needs no extra. FinRobot keeps the `finrobot` extra
 it has always had, and its section below covers the rate-shock experiment
@@ -246,8 +308,8 @@ effect size, and `externalities` does not aggregate across seeds.
 This runs a [FinRobot](https://github.com/AI4Finance-Foundation/FinRobot)
 agent in a controlled tradefloor market. It runs a shared history, checkpoints
 the world, forks it, raises rates by 200bps in one branch, and compares how
-the same agent responds. It is the README's rate-shock demo with the agent
-swapped and nothing else changed.
+the same agent responds. It is the rate-shock demo of `examples/rate-shock/` with the
+agent swapped and nothing else changed.
 
 ```bash
 git clone https://github.com/simoncoombes/tradefloor

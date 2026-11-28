@@ -27,8 +27,8 @@ held-out set of companies.
 
 The count is a verdict on figures pooled over the seeds, the median for
 each shape statistic. One seed's year often misses one or more of the 14
-shape statistics: on pt-v21, seeds 101 to 116 had all 14 in range on 8 of
-the 16, and one seed had 11 of 14. If you run one market per condition, read
+shape statistics: on pt-v21's seeds 101 to 116, all 14 were in range on 8
+of the 16, and one seed had 11 of 14. If you run one market per condition, read
 `tf.envelope.intervals()`, which gives each statistic's spread across seeds
 beside its range.
 
@@ -67,7 +67,16 @@ its statistics have a two-year range, and pt-v21 has all 15 inside.
 
 ### The long-run criteria
 
-The long-run criteria are 40 rows over 21 years. The check runs the market
+pt-v22's long-run criteria are 190 rows over 21 years, covering crash
+depth, how long fear lasts, bear markets per decade, the 2008 and 2020
+replays, the rate indices, the cost of size in the book, strategies built
+to find an edge, and the futures, options and margin
+([docs/MODEL.md](https://github.com/simoncoombes/tradefloor/blob/main/docs/MODEL.md)).
+pt-v22 meets all 190, read on 270 histories. Two more rows are shown for
+comparison and not counted.
+
+For pt-v20 and pt-v21 the long-run criteria are 40 rows over 21 years. The
+check runs the market
 for 21 years many times over and replays 2008 and 2020 with the real VIX.
 The first 15 rows compare what a user would notice with real markets: how
 deep crashes go, how long fear lasts, how often the VIX is above 30 or below
@@ -114,7 +123,9 @@ registered long-run rows on held-out seeds and graded on fresh ones. Many of
 the dials it keeps are pt-v19's, chosen with a scoring rule over 19
 statistics that overlaps the one-year table. So that table helped choose them and cannot also serve as a
 held-out test. The held-out checks are the fresh seeds and the fresh set of
-companies.
+companies. The one-year table helped choose many of the coefficients pt-v22
+keeps, so the held-out checks are the fresh seeds and the fresh set of
+companies the panel is repeated on.
 
 ### The shock flow behind every figure
 
