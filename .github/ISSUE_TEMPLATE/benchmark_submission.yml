@@ -1,5 +1,6 @@
 name: Benchmark submission
 description: Results from a benchmark run, offered for the public record
+labels: ["benchmark"]
 body:
   - type: markdown
     attributes:
