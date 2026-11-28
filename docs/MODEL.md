@@ -1598,7 +1598,12 @@ snapshot (`oil_path_hold`), so an engine restored between simulations reads
 the same paths. The start's law each simulation draws on is worked out once
 per process from the state it first forecasts on, as the cycle's age law is,
 so an engine restored in another process can leave the original's oil
-forecast at its next simulation by that law's sampling. `usd_mean_reversion` and
+forecast at its next simulation by that law's sampling. The start law's long
+run plays a copy of the engine taken at the first forecast close, whose
+companies keep that close's day return, so every close of the long run reads
+that one market return; `oil_path_law_zero_return` (0.0 on every shipped
+preset, refused without the path law) stands them at their close, so the
+long run reads a return of zero. `usd_mean_reversion` and
 `usd_noise_sd` set the dollar index's law (0.0 the standing 0.02 and 0.3): FRED's
 trade-weighted dollar (DTWEXM, 1987 to 2019) has an AR(1) half-life of 729
 sessions and a daily log change of 0.0043, so the dollar the oil curve carries

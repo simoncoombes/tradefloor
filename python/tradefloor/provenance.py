@@ -604,6 +604,12 @@ OUT_OF_SCOPE = {
         "is simulated); the paths draw from a generator of their own and "
         "the switch reads the forecast only, so the law moves no price at any "
         "value, and at 0.0 it is also left out of the model's digest",
+    "oil_path_law_zero_return":
+        "inert at 0.0: the start law's long-run copy keeps its companies as "
+        "taken (a branch on `!= 0.0`); refused without "
+        "`oil_forecast_path_law`, it changes only the start law the forecast's "
+        "paths draw on, so it moves no price at any value, and at 0.0 it is "
+        "also left out of the model's digest",
     "oil_target_drift_reversion":
         "inert at 0.0: no pull on the oil target's long factor (a branch on "
         "the dial), the arithmetic that stood. Read only with "

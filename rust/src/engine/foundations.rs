@@ -1626,6 +1626,14 @@ impl Engine {
         e.term_premium_key = crate::rng::age_law_key(self.term_premium_key);
         e.cycle_publication.key = crate::rng::age_law_key(self.cycle_publication.key);
         e.economy_alone = true;
+        // `oil_path_law_zero_return`: the copy's companies stand at their
+        // close, so every close of the long run reads a market day return of
+        // zero rather than the one the copy was taken on.
+        if self.params.oil_path_law_zero_return != 0.0 {
+            for c in e.companies.iter_mut() {
+                c.stock.previous_close = c.stock.price;
+            }
+        }
         // The absolute clocks move with the days, as the burn-in's do.
         let shift = CYCLE_AGE_LAW_ORIGIN - day;
         e.central_bank.next_meeting_date += shift * 24 * 60;

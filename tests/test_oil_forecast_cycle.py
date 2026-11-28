@@ -9,6 +9,7 @@ at the forecast, are what move.
 from __future__ import annotations
 
 
+import pytest
 import tradefloor as tf
 
 UNIVERSE = tf.Universe.random(8, seed=5)
@@ -104,3 +105,39 @@ def test_the_held_paths_are_carried_only_with_the_switch_on():
         for _ in range(3):
             day(e)
         assert "oil_path_hold" not in e.state_snapshot()
+
+
+#: The path law's start fixes (v23 step 4c): each a switch that needs the path
+#: law and changes only the start law its paths draw on.
+START_FIXES = ("oil_path_law_zero_return",)
+
+
+@pytest.mark.parametrize("name", START_FIXES)
+def test_a_start_fix_is_off_on_every_shipped_preset_and_silent_in_the_digest(name):
+    for preset in tf.preset_names():
+        assert getattr(tf.ModelParams.from_preset(preset), name) == 0.0, preset
+    assert name in set(tf.ModelParams.digest_silent_at_zero())
+    assert model(**{name: 0.0}).fingerprint == "pt-v21"
+
+
+@pytest.mark.parametrize("name", START_FIXES)
+def test_a_start_fix_is_refused_without_the_path_law(name):
+    with pytest.raises(tf.ValidationError, match=name):
+        model(**ON, **{name: 1.0})
+
+
+@pytest.mark.parametrize("name", START_FIXES)
+def test_a_start_fix_moves_no_price_and_no_economy_and_only_the_forecasts_oil(name):
+    law = tf.Engine(seed=11, universe=UNIVERSE, model=model(**ON, oil_forecast_path_law=1.0))
+    fixed = tf.Engine(seed=11, universe=UNIVERSE, model=model(**ON, oil_forecast_path_law=1.0, **{name: 1.0}))
+    moved = 0.0
+    for _ in range(12):
+        day(law)
+        day(fixed)
+        assert fixed.prices() == law.prices()
+        assert repr(fixed.economy()) == repr(law.economy())
+        a, b = law.forecast(), fixed.forecast()
+        for k in ("index_variance", "policy_rate"):
+            assert a[k] == b[k], k
+        moved = max(moved, abs(a["oil"][-1] - b["oil"][-1]))
+    assert moved > 0.0
