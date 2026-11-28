@@ -386,7 +386,7 @@ sections above:
 
 ### Examples
 
-The twelve numbered [`examples/`](https://github.com/simoncoombes/tradefloor/tree/main/examples) are in reading order, and the test suite runs them:
+The thirteen numbered [`examples/`](https://github.com/simoncoombes/tradefloor/tree/main/examples) are in reading order, and the test suite runs them:
 
 | | |
 |---|---|
@@ -402,6 +402,7 @@ The twelve numbered [`examples/`](https://github.com/simoncoombes/tradefloor/tre
 | [`09-a-pandemic-shaped-market`](https://github.com/simoncoombes/tradefloor/blob/main/examples/09-a-pandemic-shaped-market.ipynb) | A real 2020-21 macro path, and which fields transmit. Pinned to `pt-v12`, whose QE channel carries the valuation path, with the same path on `pt-v21`, the default until 0.10.2, at the end |
 | [`10-forking-a-market`](https://github.com/simoncoombes/tradefloor/blob/main/examples/10-forking-a-market.py) | Fork a market, raise the rate in one branch, and compare the futures |
 | [`11-scenario-fork.py`](https://github.com/simoncoombes/tradefloor/blob/main/examples/11-scenario-fork.py) | A scenario file applied to one branch of a fork, and what it cost |
+| [`12-ai-vs-traditional`](https://github.com/simoncoombes/tradefloor/blob/main/examples/12-ai-vs-traditional.ipynb) | A recorded Claude run beside buy-and-hold, momentum, mean reversion, random and the Oracle on one market, from `08-claude-agent.py` |
 
 The [`rate-shock/`](https://github.com/simoncoombes/tradefloor/tree/main/examples/rate-shock)
 study is the demo under Forking a market, and
