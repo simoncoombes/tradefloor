@@ -1144,6 +1144,10 @@ def _nothing_dormant():
                    # works out the start's law once, so the restored engine's
                    # next simulation draws on the same law as the copy's.
                    oil_forecast_path_law=1.0,
+                   # The path law's start fixes, switches that need it; on, so
+                   # the start's laws they read are restored with it.
+                   oil_path_law_zero_return=1.0,
+                   oil_path_law_belief_start=1.0,
                    # The bank's and the curve's core inflation: switches,
                    # and both on so the oil part of headline is carried.
                    fed_core_inflation=1.0,
