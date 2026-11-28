@@ -1405,6 +1405,43 @@ impl MarketVarianceState {
         (target, Some(slow_target))
     }
 
+    /// The close on a pinned session under `pinned_vix_variance_map`: the
+    /// same bookkeeping as [`Self::close_day_forced`] (the smoothed VIX, the
+    /// return memories, the day accumulator), with both components set to a
+    /// variance the engine solved for instead of the law's target at the
+    /// VIX. `variance` is clamped as every forced close clamps.
+    ///
+    /// Read only when the map is set, so no free close and no forced close
+    /// on a preset without it goes through this function.
+    pub fn close_day_forced_to(
+        &mut self,
+        params: &crate::params::ModelParams,
+        vix: f64,
+        variance: f64,
+    ) -> (f64, Option<f64>) {
+        if params.market_vol_vix_smooth != 0.0 {
+            let alpha = 2.0 / (params.market_vol_vix_smooth + 1.0);
+            let prev = self.smoothed_vix.unwrap_or(vix);
+            self.smoothed_vix = Some(prev + alpha * (vix - prev));
+        }
+        if params.market_vol_leverage != 0.0 {
+            self.step_leverage_memory(params);
+        }
+        if params.market_vol_leverage_fast != 0.0 {
+            self.step_leverage_fast_memory(params);
+        }
+        self.prev_day_factor = self.day_factor;
+        self.day_factor = 0.0;
+        let v = clamp_variance(params, variance);
+        self.variance = v;
+        self.fast_variance = v;
+        if params.market_vol_slow_weight == 0.0 {
+            return (v, None);
+        }
+        self.slow_variance = v;
+        (v, Some(v))
+    }
+
     /// Warm the variance components to the slow LEVEL the run opens on,
     /// before session one.
     ///

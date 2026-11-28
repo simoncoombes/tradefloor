@@ -1589,6 +1589,10 @@ PERTURBATIONS = [
     ("corporate_spread_noise_sd", 0.025, True),
     # INERT: read only by a VIX pin; the probe pins nothing.
     ("pinned_vix_sets_variance", 1.0, False),
+    # INERT: both read only on a forced close of a pinned VIX, and the probe
+    # pins nothing; tests/test_pinned_vix_variance_map.py holds the mechanism.
+    ("pinned_vix_variance_map", 0.263, False),
+    ("pinned_vix_variance_map_exponent", 2.687, False),
     # INERT: read only by a VIX pin; the probe pins nothing.
     ("pinned_vix_return", 0.005375, False),
     # INERT: the half-life alone is read by nothing (the sd is 0).

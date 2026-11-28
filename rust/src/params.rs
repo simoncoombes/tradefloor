@@ -3083,6 +3083,33 @@ pub struct ModelParams {
     /// variance (corr -0.78 / -0.85, slope -0.31 / -0.35 on the log change).
     /// Read only with `pinned_vix_feedback` on. In [0, 1]. pt-v21 ships 0.7.
     pub pinned_vix_variance_share: f64,
+    /// The market-factor variance a FORCED close writes on a pinned VIX,
+    /// as a share of the VIX's own variance at a VIX of 20 (the tape's
+    /// `rho`, `E[r^2] x 252 / (VIX / 100)^2` on the next session's index
+    /// return). 0.0, every preset, is off: a forced close writes the
+    /// variance law's target at that VIX (`market_vol_vix_exponent`,
+    /// `_coupling`), the level the free model is pulled toward rather than
+    /// the variance the VIX implies, and a pinned session's index variance
+    /// then reads 2.2 to 2.9 times the tape's beyond the move the VIX
+    /// carries (2008 and 2020 replays, desk seeds 1-12). Above zero the
+    /// close solves for the factor variance at which the index's own
+    /// conditional variance (`Engine::index_conditional_variance_terms_at`,
+    /// every term as it stands tonight) equals
+    /// `rho(VIX) x (VIX / 100)^2 / 252`, with
+    /// `rho(VIX) = map x (VIX / 20)^(exponent - 2)`, and writes it to both
+    /// components, clamped as the forced close clamps. Free sessions never
+    /// read it. Tape (S&P 500 and the Cboe VIX close, 1990-2025, 9,062
+    /// days, the next session's return on today's VIX): the part of the
+    /// return beyond the VIX's own move reads 0.263 (se 0.015) at 20 with
+    /// exponent 2.327 (se 0.190); the whole return 0.617 (se 0.026) with
+    /// exponent 2.687 (se 0.100). In [0, 4]; 0 is off.
+    pub pinned_vix_variance_map: f64,
+    /// The exponent of `pinned_vix_variance_map`'s power law,
+    /// `E[r^2] ~ VIX^exponent`. Read only with the map set. Its default,
+    /// 2.327, is the tape's fit for the part of the return beyond the
+    /// VIX's own move (se 0.190), and while it holds that default it is
+    /// left out of the model's digest. In [1, 6].
+    pub pinned_vix_variance_map_exponent: f64,
     /// The VIX level from which a PINNED VIX is priced below the knee
     /// (`pinned_vix_calm_share`). 0.0, which every preset through pt-v20
     /// carries, is none: a pin is priced only on its excess over
@@ -9682,6 +9709,8 @@ impl ModelParams {
             earnings_lookthrough_discount_half_life: 0.0,
             pinned_vix_feedback: 0.0,
             pinned_vix_variance_share: 0.0,
+            pinned_vix_variance_map: 0.0,
+            pinned_vix_variance_map_exponent: 2.327,
             pinned_vix_calm_knee: 0.0,
             pinned_vix_calm_share: 0.0,
             pinned_vix_priced_cap: 0.0,
@@ -12644,6 +12673,8 @@ impl ModelParams {
             "earnings_lookthrough_discount_half_life" => self.earnings_lookthrough_discount_half_life,
             "pinned_vix_feedback" => self.pinned_vix_feedback,
             "pinned_vix_variance_share" => self.pinned_vix_variance_share,
+            "pinned_vix_variance_map" => self.pinned_vix_variance_map,
+            "pinned_vix_variance_map_exponent" => self.pinned_vix_variance_map_exponent,
             "pinned_vix_calm_knee" => self.pinned_vix_calm_knee,
             "pinned_vix_calm_share" => self.pinned_vix_calm_share,
             "pinned_vix_priced_cap" => self.pinned_vix_priced_cap,
@@ -13138,6 +13169,8 @@ impl ModelParams {
             "earnings_lookthrough_discount_half_life" => out.earnings_lookthrough_discount_half_life = value,
             "pinned_vix_feedback" => out.pinned_vix_feedback = value,
             "pinned_vix_variance_share" => out.pinned_vix_variance_share = value,
+            "pinned_vix_variance_map" => out.pinned_vix_variance_map = value,
+            "pinned_vix_variance_map_exponent" => out.pinned_vix_variance_map_exponent = value,
             "pinned_vix_calm_knee" => out.pinned_vix_calm_knee = value,
             "pinned_vix_calm_share" => out.pinned_vix_calm_share = value,
             "pinned_vix_priced_cap" => out.pinned_vix_priced_cap = value,
@@ -13902,6 +13935,16 @@ impl ModelParams {
             return Err(format!(
                 "pinned_vix_variance_share is {}. It is the most of a session's market-factor variance a pinned VIX's priced move may take, in [0, 1].",
                 self.pinned_vix_variance_share));
+        }
+        if !(self.pinned_vix_variance_map >= 0.0 && self.pinned_vix_variance_map <= 4.0) {
+            return Err(format!(
+                "pinned_vix_variance_map is {}. It is the variance a forced close writes on a pinned VIX, as a share of the VIX's own variance at a VIX of 20, in [0, 4]; 0 is off.",
+                self.pinned_vix_variance_map));
+        }
+        if !(self.pinned_vix_variance_map_exponent >= 1.0 && self.pinned_vix_variance_map_exponent <= 6.0) {
+            return Err(format!(
+                "pinned_vix_variance_map_exponent is {}. It is the exponent of the pinned variance map's power law in the VIX, in [1, 6].",
+                self.pinned_vix_variance_map_exponent));
         }
         if !(self.pinned_vix_calm_knee >= 0.0 && self.pinned_vix_calm_knee <= 200.0) {
             return Err(format!(
@@ -16005,6 +16048,7 @@ pub const DIGEST_SILENT_AT_ZERO: &[&str] = &[
     "pinned_vix_sets_variance",
     "pinned_vix_return",
     "pinned_vix_variance_share",
+    "pinned_vix_variance_map",
     "policy_anticipation",
     "policy_anticipation_cut_share",
     "rate_close_remark",
@@ -16159,8 +16203,9 @@ pub(crate) fn digests_taken() -> u64 {
 /// their defaults, which are not 0.0.
 ///
 /// Each is read only while a switch in [`DIGEST_SILENT_AT_ZERO`] is set
-/// (`fed_stress_cut`, `dividend_payout_share` or
-/// `forecast_policy_reversion`), so at its default with
+/// (`fed_stress_cut`, `dividend_payout_share`,
+/// `forecast_policy_reversion` or `pinned_vix_variance_map`), so at its
+/// default with
 /// that switch off it is the model that existed before it, and with the
 /// switch on the default is the value the switch was built and measured
 /// with. Off its default each enters the digest as every other dial does.
@@ -16171,6 +16216,7 @@ pub const DIGEST_SILENT_AT_DEFAULT: &[(&str, f64)] = &[
     ("dividend_adjustment_speed", 0.4),
     ("dividend_yield_ceiling", 2.0),
     ("forecast_policy_neutral", 2.5),
+    ("pinned_vix_variance_map_exponent", 2.327),
 ];
 
 /// The settable names, sorted. A function rather than the const above so
@@ -16466,6 +16512,8 @@ pub fn settable_names() -> Vec<&'static str> {
         "earnings_lookthrough_discount_half_life",
         "pinned_vix_feedback",
         "pinned_vix_variance_share",
+        "pinned_vix_variance_map",
+        "pinned_vix_variance_map_exponent",
         "pinned_vix_calm_knee",
         "pinned_vix_calm_share",
         "pinned_vix_priced_cap",

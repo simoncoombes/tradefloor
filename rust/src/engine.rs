@@ -7316,6 +7316,46 @@ impl Engine {
     /// the floor and the ceiling. Found by bisection on those bounds. If the
     /// bracket does not hold -- no shipped preset reaches that -- the free
     /// close's denominator is returned, which is the free law's reading.
+    /// The factor variance a forced close writes under
+    /// `pinned_vix_variance_map`: the `v` at which the index's conditional
+    /// variance, every other term as it stands tonight, equals the tape's
+    /// map at the pinned VIX,
+    /// `map x (VIX / 20)^(exponent - 2) x (VIX / 100)^2 / 252`.
+    ///
+    /// `index_conditional_variance_terms_at(v).total()` rises with `v` (it
+    /// is what `forced_vix_denominator`'s read-back inverts), so the root is
+    /// unique and found by bisection between the floor and the ceiling the
+    /// forced close clamps to. A target under the floor's total gives the
+    /// floor, and one over the ceiling's total gives the ceiling: there the
+    /// index's terms other than the factor already carry more, or less,
+    /// than the map asks, and the clamp is the close's own.
+    fn pinned_vix_mapped_variance(&self) -> f64 {
+        let p = &self.params;
+        let vix = self.economy.vix;
+        let rho = p.pinned_vix_variance_map
+            * crate::mathx::pow(vix / 20.0, p.pinned_vix_variance_map_exponent - 2.0);
+        let target = rho * (vix / 100.0) * (vix / 100.0) / 252.0;
+        let base = p.market_factor_sigma * p.market_factor_sigma;
+        let mut lo = base * p.market_vol_floor_multiple;
+        let mut hi = base * p.market_vol_ceiling_multiple;
+        let total = |v: f64| self.index_conditional_variance_terms_at(v).total();
+        if total(lo) >= target {
+            return lo;
+        }
+        if total(hi) <= target {
+            return hi;
+        }
+        for _ in 0..80 {
+            let mid = 0.5 * (lo + hi);
+            if total(mid) < target {
+                lo = mid;
+            } else {
+                hi = mid;
+            }
+        }
+        0.5 * (lo + hi)
+    }
+
     fn forced_vix_denominator(&self, free_denominator: f64, level: f64) -> f64 {
         if self.params.market_vol_vix_excursion == 0.0 {
             return free_denominator;
@@ -8947,14 +8987,23 @@ impl Engine {
         };
         self.last_market_targets = Some(if self.vix_sets_variance_pending {
             self.vix_sets_variance_pending = false;
-            let denominator =
-                self.forced_vix_denominator(vix_ratio_denominator, market_vol_level);
-            self.market_vol.close_day_forced(
-                &self.params,
-                denominator,
-                self.economy.vix,
-                market_vol_level,
-            )
+            if self.params.pinned_vix_variance_map != 0.0 {
+                // `pinned_vix_variance_map`: the variance the index's own
+                // identity needs to read the tape's map at this VIX, in
+                // place of the law's target. A branch, so a preset without
+                // the map takes the close below, unchanged.
+                let v = self.pinned_vix_mapped_variance();
+                self.market_vol.close_day_forced_to(&self.params, self.economy.vix, v)
+            } else {
+                let denominator =
+                    self.forced_vix_denominator(vix_ratio_denominator, market_vol_level);
+                self.market_vol.close_day_forced(
+                    &self.params,
+                    denominator,
+                    self.economy.vix,
+                    market_vol_level,
+                )
+            }
         } else {
             self.market_vol.close_day_scaled(
                 &self.params,
@@ -15957,6 +16006,58 @@ mod tests {
                 short_interest: 0.0,
                 float: 1e8,
             },
+        }
+    }
+
+    /// `pinned_vix_variance_map`: the forced close's variance is the root
+    /// of the index identity against the tape's map, or the clamp when the
+    /// identity's other terms alone already pass the map (the floor) or the
+    /// factor cannot reach it (the ceiling).
+    #[test]
+    fn the_pinned_variance_map_solves_the_identity_for_the_tapes_map() {
+        let params = crate::params::PT_V22
+            .with_override("pinned_vix_variance_map", 0.263)
+            .unwrap();
+        let mut e = Engine::with_params(
+            7,
+            vec![company("A", 100.0), company("B", 50.0), company("C", 220.0)],
+            create_initial_economy_state(&InitialEconomyOptions::default()),
+            create_initial_central_bank_state(0),
+            sectors(),
+            params.clone(),
+        );
+        let base = params.market_factor_sigma * params.market_factor_sigma;
+        let (floor, ceiling) = (
+            base * params.market_vol_floor_multiple,
+            base * params.market_vol_ceiling_multiple,
+        );
+        let mut solved = 0;
+        for vix in [12.0, 20.0, 30.0, 45.0, 80.0] {
+            e.economy.vix = vix;
+            let v = e.pinned_vix_mapped_variance();
+            let rho = 0.263 * crate::mathx::pow(vix / 20.0, 2.327 - 2.0);
+            let target = rho * (vix / 100.0) * (vix / 100.0) / 252.0;
+            let total = e.index_conditional_variance_terms_at(v).total();
+            assert!(v >= floor && v <= ceiling, "vix {vix}: {v} outside the clamp");
+            if v == floor {
+                assert!(total >= target, "vix {vix}: floor read {total} under {target}");
+            } else if v == ceiling {
+                assert!(total <= target, "vix {vix}: ceiling read {total} over {target}");
+            } else {
+                assert!((total - target).abs() <= 1e-12 * target, "vix {vix}: {total} vs {target}");
+                solved += 1;
+            }
+        }
+        assert!(solved >= 2, "the identity was solved at only {solved} of five VIX levels");
+    }
+
+    /// At 0.0 the forced close is the one that stood: the map is not read.
+    #[test]
+    fn the_pinned_variance_map_is_off_on_every_shipped_preset() {
+        for name in crate::params::ModelParams::preset_names() {
+            let p = crate::params::ModelParams::preset(name).unwrap();
+            assert_eq!(p.pinned_vix_variance_map, 0.0, "{name}");
+            assert_eq!(p.pinned_vix_variance_map_exponent, 2.327, "{name}");
         }
     }
 
