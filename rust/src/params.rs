@@ -14961,7 +14961,7 @@ impl ModelParams {
         }
         if self.oil_path_law_zero_return != 0.0 && self.oil_forecast_path_law == 0.0 {
             return Err(
-                "oil_path_law_zero_return is 1 and oil_forecast_path_law is 0. It changes the path \
+                "oil_path_law_zero_return is 1 but oil_forecast_path_law is 0. It changes the path \
                  law's start, so it needs oil_forecast_path_law at 1."
                     .to_string());
         }
@@ -14974,7 +14974,7 @@ impl ModelParams {
         }
         if self.oil_path_law_belief_start != 0.0 && self.oil_forecast_path_law == 0.0 {
             return Err(
-                "oil_path_law_belief_start is 1 and oil_forecast_path_law is 0. It changes the path \
+                "oil_path_law_belief_start is 1 but oil_forecast_path_law is 0. It changes the path \
                  law's start, so it needs oil_forecast_path_law at 1."
                     .to_string());
         }
