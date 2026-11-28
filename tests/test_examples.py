@@ -264,9 +264,15 @@ RUN_BY: dict[str, str] = {
         "test_examples.py::test_the_forking_demo_runs_end_to_end",
     "11-scenario-fork.py":
         "test_examples.py::test_the_scenario_fork_runs_end_to_end",
+    "ci-selftest/baseline.py":
+        "test_ci.py::test_the_self_test_agents_hold_one_threshold_and_breach_the_other",
+    "ci-selftest/candidate.py":
+        "test_ci.py::test_the_self_test_agents_hold_one_threshold_and_breach_the_other",
     "experiments/liquidity-crisis/experiment.py":
         "test_examples.py::"
         "test_the_liquidity_crisis_study_replays_its_recording",
+    "fork-futures/fork_futures.py":
+        "test_fork_futures.py::test_the_study_reruns_to_the_same_bytes",
     "integrations/callable/five_days.py":
         "test_integration_examples.py::test_the_table_matches_a_real_run",
     "integrations/claude/five_days.py":
@@ -798,13 +804,20 @@ def test_the_liquidity_crisis_data_agrees_with_itself():
 #: 37.6 s and 0.6 s, and 10 and 11 under a second each. Before the first
 #: measurement the pages gave the rate-shock demo "about a second" in one
 #: place and "two seconds" in another, and 07 "ten to twenty seconds".
+#: Re-measured at 0.11.0 on a 10-core Mac (4 performance cores) at 1-minute
+#: load under 10: the rate-shock demo 2.9 and 3.0 s; 07 206 s user and 1 s
+#: system over 47.6 s wall, since its sweep runs eight workers, so the
+#: "about forty seconds of CPU" it carried was its wall time; fork-futures
+#: 7.0, 7.5 and 11.7 s user in three runs.
 CPU_CLAIMS = {
     "examples/README.md": ("under five seconds of CPU",
-                           "07-research-workflow.py` takes about forty seconds",
+                           "07-research-workflow.py` takes about 200 seconds of CPU",
                            "rate_shock.py` takes about a second"),
     "examples/rate-shock/README.md": ("under five seconds of CPU",),
     "examples/rate-shock/counterfactual.py": ("under five seconds of CPU",),
-    "examples/07-research-workflow.py": ("about forty seconds of CPU",),
+    "examples/07-research-workflow.py": ("about 200 seconds of CPU",),
+    "examples/fork-futures/README.md": ("seven to twelve seconds of CPU",),
+    "examples/fork-futures/fork_futures.py": ("seven to twelve seconds of CPU",),
     "examples/integrations/finrobot/README.md": ("about a second of CPU",),
 }
 
@@ -813,7 +826,8 @@ CPU_CLAIMS = {
 STALE_TIMINGS = ("in about a second", "runs in about a second",
                  "Two seconds, no keys", "ten to twenty seconds",
                  "each run in about a second", "0.7 seconds",
-                 "about two minutes", "under ten seconds")
+                 "about two minutes", "under ten seconds",
+                 "about forty seconds", "about five seconds of CPU")
 
 
 @pytest.mark.parametrize("page", sorted(CPU_CLAIMS))

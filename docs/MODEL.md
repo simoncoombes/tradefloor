@@ -5099,9 +5099,9 @@ other rate keeps a floor of -5% (`units.rs:52-92`). US real GDP fell 7.4%
 year on year to 2020Q2 and 10.0% annualised in 1958Q1 (FRED GDPC1). The
 macro step's own clip was already -10.
 
-Seven scenarios ship: `curve_shock`, `geopolitical_conflict`,
-`liquidity_crisis`, `oil_price_spike`, `policy_regime_shift`, `rate_shock`
-and `recession`. Two were recalibrated on pt-v20, on the certified roster
+Eight scenarios ship: `curve_shock`, `geopolitical_conflict`,
+`liquidity_crisis`, `oil_price_spike`, `policy_regime_shift`, `rate_shock`,
+`recession` and `recession_2008`. Two were recalibrated on pt-v20, on the certified roster
 over seeds 301 to 330, and are measured again on the graded arm, paired
 against the same seed with no scenario (box ptv20g6):
 
@@ -5109,9 +5109,12 @@ against the same seed with no scenario (box ptv20g6):
 - `liquidity_crisis`, to March 2020's speed: book depth times 0.4 and the VIX times 3.5 for 25 sessions, credit +50 bp, earnings times 0.85. The index falls 19.8% in 21 sessions and 14.0% by 63, then recovers (10.0% and 14.8% before the graded arm).
 - `curve_shock` is new: the policy rate, both Treasury yields and the corporate yield up 200 bp on day 50. On `Universe.random(20, seed=101, bonds=True)` the 10-year index falls 15.4% on the day and the median stock 3.9% by day 120, measured before the graded arm.
 
-The other four files record effect sizes measured before pt-v20.
+`geopolitical_conflict`, `oil_price_spike`, `policy_regime_shift` and
+`rate_shock` record effect sizes measured before pt-v20. `recession_2008`
+shipped in 0.11.0 and dates each leg of the 2007-09 recession to its real
+month on the NBER's phases; `recession` is kept as it was.
 
-Reshaped versions of six of them are kept as candidates in
+Reshaped versions of six of the first seven are kept as candidates in
 `tools/calibration/scenario_candidates/` (`*_r21.yml`) and do not ship.
 Written in r13, they move credit on `macro.corporate_spread` or as an
 impulse the chain carries, since a held level freezes the corporate yield
